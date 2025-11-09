@@ -27,6 +27,7 @@ This document outlines best practices for developing and maintaining this FastAP
 16. [Distributed Tracing (OpenTelemetry)](#distributed-tracing-opentelemetry)
 17. [External Authentication](#external-authentication)
 18. [Resilience Patterns](#resilience-patterns)
+19. [Settings Management (Pydantic Settings v2)](#settings-management-pydantic-settings-v2)
 
 ---
 
@@ -1344,6 +1345,334 @@ async with asyncio.timeout(10.0):
 async with asyncio.timeout(2.0):
     await cache.get(key)
 ```
+
+---
+
+## Settings Management (Pydantic Settings v2)
+
+### Modular Settings Architecture
+
+**✅ DO:** Organize settings by domain with clear prefixes
+```python
+# core/settings/app.py - Application settings
+class AppSettings(BaseSettings):
+    service_name: str = "example-service"
+    debug: bool = False
+    cors_origins: list[str] = Field(default_factory=list)
+
+    model_config = SettingsConfigDict(
+        env_prefix="APP_",
+        env_file=".env",
+        frozen=True,  # Immutable
+    )
+
+# core/settings/postgres.py - Database settings
+class PostgresSettings(BaseSettings):
+    database_url: PostgresDsn | None = None
+    pool_size: int = Field(default=10, ge=1, le=100)
+    password: SecretStr | None = None  # Use SecretStr for sensitive fields
+
+    model_config = SettingsConfigDict(
+        env_prefix="DB_",
+        frozen=True,
+    )
+```
+
+**❌ DON'T:** Put all settings in one mega-class
+```python
+# Anti-pattern: Hard to maintain, test, and understand
+class Settings(BaseSettings):
+    # App settings
+    service_name: str
+    debug: bool
+    # DB settings
+    database_url: str
+    pool_size: int
+    # Cache settings
+    redis_url: str
+    # ... 50 more fields ...
+```
+
+### LRU-Cached Settings Loaders
+
+**✅ DO:** Use LRU cache for settings access
+```python
+# core/settings/loader.py
+from functools import lru_cache
+
+@lru_cache(maxsize=1)
+def get_app_settings() -> AppSettings:
+    return AppSettings()
+
+@lru_cache(maxsize=1)
+def get_db_settings() -> PostgresSettings:
+    return PostgresSettings()
+
+# Usage in your code
+from example_service.core.settings import get_app_settings
+
+settings = get_app_settings()  # Loaded once, cached forever
+```
+
+**Why LRU cache:**
+- Settings loaded and validated once at startup
+- Subsequent access is O(1) without re-parsing files/env
+- No repeated file I/O or environment variable lookups
+- Perfect for immutable configuration
+
+### Settings in FastAPI Dependencies
+
+**✅ DO:** Use settings in FastAPI app factory
+```python
+# app/main.py
+from example_service.core.settings import get_app_settings
+
+def create_app() -> FastAPI:
+    settings = get_app_settings()
+
+    app = FastAPI(
+        title=settings.title,
+        version=settings.version,
+        debug=settings.debug,
+        docs_url=settings.get_docs_url(),  # None if disabled
+        root_path=settings.root_path,
+    )
+    return app
+```
+
+**✅ DO:** Use settings in lifespan for resource initialization
+```python
+# app/lifespan.py
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db_settings = get_db_settings()
+    redis_settings = get_redis_settings()
+
+    # Initialize resources based on settings
+    if db_settings.is_configured:
+        await init_database()
+
+    if redis_settings.is_configured:
+        await start_cache()
+
+    yield
+
+    # Cleanup
+    if redis_settings.is_configured:
+        await stop_cache()
+```
+
+### Frozen Settings for Immutability
+
+**✅ DO:** Always freeze settings models
+```python
+class AppSettings(BaseSettings):
+    service_name: str = "example-service"
+
+    model_config = SettingsConfigDict(
+        frozen=True,  # Makes settings immutable
+    )
+
+# Attempts to modify will raise an error
+settings = get_app_settings()
+settings.service_name = "new-name"  # ❌ ValidationError!
+```
+
+**Why frozen:**
+- Settings are configuration, not state
+- Prevents accidental mutation
+- Clear separation: config vs runtime state
+- Prefer restarting over hot-reloading in production
+
+### Secrets Management
+
+**✅ DO:** Use `SecretStr` for sensitive fields
+```python
+from pydantic import SecretStr
+
+class PostgresSettings(BaseSettings):
+    database_url: PostgresDsn
+    password: SecretStr | None = None
+
+# SecretStr prevents accidental logging
+settings = get_db_settings()
+print(settings.password)  # Shows '**********' not actual value
+print(settings.password.get_secret_value())  # Gets actual value when needed
+```
+
+**✅ DO:** Never log secrets
+```python
+# ❌ Bad: Logs secrets
+logger.info(f"Settings: {settings.model_dump()}")
+
+# ✅ Good: Exclude secrets
+logger.info(
+    "Settings loaded",
+    extra={
+        "service": settings.service_name,
+        "debug": settings.debug,
+        # Don't log passwords, tokens, etc.
+    }
+)
+```
+
+### Optional YAML/conf.d Sources
+
+**✅ DO:** Provide optional YAML support for complex local dev setups
+```python
+# core/settings/sources.py
+def _load_yaml(path: Path) -> dict[str, Any]:
+    if not path.exists() or yaml is None:
+        return {}
+    return yaml.safe_load(path.read_text()) or {}
+
+def app_source() -> dict[str, Any]:
+    base = Path(os.getenv("APP_CONFIG_DIR", "conf"))
+    return {
+        **_load_yaml(base / "app.yaml"),
+        **_load_conf_d(base / "app.d")
+    }
+
+# In settings class
+class AppSettings(BaseSettings):
+    @classmethod
+    def settings_customise_sources(cls, settings_cls, init, env, dotenv, secrets):
+        def files_source(_):
+            return app_source()
+        # Precedence: init > files > env > dotenv > secrets
+        return (init, files_source, env, dotenv, secrets)
+```
+
+**⚠️ BEWARE:** YAML files are optional; environment variables should be primary
+```python
+# ✅ Production: Environment variables
+export DB_DATABASE_URL=postgresql+psycopg://...
+export REDIS_REDIS_URL=redis://...
+
+# ✅ Development: .env file
+DB_DATABASE_URL=postgresql+psycopg://localhost/db
+
+# ⚠️ Optional: YAML files (not recommended for most projects)
+conf/db.yaml  # Only if you have a specific need
+```
+
+### Configuration Precedence
+
+**Understand the order** (highest to lowest priority):
+1. **Init kwargs** (testing/overrides): `AppSettings(debug=True)`
+2. **YAML/conf.d files** (optional, local dev only)
+3. **Environment variables** (production - **recommended**)
+4. **.env file** (development only)
+5. **secrets_dir** (Kubernetes/Docker secrets)
+
+### Testing with Settings
+
+**✅ DO:** Clear caches and override in tests
+```python
+# conftest.py
+import pytest
+from example_service.core.settings.loader import (
+    get_app_settings,
+    clear_all_caches,
+)
+from example_service.core.settings.app import AppSettings
+
+@pytest.fixture(autouse=True)
+def reset_settings():
+    """Clear settings cache before each test."""
+    yield
+    clear_all_caches()
+
+@pytest.fixture
+def test_settings():
+    """Provide test settings."""
+    return AppSettings(
+        service_name="test-service",
+        debug=True,
+        database_url="postgresql+psycopg://localhost/test_db",
+    )
+
+# Test with override
+def test_with_custom_settings(test_settings):
+    get_app_settings.cache_clear()
+    # Use test_settings instead
+    assert test_settings.debug is True
+```
+
+### Kubernetes/Docker Configuration
+
+**✅ DO:** Inject settings via environment variables
+```yaml
+# deployment.yaml
+env:
+  # Non-secret config from ConfigMap
+  - name: APP_SERVICE_NAME
+    valueFrom:
+      configMapKeyRef:
+        name: app-config
+        key: SERVICE_NAME
+
+  # Secrets from Secret resource
+  - name: DB_DATABASE_URL
+    valueFrom:
+      secretKeyRef:
+        name: db-credentials
+        key: DATABASE_URL
+
+  - name: REDIS_REDIS_URL
+    valueFrom:
+      secretKeyRef:
+        name: redis-credentials
+        key: REDIS_URL
+```
+
+**❌ DON'T:** Mount config files in Kubernetes
+```yaml
+# Anti-pattern: Avoid mounting .env or YAML files in K8s
+volumes:
+  - name: config
+    configMap:
+      name: app-config-file  # ❌ Don't do this
+```
+
+### Settings Validation
+
+**✅ DO:** Use Pydantic validators for complex validation
+```python
+from pydantic import field_validator, model_validator
+
+class AppSettings(BaseSettings):
+    cors_origins: list[str] = Field(default_factory=list)
+    environment: str = "development"
+
+    @field_validator("environment")
+    @classmethod
+    def validate_environment(cls, v: str) -> str:
+        allowed = {"development", "staging", "production"}
+        if v not in allowed:
+            raise ValueError(f"environment must be one of {allowed}")
+        return v
+
+    @model_validator(mode="after")
+    def validate_production_settings(self) -> "AppSettings":
+        if self.environment == "production":
+            if self.debug:
+                raise ValueError("debug must be False in production")
+        return self
+```
+
+### Best Practices Summary
+
+**Configuration Checklist:**
+- [ ] Settings split by domain (app/db/cache/broker/auth/logging/otel)
+- [ ] All settings classes use `frozen=True`
+- [ ] Sensitive fields use `SecretStr`
+- [ ] Settings accessed via LRU-cached loaders
+- [ ] Environment variable prefixes clearly defined (APP_, DB_, etc.)
+- [ ] No secrets in logs or error messages
+- [ ] Kubernetes uses env vars from ConfigMap/Secret
+- [ ] Tests clear caches and provide overrides
+- [ ] Documentation shows all available env vars (.env.example)
 
 ---
 

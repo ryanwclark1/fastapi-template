@@ -153,16 +153,87 @@ uv run alembic history
 
 ## Configuration
 
-Configuration is managed via environment variables with the `EXAMPLE_SERVICE_` prefix.
+### Modular Settings Architecture
 
-See `.env.example` for all available options.
+This template uses **Pydantic Settings v2** with a modular, domain-based architecture:
 
-Key settings:
+```
+example_service/core/settings/
+├── __init__.py          # Exports cached loaders
+├── loader.py            # LRU-cached settings getters
+├── sources.py           # Optional YAML/conf.d support
+├── app.py               # Application settings (APP_*)
+├── postgres.py          # Database settings (DB_*)
+├── redis.py             # Cache settings (REDIS_*)
+├── rabbit.py            # Messaging settings (RABBIT_*)
+├── auth.py              # Authentication settings (AUTH_*)
+├── logging_.py          # Logging settings (LOG_*)
+└── otel.py              # OpenTelemetry settings (OTEL_*)
+```
 
-- `EXAMPLE_SERVICE_DATABASE_URL` - Database connection string
-- `EXAMPLE_SERVICE_REDIS_URL` - Redis connection string
-- `EXAMPLE_SERVICE_LOG_LEVEL` - Logging level (DEBUG, INFO, WARNING, ERROR)
-- `EXAMPLE_SERVICE_DEBUG` - Enable debug mode
+### Configuration Precedence
+
+Settings are loaded in this order (highest to lowest priority):
+
+1. **Init kwargs** (testing overrides)
+2. **YAML/conf.d files** (optional, local dev)
+3. **Environment variables** (production - **recommended**)
+4. **.env file** (development only)
+5. **secrets_dir** (Kubernetes/Docker secrets)
+
+### Environment Variables
+
+All settings use prefixed environment variables. See `.env.example` for complete documentation.
+
+Key settings examples:
+
+```bash
+# Application Settings (APP_*)
+APP_SERVICE_NAME=example-service
+APP_DEBUG=false
+APP_CORS_ORIGINS=["http://localhost:3000"]
+
+# Database Settings (DB_*)
+DB_DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/example_service
+
+# Redis Cache (REDIS_*)
+REDIS_REDIS_URL=redis://localhost:6379/0
+
+# RabbitMQ (RABBIT_*)
+RABBIT_RABBITMQ_URL=amqp://guest:guest@localhost:5672/
+
+# Logging (LOG_*)
+LOG_LEVEL=INFO
+LOG_JSON=true
+
+# OpenTelemetry (OTEL_*)
+OTEL_ENABLED=false
+OTEL_ENDPOINT=http://localhost:4317
+```
+
+### Usage in Code
+
+```python
+from example_service.core.settings import get_app_settings, get_db_settings
+
+# Settings are loaded once and cached (LRU)
+settings = get_app_settings()
+print(settings.service_name)
+
+# Settings are immutable (frozen)
+settings.debug = True  # ❌ Raises ValidationError
+```
+
+### Optional YAML Configuration
+
+For local development, you can optionally use YAML files (requires `pyyaml`):
+
+```bash
+# Install YAML support (optional)
+uv sync --group yaml
+```
+
+See `conf/` directory for examples. **Note**: Environment variables always override YAML files.
 
 ## Testing
 

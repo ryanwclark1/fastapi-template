@@ -1,0 +1,19 @@
+# Optional YAML configuration for application settings
+# These settings are overridden by environment variables (APP_*)
+
+service_name: example-service
+title: Example Service API
+version: 1.0.0
+environment: development
+debug: false
+
+# CORS - List of allowed origins
+cors_origins:
+  - http://localhost:3000
+  - http://localhost:8080
+
+# API Documentation
+docs_url: /docs
+redoc_url: /redoc
+openapi_url: /openapi.json
+disable_docs: false

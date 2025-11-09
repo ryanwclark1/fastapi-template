@@ -46,6 +46,9 @@ dev = [
     "mypy>=1.13.0",
     "pre-commit>=4.0.0",
 ]
+yaml = [
+    "pyyaml>=6.0.0",
+]
 
 [project.scripts]
 example-service = "example_service.app.main:app"

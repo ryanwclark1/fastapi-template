@@ -6,22 +6,33 @@ from fastapi import FastAPI
 from example_service.app.lifespan import lifespan
 from example_service.app.middleware import configure_middleware
 from example_service.app.router import setup_routers
+from example_service.core.settings import get_app_settings
 
 
 def create_app() -> FastAPI:
     """Create and configure FastAPI application.
 
+    Uses modular settings from core.settings for all configuration.
+    Settings are loaded once and cached via LRU cache.
+
     Returns:
         Configured FastAPI application instance.
     """
+    settings = get_app_settings()
+
     app = FastAPI(
-        title="Example Service API",
-        version="0.1.0",
-        description="Service template following standard architecture",
+        title=settings.title,
+        version=settings.version,
+        description="FastAPI service template following standard architecture patterns",
+        debug=settings.debug,
+        docs_url=settings.get_docs_url(),
+        redoc_url=settings.get_redoc_url(),
+        openapi_url=settings.get_openapi_url(),
+        root_path=settings.root_path,
         lifespan=lifespan,
     )
 
-    # Configure middleware
+    # Configure middleware (CORS, logging, etc.)
     configure_middleware(app)
 
     # Setup routers

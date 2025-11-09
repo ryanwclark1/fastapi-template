@@ -7,7 +7,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from example_service.core.settings import settings
+from example_service.core.settings import (
+    get_app_settings,
+    get_db_settings,
+    get_otel_settings,
+    get_rabbit_settings,
+    get_redis_settings,
+)
 from example_service.infra.cache.redis import start_cache, stop_cache
 from example_service.infra.database.session import close_database, init_database
 from example_service.infra.logging.config import configure_logging
@@ -35,35 +41,50 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     Yields:
         None during application runtime.
     """
+    # Load settings (cached after first call)
+    app_settings = get_app_settings()
+    db_settings = get_db_settings()
+    redis_settings = get_redis_settings()
+    rabbit_settings = get_rabbit_settings()
+    otel_settings = get_otel_settings()
+
     # Startup
     configure_logging()
-    logger.info("Application starting", extra={"service": settings.service_name})
+    logger.info(
+        "Application starting",
+        extra={
+            "service": app_settings.service_name,
+            "environment": app_settings.environment,
+        },
+    )
 
     # Setup OpenTelemetry tracing (must be done early)
-    if settings.enable_tracing:
+    if otel_settings.is_configured:
         setup_tracing()
-        logger.info("OpenTelemetry tracing enabled")
+        logger.info(
+            "OpenTelemetry tracing enabled",
+            extra={"endpoint": otel_settings.endpoint},
+        )
 
     # Initialize database connection with retry
-    if settings.database_url:
+    if db_settings.is_configured:
         await init_database()
         logger.info("Database connection initialized")
 
     # Initialize Redis cache
-    if settings.redis_url:
+    if redis_settings.is_configured:
         await start_cache()
         logger.info("Redis cache initialized")
 
     # Initialize RabbitMQ/FastStream broker
-    if settings.rabbitmq_url:
+    if rabbit_settings.is_configured:
         await start_broker()
         # Import handlers to register subscribers
         import example_service.infra.messaging.handlers  # noqa: F401
 
         logger.info("RabbitMQ broker initialized")
 
-    # Initialize Taskiq broker for background tasks
-    if settings.taskiq_broker_url:
+        # Initialize Taskiq broker for background tasks (uses same RabbitMQ)
         await start_taskiq()
         # Import tasks to register them
         import example_service.infra.tasks.tasks  # noqa: F401
@@ -73,35 +94,45 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info(
         "Application startup complete",
         extra={
-            "service": settings.service_name,
-            "tracing_enabled": settings.enable_tracing,
-            "metrics_enabled": settings.enable_metrics,
+            "service": app_settings.service_name,
+            "environment": app_settings.environment,
+            "tracing_enabled": otel_settings.is_configured,
+            "database_enabled": db_settings.is_configured,
+            "cache_enabled": redis_settings.is_configured,
+            "messaging_enabled": rabbit_settings.is_configured,
         },
     )
 
     yield
 
     # Shutdown
-    logger.info("Application shutting down", extra={"service": settings.service_name})
+    app_settings = get_app_settings()
+    db_settings = get_db_settings()
+    redis_settings = get_redis_settings()
+    rabbit_settings = get_rabbit_settings()
 
-    # Close database connection
-    if settings.database_url:
-        await close_database()
-        logger.info("Database connection closed")
+    logger.info(
+        "Application shutting down", extra={"service": app_settings.service_name}
+    )
 
-    # Close Redis cache
-    if settings.redis_url:
-        await stop_cache()
-        logger.info("Redis cache closed")
+    # Close Taskiq broker first (depends on RabbitMQ)
+    if rabbit_settings.is_configured:
+        await stop_taskiq()
+        logger.info("Taskiq broker closed")
 
     # Close RabbitMQ broker
-    if settings.rabbitmq_url:
+    if rabbit_settings.is_configured:
         await stop_broker()
         logger.info("RabbitMQ broker closed")
 
-    # Close Taskiq broker
-    if settings.taskiq_broker_url:
-        await stop_taskiq()
-        logger.info("Taskiq broker closed")
+    # Close Redis cache
+    if redis_settings.is_configured:
+        await stop_cache()
+        logger.info("Redis cache closed")
+
+    # Close database connection
+    if db_settings.is_configured:
+        await close_database()
+        logger.info("Database connection closed")
 
     logger.info("Application shutdown complete")
