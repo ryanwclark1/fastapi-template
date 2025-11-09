@@ -21,11 +21,11 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             ...
         ```
     """
-    # TODO: Import session factory from infra.database.session
-    # from example_service.infra.database.session import get_async_session
-    #
-    # async with get_async_session() as session:
-    #     yield session
+    from example_service.infra.database.session import get_async_session
 
-    # Placeholder implementation
-    raise NotImplementedError("Database session not configured")
+    async with get_async_session() as session:
+        yield session
+
+
+# Alias for compatibility
+get_session = get_db

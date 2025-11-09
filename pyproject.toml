@@ -35,6 +35,7 @@ dependencies = [
     "taskiq>=0.11.0",
     "taskiq-faststream>=0.3.0",
     "taskiq-redis>=1.0.0",
+    "click>=8.3.0",
 ]
 
 [project.optional-dependencies]
@@ -51,7 +52,7 @@ yaml = [
 ]
 
 [project.scripts]
-example-service = "example_service.app.main:app"
+example-service = "example_service.cli.main:main"
 
 [build-system]
 requires = ["hatchling"]
