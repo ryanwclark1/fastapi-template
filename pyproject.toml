@@ -151,3 +151,8 @@ disallow_untyped_defs = false
 [tool.alembic]
 script_location = "alembic"
 prepend_sys_path = "."
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+]

@@ -20,7 +20,7 @@ from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_VERSION
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-from example_service.core.settings import settings
+from example_service.core.settings import get_app_settings, get_otel_settings
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ def setup_tracing() -> None:
             yield
         ```
     """
-    if not settings.enable_tracing or not settings.otlp_endpoint:
+    if not settings.enable_tracing or not get_otel_settings().endpoint:
         logger.info("OpenTelemetry tracing is disabled")
         return
 
@@ -56,7 +56,7 @@ def setup_tracing() -> None:
         # Create resource with service information
         resource = Resource(
             attributes={
-                SERVICE_NAME: settings.service_name,
+                SERVICE_NAME: get_app_settings().service_name,
                 SERVICE_VERSION: "0.1.0",
                 "environment": "production" if not settings.debug else "development",
             }
@@ -64,8 +64,8 @@ def setup_tracing() -> None:
 
         # Configure OTLP exporter
         otlp_exporter = OTLPSpanExporter(
-            endpoint=settings.otlp_endpoint,
-            insecure=settings.otlp_insecure,
+            endpoint=get_otel_settings().endpoint,
+            insecure=get_otel_settings().insecure,
         )
 
         # Create tracer provider with batch processor
@@ -79,8 +79,8 @@ def setup_tracing() -> None:
         _setup_instrumentations()
 
         logger.info(
-            f"OpenTelemetry tracing configured: endpoint={settings.otlp_endpoint}",
-            extra={"service": settings.service_name, "endpoint": settings.otlp_endpoint},
+            f"OpenTelemetry tracing configured: endpoint={get_otel_settings().endpoint}",
+            extra={"service": get_app_settings().service_name, "endpoint": get_otel_settings().endpoint},
         )
 
     except Exception as e:

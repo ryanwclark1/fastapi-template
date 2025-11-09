@@ -16,7 +16,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from example_service.core.schemas.auth import AuthUser, TokenPayload
-from example_service.core.settings import settings
+from example_service.core.settings import get_auth_settings, get_redis_settings
 from example_service.infra.cache.redis import get_cache
 from example_service.utils.retry import retry
 
@@ -53,7 +53,7 @@ async def validate_token_with_auth_service(token: str) -> TokenPayload:
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.post(
-                f"{settings.auth_token_url}/validate",
+                f"{get_auth_settings().get_validation_url()}/validate",
                 headers={"Authorization": f"Bearer {token}"},
             )
 
@@ -168,7 +168,7 @@ async def get_current_user(
             await cache.set(
                 cache_key,
                 auth_user.model_dump(),
-                ttl=settings.auth_token_cache_ttl,
+                ttl=get_auth_settings().token_cache_ttl,
             )
         except Exception as e:
             logger.warning("Failed to cache token validation", extra={"error": str(e)})

@@ -15,7 +15,7 @@ from typing import Any
 
 import httpx
 
-from example_service.core.settings import settings
+from example_service.core.settings import get_app_settings
 from example_service.utils.retry import retry
 
 logger = logging.getLogger(__name__)

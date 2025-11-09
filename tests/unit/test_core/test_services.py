@@ -20,7 +20,7 @@ async def test_health_service_check_health():
     assert result["status"] == "healthy"
     assert "timestamp" in result
     assert "service" in result
-    assert result["service"] == "example-service"
+    assert result["service"] == "test-service"  # From test environment
     assert "version" in result
 
 

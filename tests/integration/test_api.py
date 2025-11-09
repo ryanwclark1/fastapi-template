@@ -17,7 +17,7 @@ async def test_health_check(client: AsyncClient):
 
     data = response.json()
     assert data["status"] == "healthy"
-    assert data["service"] == "example-service"
+    assert data["service"] == "test-service"  # From test environment
     assert "timestamp" in data
     assert "version" in data
 

@@ -79,17 +79,6 @@ class PostgresSettings(BaseSettings):
         populate_by_name=True,  # Allow both DATABASE_URL and database_url
     )
 
-    @classmethod
-    def settings_customise_sources(
-        cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings
-    ):
-        """Customize settings source precedence."""
-
-        def files_source(_):
-            return db_source()
-
-        return (init_settings, files_source, env_settings, dotenv_settings, file_secret_settings)
-
     @property
     def is_configured(self) -> bool:
         """Check if database is configured."""

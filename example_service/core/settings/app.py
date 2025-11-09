@@ -64,17 +64,6 @@ class AppSettings(BaseSettings):
         frozen=True,  # Immutable settings
     )
 
-    @classmethod
-    def settings_customise_sources(
-        cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings
-    ):
-        """Customize settings source precedence: init > files > env > dotenv > secrets."""
-
-        def files_source(_):
-            return app_source()
-
-        return (init_settings, files_source, env_settings, dotenv_settings, file_secret_settings)
-
     @property
     def docs_enabled(self) -> bool:
         """Check if API documentation is enabled."""

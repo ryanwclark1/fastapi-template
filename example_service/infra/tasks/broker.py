@@ -1,90 +1,94 @@
-"""Taskiq broker configuration for background task processing.
-
-This module provides the Taskiq broker setup for executing background tasks
-asynchronously. It integrates with FastStream for task distribution and
-Redis for result storage.
-"""
+"""Taskiq broker configuration for background tasks."""
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 from taskiq import TaskiqScheduler
-from taskiq_faststream import FastStreamBroker
+from taskiq_faststream import BrokerWrapper, StreamScheduler
 from taskiq_redis import RedisAsyncResultBackend
 
-from example_service.core.settings import settings
-from example_service.infra.messaging.broker import broker as rabbitmq_broker
-
-if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+from example_service.core.settings import get_rabbit_settings, get_redis_settings
 
 logger = logging.getLogger(__name__)
 
-# Initialize Taskiq broker with FastStream transport
-# This allows tasks to be distributed via RabbitMQ and results stored in Redis
-broker = FastStreamBroker(rabbitmq_broker).with_result_backend(
-    RedisAsyncResultBackend(settings.taskiq_result_backend)
-)
-
-# Initialize scheduler for cron-like scheduled tasks
-scheduler = TaskiqScheduler(broker=broker)
+# Global broker and scheduler (created lazily)
+_broker: BrokerWrapper | None = None
+_scheduler: TaskiqScheduler | None = None
 
 
-async def get_broker() -> AsyncIterator[FastStreamBroker]:
-    """Get the Taskiq broker instance.
-
-    This is a dependency that can be used in FastAPI endpoints
-    to access the broker for scheduling tasks.
-
-    Yields:
-        Taskiq broker instance.
-
-    Example:
-        ```python
-        from example_service.infra.tasks.tasks import example_task
-
-        @router.post("/schedule")
-        async def schedule_task():
-            task = await example_task.kiq(data="test")
-            return {"task_id": task.task_id}
-        ```
+def get_taskiq_broker() -> BrokerWrapper:
+    """Get or create Taskiq broker instance.
+    
+    Returns:
+        Taskiq FastStream broker wrapper.
     """
-    yield broker
+    global _broker
+    
+    if _broker is None:
+        from example_service.infra.messaging.broker import get_broker_instance
+        
+        rabbit_settings = get_rabbit_settings()
+        redis_settings = get_redis_settings()
+        
+        # Get the FastStream broker
+        faststream_broker = get_broker_instance()
+        
+        # Create result backend if Redis is configured
+        result_backend = None
+        if redis_settings.is_configured:
+            result_backend = RedisAsyncResultBackend(redis_settings.get_url())
+        
+        # Create Taskiq broker wrapping FastStream
+        _broker = BrokerWrapper(faststream_broker, result_backend=result_backend)
+        logger.info("Taskiq broker initialized")
+    
+    return _broker
+
+
+def get_taskiq_scheduler() -> TaskiqScheduler:
+    """Get or create Taskiq scheduler instance.
+    
+    Returns:
+        Taskiq scheduler.
+    """
+    global _scheduler
+    
+    if _scheduler is None:
+        broker = get_taskiq_broker()
+        _scheduler = StreamScheduler(broker=broker)
+        logger.info("Taskiq scheduler initialized")
+    
+    return _scheduler
+
+
+# Expose broker for compatibility
+broker = property(lambda self: get_taskiq_broker())
+
+
+def get_broker() -> BrokerWrapper:
+    """Get Taskiq broker instance (compatibility function)."""
+    return get_taskiq_broker()
 
 
 async def start_taskiq() -> None:
-    """Start the Taskiq broker.
-
-    This should be called during application startup in the lifespan context.
-    It initializes the connection to the result backend.
-
-    Raises:
-        ConnectionError: If unable to connect to result backend.
-    """
-    logger.info(
-        "Starting Taskiq broker",
-        extra={"result_backend": settings.taskiq_result_backend},
-    )
-
-    try:
-        await broker.startup()
-        logger.info("Taskiq broker started successfully")
-    except Exception as e:
-        logger.exception("Failed to start Taskiq broker", extra={"error": str(e)})
-        raise
+    """Start the Taskiq broker."""
+    rabbit_settings = get_rabbit_settings()
+    
+    if not rabbit_settings.is_configured:
+        logger.info("RabbitMQ not configured, skipping Taskiq startup")
+        return
+    
+    broker_instance = get_taskiq_broker()
+    await broker_instance.startup()
+    logger.info("Taskiq broker started")
 
 
 async def stop_taskiq() -> None:
-    """Stop the Taskiq broker.
-
-    This should be called during application shutdown in the lifespan context.
-    It gracefully closes connections to the result backend.
-    """
-    logger.info("Stopping Taskiq broker")
-
-    try:
-        await broker.shutdown()
-        logger.info("Taskiq broker stopped successfully")
-    except Exception as e:
-        logger.exception("Error stopping Taskiq broker", extra={"error": str(e)})
+    """Stop the Taskiq broker."""
+    global _broker, _scheduler
+    
+    if _broker is not None:
+        await _broker.shutdown()
+        logger.info("Taskiq broker stopped")
+        _broker = None
+        _scheduler = None

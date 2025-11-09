@@ -7,7 +7,12 @@ from typing import Any
 
 from example_service.core.schemas.common import HealthStatus
 from example_service.core.services.base import BaseService
-from example_service.core.settings import settings
+from example_service.core.settings import (
+    get_app_settings,
+    get_auth_settings,
+    get_db_settings,
+    get_redis_settings,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +64,7 @@ class HealthService(BaseService):
         return {
             "status": status,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "service": settings.service_name,
+            "service": get_app_settings().service_name,
             "version": "0.1.0",
             "checks": checks,
         }
@@ -116,7 +121,7 @@ class HealthService(BaseService):
         return {
             "alive": True,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "service": settings.service_name,
+            "service": get_app_settings().service_name,
         }
 
     async def startup(self) -> dict[str, Any]:
@@ -143,22 +148,26 @@ class HealthService(BaseService):
         """
         checks: dict[str, bool] = {}
 
+        db_settings = get_db_settings()
+        redis_settings = get_redis_settings()
+        auth_settings = get_auth_settings()
+
         # Database check (if configured)
-        if settings.database_url:
+        if db_settings.is_configured:
             checks["database"] = await self._check_database()
         else:
             checks["database"] = True  # Not configured, don't fail
 
         # Cache check (if configured)
-        if settings.redis_url:
+        if redis_settings.is_configured:
             checks["cache"] = await self._check_cache()
         else:
             checks["cache"] = True  # Not configured, don't fail
 
         # External services (if configured)
-        if settings.auth_service_url:
+        if auth_settings.is_configured:
             checks["auth_service"] = await self._check_external_service(
-                "auth", settings.auth_service_url
+                "auth", str(auth_settings.service_url)
             )
 
         return checks
@@ -171,8 +180,10 @@ class HealthService(BaseService):
         """
         checks: dict[str, bool] = {}
 
+        db_settings = get_db_settings()
+
         # Database is critical for readiness
-        if settings.database_url:
+        if db_settings.is_configured:
             checks["database"] = await self._check_database()
 
         # Cache is not critical (service can run without it)
@@ -188,9 +199,10 @@ class HealthService(BaseService):
         """
         try:
             # Import here to avoid circular dependencies
-            from example_service.infra.database.session import engine
+            from example_service.infra.database.session import get_engine
             from sqlalchemy import text
 
+            engine = get_engine()
             async with engine.connect() as conn:
                 await conn.execute(text("SELECT 1"))
             return True

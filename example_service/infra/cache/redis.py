@@ -17,7 +17,7 @@ from redis.asyncio import ConnectionPool, Redis
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
-from example_service.core.settings import settings
+from example_service.core.settings import get_redis_settings
 from example_service.utils.retry import retry
 
 if TYPE_CHECKING:
@@ -61,11 +61,11 @@ class RedisCache:
         Raises:
             RedisConnectionError: If unable to connect to Redis.
         """
-        logger.info("Connecting to Redis", extra={"url": settings.redis_url})
+        logger.info("Connecting to Redis", extra={"url": get_redis_settings().get_url()})
 
         try:
             self._pool = ConnectionPool.from_url(
-                settings.redis_url,
+                get_redis_settings().get_url(),
                 max_connections=20,
                 decode_responses=True,
                 encoding="utf-8",
