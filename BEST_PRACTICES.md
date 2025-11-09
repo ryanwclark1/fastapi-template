@@ -21,6 +21,12 @@ This document outlines best practices for developing and maintaining this FastAP
 10. [Security](#security)
 11. [Logging & Observability](#logging--observability)
 12. [Code Quality](#code-quality)
+13. [Caching with Redis](#caching-with-redis)
+14. [Background Tasks (Taskiq)](#background-tasks-taskiq)
+15. [Event-Driven Architecture (FastStream)](#event-driven-architecture-faststream)
+16. [Distributed Tracing (OpenTelemetry)](#distributed-tracing-opentelemetry)
+17. [External Authentication](#external-authentication)
+18. [Resilience Patterns](#resilience-patterns)
 
 ---
 
@@ -832,6 +838,511 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Always provide downgrade path
     op.drop_table(...)
+```
+
+---
+
+## Caching with Redis
+
+### Cache-Aside Pattern
+
+**✅ DO:** Implement cache-aside (lazy loading) pattern
+```python
+from example_service.infra.cache.redis import get_cache
+
+async def get_user_profile(
+    user_id: str,
+    cache: RedisCache = Depends(get_cache)
+) -> UserProfile:
+    """Get user profile with caching."""
+    cache_key = f"user:profile:{user_id}"
+
+    # Try cache first
+    cached = await cache.get(cache_key)
+    if cached:
+        return UserProfile(**cached)
+
+    # Cache miss - fetch from database
+    profile = await fetch_user_from_db(user_id)
+
+    # Store in cache for 1 hour
+    await cache.set(cache_key, profile.model_dump(), ttl=3600)
+
+    return profile
+```
+
+### Cache Invalidation
+
+**✅ DO:** Invalidate cache when data changes
+```python
+async def update_user_profile(
+    user_id: str,
+    data: UserUpdate,
+    cache: RedisCache = Depends(get_cache)
+) -> UserProfile:
+    """Update user and invalidate cache."""
+    # Update database
+    profile = await update_user_in_db(user_id, data)
+
+    # Invalidate cache
+    await cache.delete(f"user:profile:{user_id}")
+
+    return profile
+```
+
+### Cache Key Naming
+
+**✅ DO:** Use descriptive, hierarchical cache keys
+```python
+# Good cache keys
+f"user:{user_id}:profile"
+f"auth:token:{token_prefix}"
+f"posts:{post_id}:comments"
+f"session:{session_id}"
+
+# Bad cache keys
+f"u:{user_id}"  # Too cryptic
+f"{user_id}_profile"  # Inconsistent separator
+```
+
+---
+
+## Background Tasks (Taskiq)
+
+### Task Definition
+
+**✅ DO:** Define tasks with clear names and retry strategies
+```python
+from example_service.infra.tasks.broker import broker
+
+@broker.task(retry_on_error=True, max_retries=3)
+async def send_welcome_email(user_id: str, email: str) -> dict:
+    """Send welcome email to new user.
+
+    This task retries automatically on failure up to 3 times.
+    """
+    logger.info("Sending welcome email", extra={"user_id": user_id})
+
+    await email_service.send(
+        to=email,
+        subject="Welcome!",
+        template="welcome"
+    )
+
+    return {"status": "sent", "user_id": user_id}
+```
+
+### Scheduling Tasks
+
+**✅ DO:** Schedule tasks from API endpoints
+```python
+from example_service.infra.tasks.tasks import send_welcome_email
+
+@router.post("/users", status_code=201)
+async def create_user(data: UserCreate) -> UserResponse:
+    """Create user and schedule welcome email."""
+    # Create user
+    user = await user_service.create(data)
+
+    # Schedule background task
+    await send_welcome_email.kiq(
+        user_id=user.id,
+        email=user.email
+    )
+
+    return user
+```
+
+### Long-Running Tasks
+
+**✅ DO:** Return task ID for long-running operations
+```python
+@broker.task()
+async def generate_report(report_id: str) -> dict:
+    """Generate large report (may take minutes)."""
+    # Long-running operation
+    data = await fetch_large_dataset()
+    report = await process_data(data)
+    await store_report(report_id, report)
+    return {"report_id": report_id, "status": "completed"}
+
+@router.post("/reports")
+async def create_report() -> dict:
+    """Start report generation and return task ID."""
+    report_id = str(uuid.uuid4())
+
+    # Schedule task
+    task = await generate_report.kiq(report_id=report_id)
+
+    # Return task ID for status checking
+    return {
+        "report_id": report_id,
+        "task_id": task.task_id,
+        "status": "processing"
+    }
+```
+
+---
+
+## Event-Driven Architecture (FastStream)
+
+### Domain Events
+
+**✅ DO:** Define clear domain events with timestamps
+```python
+from example_service.infra.messaging.events import BaseEvent
+
+class OrderCreatedEvent(BaseEvent):
+    """Event published when order is created."""
+    event_type: str = Field(default="order.created")
+    order_id: str
+    user_id: str
+    amount: Decimal
+    items: list[dict]
+```
+
+### Publishing Events
+
+**✅ DO:** Publish events after successful operations
+```python
+from example_service.infra.messaging.broker import broker
+
+async def create_order(data: OrderCreate) -> Order:
+    """Create order and publish event."""
+    # Create order in database
+    order = await order_repository.create(data)
+
+    # Publish event
+    event = OrderCreatedEvent(
+        order_id=order.id,
+        user_id=order.user_id,
+        amount=order.total,
+        items=order.items
+    )
+    await broker.publish(event, queue="order-events")
+
+    return order
+```
+
+### Event Handlers
+
+**✅ DO:** Keep handlers idempotent and focused
+```python
+from example_service.infra.messaging.broker import broker
+
+@broker.subscriber("order-events")
+async def handle_order_created(event: OrderCreatedEvent) -> None:
+    """Handle order creation - send confirmation email.
+
+    This handler is idempotent - safe to retry.
+    """
+    # Check if already processed (idempotency)
+    cache_key = f"processed:order:{event.order_id}"
+    if await cache.exists(cache_key):
+        logger.info("Event already processed", extra={"event_id": event.event_id})
+        return
+
+    # Process event
+    await email_service.send_order_confirmation(event.order_id)
+
+    # Mark as processed
+    await cache.set(cache_key, "1", ttl=86400)  # 24 hours
+```
+
+### Event Ordering
+
+**⚠️ BEWARE:** Events may arrive out of order
+```python
+# ❌ Don't assume order
+@broker.subscriber("user-events")
+async def handle_user_event(event: UserEvent) -> None:
+    # Event B might arrive before Event A!
+    await update_user(event)
+
+# ✅ Use timestamps and version numbers
+class UserEvent(BaseEvent):
+    user_id: str
+    version: int  # Incrementing version number
+    timestamp: datetime
+
+@broker.subscriber("user-events")
+async def handle_user_event(event: UserEvent) -> None:
+    current_version = await get_user_version(event.user_id)
+    if event.version <= current_version:
+        logger.warning("Outdated event received", extra={"event": event})
+        return  # Ignore old events
+
+    await update_user(event)
+```
+
+---
+
+## Distributed Tracing (OpenTelemetry)
+
+### Automatic Instrumentation
+
+**✅ DO:** Use auto-instrumentation for common libraries
+```python
+# Already configured in infra/tracing/opentelemetry.py
+# Automatically traces:
+# - FastAPI endpoints
+# - HTTPX requests
+# - SQLAlchemy queries
+# - asyncpg operations
+```
+
+### Custom Spans
+
+**✅ DO:** Add custom spans for business logic
+```python
+from example_service.infra.tracing.opentelemetry import get_tracer
+
+tracer = get_tracer(__name__)
+
+async def process_order(order_id: str) -> Order:
+    """Process order with custom tracing."""
+    with tracer.start_as_current_span("process_order") as span:
+        # Add attributes
+        span.set_attribute("order.id", order_id)
+
+        # Validate order
+        with tracer.start_as_current_span("validate_order"):
+            order = await validate_order(order_id)
+            span.set_attribute("order.amount", float(order.total))
+
+        # Charge payment
+        with tracer.start_as_current_span("charge_payment"):
+            await charge_payment(order)
+
+        # Update inventory
+        with tracer.start_as_current_span("update_inventory"):
+            await update_inventory(order)
+
+        return order
+```
+
+### Span Attributes
+
+**✅ DO:** Add meaningful attributes to spans
+```python
+from example_service.infra.tracing.opentelemetry import add_span_attributes
+
+async def get_user(user_id: str) -> User:
+    """Get user with tracing attributes."""
+    add_span_attributes({
+        "user.id": user_id,
+        "db.system": "postgresql",
+        "db.operation": "select"
+    })
+
+    user = await user_repository.get(user_id)
+
+    if user:
+        add_span_attributes({
+            "user.email": user.email,
+            "user.active": user.is_active
+        })
+
+    return user
+```
+
+### Error Recording
+
+**✅ DO:** Record exceptions in spans
+```python
+from example_service.infra.tracing.opentelemetry import record_exception
+
+async def process_payment(order_id: str) -> Payment:
+    """Process payment with error tracking."""
+    try:
+        payment = await payment_gateway.charge(order_id)
+        return payment
+    except PaymentError as e:
+        # Record exception in current span
+        record_exception(e)
+        raise
+```
+
+---
+
+## External Authentication
+
+### Token Validation
+
+**✅ DO:** Use caching for token validation
+```python
+from example_service.core.dependencies.auth import get_current_user
+
+# Token validation is automatically cached in Redis
+@router.get("/profile")
+async def get_profile(
+    user: Annotated[AuthUser, Depends(get_current_user)]
+) -> UserProfile:
+    """Protected endpoint - requires valid token."""
+    return await get_user_profile(user.identifier)
+```
+
+### Permission-Based Access
+
+**✅ DO:** Use permission dependencies for granular control
+```python
+from example_service.core.dependencies.auth import require_permission
+
+@router.delete("/posts/{post_id}")
+async def delete_post(
+    post_id: str,
+    user: Annotated[AuthUser, Depends(require_permission("posts:delete"))]
+) -> None:
+    """Delete post - requires posts:delete permission."""
+    await post_service.delete(post_id)
+```
+
+### Resource-Level ACL
+
+**✅ DO:** Check ACL for resource-specific permissions
+```python
+from example_service.core.dependencies.auth import require_resource_access
+
+@router.put("/documents/{doc_id}")
+async def update_document(
+    doc_id: str,
+    data: DocumentUpdate,
+    user: Annotated[AuthUser, Depends(require_resource_access("documents", "write"))]
+) -> Document:
+    """Update document - requires write access to documents resource."""
+    return await document_service.update(doc_id, data)
+```
+
+### Optional Authentication
+
+**✅ DO:** Use optional auth for public endpoints with personalization
+```python
+from example_service.core.dependencies.auth import get_current_user_optional
+
+@router.get("/feed")
+async def get_feed(
+    user: Annotated[AuthUser | None, Depends(get_current_user_optional)]
+) -> FeedResponse:
+    """Get feed - personalized if authenticated, generic otherwise."""
+    if user:
+        # Personalized feed for authenticated user
+        return await get_personalized_feed(user.identifier)
+    else:
+        # Generic public feed
+        return await get_public_feed()
+```
+
+### Custom Permission Logic
+
+**✅ DO:** Implement custom authorization logic in services
+```python
+async def delete_post(post_id: str, user: AuthUser) -> None:
+    """Delete post with custom authorization."""
+    post = await post_repository.get(post_id)
+
+    # Check if user owns the post OR has admin role
+    if post.author_id != user.user_id and not user.has_role("admin"):
+        raise ForbiddenException("Cannot delete other users' posts")
+
+    await post_repository.delete(post_id)
+```
+
+---
+
+## Resilience Patterns
+
+### Retry with Exponential Backoff
+
+**✅ DO:** Use retry decorator for transient failures
+```python
+from example_service.utils.retry import retry
+
+@retry(
+    max_attempts=5,
+    initial_delay=1.0,
+    max_delay=30.0,
+    exponential_base=2.0,
+    jitter=True,
+    exceptions=(httpx.TimeoutException, httpx.NetworkError)
+)
+async def call_external_api(endpoint: str) -> dict:
+    """Call external API with automatic retry."""
+    async with httpx.AsyncClient() as client:
+        response = await client.get(endpoint)
+        response.raise_for_status()
+        return response.json()
+```
+
+### Database Connection Resilience
+
+**✅ DO:** Initialize database with retry on startup
+```python
+# Already implemented in infra/database/session.py
+# Database connections automatically retry with exponential backoff
+# This handles cases where DB is not immediately available (e.g., Docker)
+```
+
+### Circuit Breaker
+
+**✅ DO:** Use circuit breaker for failing dependencies
+```python
+from example_service.utils.retry import CircuitBreaker
+
+payment_gateway_cb = CircuitBreaker(
+    failure_threshold=5,
+    timeout=60.0,
+    name="payment_gateway"
+)
+
+async def charge_payment(amount: Decimal) -> Payment:
+    """Charge payment with circuit breaker protection."""
+    if payment_gateway_cb.is_open:
+        # Circuit is open - fail fast
+        raise ServiceUnavailableException("Payment gateway unavailable")
+
+    try:
+        result = await payment_gateway.charge(amount)
+        payment_gateway_cb.record_success()
+        return result
+    except Exception as e:
+        payment_gateway_cb.record_failure()
+        raise
+```
+
+### Graceful Degradation
+
+**✅ DO:** Provide fallbacks for non-critical services
+```python
+async def get_recommendations(user_id: str) -> list[Product]:
+    """Get product recommendations with fallback."""
+    try:
+        # Try ML recommendation service
+        recommendations = await ml_service.get_recommendations(user_id)
+        return recommendations
+    except Exception as e:
+        logger.warning(
+            "Recommendation service failed, using fallback",
+            extra={"user_id": user_id, "error": str(e)}
+        )
+        # Fallback to simple popular items
+        return await get_popular_products(limit=10)
+```
+
+### Timeout Configuration
+
+**✅ DO:** Set appropriate timeouts for all external calls
+```python
+# HTTP client with timeout
+async with httpx.AsyncClient(timeout=5.0) as client:
+    response = await client.get(url)
+
+# Database query timeout
+async with asyncio.timeout(10.0):
+    result = await session.execute(complex_query)
+
+# Redis operation timeout
+async with asyncio.timeout(2.0):
+    await cache.get(key)
 ```
 
 ---
