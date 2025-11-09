@@ -4,12 +4,43 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Generic, TypeVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 T = TypeVar("T")
 
 
-class TimestampedBase(BaseModel):
+class CustomBase(BaseModel):
+    """Base model with common configuration for all schemas.
+
+    Provides standardized datetime serialization and common settings
+    that should be applied across all Pydantic models in the application.
+
+    Example:
+        ```python
+        class UserResponse(CustomBase):
+            id: str
+            email: str
+            created_at: datetime
+        ```
+    """
+
+    model_config = ConfigDict(
+        # Serialize datetimes as ISO 8601 strings
+        json_encoders={
+            datetime: lambda v: v.isoformat(),
+        },
+        # Validate on assignment (not just initialization)
+        validate_assignment=True,
+        # Use enum values instead of names
+        use_enum_values=True,
+        # Populate models by field name (not alias)
+        populate_by_name=True,
+        # Don't allow extra fields by default
+        extra="forbid",
+    )
+
+
+class TimestampedBase(CustomBase):
     """Base model with timestamp fields.
 
     Includes created_at and updated_at timestamp fields
