@@ -50,7 +50,37 @@ class Settings(BaseSettings):
     enable_metrics: bool = Field(default=True, description="Enable Prometheus metrics")
     enable_tracing: bool = Field(default=False, description="Enable OpenTelemetry tracing")
     otlp_endpoint: str | None = Field(
-        default=None, description="OpenTelemetry OTLP endpoint"
+        default=None, description="OpenTelemetry OTLP endpoint (e.g., http://tempo:4317)"
+    )
+    otlp_insecure: bool = Field(
+        default=True, description="Use insecure connection for OTLP"
+    )
+
+    # Message Broker (RabbitMQ)
+    rabbitmq_url: str | None = Field(
+        default=None, description="RabbitMQ connection URL (amqp://user:pass@host:port)"
+    )
+    rabbitmq_exchange: str = Field(
+        default="example_exchange", description="RabbitMQ exchange name"
+    )
+    rabbitmq_queue_prefix: str = Field(
+        default="example", description="RabbitMQ queue name prefix"
+    )
+
+    # Task Queue (Taskiq)
+    taskiq_broker_url: str | None = Field(
+        default=None, description="Taskiq broker URL (redis://host:port or amqp://...)"
+    )
+    taskiq_result_backend: str | None = Field(
+        default=None, description="Taskiq result backend URL"
+    )
+
+    # External Auth
+    auth_token_url: str | None = Field(
+        default=None, description="External auth token validation URL"
+    )
+    auth_token_cache_ttl: int = Field(
+        default=300, description="Auth token cache TTL in seconds"
     )
 
 

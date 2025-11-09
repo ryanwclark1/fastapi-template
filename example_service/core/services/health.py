@@ -205,11 +205,11 @@ class HealthService(BaseService):
             True if cache is accessible, False otherwise.
         """
         try:
-            # TODO: Implement Redis health check
-            # from example_service.infra.cache.redis import get_redis_client
-            # async with get_redis_client() as redis:
-            #     await redis.ping()
-            return True
+            from example_service.infra.cache.redis import get_cache
+
+            async for cache in get_cache():
+                return await cache.health_check()
+            return False
         except Exception as e:
             logger.error(f"Cache health check failed: {e}", extra={"exception": str(e)})
             return False

@@ -1,0 +1,88 @@
+"""Domain event schemas for message publishing and consumption.
+
+This module defines the data structures for events published to
+and consumed from the message broker.
+"""
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from typing import Any
+from uuid import uuid4
+
+from pydantic import BaseModel, Field
+
+
+class BaseEvent(BaseModel):
+    """Base class for all domain events.
+
+    All events should inherit from this class to ensure they have
+    common fields like event_id, timestamp, and event_type.
+    """
+
+    event_id: str = Field(default_factory=lambda: str(uuid4()), description="Unique event ID")
+    event_type: str = Field(description="Type of the event")
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(UTC), description="Event timestamp"
+    )
+    service: str = Field(
+        default="example-service", description="Service that generated the event"
+    )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Additional event metadata"
+    )
+
+    class Config:
+        """Pydantic configuration."""
+
+        json_encoders = {datetime: lambda v: v.isoformat()}
+
+
+class ExampleCreatedEvent(BaseEvent):
+    """Event published when an example entity is created.
+
+    Example:
+        ```python
+        event = ExampleCreatedEvent(
+            event_type="example.created",
+            data={"id": "123", "name": "Example"}
+        )
+        await broker.publish(event, queue="example-events")
+        ```
+    """
+
+    event_type: str = Field(default="example.created", description="Event type")
+    data: dict[str, Any] = Field(description="Entity data")
+
+
+class ExampleUpdatedEvent(BaseEvent):
+    """Event published when an example entity is updated.
+
+    Example:
+        ```python
+        event = ExampleUpdatedEvent(
+            event_type="example.updated",
+            data={"id": "123", "changes": {"name": "New Name"}}
+        )
+        await broker.publish(event, queue="example-events")
+        ```
+    """
+
+    event_type: str = Field(default="example.updated", description="Event type")
+    data: dict[str, Any] = Field(description="Entity data with changes")
+
+
+class ExampleDeletedEvent(BaseEvent):
+    """Event published when an example entity is deleted.
+
+    Example:
+        ```python
+        event = ExampleDeletedEvent(
+            event_type="example.deleted",
+            data={"id": "123"}
+        )
+        await broker.publish(event, queue="example-events")
+        ```
+    """
+
+    event_type: str = Field(default="example.deleted", description="Event type")
+    data: dict[str, Any] = Field(description="Entity identifier")
