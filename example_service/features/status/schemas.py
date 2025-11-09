@@ -13,15 +13,22 @@ class HealthResponse(BaseModel):
             "status": "healthy",
             "timestamp": "2025-01-01T00:00:00Z",
             "service": "example-service",
-            "version": "0.1.0"
+            "version": "0.1.0",
+            "checks": {
+                "database": true,
+                "cache": true
+            }
         }
         ```
     """
 
-    status: str = Field(description="Health status")
+    status: str = Field(description="Health status (healthy, degraded, unhealthy)")
     timestamp: str = Field(description="Check timestamp in ISO format")
     service: str = Field(description="Service name")
     version: str = Field(description="Service version")
+    checks: dict[str, bool] = Field(
+        description="Individual dependency health checks"
+    )
 
     class Config:
         """Pydantic configuration."""
@@ -32,6 +39,7 @@ class HealthResponse(BaseModel):
                 "timestamp": "2025-01-01T00:00:00Z",
                 "service": "example-service",
                 "version": "0.1.0",
+                "checks": {"database": True, "cache": True},
             }
         }
 
@@ -75,13 +83,15 @@ class LivenessResponse(BaseModel):
         ```json
         {
             "alive": true,
-            "timestamp": "2025-01-01T00:00:00Z"
+            "timestamp": "2025-01-01T00:00:00Z",
+            "service": "example-service"
         }
         ```
     """
 
     alive: bool = Field(description="Liveness status")
     timestamp: str = Field(description="Check timestamp in ISO format")
+    service: str = Field(description="Service name")
 
     class Config:
         """Pydantic configuration."""
@@ -89,6 +99,33 @@ class LivenessResponse(BaseModel):
         json_schema_extra = {
             "example": {
                 "alive": True,
+                "timestamp": "2025-01-01T00:00:00Z",
+                "service": "example-service",
+            }
+        }
+
+
+class StartupResponse(BaseModel):
+    """Startup probe response.
+
+    Example:
+        ```json
+        {
+            "started": true,
+            "timestamp": "2025-01-01T00:00:00Z"
+        }
+        ```
+    """
+
+    started: bool = Field(description="Startup completion status")
+    timestamp: str = Field(description="Check timestamp in ISO format")
+
+    class Config:
+        """Pydantic configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "started": True,
                 "timestamp": "2025-01-01T00:00:00Z",
             }
         }
