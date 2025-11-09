@@ -1,0 +1,19 @@
+# Optional YAML configuration for logging settings
+# These settings are overridden by environment variables (LOG_*)
+
+level: INFO
+json: true
+include_uvicorn: true
+
+# Log file
+log_file: logs/example-service.log.jsonl
+max_bytes: 10485760  # 10MB
+backup_count: 5
+
+# Console
+console_enabled: true
+
+# Features
+include_request_id: true
+log_slow_requests: true
+slow_request_threshold: 1.0

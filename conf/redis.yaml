@@ -1,0 +1,17 @@
+# Optional YAML configuration for Redis cache settings
+# These settings are overridden by environment variables (REDIS_*)
+
+# Cache TTL (seconds)
+default_ttl: 3600       # 1 hour
+auth_token_ttl: 300     # 5 minutes
+
+# Connection pool
+pool_size: 10
+pool_timeout: 10
+
+# Retry settings
+max_retries: 3
+retry_delay: 0.5
+
+# Key prefix for isolation
+key_prefix: "example-service:"

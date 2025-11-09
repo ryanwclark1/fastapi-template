@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-service
+  labels:
+    app: example-service
+    version: v1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: example-service
+  template:
+    metadata:
+      labels:
+        app: example-service
+        version: v1
+    spec:
+      containers:
+      - name: example-service
+        image: example-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        env:
+        - name: EXAMPLE_SERVICE_SERVICE_NAME
+          value: "example-service"
+        - name: EXAMPLE_SERVICE_SERVICE_PORT
+          value: "8000"
+        - name: EXAMPLE_SERVICE_LOG_LEVEL
+          value: "INFO"
+        # Database configuration (from secret)
+        - name: EXAMPLE_SERVICE_DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: example-service-secrets
+              key: database-url
+        # Redis configuration (from config)
+        - name: EXAMPLE_SERVICE_REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: example-service-config
+              key: redis-url
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        # Startup probe - gives app time to initialize
+        startupProbe:
+          httpGet:
+            path: /api/v1/health/startup
+            port: http
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 30  # 30 * 5s = 150s max startup time
+        # Liveness probe - restart if unresponsive
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health/live
+            port: http
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        # Readiness probe - remove from service if not ready
+        readinessProbe:
+          httpGet:
+            path: /api/v1/health/ready
+            port: http
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        # Graceful shutdown
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 15"]
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-service
+  labels:
+    app: example-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app: example-service
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-service-config
+data:
+  redis-url: "redis://redis-service:6379/0"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: example-service-secrets
+type: Opaque
+stringData:
+  database-url: "postgresql+asyncpg://user:password@postgres:5432/example_db"

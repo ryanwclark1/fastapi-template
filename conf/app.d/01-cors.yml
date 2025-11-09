@@ -1,0 +1,13 @@
+# CORS configuration override
+# Files in app.d/ are merged alphabetically after app.yaml
+
+cors_allow_credentials: true
+cors_allow_methods:
+  - GET
+  - POST
+  - PUT
+  - PATCH
+  - DELETE
+  - OPTIONS
+cors_allow_headers:
+  - "*"

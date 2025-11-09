@@ -1,0 +1,22 @@
+# Optional YAML configuration for OpenTelemetry settings
+# These settings are overridden by environment variables (OTEL_*)
+
+enabled: false
+endpoint: http://localhost:4317
+
+# Service identification
+service_name: example-service
+service_version: 1.0.0
+
+# Connection
+insecure: true
+timeout: 10
+
+# Sampling
+sample_rate: 1.0
+
+# Instrumentation
+instrument_fastapi: true
+instrument_httpx: true
+instrument_sqlalchemy: true
+instrument_asyncpg: true

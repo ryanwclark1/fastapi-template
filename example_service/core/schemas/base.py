@@ -1,0 +1,129 @@
+"""Base schema classes for API responses."""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import Generic, TypeVar
+
+from pydantic import BaseModel, ConfigDict, Field
+
+T = TypeVar("T")
+
+
+class CustomBase(BaseModel):
+    """Base model with common configuration for all schemas.
+
+    Provides standardized datetime serialization and common settings
+    that should be applied across all Pydantic models in the application.
+
+    Example:
+        ```python
+        class UserResponse(CustomBase):
+            id: str
+            email: str
+            created_at: datetime
+        ```
+    """
+
+    model_config = ConfigDict(
+        # Serialize datetimes as ISO 8601 strings
+        json_encoders={
+            datetime: lambda v: v.isoformat(),
+        },
+        # Validate on assignment (not just initialization)
+        validate_assignment=True,
+        # Use enum values instead of names
+        use_enum_values=True,
+        # Populate models by field name (not alias)
+        populate_by_name=True,
+        # Don't allow extra fields by default
+        extra="forbid",
+    )
+
+
+class TimestampedBase(CustomBase):
+    """Base model with timestamp fields.
+
+    Includes created_at and updated_at timestamp fields
+    that are common across many models.
+    """
+
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Creation timestamp",
+    )
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Last update timestamp",
+    )
+
+
+class APIResponse(BaseModel, Generic[T]):
+    """Generic API response wrapper.
+
+    Wraps response data in a consistent structure with metadata.
+
+    Example:
+        ```python
+        @router.get("/items", response_model=APIResponse[list[Item]])
+        async def list_items() -> APIResponse[list[Item]]:
+            items = await get_items()
+            return APIResponse(
+                data=items,
+                message="Items retrieved successfully"
+            )
+        ```
+    """
+
+    success: bool = Field(default=True, description="Operation success status")
+    message: str | None = Field(default=None, description="Response message")
+    data: T | None = Field(default=None, description="Response data")
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    """Paginated response wrapper.
+
+    Wraps paginated data with pagination metadata.
+
+    Example:
+        ```python
+        @router.get("/items", response_model=PaginatedResponse[Item])
+        async def list_items(page: int = 1, page_size: int = 20):
+            items, total = await get_paginated_items(page, page_size)
+            return PaginatedResponse(
+                items=items,
+                total=total,
+                page=page,
+                page_size=page_size
+            )
+        ```
+    """
+
+    items: list[T] = Field(default_factory=list, description="Paginated items")
+    total: int = Field(description="Total number of items")
+    page: int = Field(ge=1, description="Current page number")
+    page_size: int = Field(ge=1, le=100, description="Items per page")
+    total_pages: int = Field(description="Total number of pages")
+
+    @classmethod
+    def create(
+        cls, items: list[T], total: int, page: int, page_size: int
+    ) -> PaginatedResponse[T]:
+        """Create paginated response with calculated total pages.
+
+        Args:
+            items: List of items for current page.
+            total: Total number of items.
+            page: Current page number.
+            page_size: Number of items per page.
+
+        Returns:
+            PaginatedResponse instance with calculated fields.
+        """
+        total_pages = (total + page_size - 1) // page_size
+        return cls(
+            items=items,
+            total=total,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages,
+        )

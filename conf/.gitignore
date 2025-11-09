@@ -1,0 +1,8 @@
+# Ignore local overrides and secrets
+*.local.yaml
+*.local.yml
+**/secrets/
+**/*secret*.yaml
+**/*secret*.yml
+**/*password*.yaml
+**/*password*.yml

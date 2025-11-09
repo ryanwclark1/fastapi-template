@@ -1,0 +1,95 @@
+"""External authentication service settings."""
+
+from __future__ import annotations
+
+from pydantic import AnyUrl, Field, SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from .sources import app_source  # Auth settings can share app_source
+
+
+class AuthSettings(BaseSettings):
+    """External authentication and authorization settings.
+
+    Environment variables use AUTH_ prefix.
+    Example: AUTH_SERVICE_URL="http://auth-service:8000"
+    """
+
+    # Auth service endpoints
+    service_url: AnyUrl | None = Field(
+        default=None,
+        alias="AUTH_SERVICE_URL",
+        description="Base URL for authentication service",
+    )
+    token_validation_endpoint: str = Field(
+        default="/api/v1/auth/validate",
+        description="Token validation endpoint path",
+    )
+
+    # Token settings
+    token_cache_ttl: int = Field(
+        default=300, ge=0, description="Validated token cache TTL in seconds"
+    )
+    token_header: str = Field(
+        default="Authorization", description="HTTP header containing the token"
+    )
+    token_scheme: str = Field(
+        default="Bearer", description="Token authentication scheme"
+    )
+
+    # Service-to-service authentication
+    service_token: SecretStr | None = Field(
+        default=None, description="Service token for service-to-service auth"
+    )
+    service_id: str | None = Field(
+        default=None, description="Service identifier for service-to-service auth"
+    )
+
+    # Retry and timeout settings
+    request_timeout: float = Field(
+        default=5.0, ge=0.1, le=30.0, description="Auth request timeout in seconds"
+    )
+    max_retries: int = Field(
+        default=3, ge=0, le=5, description="Maximum retry attempts"
+    )
+
+    # Optional features
+    enable_permission_caching: bool = Field(
+        default=True, description="Cache user permissions"
+    )
+    enable_role_caching: bool = Field(
+        default=True, description="Cache user roles"
+    )
+
+    model_config = SettingsConfigDict(
+        env_prefix="AUTH_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        frozen=True,
+        populate_by_name=True,
+    )
+
+    @classmethod
+    def settings_customise_sources(
+        cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings
+    ):
+        """Customize settings source precedence."""
+
+        def files_source(_):
+            return app_source()  # Share with app or create auth_source()
+
+        return (init_settings, files_source, env_settings, dotenv_settings, file_secret_settings)
+
+    @property
+    def is_configured(self) -> bool:
+        """Check if auth service is configured."""
+        return self.service_url is not None
+
+    def get_validation_url(self) -> str:
+        """Get full token validation URL."""
+        if not self.service_url:
+            raise ValueError("Auth service URL not configured")
+        base = str(self.service_url).rstrip("/")
+        endpoint = self.token_validation_endpoint.lstrip("/")
+        return f"{base}/{endpoint}"

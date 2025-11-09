@@ -1,0 +1,16 @@
+# Optional YAML configuration for database settings
+# These settings are overridden by environment variables (DB_*)
+
+# Connection pool settings
+pool_size: 10
+pool_min: 1
+max_overflow: 10
+pool_timeout: 30
+pool_recycle: 1800
+pool_pre_ping: true
+echo_sql: false
+
+# psycopg3 native pool
+pg_min_size: 1
+pg_max_size: 10
+pg_timeout: 30.0
