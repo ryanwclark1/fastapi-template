@@ -293,10 +293,10 @@ EXAMPLE_SERVICE_DEBUG=true
 EXAMPLE_SERVICE_LOG_LEVEL=DEBUG
 
 # Database (local PostgreSQL)
-EXAMPLE_SERVICE_DATABASE_URL=postgresql+asyncpg://localhost/example_service
+EXAMPLE_SERVICE_DATABASE_URL=postgresql+psycopg://localhost/example_service
 
 # Or use Docker database
-EXAMPLE_SERVICE_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/example_service
+EXAMPLE_SERVICE_DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/example_service
 
 # Cache (local Redis)
 EXAMPLE_SERVICE_REDIS_URL=redis://localhost:6379/0

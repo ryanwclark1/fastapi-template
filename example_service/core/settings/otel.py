@@ -59,8 +59,8 @@ class OtelSettings(BaseSettings):
     instrument_sqlalchemy: bool = Field(
         default=True, description="Instrument SQLAlchemy"
     )
-    instrument_asyncpg: bool = Field(
-        default=True, description="Instrument asyncpg PostgreSQL driver"
+    instrument_psycopg: bool = Field(
+        default=True, description="Instrument psycopg PostgreSQL driver"
     )
 
     model_config = SettingsConfigDict(

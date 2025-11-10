@@ -264,7 +264,7 @@ docker build -t example-service:latest .
 
 # Run container
 docker run -p 8000:8000 \
-  -e EXAMPLE_SERVICE_DATABASE_URL=postgresql+asyncpg://... \
+  -e EXAMPLE_SERVICE_DATABASE_URL=postgresql+psycopg://... \
   example-service:latest
 ```
 

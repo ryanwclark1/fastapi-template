@@ -1,7 +1,7 @@
 """OpenTelemetry tracing configuration and setup.
 
 Provides distributed tracing for the service with automatic instrumentation
-for FastAPI, HTTPX, SQLAlchemy, and asyncpg.
+for FastAPI, HTTPX, SQLAlchemy, and psycopg.
 
 Traces are exported via OTLP to collectors like Jaeger, Tempo, or Zipkin.
 """
@@ -15,7 +15,7 @@ from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExport
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
-from opentelemetry.instrumentation.asyncpg import AsyncPGInstrumentor
+from opentelemetry.instrumentation.psycopg import PsycopgInstrumentor
 from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_VERSION
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -32,7 +32,7 @@ def setup_tracing() -> None:
     - OTLP exporter to send traces to collector
     - Resource attributes (service name, version)
     - TracerProvider with batch span processor
-    - Automatic instrumentation for FastAPI, HTTPX, SQLAlchemy, asyncpg
+    - Automatic instrumentation for FastAPI, HTTPX, SQLAlchemy, psycopg
 
     This should be called once at application startup, before creating
     the FastAPI app.
@@ -98,7 +98,7 @@ def _setup_instrumentations() -> None:
     Instruments:
     - HTTPX: Traces all outgoing HTTP requests
     - SQLAlchemy: Traces all database queries
-    - asyncpg: Traces PostgreSQL operations
+    - psycopg: Traces PostgreSQL operations
     - FastAPI: Automatically done when app is created
 
     Note: FastAPI instrumentation happens when you call
@@ -112,9 +112,9 @@ def _setup_instrumentations() -> None:
     SQLAlchemyInstrumentor().instrument()
     logger.debug("SQLAlchemy instrumentation enabled")
 
-    # Instrument asyncpg for PostgreSQL operations
-    AsyncPGInstrumentor().instrument()
-    logger.debug("asyncpg instrumentation enabled")
+    # Instrument psycopg for PostgreSQL operations
+    PsycopgInstrumentor().instrument()
+    logger.debug("psycopg instrumentation enabled")
 
 
 def instrument_app(app: Any) -> None:

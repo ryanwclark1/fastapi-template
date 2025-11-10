@@ -19,4 +19,4 @@ sample_rate: 1.0
 instrument_fastapi: true
 instrument_httpx: true
 instrument_sqlalchemy: true
-instrument_asyncpg: true
+instrument_psycopg: true

@@ -183,7 +183,7 @@ metadata:
   name: example-service-secrets
 type: Opaque
 stringData:
-  database-url: "postgresql+asyncpg://user:password@postgres:5432/db"
+  database-url: "postgresql+psycopg://user:password@postgres:5432/db"
   jwt-secret: "your-secret-key"
 ```
 

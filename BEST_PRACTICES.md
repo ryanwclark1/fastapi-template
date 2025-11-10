@@ -1089,7 +1089,7 @@ async def handle_user_event(event: UserEvent) -> None:
 # - FastAPI endpoints
 # - HTTPX requests
 # - SQLAlchemy queries
-# - asyncpg operations
+# - psycopg operations
 ```
 
 ### Custom Spans
