@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class StatusEnum(str, Enum):
@@ -26,12 +26,16 @@ class HealthStatus(str, Enum):
 class MessageResponse(BaseModel):
     """Simple message response."""
 
-    message: str = Field(description="Response message")
+    message: str = Field(
+        min_length=1,
+        max_length=1000,
+        description="Response message"
+    )
     success: bool = Field(default=True, description="Operation success status")
 
-    class Config:
-        """Pydantic configuration."""
-
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {"message": "Operation completed successfully", "success": True}
-        }
+        },
+        str_strip_whitespace=True,
+    )

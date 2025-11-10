@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class TokenPayload(BaseModel):
@@ -13,21 +13,55 @@ class TokenPayload(BaseModel):
     after validating a token.
     """
 
-    sub: str = Field(description="Subject (user ID or service ID)")
-    user_id: str | None = Field(default=None, description="User ID if authenticated as user")
-    service_id: str | None = Field(
-        default=None, description="Service ID if authenticated as service"
+    sub: str = Field(min_length=1, max_length=255, description="Subject (user ID or service ID)")
+    user_id: str | None = Field(
+        default=None,
+        max_length=255,
+        description="User ID if authenticated as user"
     )
-    email: str | None = Field(default=None, description="User email")
-    roles: list[str] = Field(default_factory=list, description="User or service roles")
-    permissions: list[str] = Field(default_factory=list, description="Granted permissions")
+    service_id: str | None = Field(
+        default=None,
+        max_length=255,
+        description="Service ID if authenticated as service"
+    )
+    email: EmailStr | None = Field(default=None, description="User email")
+    roles: list[str] = Field(
+        default_factory=list,
+        max_length=50,
+        description="User or service roles"
+    )
+    permissions: list[str] = Field(
+        default_factory=list,
+        max_length=200,
+        description="Granted permissions"
+    )
     acl: dict[str, Any] = Field(
         default_factory=dict, description="Access Control List with resource permissions"
     )
-    exp: int | None = Field(default=None, description="Token expiration timestamp")
-    iat: int | None = Field(default=None, description="Token issued at timestamp")
+    exp: int | None = Field(default=None, ge=0, description="Token expiration timestamp")
+    iat: int | None = Field(default=None, ge=0, description="Token issued at timestamp")
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="Additional user/service metadata"
+    )
+
+    @field_validator("roles", mode="after")
+    @classmethod
+    def validate_roles(cls, v: list[str]) -> list[str]:
+        """Validate role names are not empty."""
+        if any(not role.strip() for role in v):
+            raise ValueError("Role names cannot be empty or whitespace")
+        return v
+
+    @field_validator("permissions", mode="after")
+    @classmethod
+    def validate_permissions(cls, v: list[str]) -> list[str]:
+        """Validate permission names are not empty."""
+        if any(not perm.strip() for perm in v):
+            raise ValueError("Permission names cannot be empty or whitespace")
+        return v
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
     )
 
 
@@ -38,16 +72,44 @@ class AuthUser(BaseModel):
     dependency injection after successful authentication.
     """
 
-    user_id: str | None = Field(default=None, description="User ID")
-    service_id: str | None = Field(default=None, description="Service ID")
-    email: str | None = Field(default=None, description="User email")
-    roles: list[str] = Field(default_factory=list, description="User or service roles")
-    permissions: list[str] = Field(default_factory=list, description="Granted permissions")
+    user_id: str | None = Field(default=None, max_length=255, description="User ID")
+    service_id: str | None = Field(default=None, max_length=255, description="Service ID")
+    email: EmailStr | None = Field(default=None, description="User email")
+    roles: list[str] = Field(
+        default_factory=list,
+        max_length=50,
+        description="User or service roles"
+    )
+    permissions: list[str] = Field(
+        default_factory=list,
+        max_length=200,
+        description="Granted permissions"
+    )
     acl: dict[str, Any] = Field(
         default_factory=dict, description="Access Control List with resource permissions"
     )
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="Additional user/service metadata"
+    )
+
+    @field_validator("roles", mode="after")
+    @classmethod
+    def validate_roles(cls, v: list[str]) -> list[str]:
+        """Validate role names are not empty."""
+        if any(not role.strip() for role in v):
+            raise ValueError("Role names cannot be empty or whitespace")
+        return v
+
+    @field_validator("permissions", mode="after")
+    @classmethod
+    def validate_permissions(cls, v: list[str]) -> list[str]:
+        """Validate permission names are not empty."""
+        if any(not perm.strip() for perm in v):
+            raise ValueError("Permission names cannot be empty or whitespace")
+        return v
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
     )
 
     @property
@@ -74,6 +136,8 @@ class AuthUser(BaseModel):
         Returns:
             True if permission is granted, False otherwise.
         """
+        if not permission or not permission.strip():
+            return False
         return permission in self.permissions
 
     def has_role(self, role: str) -> bool:
@@ -85,6 +149,8 @@ class AuthUser(BaseModel):
         Returns:
             True if role is assigned, False otherwise.
         """
+        if not role or not role.strip():
+            return False
         return role in self.roles
 
     def can_access_resource(self, resource: str, action: str) -> bool:
@@ -104,6 +170,9 @@ class AuthUser(BaseModel):
                 pass
             ```
         """
+        if not resource or not resource.strip() or not action or not action.strip():
+            return False
+
         if resource not in self.acl:
             return False
 

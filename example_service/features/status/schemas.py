@@ -1,7 +1,11 @@
 """Status and health check response schemas."""
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from example_service.core.schemas.common import HealthStatus
 
 
 class HealthResponse(BaseModel):
@@ -22,18 +26,17 @@ class HealthResponse(BaseModel):
         ```
     """
 
-    status: str = Field(description="Health status (healthy, degraded, unhealthy)")
-    timestamp: str = Field(description="Check timestamp in ISO format")
-    service: str = Field(description="Service name")
-    version: str = Field(description="Service version")
+    status: HealthStatus = Field(description="Health status (healthy, degraded, unhealthy)")
+    timestamp: datetime = Field(description="Check timestamp")
+    service: str = Field(min_length=1, max_length=100, description="Service name")
+    version: str = Field(min_length=1, max_length=50, description="Service version")
     checks: dict[str, bool] = Field(
+        default_factory=dict,
         description="Individual dependency health checks"
     )
 
-    class Config:
-        """Pydantic configuration."""
-
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "status": "healthy",
                 "timestamp": "2025-01-01T00:00:00Z",
@@ -41,7 +44,10 @@ class HealthResponse(BaseModel):
                 "version": "0.1.0",
                 "checks": {"database": True, "cache": True},
             }
-        }
+        },
+        json_encoders={datetime: lambda v: v.isoformat()},
+        str_strip_whitespace=True,
+    )
 
 
 class ReadinessResponse(BaseModel):
@@ -61,19 +67,22 @@ class ReadinessResponse(BaseModel):
     """
 
     ready: bool = Field(description="Overall readiness status")
-    checks: dict[str, bool] = Field(description="Individual dependency checks")
-    timestamp: str = Field(description="Check timestamp in ISO format")
+    checks: dict[str, bool] = Field(
+        default_factory=dict,
+        description="Individual dependency checks"
+    )
+    timestamp: datetime = Field(description="Check timestamp")
 
-    class Config:
-        """Pydantic configuration."""
-
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "ready": True,
                 "checks": {"database": True, "cache": True},
                 "timestamp": "2025-01-01T00:00:00Z",
             }
-        }
+        },
+        json_encoders={datetime: lambda v: v.isoformat()},
+    )
 
 
 class LivenessResponse(BaseModel):
@@ -90,19 +99,20 @@ class LivenessResponse(BaseModel):
     """
 
     alive: bool = Field(description="Liveness status")
-    timestamp: str = Field(description="Check timestamp in ISO format")
-    service: str = Field(description="Service name")
+    timestamp: datetime = Field(description="Check timestamp")
+    service: str = Field(min_length=1, max_length=100, description="Service name")
 
-    class Config:
-        """Pydantic configuration."""
-
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "alive": True,
                 "timestamp": "2025-01-01T00:00:00Z",
                 "service": "example-service",
             }
-        }
+        },
+        json_encoders={datetime: lambda v: v.isoformat()},
+        str_strip_whitespace=True,
+    )
 
 
 class StartupResponse(BaseModel):
@@ -118,14 +128,14 @@ class StartupResponse(BaseModel):
     """
 
     started: bool = Field(description="Startup completion status")
-    timestamp: str = Field(description="Check timestamp in ISO format")
+    timestamp: datetime = Field(description="Check timestamp")
 
-    class Config:
-        """Pydantic configuration."""
-
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "started": True,
                 "timestamp": "2025-01-01T00:00:00Z",
             }
-        }
+        },
+        json_encoders={datetime: lambda v: v.isoformat()},
+    )
