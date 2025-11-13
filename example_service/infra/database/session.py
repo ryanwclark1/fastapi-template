@@ -8,18 +8,24 @@ from contextlib import asynccontextmanager
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from example_service.core.settings import settings
+from example_service.core.settings import get_app_settings, get_db_settings
 from example_service.utils.retry import retry
 
 logger = logging.getLogger(__name__)
 
-# Create async engine
+# Load settings
+db_settings = get_db_settings()
+app_settings = get_app_settings()
+
+# Create async engine with psycopg driver
 engine = create_async_engine(
-    settings.database_url if settings.database_url else "sqlite+aiosqlite:///./test.db",
-    pool_size=settings.database_pool_size,
-    max_overflow=settings.database_max_overflow,
-    pool_pre_ping=True,  # Verify connections before using
-    echo=settings.debug,  # Log SQL statements in debug mode
+    str(db_settings.database_url) if db_settings.database_url else "sqlite+aiosqlite:///./test.db",
+    pool_size=db_settings.pool_size,
+    max_overflow=db_settings.max_overflow,
+    pool_timeout=db_settings.pool_timeout,
+    pool_recycle=db_settings.pool_recycle,
+    pool_pre_ping=db_settings.pool_pre_ping,
+    echo=db_settings.echo_sql or app_settings.debug,
 )
 
 # Create session factory
@@ -80,12 +86,12 @@ async def init_database() -> None:
 
         logger.info(
             "Database connection established successfully",
-            extra={"url": settings.database_url},
+            extra={"url": str(db_settings.database_url) if db_settings.database_url else "sqlite"},
         )
     except Exception as e:
         logger.error(
             "Failed to connect to database",
-            extra={"url": settings.database_url, "error": str(e)},
+            extra={"url": str(db_settings.database_url) if db_settings.database_url else "sqlite", "error": str(e)},
         )
         raise
 

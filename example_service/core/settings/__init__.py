@@ -21,6 +21,7 @@ Configuration precedence (highest to lowest):
 
 from __future__ import annotations
 
+from .combined import settings
 from .loader import (
     get_app_settings,
     get_auth_settings,
@@ -32,6 +33,7 @@ from .loader import (
 )
 
 __all__ = [
+    "settings",  # Combined settings object for backward compatibility
     "get_app_settings",
     "get_db_settings",
     "get_rabbit_settings",
