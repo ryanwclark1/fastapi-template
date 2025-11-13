@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import Field
+from pydantic import AnyUrl, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .sources import otel_source
@@ -19,17 +19,23 @@ class OtelSettings(BaseSettings):
     enabled: bool = Field(default=False, description="Enable OpenTelemetry tracing")
 
     # OTLP exporter endpoint
-    endpoint: str | None = Field(
+    endpoint: AnyUrl | None = Field(
         default=None,
         description="OTLP gRPC endpoint (e.g., http://tempo:4317, http://jaeger:4317)",
     )
 
     # Service identification
     service_name: str = Field(
-        default="example-service", description="Service name for tracing"
+        default="example-service",
+        min_length=1,
+        max_length=100,
+        description="Service name for tracing"
     )
     service_version: str = Field(
-        default="1.0.0", description="Service version for tracing"
+        default="1.0.0",
+        min_length=1,
+        max_length=50,
+        description="Service version for tracing"
     )
 
     # Connection settings
@@ -62,6 +68,13 @@ class OtelSettings(BaseSettings):
     instrument_asyncpg: bool = Field(
         default=True, description="Instrument asyncpg PostgreSQL driver"
     )
+
+    @model_validator(mode="after")
+    def validate_enabled_requires_endpoint(self) -> "OtelSettings":
+        """Validate that if tracing is enabled, an endpoint must be provided."""
+        if self.enabled and not self.endpoint:
+            raise ValueError("OTEL endpoint must be provided when tracing is enabled")
+        return self
 
     model_config = SettingsConfigDict(
         env_prefix="OTEL_",
