@@ -60,20 +60,26 @@ _pool: AsyncConnectionPool | None = None
     jitter=True,
 )
 async def create_pool() -> AsyncConnectionPool:
-    """Create and configure psycopg native connection pool.
+    """Create and configure psycopg native connection pool with tenacity-like retry.
 
-    Creates an AsyncConnectionPool with settings from PostgresSettings.
-    Pool is configured with:
-    - min_size: Minimum number of connections to keep
-    - max_size: Maximum number of connections allowed
-    - max_idle: Maximum idle time before connection recycling
-    - timeout: Timeout for acquiring a connection
+    Uses custom @retry decorator that provides:
+    - **Max attempts**: 5 retry attempts before failure
+    - **Exponential backoff**: delays of 1s, 2s, 4s, 8s, 16s (capped at 30s)
+    - **Jitter**: Random 50-150% multiplier to prevent thundering herd
+    - **Automatic logging**: Logs each retry attempt with details
+
+    Creates an AsyncConnectionPool with settings from PostgresSettings:
+    - **min_size**: Minimum number of connections to keep (default: 1)
+    - **max_size**: Maximum number of connections allowed (default: 10)
+    - **max_idle**: Maximum idle time before connection recycling
+    - **timeout**: Timeout for acquiring a connection (default: 30s)
 
     Returns:
         Configured AsyncConnectionPool instance.
 
     Raises:
-        ConnectionError: If unable to create pool or connect to database.
+        RetryError: If unable to create pool or connect after all 5 retry attempts.
+                   Contains the last exception and attempt count.
 
     Example:
         ```python

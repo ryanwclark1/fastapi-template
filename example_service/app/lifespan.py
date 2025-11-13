@@ -26,20 +26,33 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Manage application lifecycle.
+    """Manage application lifecycle with tenacity-like retry and graceful error handling.
 
-    Handles startup and shutdown events for the application including:
+    **Startup Phase**:
+    Handles startup events for the application including:
     - Logging configuration
     - OpenTelemetry tracing setup
-    - Database connections
-    - Cache connections
-    - Message broker connections
+    - Database connections (with exponential backoff retry - FAIL-FAST if critical)
+    - Cache connections (with error handling - CONTINUE if optional)
+    - Message broker connections (with error handling - CONTINUE if optional)
+
+    **Retry Strategy**:
+    - Database initialization uses @retry decorator: 5 attempts, 1-30s delays with jitter
+    - Ensures database availability before accepting HTTP requests
+    - Prevents cascading failures in containerized environments
+
+    **Shutdown Phase**:
+    Gracefully closes all connections with error handling to ensure
+    clean shutdown even if individual components fail to close properly.
 
     Args:
         app: FastAPI application instance.
 
     Yields:
         None during application runtime.
+
+    Raises:
+        Exception: Re-raises database initialization failures (fail-fast pattern).
     """
     # Load settings (cached after first call)
     app_settings = get_app_settings()
@@ -66,30 +79,70 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             extra={"endpoint": otel_settings.endpoint},
         )
 
-    # Initialize database connection with retry
+    # Initialize database connection with exponential backoff retry
+    # Uses @retry decorator: 5 attempts, 1s-30s delays with jitter
+    # Ensures database is available before accepting requests (fail-fast)
     if db_settings.is_configured:
-        await init_database()
-        logger.info("Database connection initialized")
+        try:
+            await init_database()
+            logger.info(
+                "Database connection initialized successfully",
+                extra={
+                    "driver": "psycopg",
+                    "pool_size": db_settings.pool_size,
+                    "max_overflow": db_settings.max_overflow,
+                    "pool_pre_ping": db_settings.pool_pre_ping,
+                },
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to initialize database after all retry attempts",
+                extra={"error": str(e), "error_type": type(e).__name__},
+            )
+            # Re-raise to prevent startup with broken database
+            # Application should fail-fast if database is required
+            raise
 
-    # Initialize Redis cache
+    # Initialize Redis cache with error handling
     if redis_settings.is_configured:
-        await start_cache()
-        logger.info("Redis cache initialized")
+        try:
+            await start_cache()
+            logger.info(
+                "Redis cache initialized successfully",
+                extra={"pool_size": redis_settings.pool_size},
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to initialize Redis cache",
+                extra={"error": str(e), "error_type": type(e).__name__},
+            )
+            # Cache failure may not be critical - decide based on requirements
+            # For now, log and continue (optional component)
+            pass
 
-    # Initialize RabbitMQ/FastStream broker
+    # Initialize RabbitMQ/FastStream broker with error handling
     if rabbit_settings.is_configured:
-        await start_broker()
-        # Import handlers to register subscribers
-        import example_service.infra.messaging.handlers  # noqa: F401
+        try:
+            await start_broker()
+            # Import handlers to register subscribers
+            import example_service.infra.messaging.handlers  # noqa: F401
 
-        logger.info("RabbitMQ broker initialized")
+            logger.info("RabbitMQ broker initialized successfully")
 
-        # Initialize Taskiq broker for background tasks (uses same RabbitMQ)
-        await start_taskiq()
-        # Import tasks to register them
-        import example_service.infra.tasks.tasks  # noqa: F401
+            # Initialize Taskiq broker for background tasks (uses same RabbitMQ)
+            await start_taskiq()
+            # Import tasks to register them
+            import example_service.infra.tasks.tasks  # noqa: F401
 
-        logger.info("Taskiq broker initialized")
+            logger.info("Taskiq broker initialized successfully")
+        except Exception as e:
+            logger.error(
+                "Failed to initialize RabbitMQ/Taskiq broker",
+                extra={"error": str(e), "error_type": type(e).__name__},
+            )
+            # Message broker failure may not be critical - decide based on requirements
+            # For now, log and continue (optional component)
+            pass
 
     logger.info(
         "Application startup complete",
@@ -115,24 +168,52 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         "Application shutting down", extra={"service": app_settings.service_name}
     )
 
+    # Graceful shutdown with error handling for each component
     # Close Taskiq broker first (depends on RabbitMQ)
     if rabbit_settings.is_configured:
-        await stop_taskiq()
-        logger.info("Taskiq broker closed")
+        try:
+            await stop_taskiq()
+            logger.info("Taskiq broker closed successfully")
+        except Exception as e:
+            logger.error(
+                "Error closing Taskiq broker",
+                extra={"error": str(e), "error_type": type(e).__name__},
+            )
 
     # Close RabbitMQ broker
     if rabbit_settings.is_configured:
-        await stop_broker()
-        logger.info("RabbitMQ broker closed")
+        try:
+            await stop_broker()
+            logger.info("RabbitMQ broker closed successfully")
+        except Exception as e:
+            logger.error(
+                "Error closing RabbitMQ broker",
+                extra={"error": str(e), "error_type": type(e).__name__},
+            )
 
     # Close Redis cache
     if redis_settings.is_configured:
-        await stop_cache()
-        logger.info("Redis cache closed")
+        try:
+            await stop_cache()
+            logger.info("Redis cache closed successfully")
+        except Exception as e:
+            logger.error(
+                "Error closing Redis cache",
+                extra={"error": str(e), "error_type": type(e).__name__},
+            )
 
-    # Close database connection
+    # Close database connection (SQLAlchemy engine dispose)
     if db_settings.is_configured:
-        await close_database()
-        logger.info("Database connection closed")
+        try:
+            await close_database()
+            logger.info("Database connection closed successfully")
+        except Exception as e:
+            logger.error(
+                "Error closing database connection",
+                extra={"error": str(e), "error_type": type(e).__name__},
+            )
 
-    logger.info("Application shutdown complete")
+    logger.info(
+        "Application shutdown complete",
+        extra={"service": app_settings.service_name},
+    )

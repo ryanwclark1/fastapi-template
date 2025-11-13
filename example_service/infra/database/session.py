@@ -67,15 +67,26 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     jitter=True,
 )
 async def init_database() -> None:
-    """Initialize database connection with retry logic.
+    """Initialize database connection with tenacity-like exponential backoff retry.
 
-    This function attempts to connect to the database with exponential
-    backoff retry. This is useful during application startup when the
-    database might not be immediately available (e.g., in containerized
-    environments).
+    Uses custom @retry decorator that provides:
+    - **Max attempts**: 5 retry attempts before failure
+    - **Exponential backoff**: delays of 1s, 2s, 4s, 8s, 16s (capped at 30s)
+    - **Jitter**: Random 50-150% multiplier to prevent thundering herd
+    - **Automatic logging**: Logs each retry attempt with details
+
+    This is essential during application startup when the database might not be
+    immediately available (e.g., in containerized/Kubernetes environments where
+    the database pod may start after the application pod).
+
+    The retry logic ensures:
+    1. Database is available before accepting HTTP requests
+    2. Transient network issues don't cause startup failures
+    3. Graceful handling of database startup delays
 
     Raises:
-        ConnectionError: If unable to connect after all retry attempts.
+        RetryError: If unable to connect after all 5 retry attempts.
+                   Contains the last exception and attempt count.
     """
     logger.info("Initializing database connection with retry")
 
