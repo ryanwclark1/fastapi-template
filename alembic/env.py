@@ -12,6 +12,10 @@ from alembic import context
 from example_service.core.settings import settings
 from example_service.infra.database.base import Base
 
+# Import all models for Alembic autogenerate support
+# This ensures Alembic can detect model changes
+from example_service.core.models import User, Product  # noqa: F401
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
