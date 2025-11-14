@@ -58,7 +58,7 @@ class HealthService(BaseService):
 
         return {
             "status": status,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(timezone.utc),
             "service": settings.service_name,
             "version": "0.1.0",
             "checks": checks,
@@ -92,7 +92,7 @@ class HealthService(BaseService):
         return {
             "ready": all_ready,
             "checks": checks,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(timezone.utc),
         }
 
     async def liveness(self) -> dict[str, Any]:
@@ -115,7 +115,7 @@ class HealthService(BaseService):
         """
         return {
             "alive": True,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(timezone.utc),
             "service": settings.service_name,
         }
 
@@ -132,7 +132,7 @@ class HealthService(BaseService):
         # Add initialization checks here if needed
         return {
             "started": True,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(timezone.utc),
         }
 
     async def _perform_health_checks(self) -> dict[str, bool]:

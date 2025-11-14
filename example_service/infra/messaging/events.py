@@ -6,10 +6,10 @@ and consumed from the message broker.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class BaseEvent(BaseModel):
@@ -20,21 +20,24 @@ class BaseEvent(BaseModel):
     """
 
     event_id: str = Field(default_factory=lambda: str(uuid4()), description="Unique event ID")
-    event_type: str = Field(description="Type of the event")
+    event_type: str = Field(min_length=1, max_length=100, description="Type of the event")
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(UTC), description="Event timestamp"
     )
     service: str = Field(
-        default="example-service", description="Service that generated the event"
+        default="example-service",
+        min_length=1,
+        max_length=100,
+        description="Service that generated the event"
     )
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="Additional event metadata"
     )
 
-    class Config:
-        """Pydantic configuration."""
-
-        json_encoders = {datetime: lambda v: v.isoformat()}
+    model_config = ConfigDict(
+        json_encoders={datetime: lambda v: v.isoformat()},
+        str_strip_whitespace=True,
+    )
 
 
 class ExampleCreatedEvent(BaseEvent):
@@ -43,14 +46,16 @@ class ExampleCreatedEvent(BaseEvent):
     Example:
         ```python
         event = ExampleCreatedEvent(
-            event_type="example.created",
             data={"id": "123", "name": "Example"}
         )
         await broker.publish(event, queue="example-events")
         ```
     """
 
-    event_type: str = Field(default="example.created", description="Event type")
+    event_type: Literal["example.created"] = Field(
+        default="example.created",
+        description="Event type"
+    )
     data: dict[str, Any] = Field(description="Entity data")
 
 
@@ -60,14 +65,16 @@ class ExampleUpdatedEvent(BaseEvent):
     Example:
         ```python
         event = ExampleUpdatedEvent(
-            event_type="example.updated",
             data={"id": "123", "changes": {"name": "New Name"}}
         )
         await broker.publish(event, queue="example-events")
         ```
     """
 
-    event_type: str = Field(default="example.updated", description="Event type")
+    event_type: Literal["example.updated"] = Field(
+        default="example.updated",
+        description="Event type"
+    )
     data: dict[str, Any] = Field(description="Entity data with changes")
 
 
@@ -77,12 +84,14 @@ class ExampleDeletedEvent(BaseEvent):
     Example:
         ```python
         event = ExampleDeletedEvent(
-            event_type="example.deleted",
             data={"id": "123"}
         )
         await broker.publish(event, queue="example-events")
         ```
     """
 
-    event_type: str = Field(default="example.deleted", description="Event type")
+    event_type: Literal["example.deleted"] = Field(
+        default="example.deleted",
+        description="Event type"
+    )
     data: dict[str, Any] = Field(description="Entity identifier")

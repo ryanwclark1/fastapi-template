@@ -27,12 +27,25 @@ class RabbitSettings(BaseSettings):
     # Queue configuration
     queue_prefix: str = Field(
         default="example-service",
-        description="Prefix for queue names (enables multi-environment setup)",
+        min_length=1,
+        max_length=100,
+        pattern=r"^[a-zA-Z0-9_-]+$",
+        description="Prefix for queue names (alphanumeric, hyphens, underscores only)",
     )
     exchange: str = Field(
-        default="example-service", description="Default exchange name"
+        default="example-service",
+        min_length=1,
+        max_length=100,
+        pattern=r"^[a-zA-Z0-9_.-]+$",
+        description="Default exchange name (alphanumeric, hyphens, underscores, dots)"
     )
-    queue: str = Field(default="tasks_queue", description="Default queue name")
+    queue: str = Field(
+        default="tasks_queue",
+        min_length=1,
+        max_length=100,
+        pattern=r"^[a-zA-Z0-9_-]+$",
+        description="Default queue name (alphanumeric, hyphens, underscores only)"
+    )
 
     # Consumer configuration
     prefetch_count: int = Field(

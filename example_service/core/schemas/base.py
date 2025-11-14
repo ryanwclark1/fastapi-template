@@ -37,6 +37,8 @@ class CustomBase(BaseModel):
         populate_by_name=True,
         # Don't allow extra fields by default
         extra="forbid",
+        # Strip leading/trailing whitespace from strings
+        str_strip_whitespace=True,
     )
 
 
@@ -89,7 +91,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
         @router.get("/items", response_model=PaginatedResponse[Item])
         async def list_items(page: int = 1, page_size: int = 20):
             items, total = await get_paginated_items(page, page_size)
-            return PaginatedResponse(
+            return PaginatedResponse.create(
                 items=items,
                 total=total,
                 page=page,
@@ -99,10 +101,10 @@ class PaginatedResponse(BaseModel, Generic[T]):
     """
 
     items: list[T] = Field(default_factory=list, description="Paginated items")
-    total: int = Field(description="Total number of items")
+    total: int = Field(ge=0, description="Total number of items")
     page: int = Field(ge=1, description="Current page number")
-    page_size: int = Field(ge=1, le=100, description="Items per page")
-    total_pages: int = Field(description="Total number of pages")
+    page_size: int = Field(ge=1, le=1000, description="Items per page")
+    total_pages: int = Field(ge=0, description="Total number of pages")
 
     @classmethod
     def create(
@@ -118,8 +120,18 @@ class PaginatedResponse(BaseModel, Generic[T]):
 
         Returns:
             PaginatedResponse instance with calculated fields.
+
+        Raises:
+            ValueError: If total, page, or page_size are invalid.
         """
-        total_pages = (total + page_size - 1) // page_size
+        if total < 0:
+            raise ValueError("Total must be non-negative")
+        if page < 1:
+            raise ValueError("Page must be at least 1")
+        if page_size < 1 or page_size > 1000:
+            raise ValueError("Page size must be between 1 and 1000")
+
+        total_pages = (total + page_size - 1) // page_size if total > 0 else 0
         return cls(
             items=items,
             total=total,

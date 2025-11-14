@@ -48,7 +48,11 @@ class RedisSettings(BaseSettings):
 
     # Key prefix for namespacing
     key_prefix: str = Field(
-        default="example-service:", description="Prefix for all cache keys"
+        default="example-service:",
+        min_length=1,
+        max_length=100,
+        pattern=r"^[a-zA-Z0-9_-]+:?$",
+        description="Prefix for all cache keys (alphanumeric, hyphens, underscores, optional trailing colon)"
     )
 
     # Optional separate password

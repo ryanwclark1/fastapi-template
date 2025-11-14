@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
-from pydantic import Field
+from typing import Literal
+
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .sources import logging_source
+
+LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 
 class LoggingSettings(BaseSettings):
@@ -16,7 +20,7 @@ class LoggingSettings(BaseSettings):
     """
 
     # Log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
-    level: str = Field(
+    level: LogLevel = Field(
         default="INFO",
         description="Logging level (DEBUG|INFO|WARNING|ERROR|CRITICAL)",
     )
@@ -34,13 +38,14 @@ class LoggingSettings(BaseSettings):
     # Log file configuration
     log_file: str | None = Field(
         default="logs/example-service.log.jsonl",
+        max_length=500,
         description="Log file path (None to disable file logging)",
     )
     max_bytes: int = Field(
-        default=10_485_760, ge=1024, description="Max log file size in bytes (10MB)"
+        default=10_485_760, ge=1024, le=1_073_741_824, description="Max log file size in bytes (10MB, max 1GB)"
     )
     backup_count: int = Field(
-        default=5, ge=0, description="Number of backup log files to keep"
+        default=5, ge=0, le=100, description="Number of backup log files to keep"
     )
 
     # Console logging
@@ -58,8 +63,16 @@ class LoggingSettings(BaseSettings):
         default=True, description="Log slow requests (> threshold)"
     )
     slow_request_threshold: float = Field(
-        default=1.0, ge=0.1, description="Slow request threshold in seconds"
+        default=1.0, ge=0.1, le=60.0, description="Slow request threshold in seconds"
     )
+
+    @field_validator("level", mode="before")
+    @classmethod
+    def normalize_level(cls, v: str) -> str:
+        """Normalize log level to uppercase."""
+        if isinstance(v, str):
+            return v.upper()
+        return v
 
     model_config = SettingsConfigDict(
         env_prefix="LOG_",

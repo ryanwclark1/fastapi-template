@@ -1,7 +1,7 @@
 """RFC 7807 Problem Details schema for error responses."""
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProblemDetails(BaseModel):
@@ -29,21 +29,33 @@ class ProblemDetails(BaseModel):
 
     type: str = Field(
         default="about:blank",
+        min_length=1,
+        max_length=200,
         description="URI reference identifying the problem type",
     )
-    title: str = Field(description="Short, human-readable summary of the problem")
-    status: int = Field(description="HTTP status code")
+    title: str = Field(
+        min_length=1,
+        max_length=200,
+        description="Short, human-readable summary of the problem"
+    )
+    status: int = Field(
+        ge=100,
+        le=599,
+        description="HTTP status code"
+    )
     detail: str | None = Field(
-        default=None, description="Human-readable explanation specific to this occurrence"
+        default=None,
+        max_length=2000,
+        description="Human-readable explanation specific to this occurrence"
     )
     instance: str | None = Field(
-        default=None, description="URI reference identifying the specific occurrence"
+        default=None,
+        max_length=500,
+        description="URI reference identifying the specific occurrence"
     )
 
-    class Config:
-        """Pydantic configuration."""
-
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "type": "validation-error",
                 "title": "Validation Error",
@@ -51,4 +63,6 @@ class ProblemDetails(BaseModel):
                 "detail": "Email address is invalid",
                 "instance": "/api/v1/users",
             }
-        }
+        },
+        str_strip_whitespace=True,
+    )
