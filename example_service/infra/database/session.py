@@ -1,4 +1,4 @@
-"""Database session management."""
+"""Database session management with psycopg3 async driver."""
 from __future__ import annotations
 
 import logging
@@ -8,18 +8,30 @@ from contextlib import asynccontextmanager
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from example_service.core.settings import settings
+from example_service.core.settings import get_app_settings, get_db_settings
 from example_service.utils.retry import retry
 
 logger = logging.getLogger(__name__)
 
-# Create async engine
+# Get settings from modular configuration
+db_settings = get_db_settings()
+app_settings = get_app_settings()
+
+# Create async engine with psycopg3
 engine = create_async_engine(
-    settings.database_url if settings.database_url else "sqlite+aiosqlite:///./test.db",
-    pool_size=settings.database_pool_size,
-    max_overflow=settings.database_max_overflow,
-    pool_pre_ping=True,  # Verify connections before using
-    echo=settings.debug,  # Log SQL statements in debug mode
+    db_settings.get_sqlalchemy_url() if db_settings.is_configured else "sqlite+aiosqlite:///./test.db",
+    pool_size=db_settings.pool_size,
+    max_overflow=db_settings.max_overflow,
+    pool_timeout=db_settings.pool_timeout,
+    pool_recycle=db_settings.pool_recycle,
+    pool_pre_ping=db_settings.pool_pre_ping,
+    echo=db_settings.echo_sql or app_settings.debug,
+    # psycopg3 specific connection arguments
+    connect_args={
+        "server_settings": {
+            "application_name": app_settings.service_name,
+        },
+    } if db_settings.is_configured else {},
 )
 
 # Create session factory
@@ -78,14 +90,16 @@ async def init_database() -> None:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
 
+        db_url = db_settings.get_sqlalchemy_url() if db_settings.is_configured else "sqlite+aiosqlite:///./test.db"
         logger.info(
             "Database connection established successfully",
-            extra={"url": settings.database_url},
+            extra={"url": db_url, "driver": "psycopg3"},
         )
     except Exception as e:
+        db_url = db_settings.get_sqlalchemy_url() if db_settings.is_configured else "sqlite+aiosqlite:///./test.db"
         logger.error(
             "Failed to connect to database",
-            extra={"url": settings.database_url, "error": str(e)},
+            extra={"url": db_url, "error": str(e)},
         )
         raise
 

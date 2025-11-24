@@ -1,4 +1,4 @@
-"""Alembic migration environment."""
+"""Alembic migration environment with async psycopg3 support."""
 from __future__ import annotations
 
 import asyncio
@@ -9,8 +9,12 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
-from example_service.core.settings import settings
+from example_service.core.settings import get_db_settings
 from example_service.infra.database.base import Base
+
+# Import all models to ensure they're discovered by Alembic
+# This is critical for autogenerate to work properly
+from example_service.core.models import Post, User  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -25,9 +29,10 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 target_metadata = Base.metadata
 
-# Override sqlalchemy.url with settings
-if settings.database_url:
-    config.set_main_option("sqlalchemy.url", settings.database_url)
+# Override sqlalchemy.url with settings from modular configuration
+db_settings = get_db_settings()
+if db_settings.is_configured:
+    config.set_main_option("sqlalchemy.url", db_settings.get_sqlalchemy_url())
 
 
 def run_migrations_offline() -> None:

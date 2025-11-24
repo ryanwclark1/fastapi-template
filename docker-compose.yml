@@ -8,24 +8,31 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - EXAMPLE_SERVICE_DEBUG=true
-      - EXAMPLE_SERVICE_LOG_LEVEL=DEBUG
-      - EXAMPLE_SERVICE_DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/example_service
-      - EXAMPLE_SERVICE_REDIS_URL=redis://redis:6379/0
+      - APP_DEBUG=true
+      - APP_LOG_LEVEL=DEBUG
+      - DB_DATABASE_URL=postgresql+psycopg://postgres:postgres@db:5432/example_service
+      - REDIS_URL=redis://redis:6379/0
+      - RABBIT_RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672/
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     volumes:
       - ./logs:/app/logs
     networks:
       - example-network
+    restart: unless-stopped
 
   db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=example_service
+      - PGDATA=/var/lib/postgresql/data/pgdata
     ports:
       - "5432:5432"
     volumes:
@@ -33,13 +40,16 @@ services:
     networks:
       - example-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d example_service"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
+    command: redis-server --appendonly yes
     ports:
       - "6379:6379"
     volumes:
@@ -51,10 +61,43 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    hostname: rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin123
+      - RABBITMQ_DEFAULT_VHOST=/
+      # Enable remote connections for non-production environments
+      - RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=-rabbit loopback_users []
+    ports:
+      - "5672:5672"   # AMQP port
+      - "15672:15672" # Management UI port
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - rabbitmq-logs:/var/log/rabbitmq
+    networks:
+      - example-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
 
 volumes:
   postgres-data:
+    driver: local
   redis-data:
+    driver: local
+  rabbitmq-data:
+    driver: local
+  rabbitmq-logs:
+    driver: local
 
 networks:
   example-network:

@@ -81,15 +81,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await start_broker()
         # Import handlers to register subscribers
         import example_service.infra.messaging.handlers  # noqa: F401
+        import example_service.infra.messaging.examples.trigger  # noqa: F401
 
         logger.info("RabbitMQ broker initialized")
 
         # Initialize Taskiq broker for background tasks (uses same RabbitMQ)
-        await start_taskiq()
-        # Import tasks to register them
-        import example_service.infra.tasks.tasks  # noqa: F401
+        if redis_settings.is_configured:
+            await start_taskiq()
+            # Import tasks to register them
+            import example_service.infra.tasks.tasks  # noqa: F401
+            import example_service.infra.tasks.examples.scheduled_tasks  # noqa: F401
+            import example_service.infra.tasks.examples.faststream_integration  # noqa: F401
 
-        logger.info("Taskiq broker initialized")
+            logger.info("Taskiq broker initialized")
 
     logger.info(
         "Application startup complete",
@@ -106,17 +110,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
     # Shutdown
-    app_settings = get_app_settings()
-    db_settings = get_db_settings()
-    redis_settings = get_redis_settings()
-    rabbit_settings = get_rabbit_settings()
-
+    # Note: Settings are still available from startup phase (cached and frozen)
     logger.info(
         "Application shutting down", extra={"service": app_settings.service_name}
     )
 
-    # Close Taskiq broker first (depends on RabbitMQ)
-    if rabbit_settings.is_configured:
+    # Close Taskiq broker first (depends on RabbitMQ and Redis)
+    if rabbit_settings.is_configured and redis_settings.is_configured:
         await stop_taskiq()
         logger.info("Taskiq broker closed")
 
