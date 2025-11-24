@@ -14,24 +14,27 @@ from typing import TYPE_CHECKING
 
 from faststream.rabbit import RabbitBroker
 
-from example_service.core.settings import settings
+from example_service.core.settings import get_rabbit_settings
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
 logger = logging.getLogger(__name__)
 
+# Get RabbitMQ settings from modular configuration
+rabbit_settings = get_rabbit_settings()
+
 # Initialize RabbitMQ broker
 broker = RabbitBroker(
-    url=settings.rabbitmq_url,
+    url=rabbit_settings.get_url() if rabbit_settings.is_configured else None,
     # Connection settings
-    max_consumers=10,
-    graceful_timeout=15,
+    max_consumers=rabbit_settings.max_consumers,
+    graceful_timeout=rabbit_settings.graceful_timeout,
     # Logging
     logger=logger,
     # Apply prefix to all queues for multi-environment support
     apply_types=True,
-)
+) if rabbit_settings.is_configured else None
 
 
 async def get_broker() -> AsyncIterator[RabbitBroker]:
@@ -67,7 +70,11 @@ async def start_broker() -> None:
     Raises:
         ConnectionError: If unable to connect to RabbitMQ.
     """
-    logger.info("Starting RabbitMQ broker", extra={"url": settings.rabbitmq_url})
+    if not rabbit_settings.is_configured or broker is None:
+        logger.warning("RabbitMQ not configured, skipping broker startup")
+        return
+
+    logger.info("Starting RabbitMQ broker", extra={"url": rabbit_settings.get_url()})
 
     try:
         await broker.start()
@@ -83,6 +90,10 @@ async def stop_broker() -> None:
     This should be called during application shutdown in the lifespan context.
     It gracefully closes the connection to RabbitMQ.
     """
+    if not rabbit_settings.is_configured or broker is None:
+        logger.debug("RabbitMQ not configured, skipping broker shutdown")
+        return
+
     logger.info("Stopping RabbitMQ broker")
 
     try:

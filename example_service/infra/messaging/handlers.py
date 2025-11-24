@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 from faststream.rabbit import RabbitQueue
 
-from example_service.core.settings import settings
+from example_service.core.settings import get_rabbit_settings
 from example_service.infra.messaging.broker import broker
 from example_service.infra.messaging.events import (
     ExampleCreatedEvent,
@@ -23,9 +23,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Get RabbitMQ settings from modular configuration
+rabbit_settings = get_rabbit_settings()
 
 # Define queues with prefixes for multi-environment support
-EXAMPLE_EVENTS_QUEUE = f"{settings.rabbitmq_queue_prefix}.example-events"
+EXAMPLE_EVENTS_QUEUE = rabbit_settings.get_prefixed_queue("example-events")
 
 
 @broker.subscriber(

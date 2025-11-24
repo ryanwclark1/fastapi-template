@@ -3,6 +3,12 @@
 This module provides the Taskiq broker setup for executing background tasks
 asynchronously. It integrates with FastStream for task distribution and
 Redis for result storage.
+
+Key features:
+- Task distribution via RabbitMQ (through FastStream)
+- Result storage in Redis
+- Scheduled/cron tasks support
+- Integration with FastAPI and FastStream
 """
 from __future__ import annotations
 
@@ -13,7 +19,7 @@ from taskiq import TaskiqScheduler
 from taskiq_faststream import FastStreamBroker
 from taskiq_redis import RedisAsyncResultBackend
 
-from example_service.core.settings import settings
+from example_service.core.settings import get_rabbit_settings, get_redis_settings
 from example_service.infra.messaging.broker import broker as rabbitmq_broker
 
 if TYPE_CHECKING:
@@ -21,14 +27,22 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Get settings from modular configuration
+redis_settings = get_redis_settings()
+rabbit_settings = get_rabbit_settings()
+
 # Initialize Taskiq broker with FastStream transport
 # This allows tasks to be distributed via RabbitMQ and results stored in Redis
-broker = FastStreamBroker(rabbitmq_broker).with_result_backend(
-    RedisAsyncResultBackend(settings.taskiq_result_backend)
-)
-
-# Initialize scheduler for cron-like scheduled tasks
-scheduler = TaskiqScheduler(broker=broker)
+if rabbit_settings.is_configured and redis_settings.is_configured and rabbitmq_broker is not None:
+    broker = FastStreamBroker(rabbitmq_broker).with_result_backend(
+        RedisAsyncResultBackend(redis_settings.get_url())
+    )
+    # Initialize scheduler for cron-like scheduled tasks
+    scheduler = TaskiqScheduler(broker=broker)
+else:
+    logger.warning("Taskiq broker not configured - RabbitMQ or Redis not available")
+    broker = None
+    scheduler = None
 
 
 async def get_broker() -> AsyncIterator[FastStreamBroker]:
@@ -62,9 +76,13 @@ async def start_taskiq() -> None:
     Raises:
         ConnectionError: If unable to connect to result backend.
     """
+    if broker is None:
+        logger.warning("Taskiq broker not configured, skipping startup")
+        return
+
     logger.info(
         "Starting Taskiq broker",
-        extra={"result_backend": settings.taskiq_result_backend},
+        extra={"result_backend": redis_settings.get_url()},
     )
 
     try:
@@ -81,6 +99,10 @@ async def stop_taskiq() -> None:
     This should be called during application shutdown in the lifespan context.
     It gracefully closes connections to the result backend.
     """
+    if broker is None:
+        logger.debug("Taskiq broker not configured, skipping shutdown")
+        return
+
     logger.info("Stopping Taskiq broker")
 
     try:
