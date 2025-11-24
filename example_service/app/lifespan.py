@@ -18,7 +18,7 @@ from example_service.infra.cache.redis import start_cache, stop_cache
 from example_service.infra.database.session import close_database, init_database
 from example_service.infra.logging.config import configure_logging
 from example_service.infra.messaging.broker import start_broker, stop_broker
-from example_service.infra.tasks.broker import start_taskiq, stop_taskiq
+from example_service.core.tasks.broker import start_taskiq, stop_taskiq
 from example_service.infra.tracing.opentelemetry import setup_tracing
 
 logger = logging.getLogger(__name__)
@@ -89,9 +89,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if redis_settings.is_configured:
             await start_taskiq()
             # Import tasks to register them
-            import example_service.infra.tasks.tasks  # noqa: F401
-            import example_service.infra.tasks.examples.scheduled_tasks  # noqa: F401
-            import example_service.infra.tasks.examples.faststream_integration  # noqa: F401
+            import example_service.core.tasks.tasks  # noqa: F401
+            import example_service.core.tasks.examples.scheduled_tasks  # noqa: F401
+            import example_service.core.tasks.examples.faststream_integration  # noqa: F401
 
             logger.info("Taskiq broker initialized")
 

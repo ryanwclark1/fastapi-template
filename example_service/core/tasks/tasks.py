@@ -10,7 +10,7 @@ from typing import Any
 
 from taskiq import TaskiqDepends
 
-from example_service.infra.tasks.broker import broker
+from example_service.core.tasks.broker import broker
 
 logger = logging.getLogger(__name__)
 
