@@ -19,7 +19,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
-from example_service.infra.tasks.broker import broker
+from example_service.core.tasks.broker import broker
 
 logger = logging.getLogger(__name__)
 
@@ -303,5 +303,5 @@ if broker is not None:
 
 
 # To use this router in your FastAPI app:
-# from example_service.infra.tasks.examples.fastapi_integration import router as tasks_router
+# from example_service.core.tasks.examples.fastapi_integration import router as tasks_router
 # app.include_router(tasks_router, prefix="/api")

@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 
 from example_service.core.settings import get_rabbit_settings
 from example_service.infra.messaging.broker import broker as faststream_broker
-from example_service.infra.tasks.broker import broker as taskiq_broker
+from example_service.core.tasks.broker import broker as taskiq_broker
 
 logger = logging.getLogger(__name__)
 

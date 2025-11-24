@@ -56,7 +56,7 @@ async def get_broker() -> AsyncIterator[FastStreamBroker]:
 
     Example:
         ```python
-        from example_service.infra.tasks.tasks import example_task
+        from example_service.core.tasks.tasks import example_task
 
         @router.post("/schedule")
         async def schedule_task():

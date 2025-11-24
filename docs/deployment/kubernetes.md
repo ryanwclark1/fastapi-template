@@ -58,7 +58,7 @@ GET /api/v1/health/
 kubectl create namespace example-service
 
 # Apply deployment
-kubectl apply -f k8s/deployment.yaml -n example-service
+kubectl apply -f deployment/k8s/deployment.yaml -n example-service
 
 # Verify deployment
 kubectl get pods -n example-service
@@ -169,7 +169,7 @@ data:
 
 Apply:
 ```bash
-kubectl apply -f k8s/configmap.yaml
+kubectl apply -f deployment/k8s/configmap.yaml
 ```
 
 ### Secrets
@@ -189,7 +189,7 @@ stringData:
 
 Apply:
 ```bash
-kubectl apply -f k8s/secrets.yaml
+kubectl apply -f deployment/k8s/secrets.yaml
 ```
 
 **Best Practices:**
@@ -231,7 +231,7 @@ spec:
 
 Apply:
 ```bash
-kubectl apply -f k8s/hpa.yaml
+kubectl apply -f deployment/k8s/hpa.yaml
 ```
 
 ### Manual Scaling

@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 
-from example_service.infra.tasks.broker import broker, scheduler
+from example_service.core.tasks.broker import broker, scheduler
 
 logger = logging.getLogger(__name__)
 

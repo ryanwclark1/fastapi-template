@@ -60,6 +60,7 @@ uv run example-service
 
 ```bash
 # Build and run with docker-compose
+cd deployment
 docker-compose up --build
 
 # Access the service
@@ -100,13 +101,14 @@ example_service/
 ├── app/                    # FastAPI application
 │   ├── main.py            # App factory
 │   ├── lifespan.py        # Lifecycle management
-│   ├── middleware.py      # Middleware config
+│   ├── middleware/        # Middleware modules
 │   └── router.py          # Router registry
 ├── core/                   # Core infrastructure
 │   ├── settings.py        # Pydantic settings
 │   ├── dependencies/      # FastAPI dependencies
 │   ├── schemas/           # Shared schemas
-│   └── services/          # Core services
+│   ├── services/          # Core services
+│   └── tasks/             # Background tasks
 ├── features/              # Feature modules
 │   └── status/           # Health check feature
 ├── infra/                 # Infrastructure
@@ -272,9 +274,11 @@ docker run -p 8000:8000 \
 
 ```bash
 # Development environment
+cd deployment
 docker-compose up
 
 # Production environment
+cd deployment
 docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
 ```
 

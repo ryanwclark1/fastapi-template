@@ -28,7 +28,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from example_service.infra.tasks.broker import broker
+from example_service.core.tasks.broker import broker
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +198,7 @@ async def start_scheduler() -> None:
     Example:
         ```python
         # In lifespan.py
-        from example_service.infra.tasks.examples.apscheduler_integration import (
+        from example_service.core.tasks.examples.apscheduler_integration import (
             setup_scheduled_jobs,
             start_scheduler,
             stop_scheduler,

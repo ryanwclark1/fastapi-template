@@ -19,7 +19,7 @@ The application layer handles HTTP concerns and FastAPI setup.
 **Key Files:**
 - `main.py` - Application factory
 - `lifespan.py` - Startup/shutdown handlers
-- `middleware.py` - Middleware configuration
+- `middleware/` - Middleware modules and configuration
 - `router.py` - Router registry
 
 ### 2. Core Layer (`core/`)
@@ -146,7 +146,7 @@ main.py (App creation)
     ↓
 lifespan.py (Lifecycle events)
     ↓
-middleware.py (Request processing)
+middleware/ (Request processing)
     ↓
 router.py (Route registration)
     ↓
