@@ -110,11 +110,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
     # Shutdown
-    app_settings = get_app_settings()
-    db_settings = get_db_settings()
-    redis_settings = get_redis_settings()
-    rabbit_settings = get_rabbit_settings()
-
+    # Note: Settings are still available from startup phase (cached and frozen)
     logger.info(
         "Application shutting down", extra={"service": app_settings.service_name}
     )

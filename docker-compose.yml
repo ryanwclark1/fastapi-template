@@ -12,10 +12,7 @@ services:
       - APP_LOG_LEVEL=DEBUG
       - DB_DATABASE_URL=postgresql+psycopg://postgres:postgres@db:5432/example_service
       - REDIS_URL=redis://redis:6379/0
-      - RABBIT_HOST=rabbitmq
-      - RABBIT_PORT=5672
-      - RABBIT_USER=guest
-      - RABBIT_PASSWORD=guest
+      - RABBIT_RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672/
     depends_on:
       db:
         condition: service_healthy
@@ -71,9 +68,11 @@ services:
     image: rabbitmq:4-management-alpine
     hostname: rabbitmq
     environment:
-      - RABBITMQ_DEFAULT_USER=guest
-      - RABBITMQ_DEFAULT_PASS=guest
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin123
       - RABBITMQ_DEFAULT_VHOST=/
+      # Enable remote connections for non-production environments
+      - RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=-rabbit loopback_users []
     ports:
       - "5672:5672"   # AMQP port
       - "15672:15672" # Management UI port
