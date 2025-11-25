@@ -2,5 +2,15 @@
 from __future__ import annotations
 
 from .router import router
+from .schemas import (
+    RunningTaskResponse,
+    TaskExecutionResponse,
+    TaskStatsResponse,
+)
 
-__all__ = ["router"]
+__all__ = [
+    "router",
+    "RunningTaskResponse",
+    "TaskExecutionResponse",
+    "TaskStatsResponse",
+]

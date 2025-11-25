@@ -4,16 +4,23 @@ Provides endpoints to:
 - List scheduled jobs and their status
 - Trigger background tasks on-demand
 - Pause/resume scheduled jobs
+- View task execution history and statistics
 """
 from __future__ import annotations
 
+from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 
-from example_service.tasks import get_job_status, pause_job, resume_job
+from example_service.features.admin.schemas import (
+    RunningTaskResponse,
+    TaskExecutionResponse,
+    TaskStatsResponse,
+)
+from example_service.tasks import get_job_status, get_tracker, pause_job, resume_job
 from example_service.tasks.broker import broker
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
@@ -234,3 +241,171 @@ async def resume_scheduled_job(request: JobActionRequest) -> dict:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Job not found or cannot be resumed: {e}",
         ) from e
+
+
+# =============================================================================
+# Task Execution History Endpoints
+# =============================================================================
+
+
+@router.get(
+    "/tasks/history",
+    response_model=list[TaskExecutionResponse],
+    summary="Get task execution history",
+    description="Get recent task executions with optional filters.",
+)
+async def get_task_history(
+    limit: int = Query(default=100, ge=1, le=500, description="Max results"),
+    offset: int = Query(default=0, ge=0, description="Results to skip"),
+    task_name: str | None = Query(default=None, description="Filter by task name"),
+    task_status: Literal["success", "failure"] | None = Query(
+        default=None, alias="status", description="Filter by status"
+    ),
+) -> list[TaskExecutionResponse]:
+    """Get recent task executions.
+
+    Returns task execution records from the last 24 hours, newest first.
+    Use filters to narrow down results by task name or status.
+    """
+    tracker = get_tracker()
+    if tracker is None or not tracker.is_connected:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Task tracking not available",
+        )
+
+    history = await tracker.get_task_history(
+        limit=limit,
+        offset=offset,
+        task_name=task_name,
+        status=task_status,
+    )
+
+    # Convert to response models
+    return [
+        TaskExecutionResponse(
+            task_id=task["task_id"],
+            task_name=task["task_name"],
+            status=task["status"],
+            started_at=datetime.fromisoformat(task["started_at"]),
+            finished_at=(
+                datetime.fromisoformat(task["finished_at"])
+                if task.get("finished_at")
+                else None
+            ),
+            duration_ms=task.get("duration_ms"),
+            return_value=task.get("return_value"),
+            error_message=task.get("error_message"),
+            error_type=task.get("error_type"),
+        )
+        for task in history
+    ]
+
+
+@router.get(
+    "/tasks/running",
+    response_model=list[RunningTaskResponse],
+    summary="Get running tasks",
+    description="Get all currently executing tasks.",
+)
+async def get_running_tasks() -> list[RunningTaskResponse]:
+    """Get currently running tasks.
+
+    Returns information about tasks that are currently being executed
+    by workers, including how long they have been running.
+    """
+    tracker = get_tracker()
+    if tracker is None or not tracker.is_connected:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Task tracking not available",
+        )
+
+    running = await tracker.get_running_tasks()
+
+    return [
+        RunningTaskResponse(
+            task_id=task["task_id"],
+            task_name=task["task_name"],
+            started_at=datetime.fromisoformat(task["started_at"]),
+            running_for_ms=task["running_for_ms"],
+            worker_id=task.get("worker_id") or None,
+        )
+        for task in running
+    ]
+
+
+@router.get(
+    "/tasks/stats",
+    response_model=TaskStatsResponse,
+    summary="Get task statistics",
+    description="Get aggregate statistics about task executions.",
+)
+async def get_task_stats() -> TaskStatsResponse:
+    """Get task execution statistics.
+
+    Returns aggregate statistics including:
+    - Total executions in last 24 hours
+    - Counts by status (success, failure, running)
+    - Counts by task name
+    - Average execution duration
+    """
+    tracker = get_tracker()
+    if tracker is None or not tracker.is_connected:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Task tracking not available",
+        )
+
+    stats = await tracker.get_stats()
+
+    return TaskStatsResponse(
+        total_24h=stats["total_24h"],
+        success_count=stats["success_count"],
+        failure_count=stats["failure_count"],
+        running_count=stats["running_count"],
+        by_task_name=stats["by_task_name"],
+        avg_duration_ms=stats["avg_duration_ms"],
+    )
+
+
+@router.get(
+    "/tasks/{task_id}",
+    response_model=TaskExecutionResponse,
+    summary="Get task details",
+    description="Get full execution details for a specific task.",
+)
+async def get_task_details(task_id: str) -> TaskExecutionResponse:
+    """Get details for a specific task execution.
+
+    Returns full execution details including return value or error information.
+    """
+    tracker = get_tracker()
+    if tracker is None or not tracker.is_connected:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Task tracking not available",
+        )
+
+    task = await tracker.get_task_details(task_id)
+    if task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task execution not found: {task_id}",
+        )
+
+    return TaskExecutionResponse(
+        task_id=task["task_id"],
+        task_name=task["task_name"],
+        status=task["status"],
+        started_at=datetime.fromisoformat(task["started_at"]),
+        finished_at=(
+            datetime.fromisoformat(task["finished_at"])
+            if task.get("finished_at")
+            else None
+        ),
+        duration_ms=task.get("duration_ms"),
+        return_value=task.get("return_value"),
+        error_message=task.get("error_message"),
+        error_type=task.get("error_type"),
+    )

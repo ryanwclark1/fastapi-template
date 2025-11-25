@@ -27,6 +27,12 @@ from example_service.tasks.scheduler import (
     start_scheduler,
     stop_scheduler,
 )
+from example_service.tasks.tracking import (
+    TaskExecutionTracker,
+    get_tracker,
+    start_tracker,
+    stop_tracker,
+)
 
 # Re-export task modules for convenient access
 from example_service.tasks import backup
@@ -47,6 +53,11 @@ __all__ = [
     "get_job_status",
     "pause_job",
     "resume_job",
+    # Tracking
+    "TaskExecutionTracker",
+    "get_tracker",
+    "start_tracker",
+    "stop_tracker",
     # Task modules
     "backup",
     "cache",

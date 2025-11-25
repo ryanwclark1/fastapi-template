@@ -17,6 +17,7 @@ Architecture:
 - taskiq-aio-pika: Background task queue (async jobs)
 - taskiq-faststream: Scheduled message publishing (cron jobs that publish to queues)
 """
+
 from __future__ import annotations
 
 import logging
@@ -64,15 +65,23 @@ rabbit_settings = get_rabbit_settings()
 broker: AioPikaBrokerType | None = None
 
 if AioPikaBroker is not None and rabbit_settings.is_configured and redis_settings.is_configured:
-    broker = AioPikaBroker(
-        url=rabbit_settings.get_url(),
-        queue_name=rabbit_settings.get_prefixed_queue("taskiq-tasks"),
-        declare_exchange=True,
-        declare_queues=True,
-    ).with_result_backend(RedisAsyncResultBackend(redis_settings.get_url()))
+    from example_service.tasks.middleware import TrackingMiddleware
+
+    broker = (
+        AioPikaBroker(
+            url=rabbit_settings.get_url(),
+            queue_name=rabbit_settings.get_prefixed_queue("taskiq-tasks"),
+            declare_exchange=True,
+            declare_queues=True,
+        )
+        .with_result_backend(RedisAsyncResultBackend(redis_settings.get_url()))
+        .with_middlewares(
+            TrackingMiddleware(),
+        )
+    )
 
     logger.info(
-        "Taskiq background task broker configured",
+        "Taskiq background task broker configured with tracking middleware",
         extra={"queue": rabbit_settings.get_prefixed_queue("taskiq-tasks")},
     )
 else:
@@ -113,7 +122,7 @@ else:
         logger.debug("taskiq-faststream not installed - scheduled publishing disabled")
 
 
-async def get_broker() -> "AsyncIterator[AioPikaBrokerType | None]":
+async def get_broker() -> AsyncIterator[AioPikaBrokerType | None]:
     """Get the Taskiq background task broker instance.
 
     This is a dependency that can be used in FastAPI endpoints
@@ -179,3 +188,25 @@ async def stop_taskiq() -> None:
         logger.info("Taskiq broker stopped successfully")
     except Exception as e:
         logger.exception("Error stopping Taskiq broker", extra={"error": str(e)})
+
+
+# =============================================================================
+# Task Module Imports
+# =============================================================================
+# Import all task modules when broker is loaded to ensure tasks are registered.
+# This is critical for the worker to discover all tasks.
+# The worker imports: taskiq worker example_service.tasks.broker:broker
+# So importing here ensures all tasks are available to the worker.
+
+if broker is not None:
+    # Import main task modules
+    # Import task submodules
+    import example_service.tasks.backup.tasks  # noqa: F401
+    import example_service.tasks.cache.tasks  # noqa: F401
+    import example_service.tasks.cleanup.tasks  # noqa: F401
+    import example_service.tasks.export.tasks  # noqa: F401
+    import example_service.tasks.notifications.tasks  # noqa: F401
+    import example_service.tasks.scheduler  # noqa: F401
+    import example_service.tasks.tasks  # noqa: F401
+
+    logger.debug("All task modules imported and registered with broker")

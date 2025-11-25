@@ -22,6 +22,7 @@ from example_service.infra.logging.config import configure_logging
 from example_service.infra.messaging.broker import start_broker, stop_broker
 from example_service.infra.metrics.prometheus import application_info
 from example_service.infra.tracing.opentelemetry import setup_tracing
+from example_service.tasks.tracking import start_tracker, stop_tracker
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,51 @@ def _load_scheduler_module() -> ModuleType | None:
     except ImportError:
         logger.warning("APScheduler dependencies missing, skipping scheduler startup")
         return None
+
+
+async def _initialize_taskiq_and_scheduler(
+    rabbit_settings: object, redis_settings: object
+) -> tuple[ModuleType | None, ModuleType | None]:
+    """Initialize Taskiq broker and APScheduler for background tasks.
+
+    Args:
+        rabbit_settings: RabbitMQ settings object with is_configured attribute.
+        redis_settings: Redis settings object with is_configured attribute.
+
+    Returns:
+        Tuple of (taskiq_module, scheduler_module), either may be None.
+    """
+    # Early return if dependencies not configured
+    if not (rabbit_settings.is_configured and redis_settings.is_configured):
+        return None, None
+
+    # Load and start Taskiq broker
+    taskiq_module = _load_taskiq_module()
+    if taskiq_module is None:
+        return None, None
+
+    await taskiq_module.start_taskiq()
+    if taskiq_module.broker is None:
+        logger.warning("Taskiq broker unavailable, skipping task registration")
+        return taskiq_module, None
+
+    # Import tasks to register them with the broker
+    import example_service.tasks.scheduler  # noqa: F401
+    import example_service.tasks.tasks  # noqa: F401
+
+    logger.info("Taskiq broker initialized (use 'taskiq worker' to run tasks)")
+
+    # Initialize APScheduler (depends on Taskiq)
+    scheduler_module = _load_scheduler_module()
+    if scheduler_module is None:
+        logger.warning("APScheduler unavailable, skipping scheduler startup")
+        return taskiq_module, None
+
+    scheduler_module.setup_scheduled_jobs()
+    await scheduler_module.start_scheduler()
+    logger.info("APScheduler started with scheduled jobs")
+
+    return taskiq_module, scheduler_module
 
 
 @asynccontextmanager
@@ -109,6 +155,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await start_cache()
         logger.info("Redis cache initialized")
 
+        # Initialize task execution tracker (for querying task history via REST API)
+        await start_tracker()
+        logger.info("Task execution tracker initialized")
+
     # Initialize RabbitMQ/FastStream broker for event-driven messaging
     if rabbit_settings.is_configured:
         await start_broker()
@@ -116,29 +166,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Initialize Taskiq broker for background tasks (independent of FastStream)
     # Taskiq uses its own RabbitMQ connection via taskiq-aio-pika
-    if rabbit_settings.is_configured and redis_settings.is_configured:
-        taskiq_module = _load_taskiq_module()
-        if taskiq_module is not None:
-            await taskiq_module.start_taskiq()
-            if taskiq_module.broker is not None:
-                # Import tasks to register them with the broker
-                import example_service.tasks.scheduler  # noqa: F401
-                import example_service.tasks.tasks  # noqa: F401
-
-                logger.info("Taskiq broker initialized (use 'taskiq worker' to run tasks)")
-
-                # Initialize APScheduler for periodic tasks
-                scheduler_module = _load_scheduler_module()
-                if scheduler_module is not None:
-                    scheduler_module.setup_scheduled_jobs()
-                    await scheduler_module.start_scheduler()
-                    logger.info("APScheduler started with scheduled jobs")
-                else:
-                    logger.warning("APScheduler unavailable, skipping scheduler startup")
-            else:
-                logger.warning("Taskiq broker unavailable, skipping task registration")
-        else:
-            logger.warning("Taskiq module unavailable, skipping Taskiq startup")
+    taskiq_module, scheduler_module = await _initialize_taskiq_and_scheduler(
+        rabbit_settings, redis_settings
+    )
 
     logger.info(
         "Application startup complete - listening on %s:%s",
@@ -178,6 +208,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if rabbit_settings.is_configured:
         await stop_broker()
         logger.info("RabbitMQ broker closed")
+
+    # Close task execution tracker (before Redis since it depends on Redis)
+    if redis_settings.is_configured:
+        await stop_tracker()
+        logger.info("Task execution tracker closed")
 
     # Close Redis cache
     if redis_settings.is_configured:
