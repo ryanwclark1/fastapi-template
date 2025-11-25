@@ -6,8 +6,6 @@ from collections.abc import AsyncGenerator
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from example_service.app.main import create_app
-
 
 @pytest.fixture
 async def app():
@@ -16,6 +14,8 @@ async def app():
     Returns:
         FastAPI application instance.
     """
+    from example_service.app.main import create_app
+
     return create_app()
 
 

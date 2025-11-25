@@ -6,10 +6,15 @@ from typing import TYPE_CHECKING
 
 from fastapi.middleware.cors import CORSMiddleware
 
+from example_service.app.middleware.metrics import MetricsMiddleware
 from example_service.app.middleware.request_id import RequestIDMiddleware
 from example_service.app.middleware.size_limit import RequestSizeLimitMiddleware
 from example_service.app.middleware.timing import TimingMiddleware
-from example_service.core.settings import get_app_settings, get_logging_settings
+from example_service.core.settings import (
+    get_app_settings,
+    get_logging_settings,
+    get_otel_settings,
+)
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -17,6 +22,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "MetricsMiddleware",
     "RequestIDMiddleware",
     "RequestSizeLimitMiddleware",
     "TimingMiddleware",
@@ -28,12 +34,18 @@ def configure_middleware(app: FastAPI) -> None:
     """Configure middleware for the application.
 
     Uses modular settings for CORS and other configuration.
+    Middleware execution order (last registered = outermost = first to run):
+    1. CORS (outermost)
+    2. RequestID (provides context for metrics/logging)
+    3. Metrics (collects request metrics with trace correlation)
+    4. Timing (adds performance headers)
 
     Args:
         app: FastAPI application instance.
     """
     app_settings = get_app_settings()
     log_settings = get_logging_settings()
+    otel_settings = get_otel_settings()
 
     # CORS middleware (configure origins from settings)
     cors_origins = app_settings.cors_origins or ["*"]
@@ -48,9 +60,14 @@ def configure_middleware(app: FastAPI) -> None:
         max_age=3600,
     )
 
-    # Custom middleware
+    # Custom middleware (order matters - see docstring above)
     if log_settings.include_request_id:
         app.add_middleware(RequestIDMiddleware)
+
+    # Metrics middleware (with trace correlation via exemplars)
+    if otel_settings.is_configured:
+        app.add_middleware(MetricsMiddleware)
+        logger.info("Metrics middleware enabled with trace correlation")
 
     if log_settings.log_slow_requests:
         app.add_middleware(TimingMiddleware)

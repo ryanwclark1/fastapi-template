@@ -2,13 +2,19 @@
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from sqlalchemy import text
+from opentelemetry import trace
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from example_service.core.settings import get_app_settings, get_db_settings
+from example_service.infra.metrics.prometheus import (
+    database_connections_active,
+    database_query_duration_seconds,
+)
 from example_service.utils.retry import retry
 
 logger = logging.getLogger(__name__)
@@ -26,12 +32,12 @@ engine = create_async_engine(
     pool_recycle=db_settings.pool_recycle,
     pool_pre_ping=db_settings.pool_pre_ping,
     echo=db_settings.echo_sql or app_settings.debug,
-    # psycopg3 specific connection arguments
-    connect_args={
-        "server_settings": {
-            "application_name": app_settings.service_name,
-        },
-    } if db_settings.is_configured else {},
+    # psycopg accepts application_name directly; server_settings is asyncpg specific
+    connect_args=(
+        {"application_name": app_settings.service_name}
+        if db_settings.is_configured
+        else {}
+    ),
 )
 
 # Create session factory
@@ -42,6 +48,73 @@ AsyncSessionLocal = async_sessionmaker(
     autoflush=False,
     autocommit=False,
 )
+
+
+# ============================================================================
+# Database Metrics Instrumentation
+# ============================================================================
+
+# Track connection pool events for active connections metric
+@event.listens_for(engine.sync_engine.pool, "connect")
+def _receive_connect(dbapi_conn, connection_record):
+    """Increment active connections when a new connection is established."""
+    database_connections_active.inc()
+    logger.debug("Database connection established")
+
+
+@event.listens_for(engine.sync_engine.pool, "close")
+def _receive_close(dbapi_conn, connection_record):
+    """Decrement active connections when a connection is closed."""
+    database_connections_active.dec()
+    logger.debug("Database connection closed")
+
+
+# Track query execution duration with trace correlation
+@event.listens_for(engine.sync_engine, "before_cursor_execute")
+def _before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    """Record query start time before execution."""
+    context._query_start_time = time.perf_counter()
+
+
+@event.listens_for(engine.sync_engine, "after_cursor_execute")
+def _after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    """Record query duration and link to current trace via exemplar."""
+    # Calculate duration
+    duration = time.perf_counter() - context._query_start_time
+
+    # Extract operation type from SQL statement
+    # e.g., "SELECT * FROM..." -> "SELECT"
+    operation = "UNKNOWN"
+    if statement:
+        statement_upper = statement.strip().upper()
+        if statement_upper.startswith("SELECT"):
+            operation = "SELECT"
+        elif statement_upper.startswith("INSERT"):
+            operation = "INSERT"
+        elif statement_upper.startswith("UPDATE"):
+            operation = "UPDATE"
+        elif statement_upper.startswith("DELETE"):
+            operation = "DELETE"
+        elif statement_upper.startswith("BEGIN"):
+            operation = "BEGIN"
+        elif statement_upper.startswith("COMMIT"):
+            operation = "COMMIT"
+        elif statement_upper.startswith("ROLLBACK"):
+            operation = "ROLLBACK"
+
+    # Get current trace ID for exemplar linking
+    span = trace.get_current_span()
+    trace_id = None
+    if span and span.get_span_context().is_valid:
+        trace_id = format(span.get_span_context().trace_id, "032x")
+
+    # Record metric with exemplar if trace is available
+    if trace_id:
+        database_query_duration_seconds.labels(operation=operation).observe(
+            duration, exemplar={"trace_id": trace_id}
+        )
+    else:
+        database_query_duration_seconds.labels(operation=operation).observe(duration)
 
 
 @asynccontextmanager

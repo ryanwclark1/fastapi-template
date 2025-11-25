@@ -1,7 +1,7 @@
 """OpenTelemetry tracing configuration and setup.
 
 Provides distributed tracing for the service with automatic instrumentation
-for FastAPI, HTTPX, SQLAlchemy, and asyncpg.
+for FastAPI, HTTPX, SQLAlchemy, and psycopg.
 
 Traces are exported via OTLP to collectors like Jaeger, Tempo, or Zipkin.
 """
@@ -14,15 +14,17 @@ from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+from opentelemetry.instrumentation.psycopg import PsycopgInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
-from opentelemetry.instrumentation.asyncpg import AsyncPGInstrumentor
-from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_VERSION
+from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-from example_service.core.settings import settings
+from example_service.core.settings import get_app_settings, get_otel_settings
 
 logger = logging.getLogger(__name__)
+otel_settings = get_otel_settings()
+app_settings = get_app_settings()
 
 
 def setup_tracing() -> None:
@@ -32,7 +34,7 @@ def setup_tracing() -> None:
     - OTLP exporter to send traces to collector
     - Resource attributes (service name, version)
     - TracerProvider with batch span processor
-    - Automatic instrumentation for FastAPI, HTTPX, SQLAlchemy, asyncpg
+    - Automatic instrumentation for FastAPI, HTTPX, SQLAlchemy, psycopg
 
     This should be called once at application startup, before creating
     the FastAPI app.
@@ -48,7 +50,7 @@ def setup_tracing() -> None:
             yield
         ```
     """
-    if not settings.enable_tracing or not settings.otlp_endpoint:
+    if not otel_settings.enabled or not otel_settings.endpoint:
         logger.info("OpenTelemetry tracing is disabled")
         return
 
@@ -56,16 +58,16 @@ def setup_tracing() -> None:
         # Create resource with service information
         resource = Resource(
             attributes={
-                SERVICE_NAME: settings.service_name,
-                SERVICE_VERSION: "0.1.0",
-                "environment": "production" if not settings.debug else "development",
+                SERVICE_NAME: otel_settings.service_name,
+                SERVICE_VERSION: otel_settings.service_version,
+                "environment": "production" if not app_settings.debug else "development",
             }
         )
 
         # Configure OTLP exporter
         otlp_exporter = OTLPSpanExporter(
-            endpoint=settings.otlp_endpoint,
-            insecure=settings.otlp_insecure,
+            endpoint=str(otel_settings.endpoint),
+            insecure=otel_settings.insecure,
         )
 
         # Create tracer provider with batch processor
@@ -79,8 +81,8 @@ def setup_tracing() -> None:
         _setup_instrumentations()
 
         logger.info(
-            f"OpenTelemetry tracing configured: endpoint={settings.otlp_endpoint}",
-            extra={"service": settings.service_name, "endpoint": settings.otlp_endpoint},
+            f"OpenTelemetry tracing configured: endpoint={otel_settings.endpoint}",
+            extra={"service": otel_settings.service_name, "endpoint": str(otel_settings.endpoint)},
         )
 
     except Exception as e:
@@ -98,7 +100,7 @@ def _setup_instrumentations() -> None:
     Instruments:
     - HTTPX: Traces all outgoing HTTP requests
     - SQLAlchemy: Traces all database queries
-    - asyncpg: Traces PostgreSQL operations
+    - psycopg: Traces PostgreSQL operations
     - FastAPI: Automatically done when app is created
 
     Note: FastAPI instrumentation happens when you call
@@ -112,9 +114,9 @@ def _setup_instrumentations() -> None:
     SQLAlchemyInstrumentor().instrument()
     logger.debug("SQLAlchemy instrumentation enabled")
 
-    # Instrument asyncpg for PostgreSQL operations
-    AsyncPGInstrumentor().instrument()
-    logger.debug("asyncpg instrumentation enabled")
+    # Instrument psycopg for PostgreSQL operations
+    PsycopgInstrumentor().instrument()
+    logger.debug("psycopg instrumentation enabled")
 
 
 def instrument_app(app: Any) -> None:
@@ -135,7 +137,7 @@ def instrument_app(app: Any) -> None:
         instrument_app(app)  # Add tracing to FastAPI
         ```
     """
-    if not settings.enable_tracing:
+    if not otel_settings.enabled:
         return
 
     try:

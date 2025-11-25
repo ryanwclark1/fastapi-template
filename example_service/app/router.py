@@ -1,12 +1,19 @@
 """Router registry and setup."""
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
+from example_service.features.admin.router import router as admin_router
+from example_service.features.metrics.router import router as metrics_router
+from example_service.features.reminders.router import router as reminders_router
 from example_service.features.status.router import router as status_router
+from example_service.infra.messaging.broker import get_router as get_rabbit_router
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
+
+logger = logging.getLogger(__name__)
 
 
 def setup_routers(app: FastAPI) -> None:
@@ -15,8 +22,24 @@ def setup_routers(app: FastAPI) -> None:
     Args:
         app: FastAPI application instance.
     """
+    # Include metrics endpoint (no prefix - accessible at /metrics)
+    app.include_router(metrics_router)
+
     # Include feature routers
+    app.include_router(reminders_router, prefix="/api/v1")
     app.include_router(status_router, prefix="/api/v1")
+    app.include_router(admin_router, prefix="/api/v1")
+
+    # Include RabbitMQ/FastStream router for messaging + AsyncAPI docs
+    # Note: RabbitRouter automatically includes AsyncAPI docs at /asyncapi
+    rabbit_router = get_rabbit_router()
+    if rabbit_router is not None:
+        # Import handlers to register them with the router
+        import example_service.infra.messaging.handlers  # noqa: F401
+
+        # Include the router (handles lifespan + auto-includes AsyncAPI docs)
+        app.include_router(rabbit_router, tags=["messaging"])
+        logger.info("RabbitMQ router included - AsyncAPI docs at /asyncapi")
 
     # TODO: Add more feature routers here
     # app.include_router(users_router, prefix="/api/v1")

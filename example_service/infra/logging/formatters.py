@@ -1,10 +1,12 @@
-"""Custom logging formatters."""
+"""Custom logging formatters with trace correlation."""
 from __future__ import annotations
 
 import json
 import logging
 from datetime import datetime, timezone
 from typing import Any
+
+from opentelemetry import trace
 
 
 class JSONFormatter(logging.Formatter):
@@ -39,13 +41,13 @@ class JSONFormatter(logging.Formatter):
         self.static = static or {}
 
     def format(self, record: logging.LogRecord) -> str:
-        """Format log record as JSON string.
+        """Format log record as JSON string with trace correlation.
 
         Args:
             record: Log record to format.
 
         Returns:
-            JSON string representation of log record.
+            JSON string representation of log record with trace context.
         """
         # Build data dict from format keys
         data: dict[str, Any] = {
@@ -59,6 +61,18 @@ class JSONFormatter(logging.Formatter):
             .replace("+00:00", "Z")
         )
         data["timestamp"] = ts
+
+        # Add OpenTelemetry trace context for correlation
+        # This enables linking logs to traces in Grafana/Tempo
+        span = trace.get_current_span()
+        if span and span.get_span_context().is_valid:
+            ctx = span.get_span_context()
+            # Format as 32-character hex string (128-bit trace ID)
+            data["trace_id"] = format(ctx.trace_id, "032x")
+            # Format as 16-character hex string (64-bit span ID)
+            data["span_id"] = format(ctx.span_id, "016x")
+            # Include trace flags for completeness
+            data["trace_flags"] = f"{ctx.trace_flags:02x}"
 
         # Add exception info if present
         if record.exc_info:

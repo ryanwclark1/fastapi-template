@@ -7,6 +7,7 @@ from example_service.app.lifespan import lifespan
 from example_service.app.middleware import configure_middleware
 from example_service.app.router import setup_routers
 from example_service.core.settings import get_app_settings
+from example_service.infra.tracing.opentelemetry import instrument_app
 
 
 def create_app() -> FastAPI:
@@ -37,6 +38,10 @@ def create_app() -> FastAPI:
 
     # Setup routers
     setup_routers(app)
+
+    # Instrument FastAPI for OpenTelemetry tracing
+    # This must be called after app creation but before serving requests
+    instrument_app(app)
 
     return app
 

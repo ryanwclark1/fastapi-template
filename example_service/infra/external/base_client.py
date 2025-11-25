@@ -14,8 +14,6 @@ import logging
 from typing import Any
 
 import httpx
-
-from example_service.core.settings import settings
 from example_service.utils.retry import retry
 
 logger = logging.getLogger(__name__)
@@ -174,9 +172,7 @@ class BaseHTTPClient:
             extra={"path": path, "has_json": json is not None, "has_data": data is not None},
         )
 
-        response = await self.client.post(
-            path, json=json, data=data, headers=headers, **kwargs
-        )
+        response = await self.client.post(path, json=json, data=data, headers=headers, **kwargs)
 
         logger.info(
             f"POST response from {self.base_url}{path}",

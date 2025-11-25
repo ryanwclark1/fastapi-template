@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from pydantic import AnyUrl, Field, model_validator
+from typing import Any
+
+from pydantic import AliasChoices, AnyUrl, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .sources import otel_source
@@ -65,8 +67,10 @@ class OtelSettings(BaseSettings):
     instrument_sqlalchemy: bool = Field(
         default=True, description="Instrument SQLAlchemy"
     )
-    instrument_asyncpg: bool = Field(
-        default=True, description="Instrument asyncpg PostgreSQL driver"
+    instrument_psycopg: bool = Field(
+        default=True,
+        description="Instrument psycopg PostgreSQL driver",
+        validation_alias=AliasChoices("instrument_psycopg", "instrument_asyncpg"),
     )
 
     @model_validator(mode="after")
@@ -82,6 +86,7 @@ class OtelSettings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         frozen=True,
+        extra="ignore",
     )
 
     @classmethod
@@ -90,7 +95,7 @@ class OtelSettings(BaseSettings):
     ):
         """Customize settings source precedence."""
 
-        def files_source(_):
+        def files_source(*_: BaseSettings) -> dict[str, Any]:
             return otel_source()
 
         return (init_settings, files_source, env_settings, dotenv_settings, file_secret_settings)

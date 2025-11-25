@@ -1,0 +1,90 @@
+// ============================================================================
+// OpenTelemetry - Trace Collection and Forwarding
+// ============================================================================
+
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+  output {
+    traces = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  output {
+    traces = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4319"
+    tls {
+      insecure = true
+    }
+  }
+}
+
+// ============================================================================
+// Loki - Log Collection and Forwarding
+// ============================================================================
+
+// Scrape application logs from mounted volume
+local.file_match "app_logs" {
+  path_targets = [{
+    __path__ = "/var/log/app/*.log.jsonl",
+  }]
+}
+
+loki.source.file "app_logs" {
+  targets    = local.file_match.app_logs.targets
+  forward_to = [loki.process.app_logs.receiver]
+}
+
+// Process logs: extract labels and add metadata
+loki.process "app_logs" {
+  forward_to = [loki.write.loki.receiver]
+
+  // Parse JSON log line
+  stage.json {
+    expressions = {
+      level      = "level",
+      service    = "service",
+      logger     = "logger",
+      trace_id   = "trace_id",
+      span_id    = "span_id",
+      request_id = "request_id",
+    }
+  }
+
+  // Add labels for filtering in Grafana
+  // Labels are indexed - use only for high-level filtering
+  stage.labels {
+    values = {
+      level   = "level",
+      service = "service",
+      logger  = "logger",
+    }
+  }
+
+  // Keep trace_id and span_id as structured metadata
+  // Structured metadata is not indexed but available for correlation
+  // This reduces cardinality and query costs while enabling trace linking
+  stage.structured_metadata {
+    values = {
+      trace_id   = "trace_id",
+      span_id    = "span_id",
+      request_id = "request_id",
+    }
+  }
+}
+
+loki.write "loki" {
+  endpoint {
+    url = "http://loki:3101/loki/api/v1/push"
+  }
+}

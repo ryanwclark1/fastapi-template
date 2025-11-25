@@ -92,3 +92,9 @@ def otel_source() -> dict[str, Any]:
     """Load OpenTelemetry settings from YAML files."""
     base = Path(os.getenv("OTEL_CONFIG_DIR", "conf"))
     return {**_load_yaml(base / "otel.yaml"), **_load_conf_d(base / "otel.d")}
+
+
+def backup_source() -> dict[str, Any]:
+    """Load backup settings from YAML files."""
+    base = Path(os.getenv("BACKUP_CONFIG_DIR", "conf"))
+    return {**_load_yaml(base / "backup.yaml"), **_load_conf_d(base / "backup.d")}

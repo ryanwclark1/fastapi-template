@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from pydantic import AnyUrl, Field, SecretStr
+from typing import Any
+
+from pydantic import AnyUrl, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from ._sanitizers import sanitize_inline_numeric
 from .sources import app_source  # Auth settings can share app_source
 
 
@@ -68,6 +71,7 @@ class AuthSettings(BaseSettings):
         case_sensitive=False,
         frozen=True,
         populate_by_name=True,
+        extra="ignore",
     )
 
     @classmethod
@@ -76,7 +80,7 @@ class AuthSettings(BaseSettings):
     ):
         """Customize settings source precedence."""
 
-        def files_source(_):
+        def files_source(*_: BaseSettings) -> dict[str, Any]:
             return app_source()  # Share with app or create auth_source()
 
         return (init_settings, files_source, env_settings, dotenv_settings, file_secret_settings)
@@ -93,3 +97,9 @@ class AuthSettings(BaseSettings):
         base = str(self.service_url).rstrip("/")
         endpoint = self.token_validation_endpoint.lstrip("/")
         return f"{base}/{endpoint}"
+
+    @field_validator("token_cache_ttl", mode="before")
+    @classmethod
+    def _normalize_token_cache_ttl(cls, value: Any) -> Any:
+        """Allow inline comments in env values (e.g., "300  # seconds")."""
+        return sanitize_inline_numeric(value)

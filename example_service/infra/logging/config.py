@@ -16,7 +16,7 @@ _listener: QueueListener | None = None
 
 
 def configure_logging(
-    config_path: str | Path = "logging.json",
+    config_path: str | Path = "conf/logging.json",
     overrides: dict[str, Any] | None = None,
 ) -> None:
     """Configure logging from JSON config file.
@@ -47,6 +47,8 @@ def configure_logging(
     config = json.loads(path.read_text(encoding="utf-8"))
     if overrides:
         config.update(overrides)
+
+    _prepare_file_handlers(config, base_dir=path.resolve().parent)
 
     # Create queue if queue handler is present
     if "queue" in config.get("handlers", {}):
@@ -127,3 +129,19 @@ def _configure_default_logging() -> None:
     root = logging.getLogger()
     root.setLevel(logging.INFO)
     root.addHandler(QueueHandler(_log_queue))
+
+
+def _prepare_file_handlers(config: dict[str, Any], base_dir: Path) -> None:
+    """Ensure directories for file-based handlers exist before configuring."""
+    handlers = config.get("handlers", {})
+    for handler in handlers.values():
+        filename = handler.get("filename")
+        if not filename:
+            continue
+
+        handler_path = Path(filename)
+        if not handler_path.is_absolute():
+            handler_path = base_dir / handler_path
+
+        handler_path.parent.mkdir(parents=True, exist_ok=True)
+        handler["filename"] = str(handler_path)

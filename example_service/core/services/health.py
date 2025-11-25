@@ -7,7 +7,17 @@ from typing import Any
 
 from example_service.core.schemas.common import HealthStatus
 from example_service.core.services.base import BaseService
-from example_service.core.settings import settings
+from example_service.core.settings import (
+    get_app_settings,
+    get_auth_settings,
+    get_db_settings,
+    get_redis_settings,
+)
+
+app_settings = get_app_settings()
+db_settings = get_db_settings()
+redis_settings = get_redis_settings()
+auth_settings = get_auth_settings()
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +69,7 @@ class HealthService(BaseService):
         return {
             "status": status,
             "timestamp": datetime.now(timezone.utc),
-            "service": settings.service_name,
+            "service": app_settings.service_name,
             "version": "0.1.0",
             "checks": checks,
         }
@@ -116,7 +126,7 @@ class HealthService(BaseService):
         return {
             "alive": True,
             "timestamp": datetime.now(timezone.utc),
-            "service": settings.service_name,
+            "service": app_settings.service_name,
         }
 
     async def startup(self) -> dict[str, Any]:
@@ -144,21 +154,21 @@ class HealthService(BaseService):
         checks: dict[str, bool] = {}
 
         # Database check (if configured)
-        if settings.database_url:
+        if db_settings.database_url:
             checks["database"] = await self._check_database()
         else:
             checks["database"] = True  # Not configured, don't fail
 
         # Cache check (if configured)
-        if settings.redis_url:
+        if redis_settings.redis_url:
             checks["cache"] = await self._check_cache()
         else:
             checks["cache"] = True  # Not configured, don't fail
 
         # External services (if configured)
-        if settings.auth_service_url:
+        if auth_settings.service_url:
             checks["auth_service"] = await self._check_external_service(
-                "auth", settings.auth_service_url
+                "auth", str(auth_settings.service_url)
             )
 
         return checks
@@ -172,7 +182,7 @@ class HealthService(BaseService):
         checks: dict[str, bool] = {}
 
         # Database is critical for readiness
-        if settings.database_url:
+        if db_settings.database_url:
             checks["database"] = await self._check_database()
 
         # Cache is not critical (service can run without it)

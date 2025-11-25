@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from pydantic import Field, PostgresDsn, SecretStr
+from typing import Any
+
+from pydantic import Field, PostgresDsn, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .sources import db_source
@@ -77,6 +79,7 @@ class PostgresSettings(BaseSettings):
         case_sensitive=False,
         frozen=True,
         populate_by_name=True,  # Allow both DATABASE_URL and database_url
+        extra="ignore",
     )
 
     @classmethod
@@ -85,10 +88,18 @@ class PostgresSettings(BaseSettings):
     ):
         """Customize settings source precedence."""
 
-        def files_source(_):
+        def files_source(*_: BaseSettings) -> dict[str, Any]:
             return db_source()
 
         return (init_settings, files_source, env_settings, dotenv_settings, file_secret_settings)
+
+    @field_validator("pg_max_idle", mode="before")
+    @classmethod
+    def _normalize_pg_max_idle(cls, value: Any) -> Any:
+        """Allow 'null' or empty env values to disable idle timeout."""
+        if isinstance(value, str) and value.strip().lower() in {"null", ""}:
+            return None
+        return value
 
     @property
     def is_configured(self) -> bool:

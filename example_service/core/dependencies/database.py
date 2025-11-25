@@ -4,11 +4,13 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING
 
+from example_service.infra.database import get_async_session
+
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
+async def get_db() -> AsyncGenerator["AsyncSession", None]:
     """FastAPI dependency for database session.
 
     Yields:
@@ -21,11 +23,5 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             ...
         ```
     """
-    # TODO: Import session factory from infra.database.session
-    # from example_service.infra.database.session import get_async_session
-    #
-    # async with get_async_session() as session:
-    #     yield session
-
-    # Placeholder implementation
-    raise NotImplementedError("Database session not configured")
+    async with get_async_session() as session:
+        yield session

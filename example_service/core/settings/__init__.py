@@ -24,6 +24,7 @@ from __future__ import annotations
 from .loader import (
     get_app_settings,
     get_auth_settings,
+    get_backup_settings,
     get_db_settings,
     get_logging_settings,
     get_otel_settings,
@@ -33,10 +34,11 @@ from .loader import (
 
 __all__ = [
     "get_app_settings",
-    "get_db_settings",
-    "get_rabbit_settings",
-    "get_redis_settings",
     "get_auth_settings",
+    "get_backup_settings",
+    "get_db_settings",
     "get_logging_settings",
     "get_otel_settings",
+    "get_rabbit_settings",
+    "get_redis_settings",
 ]

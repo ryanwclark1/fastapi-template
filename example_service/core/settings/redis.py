@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from pydantic import Field, RedisDsn, SecretStr
+from typing import Any
+
+from pydantic import Field, RedisDsn, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from ._sanitizers import sanitize_inline_numeric
 from .sources import db_source  # Redis settings can share db_source or have their own
 
 
@@ -67,6 +70,7 @@ class RedisSettings(BaseSettings):
         case_sensitive=False,
         frozen=True,
         populate_by_name=True,
+        extra="ignore",
     )
 
     @classmethod
@@ -75,7 +79,7 @@ class RedisSettings(BaseSettings):
     ):
         """Customize settings source precedence."""
 
-        def files_source(_):
+        def files_source(*_: BaseSettings) -> dict[str, Any]:
             return db_source()  # Can share with DB or create redis_source()
 
         return (init_settings, files_source, env_settings, dotenv_settings, file_secret_settings)
@@ -94,3 +98,9 @@ class RedisSettings(BaseSettings):
     def get_prefixed_key(self, key: str) -> str:
         """Get cache key with prefix."""
         return f"{self.key_prefix}{key}"
+
+    @field_validator("default_ttl", "auth_token_ttl", mode="before")
+    @classmethod
+    def _normalize_ttl(cls, value: Any) -> Any:
+        """Allow numeric env vars with inline comments (e.g., "3600  # 1 hour")."""
+        return sanitize_inline_numeric(value)

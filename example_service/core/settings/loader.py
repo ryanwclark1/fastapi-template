@@ -27,7 +27,8 @@ from functools import lru_cache
 
 from .app import AppSettings
 from .auth import AuthSettings
-from .logging_ import LoggingSettings
+from .backup import BackupSettings
+from .logs import LoggingSettings
 from .otel import OtelSettings
 from .postgres import PostgresSettings
 from .rabbit import RabbitSettings
@@ -104,6 +105,16 @@ def get_auth_settings() -> AuthSettings:
     return AuthSettings()
 
 
+@lru_cache(maxsize=1)
+def get_backup_settings() -> BackupSettings:
+    """Get cached backup settings.
+
+    Returns:
+        Validated and frozen BackupSettings instance.
+    """
+    return BackupSettings()
+
+
 def clear_all_caches() -> None:
     """Clear all settings caches.
 
@@ -117,3 +128,4 @@ def clear_all_caches() -> None:
     get_otel_settings.cache_clear()
     get_redis_settings.cache_clear()
     get_auth_settings.cache_clear()
+    get_backup_settings.cache_clear()

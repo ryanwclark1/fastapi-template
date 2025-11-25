@@ -6,7 +6,10 @@ Provides Kubernetes-ready health check endpoints for:
 - Startup probes: /health/startup
 - Comprehensive health: /health/
 """
+
 from __future__ import annotations
+
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response, status
 
@@ -29,7 +32,7 @@ router = APIRouter(prefix="/health", tags=["health"])
     description="Check the overall health of the service",
 )
 async def health_check(
-    service: HealthService = Depends(get_health_service),
+    service: Annotated[HealthService, Depends(get_health_service)],
 ) -> HealthResponse:
     """Health check endpoint.
 
@@ -58,7 +61,7 @@ async def health_check(
 )
 async def readiness_check(
     response: Response,
-    service: HealthService = Depends(get_health_service),
+    service: Annotated[HealthService, Depends(get_health_service)],
 ) -> ReadinessResponse:
     """Kubernetes readiness probe endpoint.
 
@@ -93,7 +96,7 @@ async def readiness_check(
     description="Kubernetes liveness probe - always returns 200 if service is responsive",
 )
 async def liveness_check(
-    service: HealthService = Depends(get_health_service),
+    service: Annotated[HealthService, Depends(get_health_service)],
 ) -> LivenessResponse:
     """Kubernetes liveness probe endpoint.
 
@@ -121,7 +124,7 @@ async def liveness_check(
     description="Kubernetes startup probe - indicates if application has started",
 )
 async def startup_check(
-    service: HealthService = Depends(get_health_service),
+    service: Annotated[HealthService, Depends(get_health_service)],
 ) -> StartupResponse:
     """Kubernetes startup probe endpoint.
 

@@ -9,12 +9,12 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
+
+# Import the models package so Base.metadata is aware of all mapped classes.
+# The package handles recursively loading feature-level models.
+from example_service.core import models  # noqa: F401
 from example_service.core.settings import get_db_settings
 from example_service.infra.database.base import Base
-
-# Import all models to ensure they're discovered by Alembic
-# This is critical for autogenerate to work properly
-from example_service.core.models import Post, User  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -45,6 +45,7 @@ def run_migrations_offline() -> None:
 
     Calls to context.execute() here emit the given string to the
     script output.
+
     """
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
@@ -59,11 +60,6 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    """Run migrations with connection.
-
-    Args:
-        connection: Database connection.
-    """
     context.configure(connection=connection, target_metadata=target_metadata)
 
     with context.begin_transaction():
@@ -71,7 +67,11 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
-    """Run migrations in 'online' mode using async engine."""
+    """In this scenario we need to create an Engine
+    and associate a connection with the context.
+
+    """
+
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
@@ -85,11 +85,8 @@ async def run_async_migrations() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode.
+    """Run migrations in 'online' mode."""
 
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-    """
     asyncio.run(run_async_migrations())
 
 

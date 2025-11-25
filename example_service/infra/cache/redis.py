@@ -6,24 +6,33 @@ This module provides a high-level Redis cache client that includes:
 - Type-safe get/set operations
 - Serialization/deserialization helpers
 - Health checks
+- Prometheus metrics with trace correlation
 """
 from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import TYPE_CHECKING, Any
 
+from opentelemetry import trace
 from redis.asyncio import ConnectionPool, Redis
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
-from example_service.core.settings import settings
+from example_service.core.settings import get_redis_settings
+from example_service.infra.metrics.prometheus import (
+    cache_hits_total,
+    cache_misses_total,
+    cache_operation_duration_seconds,
+)
 from example_service.utils.retry import retry
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
 logger = logging.getLogger(__name__)
+redis_settings = get_redis_settings()
 
 
 class RedisCache:
@@ -61,11 +70,11 @@ class RedisCache:
         Raises:
             RedisConnectionError: If unable to connect to Redis.
         """
-        logger.info("Connecting to Redis", extra={"url": settings.redis_url})
+        logger.info("Connecting to Redis", extra={"url": redis_settings.redis_url})
 
         try:
             self._pool = ConnectionPool.from_url(
-                settings.redis_url,
+                redis_settings.get_url(),
                 max_connections=20,
                 decode_responses=True,
                 encoding="utf-8",
@@ -115,7 +124,7 @@ class RedisCache:
         exceptions=(RedisConnectionError, RedisTimeoutError),
     )
     async def get(self, key: str) -> Any | None:
-        """Get a value from cache with automatic retry.
+        """Get a value from cache with automatic retry and metrics.
 
         Args:
             key: Cache key.
@@ -126,8 +135,45 @@ class RedisCache:
         Raises:
             RedisConnectionError: If unable to connect after retries.
         """
+        start_time = time.perf_counter()
+        cache_name = "redis"
+
         try:
             value = await self.client.get(key)
+            duration = time.perf_counter() - start_time
+
+            # Get trace context for exemplar
+            span = trace.get_current_span()
+            trace_id = None
+            if span and span.get_span_context().is_valid:
+                trace_id = format(span.get_span_context().trace_id, "032x")
+
+            # Record hit/miss
+            if value is not None:
+                if trace_id:
+                    cache_hits_total.labels(cache_name=cache_name).inc(
+                        exemplar={"trace_id": trace_id}
+                    )
+                else:
+                    cache_hits_total.labels(cache_name=cache_name).inc()
+            else:
+                if trace_id:
+                    cache_misses_total.labels(cache_name=cache_name).inc(
+                        exemplar={"trace_id": trace_id}
+                    )
+                else:
+                    cache_misses_total.labels(cache_name=cache_name).inc()
+
+            # Record operation duration
+            if trace_id:
+                cache_operation_duration_seconds.labels(
+                    operation="get", cache_name=cache_name
+                ).observe(duration, exemplar={"trace_id": trace_id})
+            else:
+                cache_operation_duration_seconds.labels(
+                    operation="get", cache_name=cache_name
+                ).observe(duration)
+
             if value is None:
                 return None
 
@@ -155,7 +201,7 @@ class RedisCache:
         value: Any,
         ttl: int | None = None,
     ) -> bool:
-        """Set a value in cache with automatic retry.
+        """Set a value in cache with automatic retry and metrics.
 
         Args:
             key: Cache key.
@@ -168,12 +214,33 @@ class RedisCache:
         Raises:
             RedisConnectionError: If unable to connect after retries.
         """
+        start_time = time.perf_counter()
+        cache_name = "redis"
+
         try:
             # Serialize to JSON if not a string
             if not isinstance(value, str):
                 value = json.dumps(value)
 
             result = await self.client.set(key, value, ex=ttl)
+            duration = time.perf_counter() - start_time
+
+            # Get trace context for exemplar
+            span = trace.get_current_span()
+            trace_id = None
+            if span and span.get_span_context().is_valid:
+                trace_id = format(span.get_span_context().trace_id, "032x")
+
+            # Record operation duration
+            if trace_id:
+                cache_operation_duration_seconds.labels(
+                    operation="set", cache_name=cache_name
+                ).observe(duration, exemplar={"trace_id": trace_id})
+            else:
+                cache_operation_duration_seconds.labels(
+                    operation="set", cache_name=cache_name
+                ).observe(duration)
+
             return bool(result)
         except Exception as e:
             logger.error(
@@ -189,7 +256,7 @@ class RedisCache:
         exceptions=(RedisConnectionError, RedisTimeoutError),
     )
     async def delete(self, key: str) -> bool:
-        """Delete a value from cache with automatic retry.
+        """Delete a value from cache with automatic retry and metrics.
 
         Args:
             key: Cache key.
@@ -200,8 +267,29 @@ class RedisCache:
         Raises:
             RedisConnectionError: If unable to connect after retries.
         """
+        start_time = time.perf_counter()
+        cache_name = "redis"
+
         try:
             result = await self.client.delete(key)
+            duration = time.perf_counter() - start_time
+
+            # Get trace context for exemplar
+            span = trace.get_current_span()
+            trace_id = None
+            if span and span.get_span_context().is_valid:
+                trace_id = format(span.get_span_context().trace_id, "032x")
+
+            # Record operation duration
+            if trace_id:
+                cache_operation_duration_seconds.labels(
+                    operation="delete", cache_name=cache_name
+                ).observe(duration, exemplar={"trace_id": trace_id})
+            else:
+                cache_operation_duration_seconds.labels(
+                    operation="delete", cache_name=cache_name
+                ).observe(duration)
+
             return bool(result)
         except Exception as e:
             logger.error(
@@ -217,7 +305,7 @@ class RedisCache:
         exceptions=(RedisConnectionError, RedisTimeoutError),
     )
     async def exists(self, key: str) -> bool:
-        """Check if a key exists in cache with automatic retry.
+        """Check if a key exists in cache with automatic retry and metrics.
 
         Args:
             key: Cache key.
@@ -228,8 +316,29 @@ class RedisCache:
         Raises:
             RedisConnectionError: If unable to connect after retries.
         """
+        start_time = time.perf_counter()
+        cache_name = "redis"
+
         try:
             result = await self.client.exists(key)
+            duration = time.perf_counter() - start_time
+
+            # Get trace context for exemplar
+            span = trace.get_current_span()
+            trace_id = None
+            if span and span.get_span_context().is_valid:
+                trace_id = format(span.get_span_context().trace_id, "032x")
+
+            # Record operation duration
+            if trace_id:
+                cache_operation_duration_seconds.labels(
+                    operation="exists", cache_name=cache_name
+                ).observe(duration, exemplar={"trace_id": trace_id})
+            else:
+                cache_operation_duration_seconds.labels(
+                    operation="exists", cache_name=cache_name
+                ).observe(duration)
+
             return bool(result)
         except Exception as e:
             logger.error(

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import AnyUrl, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -77,15 +79,21 @@ class RabbitSettings(BaseSettings):
         case_sensitive=False,
         frozen=True,
         populate_by_name=True,
+        extra="ignore",
     )
 
     @classmethod
     def settings_customise_sources(
-        cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings
+        cls,
+        settings_cls,
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
     ):
         """Customize settings source precedence."""
 
-        def files_source(_):
+        def files_source(*_: BaseSettings) -> dict[str, Any]:
             return rabbit_source()
 
         return (init_settings, files_source, env_settings, dotenv_settings, file_secret_settings)

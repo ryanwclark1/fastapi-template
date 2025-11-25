@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -107,6 +107,7 @@ class AppSettings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         frozen=True,  # Immutable settings
+        extra="ignore",
     )
 
     @classmethod
@@ -115,7 +116,7 @@ class AppSettings(BaseSettings):
     ):
         """Customize settings source precedence: init > files > env > dotenv > secrets."""
 
-        def files_source(_):
+        def files_source(*_: BaseSettings) -> dict[str, Any]:
             return app_source()
 
         return (init_settings, files_source, env_settings, dotenv_settings, file_secret_settings)

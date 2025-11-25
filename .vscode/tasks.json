@@ -1,0 +1,510 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    // ═══════════════════════════════════════════════════════
+    // Infrastructure (Docker)
+    // ═══════════════════════════════════════════════════════
+    {
+      "label": "Infra: Docker Compose Up",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "compose",
+        "--env-file",
+        ".env",
+        "-f",
+        "deployment/docker/docker-compose.yml",
+        "up",
+        "-d",
+        "db",
+        "redis",
+        "rabbitmq",
+        "tempo",
+        "loki",
+        "prometheus",
+        "alloy",
+        "grafana"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "showReuseMessage": false,
+        "group": "infra"
+      },
+      "detail": "Start local infrastructure (database, cache, messaging, observability)",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Infra: Docker Compose Up (Core Only)",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "compose",
+        "--env-file",
+        ".env",
+        "-f",
+        "deployment/docker/docker-compose.yml",
+        "up",
+        "-d",
+        "db",
+        "redis",
+        "rabbitmq"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "infra"
+      },
+      "detail": "Start core infrastructure only (db, redis, rabbitmq)",
+      "problemMatcher": []
+    },
+    {
+      "label": "Infra: Docker Compose Down",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "compose",
+        "--env-file",
+        ".env",
+        "-f",
+        "deployment/docker/docker-compose.yml",
+        "down"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "infra"
+      },
+      "detail": "Stop all infrastructure services",
+      "problemMatcher": []
+    },
+    {
+      "label": "Infra: Docker Compose Down (Remove Volumes)",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "compose",
+        "--env-file",
+        ".env",
+        "-f",
+        "deployment/docker/docker-compose.yml",
+        "down",
+        "-v"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "infra"
+      },
+      "detail": "Stop all infrastructure and remove volumes (clean slate)",
+      "problemMatcher": []
+    },
+    {
+      "label": "Infra: View Logs",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "compose",
+        "-f",
+        "deployment/docker/docker-compose.yml",
+        "logs",
+        "-f"
+      ],
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "infra"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Infra: Free Ports",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/free-ports.sh",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "infra"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Infra: Free Ports (Force)",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/free-ports.sh",
+      "args": ["--force"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "infra"
+      },
+      "problemMatcher": []
+    },
+    // ═══════════════════════════════════════════════════════
+    // Service Tasks
+    // ═══════════════════════════════════════════════════════
+    {
+      "label": "Service: Start FastAPI",
+      "type": "shell",
+      "command": "uv",
+      "args": [
+        "run",
+        "uvicorn",
+        "example_service.app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--reload"
+      ],
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "service"
+      },
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^(.*)$",
+          "file": 1
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.*Started server process.*",
+          "endsPattern": "^.*Application startup complete.*"
+        }
+      }
+    },
+    {
+      "label": "Service: Start Taskiq Worker",
+      "type": "shell",
+      "command": "uv",
+      "args": [
+        "run",
+        "taskiq",
+        "worker",
+        "example_service.tasks.broker:broker"
+      ],
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "service"
+      },
+      "problemMatcher": []
+    },
+    // ═══════════════════════════════════════════════════════
+    // Testing
+    // ═══════════════════════════════════════════════════════
+    {
+      "label": "Test: Run All",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "pytest", "tests", "-v"],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "focus": true,
+        "group": "test"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run Current File",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "pytest", "${file}", "-v", "--tb=short"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "focus": true,
+        "group": "test"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run Unit Tests",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "pytest", "-m", "unit", "-v"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "test"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run Integration Tests",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "pytest", "-m", "integration", "-v"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "test"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run with Coverage",
+      "type": "shell",
+      "command": "uv",
+      "args": [
+        "run",
+        "pytest",
+        "--cov=example_service",
+        "--cov-report=term-missing",
+        "--cov-report=html:coverage/html",
+        "-v"
+      ],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "test"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run Fast (No Coverage)",
+      "type": "shell",
+      "command": "uv",
+      "args": [
+        "run",
+        "pytest",
+        "-x",
+        "--tb=line",
+        "--no-cov",
+        "-m",
+        "unit and not slow",
+        "-v"
+      ],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "test"
+      },
+      "problemMatcher": []
+    },
+    // ═══════════════════════════════════════════════════════
+    // Code Quality
+    // ═══════════════════════════════════════════════════════
+    {
+      "label": "Quality: Format Code",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "ruff", "format", "."],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "quality"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Quality: Lint Code",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "ruff", "check", ".", "--fix"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "quality"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Quality: Type Check",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "mypy", "example_service"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "quality"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Quality: Full Check",
+      "type": "shell",
+      "dependsOn": ["Quality: Format Code", "Quality: Lint Code", "Quality: Type Check"],
+      "dependsOrder": "sequence",
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "quality"
+      },
+      "problemMatcher": []
+    },
+    // ═══════════════════════════════════════════════════════
+    // Database (Alembic)
+    // ═══════════════════════════════════════════════════════
+    {
+      "label": "Database: Upgrade Head",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "alembic", "upgrade", "head"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "database"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Database: Downgrade -1",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "alembic", "downgrade", "-1"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "database"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Database: Create Migration",
+      "type": "shell",
+      "command": "uv",
+      "args": [
+        "run",
+        "alembic",
+        "revision",
+        "--autogenerate",
+        "-m",
+        "${input:migrationMessage}"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "database"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Database: Show History",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "alembic", "history", "--verbose"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "database"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Database: Show Current",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "alembic", "current"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "database"
+      },
+      "problemMatcher": []
+    },
+    // ═══════════════════════════════════════════════════════
+    // Workspace Management
+    // ═══════════════════════════════════════════════════════
+    {
+      "label": "Workspace: Sync Dependencies",
+      "type": "shell",
+      "command": "uv",
+      "args": ["sync"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Workspace: Lock Dependencies",
+      "type": "shell",
+      "command": "uv",
+      "args": ["lock"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Workspace: Clean Cache",
+      "type": "shell",
+      "command": "rm",
+      "args": [
+        "-rf",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".ruff_cache",
+        "__pycache__",
+        "*.egg-info",
+        ".coverage",
+        "coverage"
+      ],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    // ═══════════════════════════════════════════════════════
+    // Pre-commit
+    // ═══════════════════════════════════════════════════════
+    {
+      "label": "Pre-commit: Run All",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "pre-commit", "run", "--all-files"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Pre-commit: Install Hooks",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "pre-commit", "install"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "migrationMessage",
+      "type": "promptString",
+      "description": "Alembic migration message",
+      "default": "auto generated migration"
+    }
+  ]
+}

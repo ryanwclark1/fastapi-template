@@ -16,7 +16,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from example_service.core.schemas.auth import AuthUser, TokenPayload
-from example_service.core.settings import settings
+from example_service.core.settings import get_auth_settings
 from example_service.infra.cache.redis import get_cache
 from example_service.utils.retry import retry
 
@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 # Security scheme for extracting Bearer tokens
 security = HTTPBearer(auto_error=False)
+auth_settings = get_auth_settings()
 
 
 @retry(
@@ -50,10 +51,17 @@ async def validate_token_with_auth_service(token: str) -> TokenPayload:
     Raises:
         HTTPException: If token is invalid or auth service is unavailable.
     """
+    if not auth_settings.is_configured:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service not configured",
+        )
+
     try:
+        validation_url = auth_settings.get_validation_url()
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.post(
-                f"{settings.auth_token_url}/validate",
+                validation_url,
                 headers={"Authorization": f"Bearer {token}"},
             )
 
@@ -168,7 +176,7 @@ async def get_current_user(
             await cache.set(
                 cache_key,
                 auth_user.model_dump(),
-                ttl=settings.auth_token_cache_ttl,
+                ttl=auth_settings.token_cache_ttl,
             )
         except Exception as e:
             logger.warning("Failed to cache token validation", extra={"error": str(e)})

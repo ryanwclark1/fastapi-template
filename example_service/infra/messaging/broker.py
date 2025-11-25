@@ -2,49 +2,67 @@
 
 This module provides the message broker setup for event-driven communication
 using FastStream with RabbitMQ. It includes:
-- Broker initialization with connection pooling
+- RabbitRouter for FastAPI integration with AsyncAPI docs
 - Queue and exchange configuration
 - Publisher and subscriber setup
-- Integration with FastAPI lifespan
+- Automatic lifespan management
+
+AsyncAPI Documentation:
+- /asyncapi - Interactive documentation UI
+- /asyncapi.json - JSON schema download
+- /asyncapi.yaml - YAML schema download
 """
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
-
-from faststream.rabbit import RabbitBroker
+from typing import TYPE_CHECKING, Any
 
 from example_service.core.settings import get_rabbit_settings
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
+    from faststream.rabbit import RabbitBroker
+    from faststream.rabbit.fastapi import RabbitRouter as RabbitRouterType
+else:
+    RabbitRouterType = Any
+
 logger = logging.getLogger(__name__)
 
 # Get RabbitMQ settings from modular configuration
 rabbit_settings = get_rabbit_settings()
 
-# Initialize RabbitMQ broker
-broker = RabbitBroker(
-    url=rabbit_settings.get_url() if rabbit_settings.is_configured else None,
-    # Connection settings
-    max_consumers=rabbit_settings.max_consumers,
-    graceful_timeout=rabbit_settings.graceful_timeout,
-    # Logging
-    logger=logger,
-    # Apply prefix to all queues for multi-environment support
-    apply_types=True,
-) if rabbit_settings.is_configured else None
+# Initialize RabbitMQ router with AsyncAPI documentation
+# RabbitRouter wraps RabbitBroker and provides FastAPI integration
+router: RabbitRouterType | None = None
+broker: "RabbitBroker | None" = None
+
+if rabbit_settings.is_configured:
+    from faststream.rabbit.fastapi import RabbitRouter
+
+    router = RabbitRouter(
+        url=rabbit_settings.get_url(),
+        graceful_timeout=rabbit_settings.graceful_timeout,
+        logger=logger,
+        # AsyncAPI documentation configuration
+        schema_url="/asyncapi",
+        include_in_schema=True,
+        description="Event-driven messaging API for the Example Service",
+    )
+    # Access the underlying broker for direct operations
+    broker = router.broker
+else:
+    logger.warning("RabbitMQ not configured - messaging features disabled")
 
 
-async def get_broker() -> AsyncIterator[RabbitBroker]:
+async def get_broker() -> "AsyncIterator[RabbitBroker | None]":
     """Get the RabbitMQ broker instance.
 
     This is a dependency that can be used in FastAPI endpoints
     to access the broker for publishing messages.
 
     Yields:
-        RabbitMQ broker instance.
+        RabbitMQ broker instance or None if not configured.
 
     Example:
         ```python
@@ -61,14 +79,24 @@ async def get_broker() -> AsyncIterator[RabbitBroker]:
     yield broker
 
 
+def get_router() -> RabbitRouterType | None:
+    """Get the RabbitMQ router for FastAPI integration.
+
+    Returns:
+        RabbitRouter instance or None if not configured.
+    """
+    return router
+
+
+# Legacy functions for backward compatibility
+# Note: With RabbitRouter, lifecycle is managed automatically by FastAPI
+
 async def start_broker() -> None:
     """Start the RabbitMQ broker connection.
 
-    This should be called during application startup in the lifespan context.
-    It establishes the connection to RabbitMQ and sets up all queues and exchanges.
-
-    Raises:
-        ConnectionError: If unable to connect to RabbitMQ.
+    Note: When using RabbitRouter with FastAPI, the broker lifecycle
+    is managed automatically. This function is kept for backward
+    compatibility and manual startup scenarios.
     """
     if not rabbit_settings.is_configured or broker is None:
         logger.warning("RabbitMQ not configured, skipping broker startup")
@@ -87,8 +115,9 @@ async def start_broker() -> None:
 async def stop_broker() -> None:
     """Stop the RabbitMQ broker connection.
 
-    This should be called during application shutdown in the lifespan context.
-    It gracefully closes the connection to RabbitMQ.
+    Note: When using RabbitRouter with FastAPI, the broker lifecycle
+    is managed automatically. This function is kept for backward
+    compatibility and manual shutdown scenarios.
     """
     if not rabbit_settings.is_configured or broker is None:
         logger.debug("RabbitMQ not configured, skipping broker shutdown")
