@@ -1,3 +1,8 @@
+# =============================================================================
+# EXAMPLE MODEL - For demonstration and template purposes
+# This model demonstrates SQLAlchemy patterns but is not used in production.
+# Safe to remove when building your application (update migrations accordingly).
+# =============================================================================
 """Post model for demonstrating foreign key relationships."""
 
 from __future__ import annotations

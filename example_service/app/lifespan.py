@@ -1,11 +1,13 @@
 """Application lifespan management."""
 from __future__ import annotations
 
+import inspect
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from importlib import import_module
 from types import ModuleType
+from typing import Any
 
 from fastapi import FastAPI
 
@@ -119,7 +121,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     scheduler_module: ModuleType | None = None
 
     # Startup - Configure logging with settings
-    configure_logging(**log_settings.to_logging_kwargs())
+    log_config: dict[str, Any] = {}
+    if hasattr(log_settings, "to_logging_kwargs"):
+        # Allow DummySettings (used in tests) to bypass logging configuration
+        log_config = log_settings.to_logging_kwargs()  # type: ignore[attr-defined]
+    configure_logging(**log_config)
     logger.info(
         "Application starting",
         extra={
@@ -194,9 +200,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Initialize Taskiq broker for background tasks (independent of FastStream)
     # Taskiq uses its own RabbitMQ connection via taskiq-aio-pika
-    taskiq_module, scheduler_module = await _initialize_taskiq_and_scheduler(
-        rabbit_settings, redis_settings
-    )
+    initialization = _initialize_taskiq_and_scheduler(rabbit_settings, redis_settings)
+    if inspect.isawaitable(initialization):
+        initialization = await initialization
+    if initialization is None:
+        initialization = (None, None)
+    taskiq_module, scheduler_module = initialization
 
     logger.info(
         "Application startup complete - listening on %s:%s",

@@ -7,9 +7,30 @@ from .schemas import (
     TaskExecutionResponse,
     TaskStatsResponse,
 )
+from .service import (
+    AdminService,
+    AdminServiceError,
+    BrokerNotConfiguredError,
+    JobNotFoundError,
+    TaskName,
+    TaskNotFoundError,
+    TrackerNotAvailableError,
+    get_admin_service,
+)
 
 __all__ = [
+    # Router
     "router",
+    # Service
+    "AdminService",
+    "AdminServiceError",
+    "BrokerNotConfiguredError",
+    "JobNotFoundError",
+    "TaskName",
+    "TaskNotFoundError",
+    "TrackerNotAvailableError",
+    "get_admin_service",
+    # Schemas
     "RunningTaskResponse",
     "TaskExecutionResponse",
     "TaskStatsResponse",

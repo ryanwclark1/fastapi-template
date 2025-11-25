@@ -202,7 +202,7 @@ DB_DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/example_se
 REDIS_REDIS_URL=redis://localhost:6379/0
 
 # RabbitMQ (RABBIT_*)
-RABBIT_RABBITMQ_URL=amqp://guest:guest@localhost:5672/
+RABBIT_AMQP_URI=amqp://guest:guest@localhost:5672/
 
 # Logging (LOG_*)
 LOG_LEVEL=INFO

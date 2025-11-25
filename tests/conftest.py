@@ -2,10 +2,20 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncGenerator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+
+# Ensure tests run without external infrastructure
+os.environ.setdefault("APP_ROOT_PATH", "")
+os.environ.setdefault("DB_ENABLED", "false")
+os.environ.setdefault("DB_DATABASE_URL", "")
+os.environ.setdefault("REDIS_REDIS_URL", "")
+os.environ.setdefault("RABBIT_ENABLED", "false")
+os.environ.setdefault("AUTH_SERVICE_URL", "")
+os.environ.setdefault("OTEL_ENABLED", "false")
 
 
 @pytest.fixture

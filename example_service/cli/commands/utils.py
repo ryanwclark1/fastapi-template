@@ -147,7 +147,7 @@ async def health_check() -> None:
 
         async with httpx.AsyncClient() as client:
             # Check liveness
-            response = await client.get(f"{base_url}{settings.app.api_v1_str}/health/live")
+            response = await client.get(f"{base_url}{settings.app.api_prefix}/health/live")
             if response.status_code == 200:
                 success(f"  ✓ Liveness endpoint: {response.status_code}")
             else:
@@ -155,7 +155,7 @@ async def health_check() -> None:
                 all_healthy = False
 
             # Check readiness
-            response = await client.get(f"{base_url}{settings.app.api_v1_str}/health/ready")
+            response = await client.get(f"{base_url}{settings.app.api_prefix}/health/ready")
             if response.status_code == 200:
                 success(f"  ✓ Readiness endpoint: {response.status_code}")
             else:

@@ -28,7 +28,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, func, insert, select
+from sqlalchemy import delete as sql_delete
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from example_service.core.database.exceptions import NotFoundError
 
@@ -317,6 +319,192 @@ class BaseRepository[T]:
         """
         await session.delete(instance)
         await session.flush()
+
+    async def update_many(
+        self,
+        session: AsyncSession,
+        instances: Iterable[T],
+    ) -> Sequence[T]:
+        """Update multiple entities.
+
+        Each instance must already be tracked by the session (either loaded
+        or previously added). Flushes changes and refreshes all instances.
+
+        Args:
+            session: Database session
+            instances: Entity instances with modifications
+
+        Returns:
+            Sequence of updated entities
+
+        Example:
+                users = await repo.list(session, limit=100)
+            for user in users:
+                user.is_verified = True
+            updated = await repo.update_many(session, users)
+        """
+        instances_list = list(instances)
+        session.add_all(instances_list)  # Ensures all are tracked
+        await session.flush()
+        for instance in instances_list:
+            await session.refresh(instance)
+        return instances_list
+
+    async def delete_many(
+        self,
+        session: AsyncSession,
+        ids: Iterable[Any],
+    ) -> int:
+        """Delete multiple entities by primary key.
+
+        Uses a single DELETE statement for efficiency. Does not load entities
+        into session - directly executes DELETE WHERE id IN (...).
+
+        Args:
+            session: Database session
+            ids: Primary key values to delete
+
+        Returns:
+            Number of rows deleted
+
+        Example:
+                deleted_count = await repo.delete_many(session, [1, 2, 3])
+            print(f"Deleted {deleted_count} records")
+        """
+        ids_list = list(ids)
+        if not ids_list:
+            return 0
+
+        pk_attr = self._pk_attr()
+        stmt = sql_delete(self.model).where(pk_attr.in_(ids_list))
+        result = await session.execute(stmt)
+        await session.flush()
+        return result.rowcount  # type: ignore[return-value]
+
+    async def upsert_many(
+        self,
+        session: AsyncSession,
+        instances: Iterable[T],
+        *,
+        conflict_columns: Sequence[str],
+        update_columns: Sequence[str],
+    ) -> Sequence[T]:
+        """Upsert (insert or update) multiple entities.
+
+        Uses PostgreSQL's ON CONFLICT DO UPDATE for atomic upsert.
+        Requires explicit specification of conflict and update columns
+        for safety and clarity.
+
+        Args:
+            session: Database session
+            instances: Entity instances to upsert
+            conflict_columns: Columns that define uniqueness (e.g., ['email'])
+            update_columns: Columns to update on conflict (e.g., ['name', 'updated_at'])
+
+        Returns:
+            Sequence of upserted entities
+
+        Raises:
+            ValueError: If conflict_columns or update_columns is empty
+
+        Example:
+                users = [User(email=\"a@b.com\", name=\"Alice\"), User(email=\"c@d.com\", name=\"Carol\")]
+            upserted = await repo.upsert_many(
+                session,
+                users,
+                conflict_columns=[\"email\"],
+                update_columns=[\"name\", \"updated_at\"],
+            )
+
+        Note:
+            PostgreSQL-specific. For other databases, use create_many with
+            appropriate error handling.
+        """
+        if not conflict_columns:
+            raise ValueError("conflict_columns must not be empty")
+        if not update_columns:
+            raise ValueError("update_columns must not be empty")
+
+        instances_list = list(instances)
+        if not instances_list:
+            return []
+
+        # Convert instances to dicts for Core insert
+        from sqlalchemy import inspect as sa_inspect
+
+        def instance_to_dict(inst: T) -> dict[str, Any]:
+            mapper = sa_inspect(type(inst))
+            return {c.key: getattr(inst, c.key) for c in mapper.column_attrs}
+
+        values = [instance_to_dict(inst) for inst in instances_list]
+
+        # Build upsert statement
+        stmt = pg_insert(self.model).values(values)
+        update_dict = {col: stmt.excluded[col] for col in update_columns}
+        stmt = stmt.on_conflict_do_update(
+            index_elements=conflict_columns,
+            set_=update_dict,
+        ).returning(self.model)
+
+        result = await session.execute(stmt)
+        await session.flush()
+
+        # Scalars returns model instances when using RETURNING
+        return list(result.scalars().all())
+
+    async def bulk_create(
+        self,
+        session: AsyncSession,
+        instances: Iterable[T],
+        *,
+        batch_size: int = 1000,
+    ) -> int:
+        """High-performance bulk insert using SQLAlchemy Core.
+
+        Bypasses ORM overhead for maximum insert speed. Does not return
+        created instances or populate generated fields - use create_many()
+        if you need the instances back.
+
+        Best for:
+        - Large data imports (10k+ rows)
+        - When you don't need the created instances
+        - Background jobs and data migrations
+
+        Args:
+            session: Database session
+            instances: Entity instances to insert
+            batch_size: Number of rows per INSERT statement (default 1000)
+
+        Returns:
+            Total number of rows inserted
+
+        Example:
+                users = [User(email=f\"user{i}@example.com\") for i in range(10000)]
+            count = await repo.bulk_create(session, users, batch_size=2000)
+            print(f\"Inserted {count} users\")
+        """
+        from sqlalchemy import inspect as sa_inspect
+
+        def instance_to_dict(inst: T) -> dict[str, Any]:
+            mapper = sa_inspect(type(inst))
+            return {c.key: getattr(inst, c.key) for c in mapper.column_attrs}
+
+        instances_list = list(instances)
+        if not instances_list:
+            return 0
+
+        total_inserted = 0
+
+        # Process in batches
+        for i in range(0, len(instances_list), batch_size):
+            batch = instances_list[i : i + batch_size]
+            values = [instance_to_dict(inst) for inst in batch]
+            stmt = insert(self.model).values(values)
+            await session.execute(stmt)
+            total_inserted += len(batch)
+
+        await session.flush()
+        return total_inserted
 
     def _pk_attr(self) -> InstrumentedAttribute[Any]:
         """Get primary key attribute.

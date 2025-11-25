@@ -6,7 +6,7 @@ Use whichever approach fits your needs - or mix them.
 
 Base Classes and Mixins:
     - Base: Enhanced declarative base with auto table naming
-    - IntegerPKMixin, UUIDPKMixin: Flexible primary key strategies
+    - IntegerPKMixin, UUIDPKMixin, UUIDv7PKMixin: Flexible primary key strategies
     - TimestampMixin: created_at, updated_at tracking
     - AuditColumnsMixin: created_by, updated_by tracking
     - SoftDeleteMixin: Soft delete support with deleted_at
@@ -29,6 +29,16 @@ Query Filters:
     - OnBeforeAfter: Inclusive date range filtering
     - FilterGroup: Combine multiple filters
 
+UUID Utilities:
+    - generate_uuid7: Generate time-sortable UUID v7
+    - short_uuid: Convert UUID to URL-safe base64 string
+    - parse_uuid: Parse UUID from various formats
+    - uuid_to_timestamp: Extract timestamp from UUID v7
+
+Validation:
+    - validate_identifier: Validate SQL identifiers against injection
+    - safe_table_reference: Create safely quoted table references
+
 Custom Types:
     - EncryptedString: Transparent encryption for sensitive data
     - EncryptedText: Encrypted Text type for larger content
@@ -36,6 +46,7 @@ Custom Types:
 Exceptions:
     - DatabaseError: Base exception for database operations
     - NotFoundError: Entity not found (404-like)
+    - IdentifierValidationError: Invalid SQL identifier
 
 Example (Repository approach):
     from example_service.core.database import BaseRepository, SearchResult
@@ -76,6 +87,7 @@ from example_service.core.database.base import (
     TimestampMixin,
     UUIDPKMixin,
     UUIDTimestampedBase,
+    UUIDv7PKMixin,
 )
 from example_service.core.database.exceptions import (
     DatabaseError,
@@ -99,6 +111,17 @@ from example_service.core.database.types import (
     EncryptedString,
     EncryptedText,
 )
+from example_service.core.database.utils import (
+    generate_uuid7,
+    parse_uuid,
+    short_uuid,
+    uuid_to_timestamp,
+)
+from example_service.core.database.validation import (
+    IdentifierValidationError,
+    safe_table_reference,
+    validate_identifier,
+)
 
 __all__ = [
     # Base and metadata
@@ -107,6 +130,7 @@ __all__ = [
     # Primary key mixins
     "IntegerPKMixin",
     "UUIDPKMixin",
+    "UUIDv7PKMixin",
     # Audit mixins
     "TimestampMixin",
     "AuditColumnsMixin",
@@ -127,6 +151,15 @@ __all__ = [
     "BeforeAfter",
     "OnBeforeAfter",
     "FilterGroup",
+    # UUID utilities
+    "generate_uuid7",
+    "short_uuid",
+    "parse_uuid",
+    "uuid_to_timestamp",
+    # Validation
+    "validate_identifier",
+    "safe_table_reference",
+    "IdentifierValidationError",
     # Custom types
     "EncryptedString",
     "EncryptedText",

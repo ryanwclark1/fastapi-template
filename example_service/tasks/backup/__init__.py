@@ -9,10 +9,16 @@ This module provides scheduled database backup functionality:
 
 from __future__ import annotations
 
-from .tasks import backup_database, cleanup_old_local_backups, run_pg_dump
-
-__all__ = [
-    "backup_database",
-    "cleanup_old_local_backups",
-    "run_pg_dump",
-]
+try:
+    from .tasks import backup_database, cleanup_old_local_backups, run_pg_dump
+except ImportError:  # Optional dependencies missing (e.g., broker not configured)
+    backup_database = None  # type: ignore[assignment]
+    cleanup_old_local_backups = None  # type: ignore[assignment]
+    run_pg_dump = None  # type: ignore[assignment]
+    __all__: list[str] = []
+else:
+    __all__ = [
+        "backup_database",
+        "cleanup_old_local_backups",
+        "run_pg_dump",
+    ]

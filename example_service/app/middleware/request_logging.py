@@ -10,6 +10,7 @@ import json
 import logging
 import re
 import time
+import uuid
 from collections.abc import Callable
 from typing import Any
 
@@ -20,6 +21,23 @@ from starlette.types import ASGIApp
 from example_service.infra.logging.context import set_log_context
 
 logger = logging.getLogger(__name__)
+SLOW_REQUEST_THRESHOLD = 5.0
+
+try:
+    from example_service.tasks import tracking as _task_tracking
+except Exception:  # pragma: no cover - optional dependency
+    class _TrackingStub:
+        @staticmethod
+        def track_api_call(**_: Any) -> None:
+            return
+
+        @staticmethod
+        def track_slow_request(**_: Any) -> None:
+            return
+
+    tracking = _TrackingStub()
+else:  # pragma: no cover - exercised in integration tests
+    tracking = _task_tracking
 
 
 class PIIMasker:
@@ -57,6 +75,7 @@ class PIIMasker:
         "access_token",
         "refresh_token",
         "authorization",
+        "cookie",
         "auth",
         "credit_card",
         "creditcard",
@@ -66,6 +85,7 @@ class PIIMasker:
         "social_security",
         "tax_id",
         "driver_license",
+        "x-api-key",
     }
 
     def __init__(
@@ -90,6 +110,25 @@ class PIIMasker:
         self.preserve_last_4 = preserve_last_4
         self.custom_patterns = custom_patterns or {}
         self.sensitive_fields = self.SENSITIVE_FIELDS | (custom_fields or set())
+
+    def _mask_sensitive_field(self, field: str, value: Any) -> Any:
+        """Mask value based on known sensitive field semantics."""
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            return self.mask_char * 8
+
+        if field in {"email"}:
+            return self.mask_email(value)
+        if field in {"phone"}:
+            return self.mask_phone(value)
+        if field in {"credit_card", "creditcard", "card_number"}:
+            return self.mask_credit_card(value)
+        if field in {"authorization", "cookie", "api_key", "x-api-key"}:
+            return self.mask_char * 8
+        if field in {"ssn"}:
+            return self.mask_char * len(value)
+        return self.mask_char * 8
 
     def mask_email(self, email: str) -> str:
         """Mask email address.
@@ -217,9 +256,11 @@ class PIIMasker:
         for key, value in data.items():
             key_lower = key.lower()
 
+            if value is None:
+                masked[key] = None
             # Completely mask sensitive fields
-            if key_lower in self.sensitive_fields:
-                masked[key] = self.mask_char * 8
+            elif key_lower in self.sensitive_fields:
+                masked[key] = self._mask_sensitive_field(key_lower, value)
             elif isinstance(value, str):
                 masked[key] = self.mask_string(value)
             elif isinstance(value, dict):
@@ -386,7 +427,12 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         start_time = time.time()
-        request_id = getattr(request.state, "request_id", "unknown")
+        request_id = getattr(request.state, "request_id", None)
+        if not request_id:
+            header_request_id = request.headers.get("x-request-id")
+            request_id = header_request_id or str(uuid.uuid4())
+            request.state.request_id = request_id
+            request.scope.setdefault("state", {})["request_id"] = request_id
 
         # Add logging-specific context fields
         # Note: request_id is already set by RequestIDMiddleware
@@ -459,6 +505,15 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 },
                 exc_info=True,
             )
+
+            if hasattr(tracking, "track_api_call"):
+                tracking.track_api_call(
+                    path=request.url.path,
+                    method=request.method,
+                    status_code=500,
+                    duration=duration,
+                    success=False,
+                )
             raise
 
         # Calculate duration for logging purposes
@@ -481,5 +536,21 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             response_log["response_size"] = response_size
 
         logger.log(self.log_level, "HTTP Response", extra=response_log)
+
+        if hasattr(tracking, "track_api_call"):
+            tracking.track_api_call(
+                path=request.url.path,
+                method=request.method,
+                status_code=response.status_code,
+                duration=duration,
+                success=True,
+            )
+
+        if duration >= SLOW_REQUEST_THRESHOLD and hasattr(tracking, "track_slow_request"):
+            tracking.track_slow_request(
+                path=request.url.path,
+                method=request.method,
+                duration=duration,
+            )
 
         return response

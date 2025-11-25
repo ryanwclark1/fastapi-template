@@ -158,6 +158,10 @@ class RedisSettings(BaseSettings):
     # Health check and startup settings
     # ──────────────────────────────────────────────────────────────
 
+    health_checks_enabled: bool = Field(
+        default=False,
+        description="Enable Redis connectivity checks in health endpoints.",
+    )
     health_check_timeout: float = Field(
         default=2.0,
         ge=0.1,

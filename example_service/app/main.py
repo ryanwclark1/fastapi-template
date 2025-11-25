@@ -28,10 +28,6 @@ def create_app() -> FastAPI:
         summary=settings.summary,
         description=settings.description,
         version=settings.version,
-        # API info (OpenAPI)
-        terms_of_service=settings.terms_of_service,
-        contact=settings.get_contact(),
-        license_info=settings.get_license_info(),
         # Documentation URLs
         docs_url=settings.get_docs_url(),
         redoc_url=settings.get_redoc_url(),

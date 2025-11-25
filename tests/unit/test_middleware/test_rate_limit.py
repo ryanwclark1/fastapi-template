@@ -7,9 +7,7 @@ import pytest
 from fastapi import FastAPI, Request
 from httpx import AsyncClient
 
-from example_service.app.middleware.constants import EXEMPT_PATHS
 from example_service.app.middleware.rate_limit import RateLimitMiddleware
-from example_service.core.exceptions import RateLimitException
 
 
 class TestRateLimitMiddleware:

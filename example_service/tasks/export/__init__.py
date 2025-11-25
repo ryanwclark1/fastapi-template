@@ -7,9 +7,14 @@ This module provides:
 
 from __future__ import annotations
 
-from .tasks import export_data_csv, export_data_json
-
-__all__ = [
-    "export_data_csv",
-    "export_data_json",
-]
+try:
+    from .tasks import export_data_csv, export_data_json
+except ImportError:
+    export_data_csv = None  # type: ignore[assignment]
+    export_data_json = None  # type: ignore[assignment]
+    __all__: list[str] = []
+else:
+    __all__ = [
+        "export_data_csv",
+        "export_data_json",
+    ]

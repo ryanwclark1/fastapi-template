@@ -187,7 +187,7 @@ class TestRequestSizeLimitMiddleware:
         """Test that middleware passes through non-HTTP scopes."""
         from unittest.mock import AsyncMock
 
-        from starlette.types import ASGIApp, Receive, Scope, Send
+        from starlette.types import Receive, Scope, Send
 
         async def simple_app(scope: Scope, receive: Receive, send: Send):
             await send({"type": "websocket.accept"})
@@ -268,8 +268,8 @@ class TestRequestSizeLimitMiddleware:
 
     async def test_default_10mb_limit(self):
         """Test that default limit is 10MB."""
+
         from starlette.types import Receive, Scope, Send
-        from unittest.mock import AsyncMock
 
         async def mock_app(scope: Scope, receive: Receive, send: Send):
             pass

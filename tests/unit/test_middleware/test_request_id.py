@@ -5,7 +5,7 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from httpx import AsyncClient
 
 from example_service.app.middleware.request_id import RequestIDMiddleware
@@ -77,7 +77,7 @@ class TestRequestIDMiddleware:
         assert "x-request-id" in response.headers
         assert len(response.headers["x-request-id"]) > 0
 
-    @patch("example_service.app.middleware.request_id.set_log_context")
+    @patch("example_service.app.middleware.base.set_log_context")
     async def test_sets_logging_context(self, mock_set_context: MagicMock, client: AsyncClient):
         """Test that middleware sets logging context with request_id."""
         custom_id = str(uuid.uuid4())
@@ -90,7 +90,7 @@ class TestRequestIDMiddleware:
         assert call_args is not None
         assert call_args[1].get("request_id") == custom_id
 
-    @patch("example_service.app.middleware.request_id.clear_log_context")
+    @patch("example_service.app.middleware.base.clear_log_context")
     async def test_clears_logging_context_after_request(
         self, mock_clear_context: MagicMock, client: AsyncClient
     ):
@@ -100,7 +100,7 @@ class TestRequestIDMiddleware:
         # Verify clear_log_context was called
         mock_clear_context.assert_called_once()
 
-    @patch("example_service.app.middleware.request_id.clear_log_context")
+    @patch("example_service.app.middleware.base.clear_log_context")
     async def test_clears_context_on_error(
         self, mock_clear_context: MagicMock
     ):
@@ -131,7 +131,7 @@ class TestRequestIDMiddleware:
         captured_request_id = None
 
         @app.get("/test")
-        async def test_endpoint(request):
+        async def test_endpoint(request: Request):
             nonlocal captured_request_id
             captured_request_id = getattr(request.state, "request_id", None)
             return {"message": "ok"}
@@ -149,7 +149,7 @@ class TestRequestIDMiddleware:
 
     async def test_handles_non_http_scope(self):
         """Test that middleware passes through non-HTTP scopes (websocket, lifespan)."""
-        from starlette.types import ASGIApp, Receive, Scope, Send
+        from starlette.types import Receive, Scope, Send
 
         # Create a simple ASGI app
         async def simple_app(scope: Scope, receive: Receive, send: Send):

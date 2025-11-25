@@ -472,10 +472,141 @@ async def compare_schema(
     return differences
 
 
+@dataclass
+class TableStats:
+    """Statistics for a database table.
+
+    Attributes:
+        table_name: Name of the table
+        row_count: Number of rows (approximate or exact)
+        approximate: Whether row_count is an estimate or exact
+        size_bytes: Total size in bytes (data + indexes), PostgreSQL only
+        size_human: Human-readable size string (e.g., "1.2 MB")
+    """
+
+    table_name: str
+    row_count: int
+    approximate: bool
+    size_bytes: int | None
+    size_human: str | None
+
+
+async def get_table_stats(
+    engine: AsyncEngine,
+    table_name: str,
+    *,
+    exact: bool = False,
+) -> TableStats:
+    """Get table statistics including row count and size.
+
+    Uses PostgreSQL's pg_stat_user_tables for fast approximate counts,
+    avoiding expensive full table scans. For exact counts, falls back
+    to COUNT(*) which can be slow on large tables.
+
+    Args:
+        engine: SQLAlchemy async engine
+        table_name: Name of the table to analyze
+        exact: If True, use COUNT(*) for exact row count (slower)
+
+    Returns:
+        TableStats with row count, size, and whether count is approximate
+
+    Example:
+            from example_service.infra.database import engine
+        from example_service.infra.database.schema import get_table_stats
+
+        # Fast approximate count (default)
+        stats = await get_table_stats(engine, "users")
+        print(f"~{stats.row_count} rows, {stats.size_human}")
+
+        # Exact count (slower for large tables)
+        stats = await get_table_stats(engine, "users", exact=True)
+        print(f"Exactly {stats.row_count} rows")
+
+    Note:
+        PostgreSQL approximate counts come from pg_stat_user_tables.n_live_tup,
+        which is updated by VACUUM and ANALYZE. For recently modified tables,
+        run ANALYZE first for accurate estimates.
+
+        Size information is only available on PostgreSQL.
+    """
+    from example_service.core.database.validation import validate_identifier
+
+    # Validate table name to prevent SQL injection
+    validated_table = validate_identifier(table_name, identifier_type="table")
+
+    async with engine.connect() as conn:
+        dialect = conn.dialect.name
+        row_count: int = 0
+        approximate: bool = False
+        size_bytes: int | None = None
+
+        if dialect == "postgresql":
+            if exact:
+                # Exact count using COUNT(*)
+                result = await conn.execute(text(f'SELECT COUNT(*) FROM "{validated_table}"'))
+                row_count = result.scalar() or 0
+                approximate = False
+            else:
+                # Fast approximate count from statistics
+                stats_query = text("""
+                    SELECT n_live_tup
+                    FROM pg_stat_user_tables
+                    WHERE relname = :table_name
+                """)
+                result = await conn.execute(stats_query, {"table_name": validated_table})
+                row = result.first()
+                if row:
+                    row_count = row[0] or 0
+                    approximate = True
+                else:
+                    # Table not in stats (maybe just created), fall back to count
+                    result = await conn.execute(text(f'SELECT COUNT(*) FROM "{validated_table}"'))
+                    row_count = result.scalar() or 0
+                    approximate = False
+
+            # Get table size (PostgreSQL specific)
+            size_query = text("""
+                SELECT pg_total_relation_size(:table_name) AS size_bytes
+            """)
+            size_result = await conn.execute(size_query, {"table_name": validated_table})
+            size_row = size_result.first()
+            if size_row:
+                size_bytes = size_row[0]
+
+        else:
+            # Non-PostgreSQL: always use COUNT(*)
+            result = await conn.execute(text(f'SELECT COUNT(*) FROM "{validated_table}"'))
+            row_count = result.scalar() or 0
+            approximate = False
+
+        # Format human-readable size
+        size_human: str | None = None
+        if size_bytes is not None:
+            if size_bytes < 1024:
+                size_human = f"{size_bytes} B"
+            elif size_bytes < 1024 * 1024:
+                size_human = f"{size_bytes / 1024:.1f} KB"
+            elif size_bytes < 1024 * 1024 * 1024:
+                size_human = f"{size_bytes / (1024 * 1024):.1f} MB"
+            else:
+                size_human = f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
+
+        return TableStats(
+            table_name=validated_table,
+            row_count=row_count,
+            approximate=approximate,
+            size_bytes=size_bytes,
+            size_human=size_human,
+        )
+
+
 __all__ = [
     "SchemaDifference",
+    "TableStats",
     "drop_all",
     "dump_schema",
     "truncate_all",
     "compare_schema",
+    "get_table_stats",
 ]

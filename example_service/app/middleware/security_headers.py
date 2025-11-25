@@ -94,16 +94,26 @@ class SecurityHeadersMiddleware:
         Returns:
             Dictionary of CSP directives.
         """
+        swagger_cdn = "https://cdn.jsdelivr.net"
+        unpkg_cdn = "https://unpkg.com"
+        google_fonts_css = "https://fonts.googleapis.com"
+        google_fonts_assets = "https://fonts.gstatic.com"
         return {
             "default-src": "'self'",
-            "script-src": "'self' 'unsafe-inline' 'unsafe-eval'",  # Relaxed for API docs
-            "style-src": "'self' 'unsafe-inline'",  # Relaxed for API docs
+            # Allow Swagger docs (jsDelivr) + AsyncAPI docs (unpkg) to load bundled assets
+            "script-src": (
+                f"'self' 'unsafe-inline' 'unsafe-eval' {swagger_cdn} {unpkg_cdn}"
+            ),
+            "style-src": (
+                f"'self' 'unsafe-inline' {swagger_cdn} {unpkg_cdn} {google_fonts_css}"
+            ),
             "img-src": "'self' data: https:",
-            "font-src": "'self' data:",
-            "connect-src": "'self'",
+            "font-src": f"'self' data: {swagger_cdn} {google_fonts_assets}",
+            "connect-src": f"'self' {swagger_cdn}",
             "frame-ancestors": "'none'",
             "base-uri": "'self'",
             "form-action": "'self'",
+            "worker-src": "'self' blob:",
         }
 
     @staticmethod

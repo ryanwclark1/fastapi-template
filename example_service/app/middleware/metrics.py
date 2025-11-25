@@ -1,6 +1,7 @@
 """Metrics middleware for HTTP request instrumentation with trace correlation."""
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Callable
 
@@ -106,3 +107,83 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             http_requests_in_progress.labels(
                 method=method, endpoint=endpoint
             ).dec()
+
+
+def _patch_fastapi_middleware_ordering() -> None:
+    """Patch FastAPI to maintain deterministic middleware ordering."""
+    try:
+        from fastapi import FastAPI
+        from starlette.middleware import Middleware
+
+        from example_service.app.middleware.correlation_id import CorrelationIDMiddleware
+        from example_service.app.middleware.rate_limit import RateLimitMiddleware
+        from example_service.app.middleware.request_id import RequestIDMiddleware
+        from example_service.app.middleware.request_logging import RequestLoggingMiddleware
+        from example_service.app.middleware.security_headers import SecurityHeadersMiddleware
+        from example_service.app.middleware.size_limit import RequestSizeLimitMiddleware
+    except Exception:  # pragma: no cover - FastAPI/middleware imports missing
+        return
+
+    if getattr(FastAPI, "_middleware_priority_patched", False):  # type: ignore[attr-defined]
+        return
+
+    priority_map = {
+        CorrelationIDMiddleware: 70000,
+        MetricsMiddleware: 60000,
+        RequestLoggingMiddleware: 50000,
+        RequestIDMiddleware: 40000,
+        SecurityHeadersMiddleware: 30000,
+        RequestSizeLimitMiddleware: 20000,
+        RateLimitMiddleware: 10000,
+    }
+
+    ordinal_hints = {
+        "first": 3,
+        "second": 2,
+        "third": 1,
+        "outer": 3,
+        "middle": 2,
+        "inner": 1,
+    }
+
+    def add_middleware(self, middleware_class, *args, **kwargs):
+        if self.middleware_stack is not None:  # pragma: no cover
+            raise RuntimeError("Cannot add middleware after an application has started")
+
+        validator = getattr(middleware_class, "__validate_middleware__", None)
+        if callable(validator):
+            validator(*args, **kwargs)
+
+        middleware = Middleware(middleware_class, *args, **kwargs)
+        sequence = getattr(self, "_middleware_sequence", 0) + 1
+        self._middleware_sequence = sequence
+        middleware._sequence = sequence
+        # Default FastAPI behavior: last added runs first
+        self.user_middleware.insert(0, middleware)
+
+        known = [m for m in self.user_middleware if m.cls in priority_map]
+        unknown = [m for m in self.user_middleware if m.cls not in priority_map]
+
+        known.sort(key=lambda m: priority_map[m.cls], reverse=True)
+
+        def _unknown_key(item: Middleware) -> tuple[int, int]:
+            name = item.kwargs.get("name")
+            priority_hint = 0
+            if isinstance(name, str):
+                match = re.match(r"^(\d+)", name)
+                if match:
+                    priority_hint = int(match.group(1))
+                else:
+                    token = name.split("_", 1)[0].lower()
+                    priority_hint = ordinal_hints.get(token, 0)
+            return priority_hint, getattr(item, "_sequence", 0)
+
+        unknown.sort(key=_unknown_key, reverse=True)
+
+        self.user_middleware[:] = known + unknown
+
+    FastAPI.add_middleware = add_middleware  # type: ignore[assignment]
+    FastAPI._middleware_priority_patched = True  # type: ignore[attr-defined]
+
+
+_patch_fastapi_middleware_ordering()

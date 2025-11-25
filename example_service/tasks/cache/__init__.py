@@ -7,9 +7,14 @@ This module provides:
 
 from __future__ import annotations
 
-from .tasks import invalidate_cache_pattern, warm_cache
-
-__all__ = [
-    "warm_cache",
-    "invalidate_cache_pattern",
-]
+try:
+    from .tasks import invalidate_cache_pattern, warm_cache
+except ImportError:
+    warm_cache = None  # type: ignore[assignment]
+    invalidate_cache_pattern = None  # type: ignore[assignment]
+    __all__: list[str] = []
+else:
+    __all__ = [
+        "warm_cache",
+        "invalidate_cache_pattern",
+    ]

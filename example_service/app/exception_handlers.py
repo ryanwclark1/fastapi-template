@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -10,6 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError as PydanticValidationError
 
+from example_service.core.database.exceptions import NotFoundError
 from example_service.core.exceptions import AppException, RateLimitException
 from example_service.core.schemas.error import (
     ProblemDetail,
@@ -19,6 +21,23 @@ from example_service.core.schemas.error import (
 from example_service.infra.metrics import tracking
 
 logger = logging.getLogger(__name__)
+ParsedJSON = Any  # Alias for readability
+
+
+class ProblemJSONResponse(JSONResponse):
+    """JSONResponse exposing a `.json()` helper for unit tests."""
+
+    _parsed_body: ParsedJSON | None = None
+
+    def json(self) -> ParsedJSON:
+        """Return parsed JSON body similar to FastAPI TestClient responses."""
+        if self._parsed_body is None:
+            body = self.body
+            if isinstance(body, bytes):
+                charset = self.charset or "utf-8"
+                body = body.decode(charset)
+            self._parsed_body = json.loads(body)
+        return self._parsed_body
 
 
 def _get_request_id(request: Request) -> str | None:
@@ -125,10 +144,66 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
     if isinstance(exc, RateLimitException) and "retry_after" in exc.extra:
         headers["Retry-After"] = str(exc.extra["retry_after"])
 
-    return JSONResponse(
+    return ProblemJSONResponse(
         status_code=exc.status_code,
         content=problem_data,
         headers=headers if headers else None,
+    )
+
+
+async def not_found_error_handler(request: Request, exc: NotFoundError) -> JSONResponse:
+    """Handle database NotFoundError exceptions.
+
+    Converts database-layer NotFoundError into HTTP 404 response using
+    RFC 7807 Problem Details format. This bridges the gap between the
+    database layer (which raises NotFoundError) and the HTTP layer
+    (which needs a 404 response).
+
+    Args:
+        request: The FastAPI request object.
+        exc: The NotFoundError exception that was raised.
+
+    Returns:
+        JSONResponse with RFC 7807 Problem Details format and 404 status.
+    """
+    request_id = _get_request_id(request)
+
+    # Track error metric
+    tracking.track_error(
+        error_type="not-found",
+        endpoint=request.url.path,
+        status_code=status.HTTP_404_NOT_FOUND,
+        extra={"model": exc.model_name, "identifier": exc.identifier},
+    )
+
+    # Log at INFO level since this is expected behavior (client requested non-existent resource)
+    logger.info(
+        "Resource not found",
+        extra={
+            "request_id": request_id,
+            "path": request.url.path,
+            "method": request.method,
+            "model": exc.model_name,
+            "identifier": exc.identifier,
+        },
+    )
+
+    # Create RFC 7807 problem detail response
+    problem_data = _create_problem_detail(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=str(exc),
+        type_="not-found",
+        title="Not Found",
+        instance=str(request.url),
+        extra={"model": exc.model_name, **exc.identifier},
+    )
+
+    if request_id:
+        problem_data["request_id"] = request_id
+
+    return ProblemJSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content=problem_data,
     )
 
 
@@ -190,7 +265,7 @@ async def validation_exception_handler(
     if request_id:
         response_data["request_id"] = request_id
 
-    return JSONResponse(
+    return ProblemJSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=response_data,
     )
@@ -244,7 +319,7 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
     if request_id:
         problem_data["request_id"] = request_id
 
-    return JSONResponse(
+    return ProblemJSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=problem_data,
     )
@@ -302,7 +377,7 @@ async def pydantic_validation_exception_handler(
     if request_id:
         response_data["request_id"] = request_id
 
-    return JSONResponse(
+    return ProblemJSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=response_data,
     )
@@ -321,6 +396,10 @@ def configure_exception_handlers(app: FastAPI) -> None:
             app = FastAPI()
         configure_exception_handlers(app)
     """
+    # Database NotFoundError (converts to HTTP 404)
+    # Register before AppException since it's more specific
+    app.add_exception_handler(NotFoundError, not_found_error_handler)
+
     # Custom application exceptions
     app.add_exception_handler(AppException, app_exception_handler)
 
@@ -334,6 +413,21 @@ def configure_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(Exception, generic_exception_handler)
 
     logger.info("Exception handlers configured")
+
+    @app.middleware("http")
+    async def _exception_handling_middleware(request: Request, call_next):
+        try:
+            return await call_next(request)
+        except NotFoundError as exc:
+            return await not_found_error_handler(request, exc)
+        except AppException as exc:
+            return await app_exception_handler(request, exc)
+        except RequestValidationError as exc:
+            return await validation_exception_handler(request, exc)
+        except PydanticValidationError as exc:
+            return await pydantic_validation_exception_handler(request, exc)
+        except Exception as exc:  # pragma: no cover - safety fallback
+            return await generic_exception_handler(request, exc)
 
 
 # Helper function to get default title from status code

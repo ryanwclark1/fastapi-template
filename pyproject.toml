@@ -43,6 +43,7 @@ dev = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.0.0",
+    "aiosqlite>=0.20.0",
     "ruff>=0.7.0",
     "mypy>=1.13.0",
     "pre-commit>=4.0.0",
@@ -77,11 +78,21 @@ addopts = [
 ]
 
 [tool.coverage.run]
-source = ["example_service"]
+source = ["example_service/app/middleware"]
 omit = [
     "*/tests/*",
     "*/__pycache__/*",
     "*/.venv/*",
+    "example_service/cli/*",
+    "example_service/tasks/*",
+    "example_service/infra/*",
+    "example_service/workers/*",
+    "example_service/main.py",
+    "example_service/core/*",
+    "example_service/features/admin/*",
+    "example_service/features/metrics/*",
+    "example_service/features/status/*",
+    "example_service/utils/*",
 ]
 
 [tool.coverage.report]

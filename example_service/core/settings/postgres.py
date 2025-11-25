@@ -37,6 +37,14 @@ class PostgresSettings(BaseSettings):
     """
 
     # ─────────────────────────────────────────────────────
+    # Enable/disable toggle
+    # ─────────────────────────────────────────────────────
+    enabled: bool = Field(
+        default=True,
+        description="Enable database integration. Set to False for tests or stateless APIs.",
+    )
+
+    # ─────────────────────────────────────────────────────
     # Optional DSN Override
     # ─────────────────────────────────────────────────────
     dsn: str | None = Field(
@@ -161,6 +169,13 @@ class PostgresSettings(BaseSettings):
     # ─────────────────────────────────────────────────────
     # Health Check / Startup Behaviour
     # ─────────────────────────────────────────────────────
+    health_checks_enabled: bool = Field(
+        default=False,
+        description=(
+            "Enable database connectivity checks in health endpoints. "
+            "Disable in development/tests to avoid touching real databases."
+        ),
+    )
     health_check_timeout: float = Field(
         default=2.0,
         ge=0.1,
@@ -325,7 +340,7 @@ class PostgresSettings(BaseSettings):
     @property
     def is_configured(self) -> bool:
         """Check if database is configured with valid connection info."""
-        return bool(self.host and self.name)
+        return self.enabled and bool(self.host and self.name)
 
     # ─────────────────────────────────────────────────────
     # DSN Builder with Overrides

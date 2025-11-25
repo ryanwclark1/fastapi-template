@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI, Request
@@ -384,7 +384,6 @@ class TestRequestLoggingMiddleware:
     @patch("example_service.app.middleware.request_logging.logger")
     async def test_duration_measurement(self, mock_logger: MagicMock):
         """Test that request duration is measured accurately."""
-        import time
 
         app = FastAPI()
         app.add_middleware(RequestLoggingMiddleware)
@@ -394,8 +393,9 @@ class TestRequestLoggingMiddleware:
             await asyncio.sleep(0.1)  # 100ms delay
             return {"message": "ok"}
 
-        from httpx import ASGITransport
         import asyncio
+
+        from httpx import ASGITransport
 
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"

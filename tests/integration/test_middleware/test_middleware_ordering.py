@@ -1,7 +1,7 @@
 """Integration tests for middleware execution order."""
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi import FastAPI, Request
@@ -395,7 +395,7 @@ class TestMiddlewareOrdering:
             async def __call__(self, scope, receive, send):
                 try:
                     await self.app(scope, receive, send)
-                except ValueError as e:
+                except ValueError:
                     exception_handlers.append(self.name)
                     raise
 

@@ -79,6 +79,21 @@ class TestSecurityHeadersMiddleware:
         csp = response.headers["content-security-policy"]
         assert "default-src 'self'" in csp
         assert "frame-ancestors 'none'" in csp
+        assert (
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net"
+            " https://unpkg.com"
+            in csp
+        )
+        assert (
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://fonts.googleapis.com"
+            in csp
+        )
+        assert (
+            "font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com"
+            in csp
+        )
+        assert "connect-src 'self' https://cdn.jsdelivr.net" in csp
+        assert "worker-src 'self' blob:" in csp
 
     async def test_x_frame_options_header(self, client: AsyncClient):
         """Test that X-Frame-Options header is present."""
@@ -379,7 +394,7 @@ class TestSecurityHeadersMiddleware:
 
         assert response.headers["referrer-policy"] == "no-referrer"
 
-    async def test_csp_with_multiple_directives(self):
+    async def test_csp_with_multiple_directives(self, client: AsyncClient):
         """Test CSP header with multiple complex directives."""
         response = await client.get("/test")
 

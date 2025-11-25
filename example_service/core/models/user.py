@@ -1,3 +1,8 @@
+# =============================================================================
+# EXAMPLE MODEL - For demonstration and template purposes
+# This model demonstrates SQLAlchemy patterns but is not used in production.
+# Safe to remove when building your application (update migrations accordingly).
+# =============================================================================
 """User model for demonstrating database migrations."""
 
 from __future__ import annotations

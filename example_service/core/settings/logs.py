@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import Any, Literal
 
@@ -113,6 +114,27 @@ class LoggingSettings(BaseSettings):
             "If None, uses default color scheme."
         ),
     )
+
+    @field_validator("level_colors", mode="before")
+    @classmethod
+    def _coerce_invalid_level_colors(cls, v: Any) -> dict[str, Any] | None:
+        """Coerce invalid level_colors values to None with a warning.
+
+        This prevents startup failures from config typos (e.g., `level_colors: true`
+        when the user meant `colorize: true`).
+        """
+        if v is None:
+            return None
+        if isinstance(v, dict):
+            return v
+        # Invalid type - warn and fall back to default
+        warnings.warn(
+            f"Invalid level_colors value: {v!r} (expected dict or null). "
+            f"Using default color scheme. Did you mean 'colorize: true'?",
+            UserWarning,
+            stacklevel=2,
+        )
+        return None
 
     # ──────────────────────────────────────────────────────────────
     # Context injection

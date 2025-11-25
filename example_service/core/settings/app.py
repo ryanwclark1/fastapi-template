@@ -12,59 +12,6 @@ from .yaml_sources import create_app_yaml_source
 Environment = Literal["development", "staging", "production", "test"]
 
 
-class ContactInfo(BaseSettings):
-    """API contact information for OpenAPI documentation."""
-
-    name: str | None = Field(default=None, description="Contact name")
-    url: str | None = Field(default=None, description="Contact URL")
-    email: str | None = Field(default=None, description="Contact email")
-
-    model_config = SettingsConfigDict(
-        env_prefix="APP_CONTACT_",
-        env_file=".env",
-        case_sensitive=False,
-        extra="ignore",
-    )
-
-    def to_dict(self) -> dict[str, str] | None:
-        """Convert to OpenAPI contact dict, or None if empty."""
-        result = {}
-        if self.name:
-            result["name"] = self.name
-        if self.url:
-            result["url"] = self.url
-        if self.email:
-            result["email"] = self.email
-        return result or None
-
-
-class LicenseInfo(BaseSettings):
-    """API license information for OpenAPI documentation."""
-
-    name: str | None = Field(default=None, description="License name (e.g., MIT, Apache 2.0)")
-    url: str | None = Field(default=None, description="License URL")
-    identifier: str | None = Field(
-        default=None, description="SPDX license identifier (e.g., MIT, Apache-2.0)"
-    )
-
-    model_config = SettingsConfigDict(
-        env_prefix="APP_LICENSE_",
-        env_file=".env",
-        case_sensitive=False,
-        extra="ignore",
-    )
-
-    def to_dict(self) -> dict[str, str] | None:
-        """Convert to OpenAPI license dict, or None if empty."""
-        if not self.name:
-            return None
-        result = {"name": self.name}
-        if self.url:
-            result["url"] = self.url
-        if self.identifier:
-            result["identifier"] = self.identifier
-        return result
-
 
 class AppSettings(BaseSettings):
     """FastAPI application settings.
@@ -106,16 +53,12 @@ class AppSettings(BaseSettings):
     environment: Environment = Field(
         default="development", description="Environment: development|staging|production|test"
     )
-
-    # API metadata (OpenAPI info)
-    terms_of_service: str | None = Field(
-        default=None, description="URL to API terms of service"
-    )
-    contact: ContactInfo = Field(
-        default_factory=ContactInfo, description="API contact information"
-    )
-    license_info: LicenseInfo = Field(
-        default_factory=LicenseInfo, description="API license information"
+    api_prefix: str = Field(
+        default="/api/v1",
+        min_length=1,
+        max_length=255,
+        pattern=r"^/.*$",
+        description="Base URL prefix for API routes (e.g., /api/v1)",
     )
 
     # FastAPI toggles
@@ -129,7 +72,8 @@ class AppSettings(BaseSettings):
         default=False, description="Disable all API documentation"
     )
     root_path: str = Field(
-        default="/api/v1", description="Root path for proxy/ingress (e.g., /api/v1)"
+        default="",
+        description="Root path for proxy/ingress (set when behind a reverse proxy)",
     )
     root_path_in_servers: bool = Field(
         default=True,

@@ -4,7 +4,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from httpx import AsyncClient
 
 from example_service.app.middleware.metrics import MetricsMiddleware
@@ -318,7 +318,6 @@ class TestMetricsMiddleware:
     async def test_timing_header_accuracy(self):
         """Test that X-Process-Time header reflects actual processing time."""
         import asyncio
-        import time
 
         app = FastAPI()
         app.add_middleware(MetricsMiddleware)
@@ -402,8 +401,9 @@ class TestMetricsMiddleware:
 
     async def test_handles_missing_route(self):
         """Test metrics when route information is not available."""
-        from starlette.types import Receive, Scope, Send
         from unittest.mock import AsyncMock
+
+        from starlette.types import Receive, Scope, Send
 
         async def mock_app(scope: Scope, receive: Receive, send: Send):
             await send({

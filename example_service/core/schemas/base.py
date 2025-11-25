@@ -28,14 +28,16 @@ class CustomBase(BaseModel):
         json_encoders={
             datetime: lambda v: v.isoformat(),
         },
+        # Allow creation from ORM models (SQLAlchemy)
+        from_attributes=True,
         # Validate on assignment (not just initialization)
         validate_assignment=True,
         # Use enum values instead of names
         use_enum_values=True,
         # Populate models by field name (not alias)
         populate_by_name=True,
-        # Don't allow extra fields by default
-        extra="forbid",
+        # Ignore extra fields for security (silently drop unexpected data)
+        extra="ignore",
         # Strip leading/trailing whitespace from strings
         str_strip_whitespace=True,
     )
@@ -56,6 +58,32 @@ class TimestampedBase(CustomBase):
         default_factory=lambda: datetime.now(UTC),
         description="Last update timestamp",
     )
+
+
+class UUIDMixin(BaseModel):
+    """Mixin for schemas that include a UUID identifier.
+
+    Example:
+        class UserSchema(CustomBase, UUIDMixin):
+            username: str
+
+        user = UserSchema(uuid="550e8400-e29b-41d4-a716-446655440000", username="john")
+    """
+
+    uuid: str = Field(..., description="Unique identifier (UUID)")
+
+
+class TenantMixin(BaseModel):
+    """Mixin for schemas that include tenant information.
+
+    Example:
+        class UserSchema(CustomBase, TenantMixin):
+            username: str
+
+        user = UserSchema(tenant_uuid="550e8400-e29b-41d4-a716-446655440000", username="john")
+    """
+
+    tenant_uuid: str = Field(..., description="Tenant UUID")
 
 
 class APIResponse(BaseModel, Generic[T]):
@@ -132,3 +160,13 @@ class PaginatedResponse(BaseModel, Generic[T]):
             page_size=page_size,
             total_pages=total_pages,
         )
+
+
+__all__ = [
+    "APIResponse",
+    "CustomBase",
+    "PaginatedResponse",
+    "TenantMixin",
+    "TimestampedBase",
+    "UUIDMixin",
+]

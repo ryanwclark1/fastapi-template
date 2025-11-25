@@ -326,6 +326,7 @@ def _configure_with_dictconfig(
         json_logs=json_logs,
         colorize=colorize,
         colorize_message=colorize_message,
+        level_colors=level_colors,
     )
 
 
@@ -492,6 +493,7 @@ def _setup_queue_logging(
     json_logs: bool,
     colorize: bool | None,
     colorize_message: bool,
+    level_colors: dict[str, str | tuple[int, int, int]] | None,
 ) -> None:
     """Set up QueueHandler + QueueListener for non-blocking logging.
 
@@ -509,6 +511,7 @@ def _setup_queue_logging(
         json_logs: Use JSON format.
         colorize: Enable colors (None=auto-detect).
         colorize_message: Colorize entire message.
+        level_colors: Custom color mapping for log levels, or None for defaults.
     """
     global _log_queue, _listener
 

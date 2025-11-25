@@ -24,6 +24,10 @@ class AuthSettings(BaseSettings):
         alias="AUTH_SERVICE_URL",
         description="Base URL for authentication service",
     )
+    health_checks_enabled: bool = Field(
+        default=False,
+        description="Enable auth service connectivity checks in health endpoints.",
+    )
     token_validation_endpoint: str = Field(
         default="/api/v1/auth/validate",
         description="Token validation endpoint path",

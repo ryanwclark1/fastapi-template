@@ -46,7 +46,7 @@ def show(output_format: str, show_secrets: bool) -> None:
                 "debug": settings.app.debug,
                 "host": settings.app.host,
                 "port": settings.app.port,
-                "api_prefix": settings.app.api_v1_str,
+                "api_prefix": settings.app.api_prefix,
             },
             "database": {
                 "host": settings.database.db_host,
@@ -312,7 +312,7 @@ APP_ENVIRONMENT=development
 APP_DEBUG=true
 APP_HOST=0.0.0.0
 APP_PORT=8000
-APP_API_V1_STR=/api/v1
+APP_API_PREFIX=/api/v1
 APP_CORS_ORIGINS=["http://localhost:3000"]
 
 # ============================================================================
@@ -526,7 +526,7 @@ def show_env(show_all: bool, filter_prefix: str | None) -> None:
             "APP_DEBUG",
             "APP_HOST",
             "APP_PORT",
-            "APP_API_V1_STR",
+            "APP_API_PREFIX",
         ],
         "Database": [
             "DB_HOST",

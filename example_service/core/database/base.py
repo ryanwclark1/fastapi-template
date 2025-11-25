@@ -114,7 +114,7 @@ class UUIDPKMixin:
         id: UUID v4 primary key (random)
 
     Note: UUID v4 is not time-sortable. For time-ordered UUIDs,
-    consider implementing UUIDv7PKMixin.
+    use UUIDv7PKMixin instead.
     """
 
     __allow_unmapped__ = True
@@ -124,6 +124,66 @@ class UUIDPKMixin:
         default=uuid.uuid4,
         comment="UUID v4 primary key",
     )
+
+
+class UUIDv7PKMixin:
+    """UUID v7 primary key (time-sortable).
+
+    UUID v7 encodes Unix timestamp in the first 48 bits, providing:
+    - Natural time-ordering (later IDs sort after earlier ones)
+    - Better B-tree index locality for sequential inserts
+    - Extractable creation timestamp
+    - Global uniqueness (safe for distributed systems)
+
+    Best for:
+    - High-volume insert scenarios
+    - When chronological ordering by ID is useful
+    - Distributed systems with time correlation needs
+    - Event sourcing and audit logs
+
+    Provides:
+        id: UUID v7 primary key (time-ordered)
+
+    Example:
+        class AuditLog(Base, UUIDv7PKMixin, TimestampMixin):
+            __tablename__ = "audit_logs"
+            action: Mapped[str] = mapped_column(String(255))
+
+        # IDs are naturally ordered by creation time
+        log1 = AuditLog(action="create")
+        log2 = AuditLog(action="update")
+        assert str(log1.id) < str(log2.id)  # True if log1 created first
+    """
+
+    __allow_unmapped__ = True
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True,
+        default=lambda: _generate_uuid7(),
+        comment="UUID v7 primary key (time-sortable)",
+    )
+
+
+def _generate_uuid7() -> uuid.UUID:
+    """Generate UUID v7 for default value.
+
+    Inline implementation to avoid circular imports.
+    For full UUID utilities, use core.database.utils.
+    """
+    import os
+    import time
+
+    timestamp_ms = int(time.time() * 1000)
+    random_bytes = os.urandom(10)
+
+    uuid_bytes = bytearray(16)
+    uuid_bytes[0:6] = timestamp_ms.to_bytes(6, byteorder="big")
+    uuid_bytes[6] = (random_bytes[0] & 0x0F) | 0x70  # Version 7
+    uuid_bytes[7] = random_bytes[1]
+    uuid_bytes[8] = (random_bytes[2] & 0x3F) | 0x80  # Variant
+    uuid_bytes[9:16] = random_bytes[3:10]
+
+    return uuid.UUID(bytes=bytes(uuid_bytes))
 
 
 # ============================================================================

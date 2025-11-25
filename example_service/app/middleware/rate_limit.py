@@ -7,6 +7,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from starlette.requests import Request
+from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from example_service.app.middleware.constants import EXEMPT_PATHS
@@ -84,6 +85,14 @@ class RateLimitMiddleware:
         self.key_func = key_func or self._default_key_func
 
         if self.enabled and self.limiter is None:
+            raise ValueError("limiter is required when rate limiting is enabled")
+
+    @staticmethod
+    def __validate_middleware__(*args, **kwargs) -> None:
+        """Eager validation when middleware is registered."""
+        enabled = kwargs.get("enabled", True)
+        limiter = kwargs.get("limiter")
+        if enabled and limiter is None:
             raise ValueError("limiter is required when rate limiting is enabled")
 
     @staticmethod
@@ -179,9 +188,9 @@ class RateLimitMiddleware:
             # Store metadata for response headers
             rate_limit_metadata = metadata
 
-        except RateLimitException:
-            # Re-raise rate limit exceptions to be handled by exception handler
-            raise
+        except RateLimitException as exc:
+            await self._send_rate_limit_response(exc, scope, receive, send)
+            return
         except Exception as e:
             # Log error but allow request to proceed
             # This ensures the application continues to function if Redis fails
@@ -218,5 +227,44 @@ class RateLimitMiddleware:
 
             await send(message)
 
-        # Call the next middleware/app with wrapped send
         await self.app(scope, receive, send_with_headers)
+
+    async def _send_rate_limit_response(
+        self,
+        exc: RateLimitException,
+        scope: Scope,
+        receive: Receive,
+        send: Send,
+    ) -> None:
+        """Send JSON response for rate limit exceptions.
+
+        Args:
+            exc: RateLimitException instance.
+            send: ASGI send callable.
+        """
+        metadata = exc.extra or {}
+        headers: dict[str, str] = {}
+
+        retry_after = metadata.get("retry_after")
+        if retry_after is not None:
+            headers["Retry-After"] = str(retry_after)
+
+        if "limit" in metadata:
+            headers["X-RateLimit-Limit"] = str(metadata["limit"])
+        if "remaining" in metadata:
+            headers["X-RateLimit-Remaining"] = str(metadata["remaining"])
+        if "reset" in metadata:
+            headers["X-RateLimit-Reset"] = str(metadata["reset"])
+
+        response = JSONResponse(
+            {
+                "detail": exc.detail,
+                "type": exc.type,
+                "title": exc.title,
+                "instance": exc.instance,
+                "extra": metadata or None,
+            },
+            status_code=exc.status_code,
+            headers=headers or None,
+        )
+        await response(scope, receive, send)

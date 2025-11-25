@@ -316,6 +316,8 @@ class RateLimitException(AppException):
         type: str = "rate-limit-exceeded",
         instance: str | None = None,
         extra: dict[str, Any] | None = None,
+        *,
+        status_code: int = 429,
     ) -> None:
         """Initialize rate limit exception.
 
@@ -324,9 +326,10 @@ class RateLimitException(AppException):
             type: Error type identifier.
             instance: URI reference identifying this specific occurrence.
             extra: Additional context about the error (should include retry_after).
+            status_code: Override for HTTP status (defaults to 429).
         """
         super().__init__(
-            status_code=429,
+            status_code=status_code,
             detail=detail,
             type=type,
             title="Too Many Requests",

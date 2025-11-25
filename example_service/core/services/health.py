@@ -153,22 +153,25 @@ class HealthService(BaseService):
         checks: dict[str, bool] = {}
 
         # Database check (if configured)
-        if db_settings.database_url:
+        if db_settings.health_checks_enabled:
             checks["database"] = await self._check_database()
         else:
-            checks["database"] = True  # Not configured, don't fail
+            checks["database"] = True  # Disabled in settings, assume healthy
 
         # Cache check (if configured)
-        if redis_settings.redis_url:
+        if redis_settings.health_checks_enabled:
             checks["cache"] = await self._check_cache()
         else:
-            checks["cache"] = True  # Not configured, don't fail
+            checks["cache"] = True  # Disabled, don't fail
 
         # External services (if configured)
-        if auth_settings.service_url:
+        if auth_settings.service_url and auth_settings.health_checks_enabled:
             checks["auth_service"] = await self._check_external_service(
-                "auth", str(auth_settings.service_url)
+                "auth",
+                str(auth_settings.service_url),
             )
+        else:
+            checks["auth_service"] = True
 
         # Messaging check (if configured)
         if rabbit_settings.is_configured:
@@ -193,8 +196,10 @@ class HealthService(BaseService):
         checks: dict[str, bool] = {}
 
         # Database is critical for readiness
-        if db_settings.database_url:
+        if db_settings.health_checks_enabled:
             checks["database"] = await self._check_database()
+        else:
+            checks["database"] = True
 
         # Cache is not critical (service can run without it)
         # External services depend on your requirements

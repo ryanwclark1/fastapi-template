@@ -6,7 +6,9 @@ from typing import TYPE_CHECKING
 
 from fastapi.middleware.cors import CORSMiddleware
 
+from example_service.app.middleware.base import HeaderContextMiddleware
 from example_service.app.middleware.constants import EXEMPT_PATHS
+from example_service.app.middleware.correlation_id import CorrelationIDMiddleware
 from example_service.app.middleware.metrics import MetricsMiddleware
 from example_service.app.middleware.rate_limit import RateLimitMiddleware
 from example_service.app.middleware.request_id import RequestIDMiddleware
@@ -28,6 +30,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "CorrelationIDMiddleware",
+    "HeaderContextMiddleware",
     "MetricsMiddleware",
     "PIIMasker",
     "RateLimitMiddleware",
@@ -48,13 +52,19 @@ def configure_middleware(app: FastAPI) -> None:
     2. Rate Limit (optional, early rejection for DDoS protection)
     3. Request Size Limit (early rejection for large payload DoS)
     4. Security Headers (add security headers to all responses)
-    5. RequestID (generates/extracts ID, sets logging context)
-    6. Request Logging (detailed request/response logging with PII masking)
-    7. Metrics (collects metrics + trace correlation + timing header)
+    5. CorrelationID (transaction-level ID across services, sets logging context)
+    6. RequestID (request-level ID per hop, sets logging context)
+    7. Request Logging (detailed request/response logging with PII masking)
+    8. Metrics (collects metrics + trace correlation + timing header)
 
     IMPORTANT:
     - Rate limiting and size limits run early for fast rejection
-    - RequestID MUST run before Request Logging so request_id is in context
+    - CorrelationID runs before RequestID (transaction scope > request scope)
+    - Both IDs MUST run before Request Logging so both are available in logs
+
+    Correlation ID vs Request ID:
+    - Correlation ID: Shared across all services in a transaction (Service A → B → C)
+    - Request ID: Unique per HTTP request (one per service hop)
 
     Args:
         app: FastAPI application instance.
@@ -131,8 +141,19 @@ def configure_middleware(app: FastAPI) -> None:
     )
     logger.info("Security headers middleware enabled")
 
-    # Custom middleware (order matters - see docstring above)
-    # RequestID must run BEFORE logging so request_id is available in logs
+    # Correlation ID middleware (for distributed tracing across services)
+    # Sets correlation_id in logging context for transaction-level tracking
+    # Must run BEFORE RequestID so both IDs are available in correct order
+    app.add_middleware(
+        CorrelationIDMiddleware,
+        header_name="x-correlation-id",
+        generate_if_missing=True,  # Generate if not provided by upstream service
+    )
+    logger.info("Correlation ID middleware enabled")
+
+    # Request ID middleware (for per-request tracking within this service)
+    # Sets request_id in logging context for request-level debugging
+    # Must run BEFORE logging so request_id is available in logs
     if log_settings.include_request_id:
         app.add_middleware(RequestIDMiddleware)
         logger.info("Request ID middleware enabled")
