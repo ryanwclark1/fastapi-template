@@ -2,7 +2,18 @@
 
 import click
 
-from example_service.cli.commands import cache, config, database, server, utils
+from example_service.cli.commands import (
+    cache,
+    config,
+    data,
+    database,
+    monitor,
+    scheduler,
+    server,
+    tasks,
+    users,
+    utils,
+)
 
 
 @click.group()
@@ -14,16 +25,46 @@ def cli(ctx: click.Context) -> None:
 
     This CLI provides commands for managing the service infrastructure including
     database operations, cache management, server running, configuration validation,
-    and various utility operations.
+    background tasks, scheduled jobs, user management, and various utility operations.
+
+    \b
+    Command Groups:
+      db         Database migrations and management
+      cache      Redis cache operations
+      server     Development and production servers
+      config     Configuration management
+      tasks      Background task management
+      scheduler  Scheduled job management
+      users      User account management
+      data       Data import/export operations
+      monitor    Monitoring and observability
+
+    \b
+    Quick Start:
+      example-service db init           # Test database connection
+      example-service db upgrade        # Apply migrations
+      example-service config validate   # Check all dependencies
+      example-service health-check      # Check service health
     """
     ctx.ensure_object(dict)
 
 
-# Register command groups
+# Register command groups - Core infrastructure
 cli.add_command(database.db)
 cli.add_command(cache.cache)
 cli.add_command(server.server)
 cli.add_command(config.config)
+
+# Register command groups - Task management
+cli.add_command(tasks.tasks)
+cli.add_command(scheduler.scheduler)
+
+# Register command groups - User and data management
+cli.add_command(users.users)
+cli.add_command(data.data)
+
+# Register command groups - Monitoring
+cli.add_command(monitor.monitor)
 
 # Register standalone utility commands
 cli.add_command(utils.shell)
