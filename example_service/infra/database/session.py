@@ -16,6 +16,7 @@ from example_service.infra.metrics.prometheus import (
     database_connections_active,
     database_query_duration_seconds,
 )
+from example_service.infra.metrics.tracking import track_slow_query
 from example_service.utils.retry import retry
 
 logger = logging.getLogger(__name__)
@@ -120,6 +121,10 @@ def _after_cursor_execute(conn, cursor, statement, parameters, context, executem
         )
     else:
         database_query_duration_seconds.labels(operation=operation).observe(duration)
+
+    # Track slow queries (>1 second)
+    if duration > 1.0:
+        track_slow_query(operation)
 
 
 @asynccontextmanager

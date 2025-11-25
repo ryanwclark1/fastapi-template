@@ -10,6 +10,17 @@ architecture for monitoring application dependencies.
 - `/health/ready` - Kubernetes readiness probe
 - `/health/live` - Kubernetes liveness probe
 - `/health/startup` - Kubernetes startup probe
+- `/health/history` - Health check history for trend analysis
+- `/health/stats` - Aggregated health statistics
+- `/health/providers` - List registered providers
+- `/health/cache` - Cache status information
+
+## Features
+
+- **Concurrent checks**: All providers checked in parallel with asyncio
+- **Result caching**: Configurable TTL to avoid hammering dependencies
+- **History tracking**: Rolling history for trend analysis and debugging
+- **Statistics**: Uptime percentage, latency averages, per-provider stats
 
 ## Quick Start
 
@@ -61,8 +72,13 @@ from __future__ import annotations
 
 from example_service.core.schemas.common import HealthStatus
 from example_service.features.health.aggregator import (
+    DEFAULT_CACHE_TTL_SECONDS,
+    DEFAULT_CHECK_TIMEOUT_SECONDS,
+    DEFAULT_HISTORY_SIZE,
     AggregatedHealthResult,
     HealthAggregator,
+    HealthHistoryEntry,
+    HealthStats,
     get_global_aggregator,
     set_global_aggregator,
 )
@@ -78,10 +94,15 @@ from example_service.features.health.providers import (
 )
 from example_service.features.health.router import router
 from example_service.features.health.schemas import (
+    CacheInfoResponse,
     ComponentHealthDetail,
     DetailedHealthResponse,
+    HealthHistoryResponse,
     HealthResponse,
+    HealthStatsResponse,
     LivenessResponse,
+    ProviderStatsDetail,
+    ProvidersResponse,
     ReadinessResponse,
     StartupResponse,
 )
@@ -104,9 +125,15 @@ __all__ = [
     "HealthAggregator",
     "HealthAggregatorDep",
     "AggregatedHealthResult",
+    "HealthHistoryEntry",
+    "HealthStats",
     "get_health_aggregator",
     "get_global_aggregator",
     "set_global_aggregator",
+    # Configuration defaults
+    "DEFAULT_CACHE_TTL_SECONDS",
+    "DEFAULT_CHECK_TIMEOUT_SECONDS",
+    "DEFAULT_HISTORY_SIZE",
     # Provider Protocol & Result
     "HealthProvider",
     "HealthCheckResult",
@@ -125,4 +152,9 @@ __all__ = [
     "ReadinessResponse",
     "LivenessResponse",
     "StartupResponse",
+    "HealthHistoryResponse",
+    "HealthStatsResponse",
+    "ProviderStatsDetail",
+    "CacheInfoResponse",
+    "ProvidersResponse",
 ]

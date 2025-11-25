@@ -1,22 +1,20 @@
-"""Service dependencies for FastAPI."""
+"""Service dependencies for FastAPI.
+
+Re-exports service factory functions from feature modules for
+backwards compatibility and convenience.
+"""
 
 from __future__ import annotations
 
-from example_service.core.services.health import HealthService
+# Re-export from health feature for backwards compatibility
+from example_service.features.health.service import (
+    HealthService,
+    HealthServiceDep,
+    get_health_service,
+)
 
-
-def get_health_service() -> HealthService:
-    """Get health check service instance.
-
-    Returns:
-        HealthService instance for health checks.
-
-    Example:
-            @router.get("/health")
-        async def health(service: HealthService = Depends(get_health_service)):
-            return await service.check_health()
-    """
-    return HealthService()
-
-
-__all__ = ["get_health_service"]
+__all__ = [
+    "HealthService",
+    "HealthServiceDep",
+    "get_health_service",
+]

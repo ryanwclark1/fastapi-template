@@ -239,3 +239,20 @@ def create_backup_yaml_source(settings_cls: type[BaseSettings]) -> ConfDYamlConf
         confd_dir="backup.d",
         config_dir_env="BACKUP_CONFIG_DIR",
     )
+
+
+def create_consul_yaml_source(settings_cls: type[BaseSettings]) -> ConfDYamlConfigSettingsSource:
+    """Create YAML source for ConsulSettings.
+
+    Loads from:
+    - conf/consul.yaml (base)
+    - conf/consul.d/*.yaml (overrides)
+
+    Override directory with: CONSUL_CONFIG_DIR=/custom/path
+    """
+    return ConfDYamlConfigSettingsSource(
+        settings_cls,
+        yaml_file="consul.yaml",
+        confd_dir="consul.d",
+        config_dir_env="CONSUL_CONFIG_DIR",
+    )

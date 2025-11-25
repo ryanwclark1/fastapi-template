@@ -295,7 +295,7 @@ slow_requests_total = Counter(
 memory_usage_bytes = Gauge(
     "memory_usage_bytes",
     "Current memory usage in bytes",
-    ["type"],  # type: rss, vms, shared
+    ["type"],  # categories: rss, vms, shared
     registry=REGISTRY,
 )
 
@@ -336,7 +336,7 @@ error_budget_remaining = Gauge(
 dependency_health = Gauge(
     "dependency_health",
     "Dependency health status (1=healthy, 0=unhealthy)",
-    ["dependency_name", "dependency_type"],  # type: database, cache, queue, api
+    ["dependency_name", "dependency_type"],  # dependency_type values: database, cache, queue, api
     registry=REGISTRY,
 )
 

@@ -20,6 +20,7 @@ from taskiq import TaskiqMiddleware
 if TYPE_CHECKING:
     from taskiq import TaskiqMessage, TaskiqResult
 
+from example_service.infra.tracing.opentelemetry import get_tracer, record_exception
 from example_service.tasks.tracking import get_tracker, start_tracker, stop_tracker
 
 logger = logging.getLogger(__name__)
@@ -161,3 +162,130 @@ class TrackingMiddleware(TaskiqMiddleware):
                 "duration_ms": duration_ms,
             },
         )
+
+
+class TracingMiddleware(TaskiqMiddleware):
+    """Middleware that creates distributed traces for all task executions.
+
+    This middleware integrates Taskiq background tasks with OpenTelemetry
+    distributed tracing, making tasks visible in trace visualizers like
+    Jaeger, Tempo, or Zipkin.
+
+    For each task execution, it:
+    - Creates a span with the tracer name "taskiq.worker"
+    - Sets span attributes for task.id and task.name
+    - Records exceptions if the task fails
+    - Properly ends the span on completion
+
+    Example usage:
+        broker = AioPikaBroker(...)
+        broker.add_middlewares(TracingMiddleware())
+
+    The spans will appear in your distributed tracing UI with full
+    context propagation from HTTP requests through background tasks.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the tracing middleware."""
+        super().__init__()
+        self._tracer = get_tracer("taskiq.worker")
+        # Store spans keyed by task_id since we need them across pre/post execute
+        self._spans: dict[str, Any] = {}
+
+    async def pre_execute(
+        self,
+        message: TaskiqMessage,
+    ) -> TaskiqMessage:
+        """Create and start a span for the task execution.
+
+        This is called before the task function is executed.
+
+        Args:
+            message: The task message containing task_id and task_name.
+
+        Returns:
+            The message, unmodified.
+        """
+        task_id = message.task_id
+        task_name = message.task_name
+
+        # Create and start a new span for this task
+        span = self._tracer.start_span(
+            name=f"task.{task_name}",
+            attributes={
+                "task.id": task_id,
+                "task.name": task_name,
+            },
+        )
+
+        # Store the span so we can end it in post_execute
+        self._spans[task_id] = span
+
+        logger.debug(
+            "Task span created",
+            extra={
+                "task_id": task_id,
+                "task_name": task_name,
+                "span_id": span.get_span_context().span_id if span.is_recording() else None,
+            },
+        )
+
+        return message
+
+    async def post_execute(
+        self,
+        message: TaskiqMessage,
+        result: TaskiqResult[Any],
+    ) -> None:
+        """End the span and record any exceptions.
+
+        This is called after the task function completes (success or failure).
+
+        Args:
+            message: The task message containing task_id and task_name.
+            result: The task result containing return value or error.
+        """
+        task_id = message.task_id
+        task_name = message.task_name
+
+        # Retrieve the span we created in pre_execute
+        span = self._spans.pop(task_id, None)
+
+        if span is None:
+            logger.warning(
+                "No span found for task in post_execute",
+                extra={"task_id": task_id, "task_name": task_name},
+            )
+            return
+
+        try:
+            # Record exception if task failed
+            if result.is_err and result.error is not None:
+                # Record the exception in the span
+                if isinstance(result.error, Exception):
+                    span.record_exception(result.error)
+                else:
+                    # If error is not an Exception, create a generic one
+                    span.record_exception(Exception(str(result.error)))
+
+                # Set span status to error
+                from opentelemetry import trace
+
+                span.set_status(trace.Status(trace.StatusCode.ERROR))
+
+                span.set_attribute("task.status", "failure")
+            else:
+                span.set_attribute("task.status", "success")
+
+            logger.debug(
+                "Task span ended",
+                extra={
+                    "task_id": task_id,
+                    "task_name": task_name,
+                    "status": "failure" if result.is_err else "success",
+                },
+            )
+
+        finally:
+            # Always end the span, even if recording the exception failed
+            span.end()

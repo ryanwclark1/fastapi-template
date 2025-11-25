@@ -28,6 +28,7 @@ from example_service.features.admin.service import (
     TrackerNotAvailableError,
     get_admin_service,
 )
+from example_service.infra.metrics.tracking import track_feature_usage
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -96,6 +97,8 @@ async def pause_scheduled_job(
     service: AdminService = Depends(get_admin_service),
 ) -> dict:
     """Pause a scheduled job."""
+    track_feature_usage("admin_job_management", is_authenticated=True)
+
     try:
         return service.pause_job(request.job_id)
     except JobNotFoundError as e:
@@ -115,6 +118,8 @@ async def resume_scheduled_job(
     service: AdminService = Depends(get_admin_service),
 ) -> dict:
     """Resume a paused scheduled job."""
+    track_feature_usage("admin_job_management", is_authenticated=True)
+
     try:
         return service.resume_job(request.job_id)
     except JobNotFoundError as e:
@@ -144,6 +149,9 @@ async def trigger_task(
     The task will be queued for execution by a Taskiq worker.
     Make sure a worker is running: `taskiq worker example_service.tasks.broker:broker`
     """
+    # Track admin feature usage (admin endpoints require authentication in production)
+    track_feature_usage("admin_task_trigger", is_authenticated=True)
+
     try:
         result = await service.trigger_task(request.task, request.params)
         return TriggerTaskResponse(**result)

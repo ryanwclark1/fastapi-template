@@ -28,6 +28,7 @@ from functools import lru_cache
 from .app import AppSettings
 from .auth import AuthSettings
 from .backup import BackupSettings
+from .consul import ConsulSettings
 from .logs import LoggingSettings
 from .otel import OtelSettings
 from .postgres import PostgresSettings
@@ -115,6 +116,16 @@ def get_backup_settings() -> BackupSettings:
     return BackupSettings()
 
 
+@lru_cache(maxsize=1)
+def get_consul_settings() -> ConsulSettings:
+    """Get cached Consul service discovery settings.
+
+    Returns:
+        Validated and frozen ConsulSettings instance.
+    """
+    return ConsulSettings()
+
+
 def clear_all_caches() -> None:
     """Clear all settings caches.
 
@@ -129,3 +140,4 @@ def clear_all_caches() -> None:
     get_redis_settings.cache_clear()
     get_auth_settings.cache_clear()
     get_backup_settings.cache_clear()
+    get_consul_settings.cache_clear()

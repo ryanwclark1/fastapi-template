@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from .app import AppSettings
     from .auth import AuthSettings
     from .backup import BackupSettings
+    from .consul import ConsulSettings
     from .logs import LoggingSettings
     from .otel import OtelSettings
     from .postgres import PostgresSettings
@@ -91,6 +92,12 @@ def _get_backup_settings() -> BackupSettings:
     return BackupSettings()
 
 
+def _get_consul_settings() -> ConsulSettings:
+    """Lazy import to avoid circular dependencies."""
+    from .consul import ConsulSettings
+    return ConsulSettings()
+
+
 class Settings(BaseSettings):
     """Unified settings composing all domain settings.
 
@@ -120,6 +127,7 @@ class Settings(BaseSettings):
     otel: OtelSettings = Field(default_factory=_get_otel_settings)
     auth: AuthSettings = Field(default_factory=_get_auth_settings)
     backup: BackupSettings = Field(default_factory=_get_backup_settings)
+    consul: ConsulSettings = Field(default_factory=_get_consul_settings)
 
 
 def _rebuild_model() -> None:
@@ -132,6 +140,7 @@ def _rebuild_model() -> None:
     from .app import AppSettings
     from .auth import AuthSettings
     from .backup import BackupSettings
+    from .consul import ConsulSettings
     from .logs import LoggingSettings
     from .otel import OtelSettings
     from .postgres import PostgresSettings
@@ -148,6 +157,7 @@ def _rebuild_model() -> None:
             "OtelSettings": OtelSettings,
             "AuthSettings": AuthSettings,
             "BackupSettings": BackupSettings,
+            "ConsulSettings": ConsulSettings,
         }
     )
 

@@ -13,6 +13,7 @@ from fastapi import FastAPI
 
 from example_service.core.settings import (
     get_app_settings,
+    get_consul_settings,
     get_db_settings,
     get_logging_settings,
     get_otel_settings,
@@ -21,6 +22,7 @@ from example_service.core.settings import (
 )
 from example_service.infra.cache.redis import start_cache, stop_cache
 from example_service.infra.database.session import close_database, init_database
+from example_service.infra.discovery import start_discovery, stop_discovery
 from example_service.infra.logging.config import configure_logging
 from example_service.infra.messaging.broker import start_broker, stop_broker
 from example_service.infra.metrics.prometheus import application_info
@@ -113,6 +115,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _ = app  # Reserved for future FastAPI state hooks
     # Load settings (cached after first call)
     app_settings = get_app_settings()
+    consul_settings = get_consul_settings()
     db_settings = get_db_settings()
     redis_settings = get_redis_settings()
     rabbit_settings = get_rabbit_settings()
@@ -153,6 +156,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         "Application metrics initialized",
         extra={"metrics_endpoint": "/metrics"},
     )
+
+    # Initialize Consul service discovery (optional, never blocks startup)
+    if consul_settings.is_configured:
+        discovery_started = await start_discovery()
+        if discovery_started:
+            logger.info(
+                "Consul service discovery started",
+                extra={"consul_url": consul_settings.base_url},
+            )
+        else:
+            logger.warning(
+                "Consul service discovery failed to start, continuing without it",
+                extra={"consul_url": consul_settings.base_url},
+            )
 
     # Initialize database connection with retry
     if db_settings.is_configured:
@@ -216,6 +233,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "service": app_settings.service_name,
             "environment": app_settings.environment,
             "tracing_enabled": otel_settings.is_configured,
+            "service_discovery_enabled": consul_settings.is_configured,
             "database_enabled": db_settings.is_configured,
             "cache_enabled": redis_settings.is_configured,
             "messaging_enabled": rabbit_settings.is_configured,
@@ -231,6 +249,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info(
         "Application shutting down", extra={"service": app_settings.service_name}
     )
+
+    # Stop Consul service discovery first (deregister before dependencies close)
+    if consul_settings.is_configured:
+        await stop_discovery()
+        logger.info("Consul service discovery stopped")
 
     # Stop APScheduler first (depends on Taskiq for task execution)
     if scheduler_module is not None:

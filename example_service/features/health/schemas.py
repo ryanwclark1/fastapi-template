@@ -93,6 +93,7 @@ class DetailedHealthResponse(BaseModel):
             "service": "example-service",
             "version": "0.1.0",
             "duration_ms": 15.5,
+            "from_cache": false,
             "checks": {
                 "database": {
                     "healthy": true,
@@ -110,6 +111,7 @@ class DetailedHealthResponse(BaseModel):
     service: str = Field(min_length=1, max_length=100, description="Service name")
     version: str = Field(min_length=1, max_length=50, description="Service version")
     duration_ms: float = Field(description="Total check duration in milliseconds")
+    from_cache: bool = Field(default=False, description="Whether result was served from cache")
     checks: dict[str, Any] = Field(
         default_factory=dict, description="Detailed per-component health info"
     )
@@ -122,6 +124,7 @@ class DetailedHealthResponse(BaseModel):
                 "service": "example-service",
                 "version": "0.1.0",
                 "duration_ms": 15.5,
+                "from_cache": False,
                 "checks": {
                     "database": {
                         "healthy": True,
@@ -241,11 +244,272 @@ class StartupResponse(BaseModel):
     )
 
 
+# =============================================================================
+# History & Statistics Schemas
+# =============================================================================
+
+
+class HealthHistoryEntry(BaseModel):
+    """A single entry in the health check history.
+
+    Example:
+        ```json
+        {
+            "timestamp": "2025-01-01T00:00:00Z",
+            "status": "healthy",
+            "duration_ms": 15.2,
+            "checks": {
+                "database": "healthy",
+                "cache": "healthy"
+            }
+        }
+        ```
+    """
+
+    timestamp: str = Field(description="When the check was performed (ISO format)")
+    status: str = Field(description="Overall health status at that time")
+    duration_ms: float = Field(description="How long the check took")
+    checks: dict[str, str] | None = Field(
+        default=None, description="Individual provider statuses"
+    )
+    provider_status: str | None = Field(
+        default=None, description="Status for filtered provider"
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "timestamp": "2025-01-01T00:00:00Z",
+                "status": "healthy",
+                "duration_ms": 15.2,
+                "checks": {"database": "healthy", "cache": "healthy"},
+            }
+        }
+    )
+
+
+class HealthHistoryResponse(BaseModel):
+    """Health check history response.
+
+    Returns a list of recent health check results for trend analysis.
+
+    Example:
+        ```json
+        {
+            "entries": [
+                {
+                    "timestamp": "2025-01-01T00:00:05Z",
+                    "status": "healthy",
+                    "duration_ms": 12.5,
+                    "checks": {"database": "healthy"}
+                },
+                {
+                    "timestamp": "2025-01-01T00:00:00Z",
+                    "status": "degraded",
+                    "duration_ms": 1015.2,
+                    "checks": {"database": "degraded"}
+                }
+            ],
+            "total_entries": 2,
+            "provider_filter": null
+        }
+        ```
+    """
+
+    entries: list[HealthHistoryEntry] = Field(description="History entries (most recent first)")
+    total_entries: int = Field(description="Total number of entries returned")
+    provider_filter: str | None = Field(default=None, description="Provider filter applied")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "entries": [
+                    {
+                        "timestamp": "2025-01-01T00:00:05Z",
+                        "status": "healthy",
+                        "duration_ms": 12.5,
+                        "checks": {"database": "healthy", "cache": "healthy"},
+                    },
+                    {
+                        "timestamp": "2025-01-01T00:00:00Z",
+                        "status": "degraded",
+                        "duration_ms": 1015.2,
+                        "checks": {"database": "degraded", "cache": "healthy"},
+                    },
+                ],
+                "total_entries": 2,
+                "provider_filter": None,
+            }
+        }
+    )
+
+
+class ProviderStatsDetail(BaseModel):
+    """Statistics for a single health provider."""
+
+    total_checks: int = Field(description="Total number of checks")
+    healthy_count: int = Field(description="Number of healthy checks")
+    degraded_count: int = Field(description="Number of degraded checks")
+    unhealthy_count: int = Field(description="Number of unhealthy checks")
+    uptime_percentage: float = Field(description="Percentage uptime (healthy + degraded)")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "total_checks": 100,
+                "healthy_count": 95,
+                "degraded_count": 3,
+                "unhealthy_count": 2,
+                "uptime_percentage": 98.0,
+            }
+        }
+    )
+
+
+class HealthStatsResponse(BaseModel):
+    """Health statistics response.
+
+    Aggregated statistics over the health check history window,
+    including uptime percentage, average latency, and per-provider stats.
+
+    Example:
+        ```json
+        {
+            "total_checks": 100,
+            "healthy_count": 95,
+            "degraded_count": 3,
+            "unhealthy_count": 2,
+            "uptime_percentage": 98.0,
+            "avg_duration_ms": 15.5,
+            "current_status": "healthy",
+            "last_status_change": "2025-01-01T00:00:00Z",
+            "provider_stats": {
+                "database": {
+                    "total_checks": 100,
+                    "healthy_count": 98,
+                    "uptime_percentage": 98.0
+                }
+            }
+        }
+        ```
+    """
+
+    total_checks: int = Field(description="Total number of health checks in history")
+    healthy_count: int = Field(description="Number of healthy checks")
+    degraded_count: int = Field(description="Number of degraded checks")
+    unhealthy_count: int = Field(description="Number of unhealthy checks")
+    uptime_percentage: float = Field(description="Overall uptime percentage")
+    avg_duration_ms: float = Field(description="Average check duration in milliseconds")
+    current_status: str | None = Field(default=None, description="Current health status")
+    last_status_change: datetime | None = Field(
+        default=None, description="When status last changed"
+    )
+    provider_stats: dict[str, ProviderStatsDetail] = Field(
+        default_factory=dict, description="Per-provider statistics"
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "total_checks": 100,
+                "healthy_count": 95,
+                "degraded_count": 3,
+                "unhealthy_count": 2,
+                "uptime_percentage": 98.0,
+                "avg_duration_ms": 15.5,
+                "current_status": "healthy",
+                "last_status_change": "2025-01-01T00:00:00Z",
+                "provider_stats": {
+                    "database": {
+                        "total_checks": 100,
+                        "healthy_count": 98,
+                        "degraded_count": 1,
+                        "unhealthy_count": 1,
+                        "uptime_percentage": 99.0,
+                    },
+                    "cache": {
+                        "total_checks": 100,
+                        "healthy_count": 95,
+                        "degraded_count": 3,
+                        "unhealthy_count": 2,
+                        "uptime_percentage": 98.0,
+                    },
+                },
+            }
+        },
+        json_encoders={datetime: lambda v: v.isoformat() if v else None},
+    )
+
+
+class CacheInfoResponse(BaseModel):
+    """Cache information response.
+
+    Shows the current state of the health check result cache.
+
+    Example:
+        ```json
+        {
+            "ttl_seconds": 10.0,
+            "is_valid": true,
+            "age_seconds": 5.2,
+            "has_cached_result": true
+        }
+        ```
+    """
+
+    ttl_seconds: float = Field(description="Cache TTL in seconds")
+    is_valid: bool = Field(description="Whether cache is currently valid")
+    age_seconds: float | None = Field(default=None, description="Age of cached result")
+    has_cached_result: bool = Field(description="Whether there is a cached result")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "ttl_seconds": 10.0,
+                "is_valid": True,
+                "age_seconds": 5.2,
+                "has_cached_result": True,
+            }
+        }
+    )
+
+
+class ProvidersResponse(BaseModel):
+    """List of registered health providers.
+
+    Example:
+        ```json
+        {
+            "providers": ["database", "cache", "messaging"],
+            "count": 3
+        }
+        ```
+    """
+
+    providers: list[str] = Field(description="List of registered provider names")
+    count: int = Field(description="Number of providers")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "providers": ["database", "cache", "messaging"],
+                "count": 3,
+            }
+        }
+    )
+
+
 __all__ = [
+    "CacheInfoResponse",
     "ComponentHealthDetail",
     "DetailedHealthResponse",
+    "HealthHistoryEntry",
+    "HealthHistoryResponse",
     "HealthResponse",
+    "HealthStatsResponse",
     "LivenessResponse",
+    "ProviderStatsDetail",
+    "ProvidersResponse",
     "ReadinessResponse",
     "StartupResponse",
 ]

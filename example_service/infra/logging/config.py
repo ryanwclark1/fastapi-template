@@ -21,6 +21,7 @@ from typing import Any
 # Global queue and listener for async logging
 _log_queue: Queue[logging.LogRecord] | None = None
 _listener: QueueListener | None = None
+logger = logging.getLogger(__name__)
 
 
 def complete() -> None:

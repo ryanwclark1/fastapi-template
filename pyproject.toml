@@ -148,6 +148,11 @@ ignore = [
     "TC002",  # typing-only third-party import
     "TC003",  # typing-only standard-library import
 ]
+"tests/**/*.py" = [
+    "ARG001",  # test helpers often accept unused fixtures/params
+    "ARG002",
+    "ARG005",
+]
 
 [tool.ruff.lint.flake8-type-checking]
 # Declarative base classes must see annotations at runtime (e.g. datetime, uuid)

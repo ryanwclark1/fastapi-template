@@ -20,6 +20,7 @@ from example_service.core.dependencies.database import get_db_session
 from example_service.features.reminders.models import Reminder
 from example_service.features.reminders.schemas import ReminderCreate, ReminderResponse
 from example_service.infra.logging import get_lazy_logger
+from example_service.infra.metrics.tracking import track_feature_usage, track_user_action
 
 router = APIRouter(prefix="/reminders", tags=["reminders"])
 
@@ -215,6 +216,10 @@ async def create_reminder(
     session: AsyncSession = Depends(get_db_session),
 ) -> ReminderResponse:
     """Create a new reminder."""
+    # Track business metrics
+    track_feature_usage("reminders", is_authenticated=False)
+    track_user_action("create", is_authenticated=False)
+
     reminder = Reminder(
         title=payload.title,
         description=payload.description,
@@ -249,6 +254,9 @@ async def update_reminder(
     if reminder is None:
         raise NotFoundError("Reminder", {"id": reminder_id})
 
+    # Track business metrics
+    track_user_action("update", is_authenticated=False)
+
     # Update fields
     reminder.title = payload.title
     reminder.description = payload.description
@@ -280,6 +288,9 @@ async def complete_reminder(
     if reminder is None:
         raise NotFoundError("Reminder", {"id": reminder_id})
 
+    # Track business metrics (completion is a significant action)
+    track_user_action("complete", is_authenticated=False)
+
     reminder.is_completed = True
 
     await session.commit()
@@ -307,6 +318,9 @@ async def delete_reminder(
 
     if reminder is None:
         raise NotFoundError("Reminder", {"id": reminder_id})
+
+    # Track business metrics
+    track_user_action("delete", is_authenticated=False)
 
     await session.delete(reminder)
     await session.commit()

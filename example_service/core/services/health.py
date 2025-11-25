@@ -230,17 +230,20 @@ class HealthService(BaseService):
             },
         }
 
-    async def check_health_detailed(self) -> dict[str, Any]:
+    async def check_health_detailed(self, force_refresh: bool = False) -> dict[str, Any]:
         """Perform health check with detailed provider information.
 
         Returns extended health information including latency and
         messages for each provider.
 
+        Args:
+            force_refresh: If True, bypass cache and run fresh checks.
+
         Returns:
             Detailed health check result with per-provider metrics.
         """
         aggregator = self._get_aggregator()
-        result = await aggregator.check_all()
+        result = await aggregator.check_all(force_refresh=force_refresh)
 
         return {
             "status": result.status.value,
@@ -248,6 +251,7 @@ class HealthService(BaseService):
             "service": self._app_settings.service_name,
             "version": "0.1.0",
             "duration_ms": result.duration_ms,
+            "from_cache": result.from_cache,
             "checks": {
                 name: {
                     "healthy": check.status == HealthStatus.HEALTHY,

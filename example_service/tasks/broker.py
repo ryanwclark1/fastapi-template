@@ -65,7 +65,7 @@ rabbit_settings = get_rabbit_settings()
 broker: AioPikaBrokerType | None = None
 
 if AioPikaBroker is not None and rabbit_settings.is_configured and redis_settings.is_configured:
-    from example_service.tasks.middleware import TrackingMiddleware
+    from example_service.tasks.middleware import TrackingMiddleware, TracingMiddleware
 
     broker = (
         AioPikaBroker(
@@ -76,12 +76,13 @@ if AioPikaBroker is not None and rabbit_settings.is_configured and redis_setting
         )
         .with_result_backend(RedisAsyncResultBackend(redis_settings.get_url()))
         .with_middlewares(
+            TracingMiddleware(),
             TrackingMiddleware(),
         )
     )
 
     logger.info(
-        "Taskiq background task broker configured with tracking middleware",
+        "Taskiq background task broker configured with tracing and tracking middleware",
         extra={"queue": rabbit_settings.get_prefixed_queue("taskiq-tasks")},
     )
 else:

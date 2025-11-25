@@ -38,6 +38,7 @@ from typing import TYPE_CHECKING, Any
 
 from example_service.core.schemas.common import HealthStatus
 from example_service.features.health.providers import HealthCheckResult, HealthProvider
+from example_service.infra.metrics.tracking import track_dependency_check, update_dependency_health
 
 if TYPE_CHECKING:
     pass
@@ -48,6 +49,17 @@ logger = logging.getLogger(__name__)
 DEFAULT_CACHE_TTL_SECONDS = 10.0
 DEFAULT_HISTORY_SIZE = 100
 DEFAULT_CHECK_TIMEOUT_SECONDS = 30.0
+
+# Provider name to dependency type mapping for metrics
+PROVIDER_TYPE_MAPPING = {
+    "database": "database",
+    "cache": "cache",
+    "redis": "cache",
+    "messaging": "queue",
+    "rabbitmq": "queue",
+    "storage": "storage",
+    "s3_storage": "storage",
+}
 
 
 @dataclass
@@ -295,12 +307,25 @@ class HealthAggregator:
             return {}
 
         async def check_provider(name: str, provider: HealthProvider) -> tuple[str, HealthCheckResult]:
-            """Run a single provider check with error handling."""
+            """Run a single provider check with error handling and metrics tracking."""
             try:
-                result = await provider.check_health()
+                # Track dependency check duration with context manager
+                async with track_dependency_check(name):
+                    result = await provider.check_health()
+
+                # Update dependency health gauge based on result
+                dependency_type = PROVIDER_TYPE_MAPPING.get(name, "api")
+                is_healthy = result.status == HealthStatus.HEALTHY
+                update_dependency_health(name, dependency_type, is_healthy)
+
                 return name, result
             except Exception as e:
                 logger.exception("Health check failed for provider", extra={"provider": name})
+
+                # Update metrics for failed check
+                dependency_type = PROVIDER_TYPE_MAPPING.get(name, "api")
+                update_dependency_health(name, dependency_type, False)
+
                 return name, HealthCheckResult(
                     status=HealthStatus.UNHEALTHY,
                     message=f"Check error: {e}",
@@ -359,9 +384,23 @@ class HealthAggregator:
             return None
 
         try:
-            return await provider.check_health()
+            # Track dependency check duration with context manager
+            async with track_dependency_check(name):
+                result = await provider.check_health()
+
+            # Update dependency health gauge based on result
+            dependency_type = PROVIDER_TYPE_MAPPING.get(name, "api")
+            is_healthy = result.status == HealthStatus.HEALTHY
+            update_dependency_health(name, dependency_type, is_healthy)
+
+            return result
         except Exception as e:
             logger.exception("Health check failed for provider", extra={"provider": name})
+
+            # Update metrics for failed check
+            dependency_type = PROVIDER_TYPE_MAPPING.get(name, "api")
+            update_dependency_health(name, dependency_type, False)
+
             return HealthCheckResult(
                 status=HealthStatus.UNHEALTHY,
                 message=f"Check error: {e}",
