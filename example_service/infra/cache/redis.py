@@ -67,24 +67,35 @@ class RedisCache:
     async def connect(self) -> None:
         """Establish connection to Redis with connection pooling.
 
+        Uses settings from RedisSettings for connection parameters including
+        timeouts, pool size, and SSL configuration.
+
         Raises:
             RedisConnectionError: If unable to connect to Redis.
         """
-        logger.info("Connecting to Redis", extra={"url": redis_settings.redis_url})
+        logger.info(
+            "Connecting to Redis",
+            extra={
+                "host": redis_settings.host,
+                "port": redis_settings.port,
+                "db": redis_settings.db,
+                "max_connections": redis_settings.max_connections,
+                "socket_timeout": redis_settings.socket_timeout,
+            },
+        )
 
         try:
+            # Use connection_pool_kwargs() to get all settings-driven parameters
             self._pool = ConnectionPool.from_url(
-                redis_settings.get_url(),
-                max_connections=20,
-                decode_responses=True,
-                encoding="utf-8",
+                redis_settings.url,
+                **redis_settings.connection_pool_kwargs(),
             )
             self._client = Redis(connection_pool=self._pool)
 
             # Test connection
             await self._client.ping()
 
-            logger.info("Redis connection established")
+            logger.info("Redis connection established successfully")
         except Exception as e:
             logger.exception("Failed to connect to Redis", extra={"error": str(e)})
             raise
@@ -118,10 +129,11 @@ class RedisCache:
         return self._client
 
     @retry(
-        max_attempts=3,
-        initial_delay=1.0,
+        max_attempts=redis_settings.max_retries,
+        initial_delay=redis_settings.retry_delay,
         max_delay=5.0,
         exceptions=(RedisConnectionError, RedisTimeoutError),
+        stop_after_delay=10.0,  # Cache ops should be fast - hard cap at 10 seconds
     )
     async def get(self, key: str) -> Any | None:
         """Get a value from cache with automatic retry and metrics.
@@ -190,10 +202,11 @@ class RedisCache:
             raise
 
     @retry(
-        max_attempts=3,
-        initial_delay=1.0,
+        max_attempts=redis_settings.max_retries,
+        initial_delay=redis_settings.retry_delay,
         max_delay=5.0,
         exceptions=(RedisConnectionError, RedisTimeoutError),
+        stop_after_delay=10.0,  # Cache ops should be fast - hard cap at 10 seconds
     )
     async def set(
         self,
@@ -250,10 +263,11 @@ class RedisCache:
             raise
 
     @retry(
-        max_attempts=3,
-        initial_delay=1.0,
+        max_attempts=redis_settings.max_retries,
+        initial_delay=redis_settings.retry_delay,
         max_delay=5.0,
         exceptions=(RedisConnectionError, RedisTimeoutError),
+        stop_after_delay=10.0,  # Cache ops should be fast - hard cap at 10 seconds
     )
     async def delete(self, key: str) -> bool:
         """Delete a value from cache with automatic retry and metrics.
@@ -299,10 +313,11 @@ class RedisCache:
             raise
 
     @retry(
-        max_attempts=3,
-        initial_delay=1.0,
+        max_attempts=redis_settings.max_retries,
+        initial_delay=redis_settings.retry_delay,
         max_delay=5.0,
         exceptions=(RedisConnectionError, RedisTimeoutError),
+        stop_after_delay=10.0,  # Cache ops should be fast - hard cap at 10 seconds
     )
     async def exists(self, key: str) -> bool:
         """Check if a key exists in cache with automatic retry and metrics.

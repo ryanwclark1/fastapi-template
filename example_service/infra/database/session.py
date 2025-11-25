@@ -31,7 +31,7 @@ engine = create_async_engine(
     pool_timeout=db_settings.pool_timeout,
     pool_recycle=db_settings.pool_recycle,
     pool_pre_ping=db_settings.pool_pre_ping,
-    echo=db_settings.echo_sql or app_settings.debug,
+    echo=db_settings.echo or app_settings.debug,
     # psycopg accepts application_name directly; server_settings is asyncpg specific
     connect_args=(
         {"application_name": app_settings.service_name}
@@ -139,11 +139,12 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 @retry(
-    max_attempts=5,
-    initial_delay=1.0,
+    max_attempts=db_settings.startup_retry_attempts,
+    initial_delay=db_settings.startup_retry_delay,
     max_delay=30.0,
     exponential_base=2.0,
     jitter=True,
+    stop_after_delay=60.0,  # Hard timeout for container orchestration/CI
 )
 async def init_database() -> None:
     """Initialize database connection with retry logic.
@@ -153,10 +154,20 @@ async def init_database() -> None:
     database might not be immediately available (e.g., in containerized
     environments).
 
+    Uses retry settings from PostgresSettings:
+    - startup_retry_attempts: Maximum number of connection attempts
+    - startup_retry_delay: Initial delay between retries
+
     Raises:
         ConnectionError: If unable to connect after all retry attempts.
     """
-    logger.info("Initializing database connection with retry")
+    logger.info(
+        "Initializing database connection with retry",
+        extra={
+            "max_attempts": db_settings.startup_retry_attempts,
+            "initial_delay": db_settings.startup_retry_delay,
+        },
+    )
 
     try:
         # Test database connection

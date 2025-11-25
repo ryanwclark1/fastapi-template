@@ -18,6 +18,18 @@ from example_service.utils.retry import retry
 
 logger = logging.getLogger(__name__)
 
+# Retry predicate for HTTP operations: retry on network errors AND transient HTTP status codes
+RETRYABLE_HTTP_STATUS_CODES = {429, 502, 503, 504}  # Rate limit, Bad Gateway, Service Unavailable, Gateway Timeout
+
+
+def _is_retryable_http_error(exc: Exception) -> bool:
+    """Check if an exception should trigger a retry."""
+    if isinstance(exc, (httpx.TimeoutException, httpx.NetworkError, httpx.RemoteProtocolError)):
+        return True
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code in RETRYABLE_HTTP_STATUS_CODES
+    return False
+
 
 class BaseHTTPClient:
     """Base HTTP client for external API integrations.
@@ -83,14 +95,10 @@ class BaseHTTPClient:
         await self.close()
 
     @retry(
-        max_attempts=3,
+        max_attempts=5,
         initial_delay=1.0,
         max_delay=10.0,
-        exceptions=(
-            httpx.TimeoutException,
-            httpx.NetworkError,
-            httpx.RemoteProtocolError,
-        ),
+        retry_if=_is_retryable_http_error,  # Retry on network errors AND 429/502/503/504
     )
     async def get(
         self,
@@ -134,14 +142,10 @@ class BaseHTTPClient:
         return response.json()
 
     @retry(
-        max_attempts=3,
+        max_attempts=5,
         initial_delay=1.0,
         max_delay=10.0,
-        exceptions=(
-            httpx.TimeoutException,
-            httpx.NetworkError,
-            httpx.RemoteProtocolError,
-        ),
+        retry_if=_is_retryable_http_error,  # Retry on network errors AND 429/502/503/504
     )
     async def post(
         self,
@@ -187,14 +191,10 @@ class BaseHTTPClient:
         return response.json()
 
     @retry(
-        max_attempts=3,
+        max_attempts=5,
         initial_delay=1.0,
         max_delay=10.0,
-        exceptions=(
-            httpx.TimeoutException,
-            httpx.NetworkError,
-            httpx.RemoteProtocolError,
-        ),
+        retry_if=_is_retryable_http_error,  # Retry on network errors AND 429/502/503/504
     )
     async def put(
         self,
@@ -238,14 +238,10 @@ class BaseHTTPClient:
         return response.json()
 
     @retry(
-        max_attempts=3,
+        max_attempts=5,
         initial_delay=1.0,
         max_delay=10.0,
-        exceptions=(
-            httpx.TimeoutException,
-            httpx.NetworkError,
-            httpx.RemoteProtocolError,
-        ),
+        retry_if=_is_retryable_http_error,  # Retry on network errors AND 429/502/503/504
     )
     async def delete(
         self,

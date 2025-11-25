@@ -30,11 +30,22 @@ security = HTTPBearer(auto_error=False)
 auth_settings = get_auth_settings()
 
 
+def _is_retryable_auth_error(exc: Exception) -> bool:
+    """Check if an auth service error should trigger a retry."""
+    if isinstance(exc, (httpx.TimeoutException, httpx.NetworkError)):
+        return True
+    # Retry on gateway errors (auth service behind load balancer)
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code in {502, 503, 504}
+    return False
+
+
 @retry(
     max_attempts=3,
     initial_delay=0.5,
     max_delay=5.0,
-    exceptions=(httpx.TimeoutException, httpx.NetworkError),
+    retry_if=_is_retryable_auth_error,  # Retry on network errors AND gateway errors
+    stop_after_delay=10.0,  # Auth validation should be fast - hard cap at 10 seconds
 )
 async def validate_token_with_auth_service(token: str) -> TokenPayload:
     """Validate token with external auth service.
