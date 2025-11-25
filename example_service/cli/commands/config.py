@@ -337,3 +337,335 @@ def get(key: str) -> None:
     except Exception as e:
         error(f"Failed to get configuration value: {e}")
         sys.exit(1)
+
+
+@config.command(name="env")
+@click.option(
+    "--all",
+    "show_all",
+    is_flag=True,
+    help="Show all environment variables, not just app-related ones",
+)
+@click.option(
+    "--filter",
+    "filter_prefix",
+    default=None,
+    help="Filter by prefix (e.g., DB_, REDIS_, RABBIT_)",
+)
+def show_env(show_all: bool, filter_prefix: str | None) -> None:
+    """Show environment variables status."""
+    import os
+
+    from example_service.cli.utils import header, section
+
+    header("Environment Variables")
+
+    # Define expected environment variables by category
+    expected_vars = {
+        "Application": [
+            "APP_SERVICE_NAME",
+            "APP_ENVIRONMENT",
+            "APP_DEBUG",
+            "APP_HOST",
+            "APP_PORT",
+            "APP_API_V1_STR",
+        ],
+        "Database": [
+            "DB_HOST",
+            "DB_PORT",
+            "DB_USER",
+            "DB_PASSWORD",
+            "DB_NAME",
+            "DB_POOL_SIZE",
+            "DB_MAX_OVERFLOW",
+        ],
+        "Redis": [
+            "REDIS_URL",
+            "REDIS_KEY_PREFIX",
+            "REDIS_TTL",
+            "REDIS_MAX_CONNECTIONS",
+        ],
+        "RabbitMQ": [
+            "RABBIT_URL",
+            "RABBIT_HOST",
+            "RABBIT_PORT",
+            "RABBIT_USER",
+            "RABBIT_PASSWORD",
+            "RABBIT_VHOST",
+            "RABBIT_QUEUE_NAME",
+        ],
+        "Authentication": [
+            "AUTH_SECRET_KEY",
+            "AUTH_ALGORITHM",
+            "AUTH_ACCESS_TOKEN_EXPIRE_MINUTES",
+        ],
+        "Observability": [
+            "OTEL_ENABLED",
+            "OTEL_SERVICE_NAME",
+            "OTEL_EXPORTER_OTLP_ENDPOINT",
+            "LOG_LEVEL",
+            "LOG_FORMAT",
+        ],
+        "Backup": [
+            "BACKUP_ENABLED",
+            "BACKUP_LOCAL_DIR",
+            "BACKUP_S3_BUCKET",
+            "BACKUP_RETENTION_DAYS",
+        ],
+    }
+
+    set_count = 0
+    unset_count = 0
+
+    if show_all:
+        # Show all environment variables
+        section("All Environment Variables")
+        for key in sorted(os.environ.keys()):
+            if filter_prefix and not key.startswith(filter_prefix):
+                continue
+            value = os.environ[key]
+            # Mask sensitive values
+            if any(s in key.upper() for s in ["PASSWORD", "SECRET", "TOKEN", "KEY"]):
+                value = "***"
+            click.echo(f"  {key}={value[:50]}{'...' if len(value) > 50 else ''}")
+    else:
+        # Show expected variables by category
+        for category, variables in expected_vars.items():
+            if filter_prefix:
+                variables = [v for v in variables if v.startswith(filter_prefix)]
+                if not variables:
+                    continue
+
+            section(category)
+            for var in variables:
+                value = os.environ.get(var)
+                if value:
+                    set_count += 1
+                    # Mask sensitive values
+                    if any(s in var.upper() for s in ["PASSWORD", "SECRET", "TOKEN", "KEY"]):
+                        display_value = "***"
+                    else:
+                        display_value = value[:40] + ("..." if len(value) > 40 else "")
+                    click.echo(f"  {click.style('OK', fg='green')} {var}={display_value}")
+                else:
+                    unset_count += 1
+                    click.echo(f"  {click.style('--', fg='red')} {var} (not set)")
+
+        click.echo()
+        info(f"Set: {set_count}, Unset: {unset_count}")
+
+        if unset_count > 0:
+            warning("Some environment variables are not set")
+            info("Use 'example-service config generate-env' to create a template")
+
+
+@config.command(name="check-env")
+def check_env() -> None:
+    """Verify all required environment variables are set."""
+    import os
+
+    from example_service.cli.utils import header, section
+
+    header("Environment Check")
+
+    # Required variables (must be set)
+    required = [
+        "DB_HOST",
+        "DB_PORT",
+        "DB_USER",
+        "DB_PASSWORD",
+        "DB_NAME",
+        "AUTH_SECRET_KEY",
+    ]
+
+    # Optional but recommended
+    recommended = [
+        "APP_ENVIRONMENT",
+        "REDIS_URL",
+        "LOG_LEVEL",
+    ]
+
+    errors_list = []
+    warnings_list = []
+
+    section("Required Variables")
+    for var in required:
+        value = os.environ.get(var)
+        if value:
+            click.echo(f"  {click.style('OK', fg='green')} {var}")
+        else:
+            click.echo(f"  {click.style('MISSING', fg='red')} {var}")
+            errors_list.append(var)
+
+    section("Recommended Variables")
+    for var in recommended:
+        value = os.environ.get(var)
+        if value:
+            click.echo(f"  {click.style('OK', fg='green')} {var}")
+        else:
+            click.echo(f"  {click.style('DEFAULT', fg='yellow')} {var} - not set (using default)")
+            warnings_list.append(var)
+
+    # Check for common issues
+    section("Configuration Checks")
+
+    # Check secret key length
+    secret_key = os.environ.get("AUTH_SECRET_KEY", "")
+    if secret_key and len(secret_key) < 32:
+        click.echo(f"  {click.style('WARN', fg='yellow')} AUTH_SECRET_KEY is short ({len(secret_key)} chars, recommend 32+)")
+        warnings_list.append("AUTH_SECRET_KEY_LENGTH")
+    elif secret_key:
+        click.echo(f"  {click.style('OK', fg='green')} AUTH_SECRET_KEY length OK ({len(secret_key)} chars)")
+
+    # Check environment value
+    env = os.environ.get("APP_ENVIRONMENT", "development")
+    if env == "production":
+        debug = os.environ.get("APP_DEBUG", "false").lower()
+        if debug == "true":
+            click.echo(f"  {click.style('WARN', fg='yellow')} APP_DEBUG=true in production environment")
+            warnings_list.append("DEBUG_IN_PROD")
+        else:
+            click.echo(f"  {click.style('OK', fg='green')} Debug disabled in production")
+
+    # Summary
+    click.echo()
+    if errors_list:
+        error(f"FAILED: {len(errors_list)} required variable(s) missing")
+        info("Set these variables in your .env file or environment")
+        sys.exit(1)
+    elif warnings_list:
+        warning(f"Passed with {len(warnings_list)} warning(s)")
+    else:
+        success("All environment checks passed!")
+
+
+@config.command(name="sources")
+def show_sources() -> None:
+    """Show where configuration values are loaded from."""
+    import os
+
+    from example_service.cli.utils import header, section
+
+    header("Configuration Sources")
+
+    # Check for .env files
+    section("Environment Files")
+    env_files = [
+        Path(".env"),
+        Path(".env.local"),
+        Path(".env.development"),
+        Path(".env.production"),
+        Path(".env.test"),
+    ]
+
+    found_files = []
+    for env_file in env_files:
+        if env_file.exists():
+            click.echo(f"  {click.style('FOUND', fg='green')} {env_file}")
+            found_files.append(env_file)
+        else:
+            click.echo(f"  {click.style('--', fg='white', dim=True)} {env_file}")
+
+    # Show current environment
+    section("Active Environment")
+    click.echo(f"  APP_ENVIRONMENT: {os.environ.get('APP_ENVIRONMENT', 'development (default)')}")
+
+    # Show configuration loading order
+    section("Loading Priority (highest to lowest)")
+    click.echo("  1. Environment variables")
+    click.echo("  2. .env.local (if exists)")
+    click.echo("  3. .env.{environment} (if exists)")
+    click.echo("  4. .env (if exists)")
+    click.echo("  5. Default values in code")
+
+    # Show key overrides
+    if found_files:
+        section("Sample Values from Files")
+        for env_file in found_files[:2]:  # Show first 2 files
+            click.echo(f"\n  From {env_file}:")
+            try:
+                with open(env_file) as f:
+                    lines = f.readlines()[:5]  # First 5 lines
+                    for line in lines:
+                        line = line.strip()
+                        if line and not line.startswith("#"):
+                            if "=" in line:
+                                key = line.split("=")[0]
+                                if any(s in key.upper() for s in ["PASSWORD", "SECRET", "TOKEN", "KEY"]):
+                                    click.echo(f"    {key}=***")
+                                else:
+                                    click.echo(f"    {line[:60]}{'...' if len(line) > 60 else ''}")
+            except Exception as e:
+                click.echo(f"    (Error reading file: {e})")
+
+
+@config.command(name="diff")
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default="table",
+    help="Output format",
+)
+def show_diff(output_format: str) -> None:
+    """Compare current configuration with defaults."""
+    import os
+
+    from example_service.cli.utils import header, section
+
+    header("Configuration Differences")
+
+    # Define defaults
+    defaults = {
+        "APP_SERVICE_NAME": "example-service",
+        "APP_ENVIRONMENT": "development",
+        "APP_DEBUG": "false",
+        "APP_HOST": "0.0.0.0",
+        "APP_PORT": "8000",
+        "DB_HOST": "localhost",
+        "DB_PORT": "5432",
+        "DB_POOL_SIZE": "20",
+        "DB_MAX_OVERFLOW": "10",
+        "REDIS_KEY_PREFIX": "example_service:",
+        "REDIS_TTL": "3600",
+        "LOG_LEVEL": "INFO",
+        "OTEL_ENABLED": "false",
+    }
+
+    differences = []
+    same = []
+
+    for key, default in sorted(defaults.items()):
+        current = os.environ.get(key, default)
+        if current != default:
+            differences.append({
+                "key": key,
+                "default": default,
+                "current": current,
+            })
+        else:
+            same.append(key)
+
+    if output_format == "json":
+        click.echo(json.dumps({
+            "differences": differences,
+            "same": same,
+        }, indent=2))
+        return
+
+    if differences:
+        section("Modified from Defaults")
+        for diff in differences:
+            # Mask sensitive values
+            current = diff["current"]
+            if any(s in diff["key"].upper() for s in ["PASSWORD", "SECRET", "TOKEN", "KEY"]):
+                current = "***"
+
+            click.echo(f"  {diff['key']}:")
+            click.echo(f"    Default: {diff['default']}")
+            click.echo(f"    Current: {click.style(current, fg='yellow')}")
+    else:
+        info("No differences from defaults")
+
+    click.echo()
+    info(f"Modified: {len(differences)}, Using defaults: {len(same)}")
