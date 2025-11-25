@@ -111,15 +111,14 @@ def compare_type(
         False if types are the same
         None to use default comparison
     """
+    _ = context, inspected_column, metadata_column
     from sqlalchemy import String, Text
 
     # Handle EncryptedString - compare underlying String type
     if isinstance(metadata_type, EncryptedString):
-        if isinstance(inspected_type, String):
-            # Encrypted values are longer than originals, so don't compare lengths
-            # Just verify the underlying type is compatible
-            return False  # Consider them compatible
-        return True  # Different base types
+        # Encrypted values are longer than originals, so don't compare lengths:
+        # compatibility depends solely on whether the source column is String.
+        return not isinstance(inspected_type, String)
 
     # Handle EncryptedText - compare underlying Text type
     if isinstance(metadata_type, EncryptedText):
@@ -164,11 +163,9 @@ def include_object(
     if type_ == "table" and name is not None and name.startswith("spatial_ref"):
         return False
 
+    _ = reflected, compare_to
     # Skip PostgreSQL system schemas
-    if hasattr(obj, "schema") and obj.schema in ("pg_catalog", "information_schema"):
-        return False
-
-    return True
+    return not (hasattr(obj, "schema") and obj.schema in ("pg_catalog", "information_schema"))
 
 
 # =============================================================================
@@ -229,6 +226,7 @@ def process_revision_directives(
         revision: Revision tuple
         directives: List of migration scripts to process
     """
+    _ = context, revision
     if getattr(config.cmd_opts, "autogenerate", False):
         script = directives[0]
         if script.upgrade_ops.is_empty():

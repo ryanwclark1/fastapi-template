@@ -1,10 +1,25 @@
-"""Health check service."""
+"""Health check service with provider-based architecture.
+
+This service provides health check functionality using a pluggable provider
+architecture. Providers can be registered dynamically at startup, or the
+service can auto-configure based on settings.
+
+Example:
+    >>> # Auto-configured from settings (default behavior)
+    >>> service = HealthService()
+    >>> result = await service.check_health()
+    >>>
+    >>> # With custom aggregator
+    >>> aggregator = HealthAggregator()
+    >>> aggregator.add_provider(DatabaseHealthProvider(engine))
+    >>> service = HealthService(aggregator=aggregator)
+"""
 
 from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from example_service.core.schemas.common import HealthStatus
 from example_service.core.services.base import BaseService
@@ -17,12 +32,8 @@ from example_service.core.settings import (
     get_redis_settings,
 )
 
-app_settings = get_app_settings()
-db_settings = get_db_settings()
-redis_settings = get_redis_settings()
-auth_settings = get_auth_settings()
-rabbit_settings = get_rabbit_settings()
-backup_settings = get_backup_settings()
+if TYPE_CHECKING:
+    from example_service.features.health.aggregator import HealthAggregator
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +41,147 @@ logger = logging.getLogger(__name__)
 class HealthService(BaseService):
     """Service for health checks and status monitoring.
 
-    Provides methods to check the health of the application
-    and its dependencies. Implements Kubernetes-ready health checks
-    with readiness and liveness probes.
+    Provides methods to check the health of the application and its
+    dependencies. Implements Kubernetes-ready health checks with
+    readiness, liveness, and startup probes.
+
+    The service can operate in two modes:
+
+    1. **Aggregator mode** (recommended): Pass a configured HealthAggregator
+       with registered providers for full control over health checks.
+
+    2. **Auto-configure mode** (default): Automatically creates providers
+       based on settings (db, redis, rabbit, etc. with health_checks_enabled).
+
+    Example:
+        >>> # Auto-configure from settings
+        >>> service = HealthService()
+        >>> health = await service.check_health()
+        >>>
+        >>> # Use with custom aggregator
+        >>> from example_service.features.health.aggregator import HealthAggregator
+        >>> from example_service.features.health.providers import DatabaseHealthProvider
+        >>>
+        >>> aggregator = HealthAggregator()
+        >>> aggregator.add_provider(DatabaseHealthProvider(engine))
+        >>> service = HealthService(aggregator=aggregator)
     """
+
+    def __init__(self, aggregator: HealthAggregator | None = None) -> None:
+        """Initialize health service.
+
+        Args:
+            aggregator: Optional pre-configured HealthAggregator.
+                       If None, auto-configures based on settings.
+        """
+        super().__init__()
+        self._aggregator = aggregator
+        self._auto_configured = aggregator is None
+
+        # Load settings
+        self._app_settings = get_app_settings()
+        self._db_settings = get_db_settings()
+        self._redis_settings = get_redis_settings()
+        self._auth_settings = get_auth_settings()
+        self._rabbit_settings = get_rabbit_settings()
+        self._backup_settings = get_backup_settings()
+
+    def _get_aggregator(self) -> HealthAggregator:
+        """Get or create the health aggregator.
+
+        Lazily creates and configures the aggregator on first access
+        if not provided in constructor.
+
+        Returns:
+            Configured HealthAggregator instance
+        """
+        if self._aggregator is not None:
+            return self._aggregator
+
+        # Import here to avoid circular dependencies
+        from example_service.features.health.aggregator import HealthAggregator
+
+        self._aggregator = HealthAggregator()
+        self._configure_providers()
+        return self._aggregator
+
+    def _configure_providers(self) -> None:
+        """Auto-configure health providers based on settings."""
+        if self._aggregator is None:
+            return
+
+        # Database provider
+        if self._db_settings.health_checks_enabled:
+            try:
+                from example_service.features.health.providers import (
+                    DatabaseHealthProvider,
+                )
+                from example_service.infra.database.session import engine
+
+                self._aggregator.add_provider(
+                    DatabaseHealthProvider(
+                        engine=engine,
+                        timeout=self._db_settings.health_check_timeout,
+                    )
+                )
+            except Exception as e:
+                logger.warning(f"Could not configure database health provider: {e}")
+
+        # Redis provider
+        if self._redis_settings.health_checks_enabled:
+            try:
+                from example_service.features.health.providers import (
+                    RedisHealthProvider,
+                )
+                from example_service.infra.cache.redis import get_redis_cache
+
+                cache = get_redis_cache()
+                if cache is not None:
+                    self._aggregator.add_provider(RedisHealthProvider(cache=cache))
+            except Exception as e:
+                logger.warning(f"Could not configure Redis health provider: {e}")
+
+        # RabbitMQ provider
+        if self._rabbit_settings.is_configured:
+            try:
+                from example_service.features.health.providers import (
+                    RabbitMQHealthProvider,
+                )
+
+                self._aggregator.add_provider(
+                    RabbitMQHealthProvider(connection_url=self._rabbit_settings.get_url())
+                )
+            except Exception as e:
+                logger.warning(f"Could not configure RabbitMQ health provider: {e}")
+
+        # External auth service provider
+        if self._auth_settings.service_url and self._auth_settings.health_checks_enabled:
+            try:
+                from example_service.features.health.providers import (
+                    ExternalServiceHealthProvider,
+                )
+
+                self._aggregator.add_provider(
+                    ExternalServiceHealthProvider(
+                        name="auth_service",
+                        base_url=str(self._auth_settings.service_url),
+                    )
+                )
+            except Exception as e:
+                logger.warning(f"Could not configure auth service health provider: {e}")
+
+        # S3 storage provider
+        if self._backup_settings.is_s3_configured:
+            try:
+                from example_service.features.health.providers import (
+                    S3StorageHealthProvider,
+                )
+                from example_service.infra.storage.s3 import S3Client
+
+                s3_client = S3Client(self._backup_settings)
+                self._aggregator.add_provider(S3StorageHealthProvider(s3_client=s3_client))
+            except Exception as e:
+                logger.warning(f"Could not configure S3 health provider: {e}")
 
     async def check_health(self) -> dict[str, Any]:
         """Perform comprehensive health check.
@@ -45,36 +193,70 @@ class HealthService(BaseService):
             Health check result with status, timestamp, and dependency checks.
 
         Example:
-                    service = HealthService()
-            health = await service.check_health()
-            # {
-            #   "status": "healthy",
-            #   "timestamp": "2025-01-01T00:00:00Z",
-            #   "service": "example-service",
-            #   "version": "0.1.0",
-            #   "checks": {"database": true, "cache": true}
-            # }
+            >>> service = HealthService()
+            >>> health = await service.check_health()
+            >>> # {
+            >>> #   "status": "healthy",
+            >>> #   "timestamp": "2025-01-01T00:00:00Z",
+            >>> #   "service": "example-service",
+            >>> #   "version": "0.1.0",
+            >>> #   "checks": {"database": true, "cache": true}
+            >>> # }
         """
-        # Perform all health checks
-        checks = await self._perform_health_checks()
+        aggregator = self._get_aggregator()
+        providers = aggregator.list_providers()
 
-        # Determine overall status
-        all_healthy = all(checks.values())
-        any_healthy = any(checks.values())
+        if not providers:
+            # No providers configured - return basic healthy status
+            return {
+                "status": HealthStatus.HEALTHY.value,
+                "timestamp": datetime.now(UTC),
+                "service": self._app_settings.service_name,
+                "version": "0.1.0",
+                "checks": {},
+            }
 
-        if all_healthy:
-            status = HealthStatus.HEALTHY.value
-        elif any_healthy:
-            status = HealthStatus.DEGRADED.value
-        else:
-            status = HealthStatus.UNHEALTHY.value
+        # Run all health checks via aggregator
+        result = await aggregator.check_all()
 
         return {
-            "status": status,
-            "timestamp": datetime.now(UTC),
-            "service": app_settings.service_name,
+            "status": result.status.value,
+            "timestamp": result.timestamp,
+            "service": self._app_settings.service_name,
             "version": "0.1.0",
-            "checks": checks,
+            "checks": {
+                name: check.status == HealthStatus.HEALTHY
+                for name, check in result.checks.items()
+            },
+        }
+
+    async def check_health_detailed(self) -> dict[str, Any]:
+        """Perform health check with detailed provider information.
+
+        Returns extended health information including latency and
+        messages for each provider.
+
+        Returns:
+            Detailed health check result with per-provider metrics.
+        """
+        aggregator = self._get_aggregator()
+        result = await aggregator.check_all()
+
+        return {
+            "status": result.status.value,
+            "timestamp": result.timestamp,
+            "service": self._app_settings.service_name,
+            "version": "0.1.0",
+            "duration_ms": result.duration_ms,
+            "checks": {
+                name: {
+                    "healthy": check.status == HealthStatus.HEALTHY,
+                    "status": check.status.value,
+                    "message": check.message,
+                    "latency_ms": round(check.latency_ms, 2),
+                }
+                for name, check in result.checks.items()
+            },
         }
 
     async def readiness(self) -> dict[str, Any]:
@@ -85,20 +267,31 @@ class HealthService(BaseService):
         receive traffic.
 
         Critical dependencies must pass for service to be ready:
-        - Database connection
-        - Required external services
+        - Database connection (if configured)
 
         Returns:
             Readiness check result.
 
         Example:
-                    result = await service.readiness()
-            if result["ready"]:
-                # Service can accept traffic
-                pass
+            >>> result = await service.readiness()
+            >>> if result["ready"]:
+            ...     # Service can accept traffic
+            ...     pass
         """
-        checks = await self._perform_readiness_checks()
-        all_ready = all(checks.values())
+        aggregator = self._get_aggregator()
+
+        # For readiness, we only check critical dependencies
+        # Database is critical; cache/messaging are not
+        critical_providers = ["database"]
+        checks: dict[str, bool] = {}
+
+        for name in critical_providers:
+            result = await aggregator.check_provider(name)
+            if result is not None:
+                checks[name] = result.status == HealthStatus.HEALTHY
+
+        # If no critical providers configured, consider ready
+        all_ready = all(checks.values()) if checks else True
 
         return {
             "ready": all_ready,
@@ -112,20 +305,20 @@ class HealthService(BaseService):
         Simple check that service is alive and responsive. Returns 200 if alive.
         Kubernetes uses this to determine if pod should be restarted.
 
-        This should be a lightweight check that only verifies the application
+        This is a lightweight check that only verifies the application
         is running and not deadlocked.
 
         Returns:
             Liveness check result.
 
         Example:
-                    result = await service.liveness()
-            # Always returns {"alive": True} if code executes
+            >>> result = await service.liveness()
+            >>> # Always returns {"alive": True} if code executes
         """
         return {
             "alive": True,
             "timestamp": datetime.now(UTC),
-            "service": app_settings.service_name,
+            "service": self._app_settings.service_name,
         }
 
     async def startup(self) -> dict[str, Any]:
@@ -137,180 +330,20 @@ class HealthService(BaseService):
         Returns:
             Startup check result.
         """
-        # For now, service starts immediately
-        # Add initialization checks here if needed
         return {
             "started": True,
             "timestamp": datetime.now(UTC),
         }
 
-    async def _perform_health_checks(self) -> dict[str, bool]:
-        """Perform all health checks for dependencies.
+    def get_aggregator(self) -> HealthAggregator:
+        """Get the underlying health aggregator.
+
+        Useful for adding custom providers or accessing detailed results.
 
         Returns:
-            Dictionary of check results.
+            The HealthAggregator instance used by this service.
         """
-        checks: dict[str, bool] = {}
+        return self._get_aggregator()
 
-        # Database check (if configured)
-        if db_settings.health_checks_enabled:
-            checks["database"] = await self._check_database()
-        else:
-            checks["database"] = True  # Disabled in settings, assume healthy
 
-        # Cache check (if configured)
-        if redis_settings.health_checks_enabled:
-            checks["cache"] = await self._check_cache()
-        else:
-            checks["cache"] = True  # Disabled, don't fail
-
-        # External services (if configured)
-        if auth_settings.service_url and auth_settings.health_checks_enabled:
-            checks["auth_service"] = await self._check_external_service(
-                "auth",
-                str(auth_settings.service_url),
-            )
-        else:
-            checks["auth_service"] = True
-
-        # Messaging check (if configured)
-        if rabbit_settings.is_configured:
-            checks["messaging"] = await self._check_messaging()
-        else:
-            checks["messaging"] = True  # Not configured, don't fail
-
-        # Storage check (if configured)
-        if backup_settings.is_s3_configured:
-            checks["storage"] = await self._check_storage()
-        else:
-            checks["storage"] = True  # Not configured, don't fail
-
-        return checks
-
-    async def _perform_readiness_checks(self) -> dict[str, bool]:
-        """Perform readiness checks for critical dependencies.
-
-        Returns:
-            Dictionary of readiness check results.
-        """
-        checks: dict[str, bool] = {}
-
-        # Database is critical for readiness
-        if db_settings.health_checks_enabled:
-            checks["database"] = await self._check_database()
-        else:
-            checks["database"] = True
-
-        # Cache is not critical (service can run without it)
-        # External services depend on your requirements
-
-        return checks
-
-    async def _check_database(self) -> bool:
-        """Check database connectivity.
-
-        Uses health_check_timeout from PostgresSettings to limit check duration.
-
-        Returns:
-            True if database is accessible, False otherwise.
-        """
-        try:
-            # Import here to avoid circular dependencies
-            import asyncio
-
-            from sqlalchemy import text
-
-            from example_service.infra.database.session import engine
-
-            async with asyncio.timeout(db_settings.health_check_timeout):
-                async with engine.connect() as conn:
-                    await conn.execute(text("SELECT 1"))
-            return True
-        except TimeoutError:
-            logger.error(
-                "Database health check timed out",
-                extra={"timeout": db_settings.health_check_timeout},
-            )
-            return False
-        except Exception as e:
-            logger.error(f"Database health check failed: {e}", extra={"exception": str(e)})
-            return False
-
-    async def _check_cache(self) -> bool:
-        """Check cache connectivity.
-
-        Returns:
-            True if cache is accessible, False otherwise.
-        """
-        try:
-            from example_service.infra.cache.redis import get_cache
-
-            async for cache in get_cache():
-                return await cache.health_check()
-            return False
-        except Exception as e:
-            logger.error(f"Cache health check failed: {e}", extra={"exception": str(e)})
-            return False
-
-    async def _check_external_service(self, name: str, url: str) -> bool:
-        """Check external service health.
-
-        Args:
-            name: Service name for logging.
-            url: Service URL.
-
-        Returns:
-            True if service is healthy, False otherwise.
-        """
-        try:
-            import httpx
-
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(f"{url}/health", follow_redirects=True)
-                return response.status_code == 200
-        except Exception as e:
-            logger.warning(
-                f"External service {name} health check failed: {e}",
-                extra={"service": name, "url": url, "exception": str(e)},
-            )
-            return False
-
-    async def _check_messaging(self) -> bool:
-        """Check messaging broker (RabbitMQ) connectivity.
-
-        Returns:
-            True if messaging broker is accessible, False otherwise.
-        """
-        try:
-            import aio_pika
-
-            connection = await aio_pika.connect_robust(rabbit_settings.get_url(), timeout=5.0)
-            await connection.close()
-            return True
-        except Exception as e:
-            logger.warning(
-                f"Messaging health check failed: {e}",
-                extra={"exception": str(e)},
-            )
-            return False
-
-    async def _check_storage(self) -> bool:
-        """Check storage (S3) connectivity.
-
-        Returns:
-            True if storage is accessible, False otherwise.
-        """
-        try:
-            from example_service.infra.storage.s3 import S3Client
-
-            client = S3Client(backup_settings)
-            # Try to list objects with a limit to verify connectivity
-            # This is a lightweight operation that confirms S3 access
-            await client.list_objects(prefix="", max_keys=1)
-            return True
-        except Exception as e:
-            logger.warning(
-                f"Storage health check failed: {e}",
-                extra={"exception": str(e)},
-            )
-            return False
+__all__ = ["HealthService"]

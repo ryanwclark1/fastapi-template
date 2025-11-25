@@ -8,6 +8,11 @@ import time
 from typing import TYPE_CHECKING
 
 from example_service.core.exceptions import RateLimitException
+from example_service.infra.metrics.tracking import (
+    track_rate_limit_check,
+    track_rate_limit_hit,
+    update_rate_limit_remaining,
+)
 
 if TYPE_CHECKING:
     from redis.asyncio import Redis
@@ -80,6 +85,7 @@ class RateLimiter:
         limit: int | None = None,
         window: int | None = None,
         cost: int = 1,
+        endpoint: str = "unknown",
     ) -> tuple[bool, dict[str, int]]:
         """Check if request is within rate limit using token bucket algorithm.
 
@@ -91,6 +97,7 @@ class RateLimiter:
             limit: Number of requests allowed per window (uses default if None).
             window: Time window in seconds (uses default if None).
             cost: Number of tokens to consume (default: 1).
+            endpoint: API endpoint being rate limited (default: "unknown").
 
         Returns:
             Tuple of (is_allowed, metadata) where metadata contains:
@@ -166,7 +173,15 @@ class RateLimiter:
                 "retry_after": window if not allowed else 0,
             }
 
+            # Track rate limit check
+            track_rate_limit_check(endpoint=endpoint, allowed=allowed)
+
+            # Update remaining tokens gauge
+            update_rate_limit_remaining(key=key, endpoint=endpoint, remaining=remaining)
+
             if not allowed:
+                # Track rate limit hit
+                track_rate_limit_hit(endpoint=endpoint, limit_type="key")
                 logger.warning(
                     "Rate limit exceeded",
                     extra={
@@ -272,6 +287,7 @@ async def check_rate_limit(
     limit: int | None = None,
     window: int | None = None,
     cost: int = 1,
+    endpoint: str = "unknown",
 ) -> dict[str, int]:
     """Check rate limit and raise exception if exceeded.
 
@@ -284,6 +300,7 @@ async def check_rate_limit(
         limit: Number of requests allowed per window.
         window: Time window in seconds.
         cost: Number of tokens to consume.
+        endpoint: API endpoint being rate limited (default: "unknown").
 
     Returns:
         Metadata dict containing limit, remaining, reset, and retry_after.
@@ -299,7 +316,7 @@ async def check_rate_limit(
             # Handle rate limit error
             pass
     """
-    allowed, metadata = await limiter.check_limit(key, limit, window, cost)
+    allowed, metadata = await limiter.check_limit(key, limit, window, cost, endpoint)
 
     if not allowed:
         raise RateLimitException(

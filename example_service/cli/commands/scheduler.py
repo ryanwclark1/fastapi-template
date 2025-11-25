@@ -7,8 +7,13 @@ This module provides CLI commands for managing APScheduler jobs:
 - View scheduler status
 """
 
+from __future__ import annotations
+
+import asyncio
+import inspect
 import sys
 from datetime import UTC, datetime
+from typing import Any
 
 import click
 
@@ -102,6 +107,17 @@ async def list_jobs(output_format: str) -> None:
         sys.exit(1)
 
 
+async def _wait_for_task_result(result: Any) -> Any | None:
+    """Best-effort wait for Taskiq AsyncResult objects."""
+    wait_callable = getattr(result, "wait_result", None)
+    if callable(wait_callable):
+        waited = wait_callable()
+        if inspect.isawaitable(waited):
+            return await waited
+        return waited
+    return None
+
+
 @scheduler.command(name="run")
 @click.argument("job_id")
 @click.option(
@@ -153,7 +169,6 @@ async def run_job(job_id: str, wait: bool) -> None:
 
             try:
                 # Call the job function (which may enqueue a Taskiq task)
-                import asyncio
                 if asyncio.iscoroutinefunction(job_func):
                     result = await job_func()
                 else:
@@ -161,8 +176,14 @@ async def run_job(job_id: str, wait: bool) -> None:
 
                 success("Job triggered successfully!")
 
+                awaited_payload = None
+                if wait:
+                    awaited_payload = await _wait_for_task_result(result)
+
                 if result is not None:
                     click.echo(f"  Result: {result}")
+                if awaited_payload is not None:
+                    click.echo(f"  Wait Result: {awaited_payload}")
 
             finally:
                 if broker is not None:

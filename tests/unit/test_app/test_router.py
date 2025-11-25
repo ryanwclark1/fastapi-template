@@ -20,7 +20,7 @@ def _prepare_base(monkeypatch: pytest.MonkeyPatch, settings: SimpleNamespace) ->
     monkeypatch.setattr(router_module, "get_app_settings", lambda: settings)
     monkeypatch.setattr(router_module, "metrics_router", object())
     monkeypatch.setattr(router_module, "reminders_router", object())
-    monkeypatch.setattr(router_module, "status_router", object())
+    monkeypatch.setattr(router_module, "health_router", object())
     monkeypatch.setattr(router_module, "admin_router", object())
 
 
@@ -35,7 +35,7 @@ def test_setup_routers_without_rabbit(monkeypatch: pytest.MonkeyPatch, settings:
     assert app.include_router.call_args_list == [
         call(router_module.metrics_router, tags=["observability"]),
         call(router_module.reminders_router, prefix="/api", tags=["reminders"]),
-        call(router_module.status_router, prefix="/api", tags=["health"]),
+        call(router_module.health_router, prefix="/api", tags=["health"]),
         call(router_module.admin_router, prefix="/api", tags=["Admin"]),
     ]
 

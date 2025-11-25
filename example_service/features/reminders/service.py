@@ -32,7 +32,17 @@ class ReminderService(BaseService):
         """Create and persist a new reminder from user input."""
         reminder = Reminder(**payload.model_dump())
         created = await self._repository.create(self._session, reminder)
-        self.logger.debug("Created reminder", extra={"reminder_id": str(created.id)})
+
+        # INFO level - business event (audit trail)
+        self.logger.info(
+            "Reminder created",
+            extra={
+                "reminder_id": str(created.id),
+                "title": payload.title[:50] if payload.title else None,
+                "has_remind_at": payload.remind_at is not None,
+                "operation": "service.create_reminder",
+            },
+        )
         return created
 
     async def list_reminders(self, *, limit: int = 100, offset: int = 0) -> list[Reminder]:
@@ -42,19 +52,56 @@ class ReminderService(BaseService):
             limit=limit,
             offset=offset,
         )
-        return list(reminders)
+        result = list(reminders)
+
+        # DEBUG level - routine list operation
+        self._lazy.debug(
+            lambda: f"service.list_reminders(limit={limit}, offset={offset}) -> {len(result)} items"
+        )
+        return result
 
     async def get_reminder(self, reminder_id: UUID) -> Reminder | None:
         """Fetch a reminder by id without raising if it is missing."""
-        return await self._repository.get(self._session, reminder_id)
+        reminder = await self._repository.get(self._session, reminder_id)
+
+        # DEBUG level - routine get
+        self._lazy.debug(
+            lambda: f"service.get_reminder({reminder_id}) -> {'found' if reminder else 'not found'}"
+        )
+        return reminder
 
     async def mark_completed(self, reminder_id: UUID) -> Reminder | None:
         """Mark a reminder as completed if it exists."""
-        return await self._repository.mark_completed(self._session, reminder_id)
+        result = await self._repository.mark_completed(self._session, reminder_id)
+
+        if result:
+            # INFO level - state transition (business event)
+            self.logger.info(
+                "Reminder marked completed",
+                extra={"reminder_id": str(reminder_id), "operation": "service.mark_completed"},
+            )
+        else:
+            # DEBUG level - expected "not found" case
+            self._lazy.debug(
+                lambda: f"service.mark_completed({reminder_id}) -> not found"
+            )
+        return result
 
     async def mark_notification_sent(self, reminder_id: UUID) -> Reminder | None:
         """Mark that a reminder's notification has been sent."""
-        return await self._repository.mark_notification_sent(self._session, reminder_id)
+        result = await self._repository.mark_notification_sent(self._session, reminder_id)
+
+        if result:
+            # INFO level - notification lifecycle event
+            self.logger.info(
+                "Notification sent for reminder",
+                extra={"reminder_id": str(reminder_id), "operation": "service.mark_notification_sent"},
+            )
+        else:
+            self._lazy.debug(
+                lambda: f"service.mark_notification_sent({reminder_id}) -> not found"
+            )
+        return result
 
 
 __all__ = ["ReminderService"]

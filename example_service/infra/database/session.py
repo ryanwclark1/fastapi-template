@@ -59,6 +59,7 @@ AsyncSessionLocal = async_sessionmaker(
 @event.listens_for(engine.sync_engine.pool, "connect")
 def _receive_connect(dbapi_conn, connection_record):
     """Increment active connections when a new connection is established."""
+    _ = dbapi_conn, connection_record
     database_connections_active.inc()
     logger.debug("Database connection established")
 
@@ -66,6 +67,7 @@ def _receive_connect(dbapi_conn, connection_record):
 @event.listens_for(engine.sync_engine.pool, "close")
 def _receive_close(dbapi_conn, connection_record):
     """Decrement active connections when a connection is closed."""
+    _ = dbapi_conn, connection_record
     database_connections_active.dec()
     logger.debug("Database connection closed")
 
@@ -74,12 +76,14 @@ def _receive_close(dbapi_conn, connection_record):
 @event.listens_for(engine.sync_engine, "before_cursor_execute")
 def _before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
     """Record query start time before execution."""
+    _ = conn, cursor, statement, parameters, executemany
     context._query_start_time = time.perf_counter()
 
 
 @event.listens_for(engine.sync_engine, "after_cursor_execute")
 def _after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
     """Record query duration and link to current trace via exemplar."""
+    _ = conn, cursor, parameters, executemany
     # Calculate duration
     duration = time.perf_counter() - context._query_start_time
 

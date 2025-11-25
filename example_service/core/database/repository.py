@@ -25,6 +25,7 @@ Example:
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -33,6 +34,7 @@ from sqlalchemy import delete as sql_delete
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from example_service.core.database.exceptions import NotFoundError
+from example_service.infra.logging import get_lazy_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -114,7 +116,7 @@ class BaseRepository[T]:
                 return result.scalars().all()
     """
 
-    __slots__ = ("model",)
+    __slots__ = ("model", "_logger", "_lazy")
 
     def __init__(self, model: type[T]) -> None:
         """Initialize repository with model class.
@@ -123,6 +125,10 @@ class BaseRepository[T]:
             model: SQLAlchemy model class (e.g., User, Post)
         """
         self.model = model
+        # Standard logger for INFO/WARNING/ERROR
+        self._logger = logging.getLogger(f"repository.{model.__name__}")
+        # Lazy logger for DEBUG (zero overhead when DEBUG disabled)
+        self._lazy = get_lazy_logger(f"repository.{model.__name__}")
 
     async def get(
         self,
@@ -149,8 +155,14 @@ class BaseRepository[T]:
         if options:
             stmt = select(self.model).where(self._pk_attr() == id).options(*options)
             result = await session.execute(stmt)
-            return result.scalar_one_or_none()
-        return await session.get(self.model, id)
+            instance = result.scalar_one_or_none()
+        else:
+            instance = await session.get(self.model, id)
+
+        self._lazy.debug(
+            lambda: f"db.get: {self.model.__name__}({id}) -> {'found' if instance else 'not found'}"
+        )
+        return instance
 
     async def get_or_raise(
         self,
@@ -174,6 +186,10 @@ class BaseRepository[T]:
         """
         instance = await self.get(session, id, options=options)
         if instance is None:
+            self._logger.info(
+                "Entity not found",
+                extra={"entity": self.model.__name__, "id": str(id), "operation": "db.get_or_raise"},
+            )
             raise NotFoundError(self.model.__name__, {"id": id})
         return instance
 
@@ -203,7 +219,12 @@ class BaseRepository[T]:
         if options:
             stmt = stmt.options(*options)
         result = await session.execute(stmt)
-        return result.scalar_one_or_none()
+        instance = result.scalar_one_or_none()
+
+        self._lazy.debug(
+            lambda: f"db.get_by: {self.model.__name__}.{attr.key}={value!r} -> {'found' if instance else 'not found'}"
+        )
+        return instance
 
     async def list(
         self,
@@ -228,7 +249,12 @@ class BaseRepository[T]:
         if options:
             stmt = stmt.options(*options)
         result = await session.execute(stmt)
-        return result.scalars().all()
+        items = result.scalars().all()
+
+        self._lazy.debug(
+            lambda: f"db.list: {self.model.__name__}(limit={limit}, offset={offset}) -> {len(items)} items"
+        )
+        return items
 
     async def search(
         self,
@@ -273,7 +299,11 @@ class BaseRepository[T]:
         result = await session.execute(paginated)
         items = result.scalars().all()
 
-        return SearchResult(items=items, total=total, limit=limit, offset=offset)
+        search_result = SearchResult(items=items, total=total, limit=limit, offset=offset)
+        self._lazy.debug(
+            lambda: f"db.search: {self.model.__name__}(limit={limit}, offset={offset}) -> {len(items)}/{total} items, page {search_result.page}/{search_result.pages}"
+        )
+        return search_result
 
     async def create(self, session: AsyncSession, instance: T) -> T:
         """Persist a new entity.
@@ -291,6 +321,11 @@ class BaseRepository[T]:
         session.add(instance)
         await session.flush()
         await session.refresh(instance)
+
+        entity_id = getattr(instance, "id", None)
+        self._lazy.debug(
+            lambda: f"db.create: {self.model.__name__}(id={entity_id})"
+        )
         return instance
 
     async def create_many(self, session: AsyncSession, instances: Iterable[T]) -> Sequence[T]:
@@ -308,6 +343,10 @@ class BaseRepository[T]:
         await session.flush()
         for instance in instances_list:
             await session.refresh(instance)
+
+        self._lazy.debug(
+            lambda: f"db.create_many: {self.model.__name__} -> {len(instances_list)} created"
+        )
         return instances_list
 
     async def delete(self, session: AsyncSession, instance: T) -> None:
@@ -317,8 +356,14 @@ class BaseRepository[T]:
             session: Database session
             instance: Entity to delete
         """
+        entity_id = getattr(instance, "id", None)
         await session.delete(instance)
         await session.flush()
+
+        self._logger.info(
+            "Entity deleted",
+            extra={"entity": self.model.__name__, "id": str(entity_id), "operation": "db.delete"},
+        )
 
     async def update_many(
         self,
@@ -348,6 +393,10 @@ class BaseRepository[T]:
         await session.flush()
         for instance in instances_list:
             await session.refresh(instance)
+
+        self._lazy.debug(
+            lambda: f"db.update_many: {self.model.__name__} -> {len(instances_list)} updated"
+        )
         return instances_list
 
     async def delete_many(
@@ -379,7 +428,24 @@ class BaseRepository[T]:
         stmt = sql_delete(self.model).where(pk_attr.in_(ids_list))
         result = await session.execute(stmt)
         await session.flush()
-        return result.rowcount  # type: ignore[return-value]
+        deleted_count: int = result.rowcount  # type: ignore[assignment]
+
+        # WARNING level for bulk deletes > 10 (audit-worthy)
+        if deleted_count > 10:
+            self._logger.warning(
+                "Bulk delete executed",
+                extra={
+                    "entity": self.model.__name__,
+                    "requested": len(ids_list),
+                    "deleted": deleted_count,
+                    "operation": "db.delete_many",
+                },
+            )
+        else:
+            self._lazy.debug(
+                lambda: f"db.delete_many: {self.model.__name__} -> {deleted_count} deleted"
+            )
+        return deleted_count
 
     async def upsert_many(
         self,
@@ -450,7 +516,11 @@ class BaseRepository[T]:
         await session.flush()
 
         # Scalars returns model instances when using RETURNING
-        return list(result.scalars().all())
+        upserted = list(result.scalars().all())
+        self._lazy.debug(
+            lambda: f"db.upsert_many: {self.model.__name__}(conflict={conflict_columns}) -> {len(upserted)} upserted"
+        )
+        return upserted
 
     async def bulk_create(
         self,
@@ -504,6 +574,17 @@ class BaseRepository[T]:
             total_inserted += len(batch)
 
         await session.flush()
+
+        # INFO level for bulk inserts (important data operation)
+        self._logger.info(
+            "Bulk create completed",
+            extra={
+                "entity": self.model.__name__,
+                "count": total_inserted,
+                "batch_size": batch_size,
+                "operation": "db.bulk_create",
+            },
+        )
         return total_inserted
 
     def _pk_attr(self) -> InstrumentedAttribute[Any]:

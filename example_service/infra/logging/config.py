@@ -173,6 +173,8 @@ def configure_logging(
         )
     """
     global _log_queue, _listener
+    if kwargs:
+        logger.debug("Unused logging kwargs supplied: %s", ", ".join(sorted(kwargs.keys())))
 
     # Enable Python warnings capture if requested
     if capture_warnings:
@@ -316,7 +318,6 @@ def _configure_with_dictconfig(
 
     # Now set up QueueHandler + QueueListener pattern
     _setup_queue_logging(
-        handlers_config=handlers_config,
         console_enabled=console_enabled,
         file_path=file_path,
         console_level=console_level,
@@ -483,7 +484,6 @@ def _build_handlers_config(
 
 
 def _setup_queue_logging(
-    handlers_config: dict[str, Any],
     console_enabled: bool,
     file_path: Path | None,
     console_level: str,
@@ -501,7 +501,6 @@ def _setup_queue_logging(
     and configures the root logger with a QueueHandler.
 
     Args:
-        handlers_config: Handlers metadata (unused, kept for signature).
         console_enabled: Enable console handler.
         file_path: File path or None.
         console_level: Console handler level.

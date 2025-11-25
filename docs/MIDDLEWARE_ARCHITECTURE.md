@@ -24,7 +24,7 @@ The application uses a carefully designed middleware stack to handle cross-cutti
 - **Logging**: Detailed request/response logging with PII masking
 - **API Documentation**: CORS configuration for development and production
 
-The middleware stack consists of **7 middleware layers** (6 custom + CORS), each serving a specific purpose and positioned strategically in the execution chain.
+The middleware stack consists of **8 middleware layers** (7 custom + CORS), each serving a specific purpose and positioned strategically in the execution chain.
 
 ## Middleware Stack
 
@@ -57,21 +57,70 @@ Checks Content-Length header and rejects oversized requests before reading the b
 
 Protects against XSS, clickjacking, MIME sniffing, and other OWASP Top 10 risks.
 
-### 5. Request ID Middleware
+### 5. Correlation ID Middleware
 **Type**: Pure ASGI
-**Purpose**: Generate/extract unique request IDs for distributed tracing
+**Purpose**: Track transactions across multiple services in distributed systems
+**Configuration**: Always enabled
+**Header**: `X-Correlation-ID`
+
+Extracts or generates correlation IDs for end-to-end tracing across service boundaries. The correlation ID remains constant as a request flows through multiple services (Service A → B → C), enabling transaction-level debugging.
+
+**Key Characteristics:**
+- **Scope**: Transaction-level (multiple services)
+- **Persistence**: Propagated across all services in the call chain
+- **Use Case**: Understanding the complete flow of a business transaction
+- **Example**: User places order → Inventory Service → Payment Service → Notification Service (all share same correlation ID)
+
+### 6. Request ID Middleware
+**Type**: Pure ASGI
+**Purpose**: Generate unique request IDs for individual HTTP requests
 **Configuration**: `LoggingSettings.include_request_id`
+**Header**: `X-Request-ID`
 
-Sets request ID in logging context immediately, making it available to all downstream middleware and handlers.
+Generates or extracts request IDs for per-hop tracking within this service. Each HTTP request gets a unique request ID, even if they share the same correlation ID.
 
-### 6. Request Logging Middleware (Debug Only)
+**Key Characteristics:**
+- **Scope**: Request-level (single service hop)
+- **Persistence**: Unique per HTTP request
+- **Use Case**: Debugging issues within a specific service
+- **Example**: Each API call gets its own request ID, even in the same transaction
+
+### Correlation ID vs Request ID
+
+Understanding the distinction is crucial for effective distributed tracing:
+
+| Aspect | Correlation ID | Request ID |
+|--------|---------------|------------|
+| **Scope** | Transaction (multiple services) | Request (single service) |
+| **Lifespan** | Entire business transaction | Single HTTP request |
+| **Generation** | Once at transaction start | Every HTTP request |
+| **Propagation** | Across service boundaries | Within service only |
+| **Use Case** | End-to-end transaction tracing | Per-service debugging |
+
+**Example Flow:**
+
+```
+Client makes order request
+  ├─ Service A: Correlation ID=abc123, Request ID=req-001
+  │   └─ Calls Service B
+  │       ├─ Service B: Correlation ID=abc123, Request ID=req-002
+  │       └─ Calls Service C
+  │           └─ Service C: Correlation ID=abc123, Request ID=req-003
+  │
+  └─ Client retries part of the transaction
+      └─ Service A: Correlation ID=abc123, Request ID=req-004 (new!)
+```
+
+All requests share `correlation_id=abc123` (same transaction), but each has a unique request ID.
+
+### 7. Request Logging Middleware (Debug Only)
 **Type**: BaseHTTPMiddleware
 **Purpose**: Detailed request/response logging with PII masking
 **Configuration**: Enabled when `debug=True` or `log_level=DEBUG`
 
-Logs HTTP details while automatically masking sensitive information (emails, tokens, credit cards, etc.).
+Logs HTTP details while automatically masking sensitive information (emails, tokens, credit cards, etc.). Now includes both correlation_id and request_id in log entries.
 
-### 7. Metrics Middleware
+### 8. Metrics Middleware
 **Type**: BaseHTTPMiddleware
 **Purpose**: Collect Prometheus metrics with trace correlation
 **Configuration**: `OtelSettings.is_configured`
@@ -90,9 +139,10 @@ Records request counts, durations, and in-progress gauges. Links metrics to trac
 2. Rate Limit (optional)   # Early rejection for DDoS
 3. Request Size Limit      # Early rejection for large payloads
 4. Security Headers        # Add security headers to all responses
-5. Request ID              # Generate ID, set logging context
-6. Request Logging         # Detailed logging (requires request_id)
-7. Metrics                 # Innermost - closest to route handlers
+5. Correlation ID          # Transaction-level tracking (sets correlation_id)
+6. Request ID              # Request-level tracking (sets request_id)
+7. Request Logging         # Detailed logging (requires both IDs)
+8. Metrics                 # Innermost - closest to route handlers
 ```
 
 ### Execution Flow (Request Path)

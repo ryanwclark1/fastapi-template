@@ -116,6 +116,7 @@ class EncryptedString(TypeDecorator):
         Returns:
             Encrypted value or None
         """
+        _ = dialect
         if value is None:
             return None
 
@@ -138,6 +139,7 @@ class EncryptedString(TypeDecorator):
         Returns:
             Decrypted plain text or None
         """
+        _ = dialect
         if value is None:
             return None
 

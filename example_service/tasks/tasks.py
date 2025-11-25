@@ -102,7 +102,10 @@ async def send_email_task(
     Returns:
         Send status.
     """
-    logger.info("Sending email", extra={"to": to, "subject": subject})
+    logger.info(
+        "Sending email",
+        extra={"to": to, "subject": subject, "body_length": len(body)},
+    )
 
     try:
         # TODO: Implement email sending logic

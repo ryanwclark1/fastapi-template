@@ -91,7 +91,7 @@ async def export_data(
         module = importlib.import_module(module_path)
         Model = getattr(module, class_name)
 
-        from sqlalchemy import inspect, select
+        from sqlalchemy import inspect, select, text
 
         from example_service.infra.database import get_session
 
@@ -101,6 +101,8 @@ async def export_data(
 
             if limit:
                 stmt = stmt.limit(limit)
+            if where:
+                stmt = stmt.where(text(where))
 
             # Execute query
             result = await session.execute(stmt)

@@ -96,6 +96,15 @@ from example_service.infra.logging.lazy import (
     get_lazy_logger,
     lazy,
 )
+from example_service.infra.logging.operations import (
+    OperationContext,
+    log_db_operation,
+    log_endpoint,
+    log_operation,
+    log_service_op,
+    operation_context,
+    operation_context_sync,
+)
 from example_service.infra.logging.opt import OptLoggerAdapter, get_opt_logger
 from example_service.infra.logging.sampling import (
     RateLimitFilter,
@@ -166,4 +175,12 @@ __all__ = [
     "SamplingFilter",
     "RateLimitFilter",
     "create_sampling_config",
+    # Operation logging decorators and helpers
+    "log_operation",
+    "log_db_operation",
+    "log_service_op",
+    "log_endpoint",
+    "operation_context",
+    "operation_context_sync",
+    "OperationContext",
 ]

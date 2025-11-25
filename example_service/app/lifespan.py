@@ -110,6 +110,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     Yields:
         None during application runtime.
     """
+    _ = app  # Reserved for future FastAPI state hooks
     # Load settings (cached after first call)
     app_settings = get_app_settings()
     db_settings = get_db_settings()

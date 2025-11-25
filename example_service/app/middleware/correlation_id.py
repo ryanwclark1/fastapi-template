@@ -100,6 +100,7 @@ class CorrelationIDMiddleware(HeaderContextMiddleware):
             value: The correlation ID.
             was_generated: True if generated, False if from upstream.
         """
+        _ = scope
         if was_generated:
             logger.debug(
                 f"Generated new correlation ID: {value}",
@@ -118,6 +119,7 @@ class CorrelationIDMiddleware(HeaderContextMiddleware):
             scope: ASGI connection scope.
             value: The correlation ID being added.
         """
+        _ = scope
         logger.debug(
             f"Added correlation ID to response: {value}",
             extra={"correlation_id": value},

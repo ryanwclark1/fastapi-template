@@ -11,6 +11,12 @@ from functools import wraps
 from typing import Any, TypeVar
 
 from example_service.core.exceptions import CircuitBreakerOpenException
+from example_service.infra.metrics.tracking import (
+    track_circuit_breaker_failure,
+    track_circuit_breaker_state_change,
+    track_circuit_breaker_success,
+    update_circuit_breaker_state,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +107,9 @@ class CircuitBreaker:
         self._half_open_calls = 0
         self._lock = asyncio.Lock()
 
+        # Initialize metrics
+        update_circuit_breaker_state(self.name, self._state.value)
+
         logger.info(
             f"Circuit breaker '{name}' initialized",
             extra={
@@ -128,8 +137,13 @@ class CircuitBreaker:
                 f"Circuit breaker '{self.name}' transitioning to HALF_OPEN",
                 extra={"recovery_timeout": self.recovery_timeout},
             )
+            old_state = self._state.value
             self._state = CircuitState.HALF_OPEN
             self._half_open_calls = 0
+
+            # Track state change
+            track_circuit_breaker_state_change(self.name, old_state, self._state.value)
+            update_circuit_breaker_state(self.name, self._state.value)
 
         return self._state
 
@@ -219,6 +233,9 @@ class CircuitBreaker:
     async def _on_success(self) -> None:
         """Handle successful call."""
         async with self._lock:
+            # Track success
+            track_circuit_breaker_success(self.name)
+
             if self._state == CircuitState.HALF_OPEN:
                 self._success_count += 1
                 logger.info(
@@ -247,6 +264,9 @@ class CircuitBreaker:
             self._failure_count += 1
             self._last_failure_time = time.time()
 
+            # Track failure
+            track_circuit_breaker_failure(self.name)
+
             logger.warning(
                 f"Circuit breaker '{self.name}' recorded failure",
                 extra={
@@ -267,8 +287,14 @@ class CircuitBreaker:
 
     def _open_circuit(self) -> None:
         """Transition circuit to OPEN state."""
+        old_state = self._state.value
         self._state = CircuitState.OPEN
         self._success_count = 0
+
+        # Track state change
+        track_circuit_breaker_state_change(self.name, old_state, self._state.value)
+        update_circuit_breaker_state(self.name, self._state.value)
+
         logger.error(
             f"Circuit breaker '{self.name}' opened",
             extra={
@@ -279,10 +305,16 @@ class CircuitBreaker:
 
     def _close_circuit(self) -> None:
         """Transition circuit to CLOSED state."""
+        old_state = self._state.value
         self._state = CircuitState.CLOSED
         self._failure_count = 0
         self._success_count = 0
         self._half_open_calls = 0
+
+        # Track state change
+        track_circuit_breaker_state_change(self.name, old_state, self._state.value)
+        update_circuit_breaker_state(self.name, self._state.value)
+
         logger.info(f"Circuit breaker '{self.name}' closed")
 
     async def reset(self) -> None:

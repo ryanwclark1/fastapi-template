@@ -164,6 +164,7 @@ class RateLimitMiddleware:
                 key=limit_key,
                 limit=self.default_limit,
                 window=self.default_window,
+                endpoint=path,
             )
 
             if not allowed:

@@ -118,9 +118,14 @@ if taskiq_broker is not None:
         Returns:
             Action result
         """
+        payload_keys = sorted(payload.keys())
         logger.info(
             f"Handling action '{action}' for user {user_id}",
-            extra={"user_id": user_id, "action": action},
+            extra={
+                "user_id": user_id,
+                "action": action,
+                "payload_keys": payload_keys,
+            },
         )
 
         try:
@@ -165,7 +170,10 @@ if taskiq_broker is not None:
             task_type: Type of completed task
             result: Task result
         """
-        logger.info(f"Sending completion notification to user {user_id}")
+        logger.info(
+            f"Sending completion notification to user {user_id}",
+            extra={"task_type": task_type, "result_status": result.get("status")},
+        )
 
         try:
             # TODO: Send notification (email, push, etc.)

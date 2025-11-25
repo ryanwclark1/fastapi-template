@@ -66,7 +66,12 @@ class ReminderRepository(BaseRepository[Reminder]):
             .offset(offset)
         )
         result = await session.execute(stmt)
-        return result.scalars().all()
+        items = result.scalars().all()
+
+        self._lazy.debug(
+            lambda: f"db.find_pending: Reminder(limit={limit}, offset={offset}) -> {len(items)} items"
+        )
+        return items
 
     async def find_overdue(
         self,
@@ -94,7 +99,21 @@ class ReminderRepository(BaseRepository[Reminder]):
             .order_by(Reminder.remind_at.asc())
         )
         result = await session.execute(stmt)
-        return result.scalars().all()
+        items = result.scalars().all()
+
+        # INFO level when overdue reminders found (actionable condition)
+        if items:
+            self._logger.info(
+                "Found overdue reminders",
+                extra={
+                    "count": len(items),
+                    "as_of": now.isoformat(),
+                    "operation": "db.find_overdue",
+                },
+            )
+        else:
+            self._lazy.debug(lambda: f"db.find_overdue: no overdue reminders as of {now}")
+        return items
 
     async def find_pending_notifications(
         self,
@@ -123,7 +142,12 @@ class ReminderRepository(BaseRepository[Reminder]):
             .order_by(Reminder.remind_at.asc())
         )
         result = await session.execute(stmt)
-        return result.scalars().all()
+        items = result.scalars().all()
+
+        self._lazy.debug(
+            lambda: f"db.find_pending_notifications: {len(items)} pending as of {now}"
+        )
+        return items
 
     async def search_reminders(
         self,
@@ -177,7 +201,14 @@ class ReminderRepository(BaseRepository[Reminder]):
             Reminder.created_at.desc(),
         )
 
-        return await self.search(session, stmt, limit=limit, offset=offset)
+        search_result = await self.search(session, stmt, limit=limit, offset=offset)
+
+        # DEBUG level - search context (useful for debugging search issues)
+        self._lazy.debug(
+            lambda: f"db.search_reminders: query={query!r}, include_completed={include_completed}, "
+            f"before={before}, after={after} -> {len(search_result.items)}/{search_result.total}"
+        )
+        return search_result
 
     async def mark_completed(
         self,
@@ -195,11 +226,18 @@ class ReminderRepository(BaseRepository[Reminder]):
         """
         reminder = await self.get(session, reminder_id)
         if reminder is None:
+            self._lazy.debug(
+                lambda: f"db.mark_completed({reminder_id}) -> not found"
+            )
             return None
 
         reminder.is_completed = True
         await session.flush()
         await session.refresh(reminder)
+
+        self._lazy.debug(
+            lambda: f"db.mark_completed({reminder_id}) -> success"
+        )
         return reminder
 
     async def mark_notification_sent(
@@ -218,11 +256,18 @@ class ReminderRepository(BaseRepository[Reminder]):
         """
         reminder = await self.get(session, reminder_id)
         if reminder is None:
+            self._lazy.debug(
+                lambda: f"db.mark_notification_sent({reminder_id}) -> not found"
+            )
             return None
 
         reminder.notification_sent = True
         await session.flush()
         await session.refresh(reminder)
+
+        self._lazy.debug(
+            lambda: f"db.mark_notification_sent({reminder_id}) -> success"
+        )
         return reminder
 
 

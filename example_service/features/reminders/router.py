@@ -1,6 +1,7 @@
 """API router for the reminders feature."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from uuid import UUID
 
@@ -18,8 +19,14 @@ from example_service.core.database import (
 from example_service.core.dependencies.database import get_db_session
 from example_service.features.reminders.models import Reminder
 from example_service.features.reminders.schemas import ReminderCreate, ReminderResponse
+from example_service.infra.logging import get_lazy_logger
 
 router = APIRouter(prefix="/reminders", tags=["reminders"])
+
+# Standard logger for INFO/WARNING/ERROR
+logger = logging.getLogger(__name__)
+# Lazy logger for DEBUG (zero overhead when DEBUG disabled)
+lazy_logger = get_lazy_logger(__name__)
 
 
 @router.get(
@@ -119,6 +126,23 @@ async def search_reminders(
 
     result = await session.execute(stmt)
     reminders = result.scalars().all()
+
+    # DEBUG - search context
+    lazy_logger.debug(
+        lambda: f"endpoint.search_reminders: query={query!r}, limit={limit}, offset={offset} -> {len(reminders)} results"
+    )
+
+    # INFO - empty search results with query (useful for debugging user issues)
+    if query and len(reminders) == 0:
+        logger.info(
+            "Search returned no results",
+            extra={
+                "query": query[:100] if query else None,
+                "has_date_filter": before is not None or after is not None,
+                "operation": "endpoint.search_reminders",
+            },
+        )
+
     return [ReminderResponse.model_validate(reminder) for reminder in reminders]
 
 
@@ -145,6 +169,14 @@ async def get_overdue_reminders(
 
     result = await session.execute(stmt)
     reminders = result.scalars().all()
+
+    # INFO - actionable condition (overdue reminders need attention)
+    if reminders:
+        logger.info(
+            "Overdue reminders retrieved",
+            extra={"count": len(reminders), "operation": "endpoint.get_overdue_reminders"},
+        )
+
     return [ReminderResponse.model_validate(reminder) for reminder in reminders]
 
 
@@ -278,3 +310,9 @@ async def delete_reminder(
 
     await session.delete(reminder)
     await session.commit()
+
+    # INFO - permanent data removal (audit trail)
+    logger.info(
+        "Reminder deleted",
+        extra={"reminder_id": str(reminder_id), "operation": "endpoint.delete_reminder"},
+    )

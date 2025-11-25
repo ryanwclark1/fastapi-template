@@ -366,8 +366,12 @@ class PostgresSettings(BaseSettings):
         safe_password = quote_plus(self.password.get_secret_value())
         safe_app = quote_plus(app_name or self.application_name)
 
+        driver = self.driver
+        if include_driver and async_enabled is not None:
+            driver = "psycopg" if async_enabled else "psycopg2"
+
         if include_driver:
-            scheme = f"postgresql+{self.driver}"
+            scheme = f"postgresql+{driver}"
         else:
             scheme = "postgresql"
 

@@ -103,7 +103,8 @@ class HeaderContextMiddleware(ABC):
             value: The extracted or generated value.
             was_generated: True if value was generated, False if from header.
         """
-        pass
+        _ = scope, value, was_generated
+        return None
 
     def on_response_start(self, scope: Scope, value: str) -> None:
         """Hook called when response starts (before header injection).
@@ -114,7 +115,8 @@ class HeaderContextMiddleware(ABC):
             scope: ASGI connection scope.
             value: The value being added to response.
         """
-        pass
+        _ = scope, value
+        return None
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Process ASGI request with header context propagation.

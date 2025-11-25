@@ -7,6 +7,12 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Any, TypeVar
 
+from example_service.infra.metrics.tracking import (
+    track_retry_attempt,
+    track_retry_exhausted,
+    track_retry_success,
+)
+
 from .exceptions import RetryError, RetryStatistics
 from .strategies import RetryStrategy
 
@@ -47,6 +53,9 @@ def retry(
             for attempt in range(max_attempts):
                 try:
                     result = await func(*args, **kwargs)
+                    # Track success after retries
+                    if statistics.attempts > 0:
+                        track_retry_success(func.__name__, statistics.attempts + 1)
                     return result
                 except Exception as e:
                     if not strategy.should_retry(e):
@@ -63,6 +72,8 @@ def retry(
 
                     if attempt >= max_attempts - 1:
                         statistics.end_time = time.monotonic()
+                        # Track retry exhaustion
+                        track_retry_exhausted(func.__name__)
                         logger.error(
                             f"All retry attempts exhausted for {func.__name__}",
                             extra={
@@ -79,6 +90,9 @@ def retry(
                     statistics.attempts += 1
                     statistics.total_delay += delay
                     statistics.exceptions.append(type(e).__name__)
+
+                    # Track retry attempt
+                    track_retry_attempt(func.__name__, attempt + 2)
 
                     logger.warning(
                         f"Retrying {func.__name__} after {delay:.2f}s (attempt {attempt + 1}/{max_attempts})",
@@ -105,6 +119,9 @@ def retry(
             for attempt in range(max_attempts):
                 try:
                     result = func(*args, **kwargs)
+                    # Track success after retries
+                    if statistics.attempts > 0:
+                        track_retry_success(func.__name__, statistics.attempts + 1)
                     return result
                 except Exception as e:
                     if not strategy.should_retry(e):
@@ -121,6 +138,8 @@ def retry(
 
                     if attempt >= max_attempts - 1:
                         statistics.end_time = time.monotonic()
+                        # Track retry exhaustion
+                        track_retry_exhausted(func.__name__)
                         logger.error(
                             f"All retry attempts exhausted for {func.__name__}",
                             extra={
@@ -137,6 +156,9 @@ def retry(
                     statistics.attempts += 1
                     statistics.total_delay += delay
                     statistics.exceptions.append(type(e).__name__)
+
+                    # Track retry attempt
+                    track_retry_attempt(func.__name__, attempt + 2)
 
                     logger.warning(
                         f"Retrying {func.__name__} after {delay:.2f}s (attempt {attempt + 1}/{max_attempts})",
