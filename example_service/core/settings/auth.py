@@ -8,7 +8,7 @@ from pydantic import AnyUrl, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ._sanitizers import sanitize_inline_numeric
-from .sources import app_source  # Auth settings can share app_source
+from .yaml_sources import create_auth_yaml_source
 
 
 class AuthSettings(BaseSettings):
@@ -72,18 +72,21 @@ class AuthSettings(BaseSettings):
         frozen=True,
         populate_by_name=True,
         extra="ignore",
+        env_ignore_empty=True,  # Ignore empty string env vars
     )
 
     @classmethod
     def settings_customise_sources(
         cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings
     ):
-        """Customize settings source precedence."""
-
-        def files_source(*_: BaseSettings) -> dict[str, Any]:
-            return app_source()  # Share with app or create auth_source()
-
-        return (init_settings, files_source, env_settings, dotenv_settings, file_secret_settings)
+        """Customize settings source precedence: init > yaml > env > dotenv > secrets."""
+        return (
+            init_settings,
+            create_auth_yaml_source(settings_cls),
+            env_settings,
+            dotenv_settings,
+            file_secret_settings,
+        )
 
     @property
     def is_configured(self) -> bool:

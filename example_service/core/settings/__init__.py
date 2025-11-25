@@ -8,8 +8,15 @@ This package provides a clean, modular settings architecture following 12-factor
 - Immutable (frozen) settings models
 - SecretStr for sensitive fields
 
-Import settings via cached loaders:
-    from example_service.core.settings.loader import get_app_settings
+Import settings via cached loaders (recommended for production):
+    from example_service.core.settings import get_app_settings
+
+Or use unified settings for convenient access to all domains:
+    from example_service.core.settings import get_settings
+
+    settings = get_settings()
+    print(settings.app.host)
+    print(settings.db.pool_size)
 
 Configuration precedence (highest to lowest):
     1. init kwargs (testing/overrides)
@@ -31,8 +38,10 @@ from .loader import (
     get_rabbit_settings,
     get_redis_settings,
 )
+from .unified import Settings, get_settings
 
 __all__ = [
+    # Individual domain loaders (recommended for production)
     "get_app_settings",
     "get_auth_settings",
     "get_backup_settings",
@@ -41,4 +50,7 @@ __all__ = [
     "get_otel_settings",
     "get_rabbit_settings",
     "get_redis_settings",
+    # Unified settings (convenient for development/testing)
+    "Settings",
+    "get_settings",
 ]

@@ -7,7 +7,7 @@ from pathlib import Path
 import click
 
 from example_service.cli.utils import error, info, success, warning
-from example_service.core.settings import get_settings
+from example_service.core.settings import get_app_settings
 
 
 @click.group(name="config")
@@ -33,7 +33,7 @@ def show(output_format: str, show_secrets: bool) -> None:
     info("Loading configuration...")
 
     try:
-        settings = get_settings()
+        settings = get_app_settings()
 
         if not show_secrets:
             warning("⚠ Secrets are hidden. Use --show-secrets to display them.")
@@ -126,7 +126,7 @@ def validate() -> None:
 
     try:
         # Load settings (will raise if invalid)
-        settings = get_settings()
+        settings = get_app_settings()
         success("✓ Settings loaded successfully")
 
         # Check database configuration
@@ -198,6 +198,86 @@ def validate() -> None:
     except Exception as e:
         error(f"Failed to validate configuration: {e}")
         sys.exit(1)
+
+
+def _extract_defaults_from_settings() -> dict[str, tuple[str, str]]:
+    """Extract default values from all settings classes.
+
+    Returns:
+        Dict mapping env var name to (prefix, formatted_default) tuple.
+        Handles SecretStr, lists, bools, Paths, and other types.
+    """
+    import json
+    from pathlib import Path
+
+    from pydantic import SecretStr
+    from pydantic_core import PydanticUndefined
+
+    from example_service.core.settings.app import AppSettings
+    from example_service.core.settings.auth import AuthSettings
+    from example_service.core.settings.backup import BackupSettings
+    from example_service.core.settings.logs import LoggingSettings
+    from example_service.core.settings.otel import OtelSettings
+    from example_service.core.settings.postgres import PostgresSettings
+    from example_service.core.settings.rabbit import RabbitSettings
+    from example_service.core.settings.redis import RedisSettings
+
+    defaults = {}
+
+    # Define settings classes with their prefixes
+    settings_map = [
+        (AppSettings, "APP_"),
+        (PostgresSettings, "DB_"),
+        (RedisSettings, "REDIS_"),
+        (RabbitSettings, "RABBIT_"),
+        (AuthSettings, "AUTH_"),
+        (LoggingSettings, "LOG_"),
+        (OtelSettings, "OTEL_"),
+        (BackupSettings, "BACKUP_"),
+    ]
+
+    for settings_cls, prefix in settings_map:
+        # Iterate through model_fields
+        for field_name, field_info in settings_cls.model_fields.items():
+            # Build env var name
+            env_name = f"{prefix}{field_name.upper()}"
+
+            # Get default value
+            default_val = field_info.default
+            if default_val is PydanticUndefined:
+                if field_info.default_factory is not None:
+                    # Call factory to get default
+                    try:
+                        default_val = field_info.default_factory()
+                    except Exception:
+                        # Skip if factory fails
+                        continue
+                else:
+                    # No default - skip
+                    continue
+
+            # Format the default value for .env file
+            if isinstance(default_val, SecretStr):
+                # Don't expose secret values
+                formatted = "change-this-secret-key"
+            elif isinstance(default_val, Path):
+                formatted = str(default_val)
+            elif isinstance(default_val, list):
+                if len(default_val) == 0:
+                    formatted = "[]"
+                else:
+                    # Format as JSON array
+                    formatted = json.dumps(default_val)
+            elif isinstance(default_val, bool):
+                formatted = str(default_val).lower()
+            elif default_val is None:
+                formatted = ""
+            else:
+                formatted = str(default_val)
+
+            defaults[env_name] = (prefix, formatted)
+
+    return defaults
 
 
 @config.command()
@@ -309,12 +389,91 @@ OTEL_TRACES_EXPORTER=otlp
         sys.exit(1)
 
 
+@config.command(name="generate-env-with-defaults")
+@click.option(
+    "--output",
+    "-o",
+    default=".env.generated",
+    help="Output file path",
+)
+@click.option(
+    "--overwrite",
+    is_flag=True,
+    help="Overwrite existing file",
+)
+def generate_env_with_defaults(output: str, overwrite: bool) -> None:
+    """Generate .env file with actual default values from pydantic settings.
+
+    Extracts default values from all settings classes and generates
+    a .env template file with those defaults populated.
+    """
+    output_path = Path(output)
+
+    if output_path.exists() and not overwrite:
+        error(f"File {output} already exists. Use --overwrite to replace it.")
+        sys.exit(1)
+
+    info(f"Generating environment file with defaults: {output}")
+
+    try:
+        # Extract defaults from settings classes
+        defaults = _extract_defaults_from_settings()
+
+        # Build .env content with sections
+        lines = [
+            "# Example Service Environment Configuration",
+            "# Generated from pydantic settings defaults",
+            "# Copy this file to .env and customize as needed",
+            "",
+        ]
+
+        # Helper to add a section
+        def add_section(title: str, prefix: str) -> None:
+            lines.append("# " + "=" * 76)
+            lines.append(f"# {title}")
+            lines.append("# " + "=" * 76)
+
+            # Get all env vars with this prefix
+            section_vars = {k: v[1] for k, v in defaults.items() if v[0] == prefix}
+
+            # Sort by name for consistent ordering
+            for var_name in sorted(section_vars.keys()):
+                value = section_vars[var_name]
+                lines.append(f"{var_name}={value}")
+
+            lines.append("")
+
+        # Add sections for each settings domain
+        add_section("APPLICATION SETTINGS", "APP_")
+        add_section("DATABASE SETTINGS (PostgreSQL)", "DB_")
+        add_section("CACHE SETTINGS (Redis)", "REDIS_")
+        add_section("MESSAGE BROKER SETTINGS (RabbitMQ)", "RABBIT_")
+        add_section("AUTHENTICATION SETTINGS", "AUTH_")
+        add_section("LOGGING SETTINGS", "LOG_")
+        add_section("OPENTELEMETRY SETTINGS", "OTEL_")
+        add_section("BACKUP SETTINGS", "BACKUP_")
+
+        # Write to file
+        env_content = "\n".join(lines)
+        output_path.write_text(env_content)
+
+        success(f"Generated environment file: {output}")
+        info(f"Total variables: {len(defaults)}")
+        info("Copy this file to .env and update with your values")
+
+    except Exception as e:
+        error(f"Failed to generate environment file: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
 @config.command()
 @click.argument("key")
 def get(key: str) -> None:
     """Get a specific configuration value by key path (e.g., app.service_name)."""
     try:
-        settings = get_settings()
+        settings = get_app_settings()
 
         # Parse key path
         parts = key.split(".")

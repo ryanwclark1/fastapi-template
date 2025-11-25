@@ -370,7 +370,6 @@ dependencies = [
     { name = "taskiq" },
     { name = "taskiq-aio-pika" },
     { name = "taskiq-faststream" },
-    { name = "taskiq-redis" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -419,7 +418,6 @@ requires-dist = [
     { name = "taskiq", specifier = ">=0.11.0" },
     { name = "taskiq-aio-pika", specifier = ">=0.4.4" },
     { name = "taskiq-faststream", specifier = ">=0.3.0" },
-    { name = "taskiq-redis", specifier = ">=1.0.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34.0" },
 ]
 provides-extras = ["dev", "yaml"]
@@ -1774,19 +1772,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/8f/5d/8c6857a9b50dd68df9f99f857880351aa10711fe35f661d70d2d1f30f299/taskiq_faststream-0.3.2.tar.gz", hash = "sha256:9fad72678338ea7892019be99aec5e42714e4f259e3b6c27c242bed1083e3889", size = 7549, upload-time = "2025-10-19T07:46:36.717Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7c/8a/fe7bcaa22b8ee222c0c7a170e6b4b43ceecaa09796106cb56e2284fba835/taskiq_faststream-0.3.2-py3-none-any.whl", hash = "sha256:c45d9852c127561a165412e57f5dfb68651348a0ae95eb5145c69a8c4cdde109", size = 8930, upload-time = "2025-10-19T07:46:35.395Z" },
-]
-
-[[package]]
-name = "taskiq-redis"
-version = "1.1.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "redis" },
-    { name = "taskiq" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/d2/0b/5006792cbdf6e78abaab45407968d96e2a1ffd0238cd41b13a62b33880cf/taskiq_redis-1.1.2.tar.gz", hash = "sha256:f878a047abc1a0fa0ddda6e4b063d742f030858d5a4409de96261a00a992c9c9", size = 16225, upload-time = "2025-10-07T10:46:13.666Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/73/20/9bf19b05eb7cb275a04871f3c38bf088c108579c4c19ea2a1358d2a81334/taskiq_redis-1.1.2-py3-none-any.whl", hash = "sha256:3b69468ff99da33243314c84acfa137a4a014abad10dd44e62195bc5e4ae9947", size = 20424, upload-time = "2025-10-07T10:46:12.779Z" },
 ]
 
 [[package]]

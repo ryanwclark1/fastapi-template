@@ -1,0 +1,351 @@
+groups:
+  # ============================================================================
+  # Application Health Alerts
+  # ============================================================================
+  - name: application_health
+    interval: 30s
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(errors_total[5m])) by (endpoint)
+            /
+            sum(rate(http_requests_total[5m])) by (endpoint)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: application
+        annotations:
+          summary: "High error rate on {{ $labels.endpoint }}"
+          description: "Error rate is {{ $value | humanizePercentage }} on endpoint {{ $labels.endpoint }} (threshold: 5%)"
+
+      - alert: CriticalErrorRate
+        expr: |
+          (
+            sum(rate(errors_total[5m])) by (endpoint)
+            /
+            sum(rate(http_requests_total[5m])) by (endpoint)
+          ) > 0.10
+        for: 2m
+        labels:
+          severity: critical
+          component: application
+        annotations:
+          summary: "Critical error rate on {{ $labels.endpoint }}"
+          description: "Error rate is {{ $value | humanizePercentage }} on endpoint {{ $labels.endpoint }} (threshold: 10%)"
+
+      - alert: High5xxErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total[5m]))
+          ) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          component: application
+        annotations:
+          summary: "High 5xx error rate"
+          description: "5xx error rate is {{ $value | humanizePercentage }} (threshold: 1%)"
+
+  # ============================================================================
+  # Performance Alerts
+  # ============================================================================
+  - name: performance
+    interval: 30s
+    rules:
+      - alert: HighResponseTime
+        expr: |
+          histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: performance
+        annotations:
+          summary: "High response time on {{ $labels.endpoint }}"
+          description: "P95 response time is {{ $value }}s on {{ $labels.method }} {{ $labels.endpoint }} (threshold: 1s)"
+
+      - alert: VeryHighResponseTime
+        expr: |
+          histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 5
+        for: 2m
+        labels:
+          severity: critical
+          component: performance
+        annotations:
+          summary: "Very high response time on {{ $labels.endpoint }}"
+          description: "P95 response time is {{ $value }}s on {{ $labels.method }} {{ $labels.endpoint }} (threshold: 5s)"
+
+      - alert: SlowQueriesDetected
+        expr: |
+          rate(slow_queries_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Slow database queries detected"
+          description: "{{ $value }} slow queries per second (>1s) for operation {{ $labels.operation }}"
+
+  # ============================================================================
+  # Circuit Breaker Alerts
+  # ============================================================================
+  - name: circuit_breakers
+    interval: 30s
+    rules:
+      - alert: CircuitBreakerOpen
+        expr: |
+          circuit_breaker_state == 2
+        for: 1m
+        labels:
+          severity: critical
+          component: resilience
+        annotations:
+          summary: "Circuit breaker {{ $labels.circuit_name }} is open"
+          description: "Circuit breaker for {{ $labels.circuit_name }} has been open for more than 1 minute"
+
+      - alert: HighCircuitBreakerFailureRate
+        expr: |
+          rate(circuit_breaker_failures_total[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+          component: resilience
+        annotations:
+          summary: "High failure rate for circuit breaker {{ $labels.circuit_name }}"
+          description: "Circuit breaker {{ $labels.circuit_name }} is experiencing {{ $value }} failures per second"
+
+      - alert: FrequentCircuitBreakerStateChanges
+        expr: |
+          rate(circuit_breaker_state_changes_total[10m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          component: resilience
+        annotations:
+          summary: "Frequent state changes for circuit breaker {{ $labels.circuit_name }}"
+          description: "Circuit breaker {{ $labels.circuit_name }} is changing state frequently (flapping)"
+
+  # ============================================================================
+  # Rate Limiting Alerts
+  # ============================================================================
+  - name: rate_limiting
+    interval: 30s
+    rules:
+      - alert: HighRateLimitHitRate
+        expr: |
+          rate(rate_limit_hits_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: ratelimit
+        annotations:
+          summary: "High rate limit hit rate on {{ $labels.endpoint }}"
+          description: "{{ $value }} rate limit hits per second on {{ $labels.endpoint }} ({{ $labels.limit_type }})"
+
+      - alert: ExcessiveRateLimiting
+        expr: |
+          (
+            sum(rate(rate_limit_checks_total{result="denied"}[5m])) by (endpoint)
+            /
+            sum(rate(rate_limit_checks_total[5m])) by (endpoint)
+          ) > 0.20
+        for: 10m
+        labels:
+          severity: warning
+          component: ratelimit
+        annotations:
+          summary: "Excessive rate limiting on {{ $labels.endpoint }}"
+          description: "{{ $value | humanizePercentage }} of requests are being rate limited on {{ $labels.endpoint }}"
+
+  # ============================================================================
+  # Authentication & Authorization Alerts
+  # ============================================================================
+  - name: auth
+    interval: 30s
+    rules:
+      - alert: HighAuthFailureRate
+        expr: |
+          (
+            rate(auth_attempts_total{result="failure"}[5m])
+            /
+            rate(auth_attempts_total[5m])
+          ) > 0.20
+        for: 5m
+        labels:
+          severity: warning
+          component: auth
+        annotations:
+          summary: "High authentication failure rate"
+          description: "{{ $value | humanizePercentage }} of authentication attempts are failing"
+
+      - alert: InvalidTokenSpike
+        expr: |
+          rate(auth_token_validations_total{result="invalid"}[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          component: auth
+        annotations:
+          summary: "Spike in invalid token validations"
+          description: "{{ $value }} invalid tokens per second being validated"
+
+  # ============================================================================
+  # External Service Alerts
+  # ============================================================================
+  - name: external_services
+    interval: 30s
+    rules:
+      - alert: ExternalServiceDown
+        expr: |
+          (
+            rate(external_service_calls_total{status="error"}[5m])
+            /
+            rate(external_service_calls_total[5m])
+          ) > 0.50
+        for: 3m
+        labels:
+          severity: critical
+          component: external
+        annotations:
+          summary: "External service {{ $labels.service_name }} may be down"
+          description: "{{ $value | humanizePercentage }} of calls to {{ $labels.service_name }} are failing"
+
+      - alert: HighExternalServiceLatency
+        expr: |
+          histogram_quantile(0.95, rate(external_service_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: external
+        annotations:
+          summary: "High latency for external service {{ $labels.service_name }}"
+          description: "P95 latency for {{ $labels.service_name }} is {{ $value }}s"
+
+      - alert: ExternalServiceTimeouts
+        expr: |
+          rate(external_service_timeouts_total[5m]) > 1
+        for: 3m
+        labels:
+          severity: warning
+          component: external
+        annotations:
+          summary: "Timeouts calling external service {{ $labels.service_name }}"
+          description: "{{ $value }} timeouts per second calling {{ $labels.service_name }}"
+
+  # ============================================================================
+  # Dependency Health Alerts
+  # ============================================================================
+  - name: dependencies
+    interval: 30s
+    rules:
+      - alert: DependencyUnhealthy
+        expr: |
+          dependency_health == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: dependency
+        annotations:
+          summary: "Dependency {{ $labels.dependency_name }} is unhealthy"
+          description: "{{ $labels.dependency_type }} dependency {{ $labels.dependency_name }} has been unhealthy for more than 2 minutes"
+
+      - alert: DatabaseConnectionPoolExhausted
+        expr: |
+          database_connections_active > 90
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Database connection pool near capacity"
+          description: "{{ $value }} active database connections (threshold: 90)"
+
+  # ============================================================================
+  # Cache Performance Alerts
+  # ============================================================================
+  - name: cache
+    interval: 30s
+    rules:
+      - alert: LowCacheHitRate
+        expr: |
+          (
+            rate(cache_hits_total[5m])
+            /
+            (rate(cache_hits_total[5m]) + rate(cache_misses_total[5m]))
+          ) < 0.80
+        for: 10m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Low cache hit rate for {{ $labels.cache_name }}"
+          description: "Cache hit rate is {{ $value | humanizePercentage }} for {{ $labels.cache_name }} (threshold: 80%)"
+
+  # ============================================================================
+  # Resource Utilization Alerts
+  # ============================================================================
+  - name: resources
+    interval: 30s
+    rules:
+      - alert: HighMemoryUsage
+        expr: |
+          memory_usage_bytes{type="rss"} / (1024*1024*1024) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}GB (threshold: 2GB)"
+
+      - alert: HighCPUUsage
+        expr: |
+          cpu_usage_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}% (threshold: 80%)"
+
+  # ============================================================================
+  # Retry & Failure Alerts
+  # ============================================================================
+  - name: retries
+    interval: 30s
+    rules:
+      - alert: HighRetryRate
+        expr: |
+          rate(retry_exhausted_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: resilience
+        annotations:
+          summary: "High retry exhaustion rate for {{ $labels.operation }}"
+          description: "{{ $value }} operations per second are exhausting all retries for {{ $labels.operation }}"
+
+  # ============================================================================
+  # Validation Alerts
+  # ============================================================================
+  - name: validation
+    interval: 30s
+    rules:
+      - alert: HighValidationErrorRate
+        expr: |
+          (
+            rate(validation_errors_total[5m])
+            /
+            rate(http_requests_total[5m])
+          ) > 0.10
+        for: 10m
+        labels:
+          severity: warning
+          component: validation
+        annotations:
+          summary: "High validation error rate on {{ $labels.endpoint }}"
+          description: "{{ $value | humanizePercentage }} of requests have validation errors on {{ $labels.endpoint }}"

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from .sources import app_source
+from .yaml_sources import create_app_yaml_source
 
 Environment = Literal["development", "staging", "production", "test"]
 
@@ -108,18 +108,21 @@ class AppSettings(BaseSettings):
         case_sensitive=False,
         frozen=True,  # Immutable settings
         extra="ignore",
+        env_ignore_empty=True,  # Ignore empty string env vars
     )
 
     @classmethod
     def settings_customise_sources(
         cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings
     ):
-        """Customize settings source precedence: init > files > env > dotenv > secrets."""
-
-        def files_source(*_: BaseSettings) -> dict[str, Any]:
-            return app_source()
-
-        return (init_settings, files_source, env_settings, dotenv_settings, file_secret_settings)
+        """Customize settings source precedence: init > yaml > env > dotenv > secrets."""
+        return (
+            init_settings,
+            create_app_yaml_source(settings_cls),
+            env_settings,
+            dotenv_settings,
+            file_secret_settings,
+        )
 
     @property
     def docs_enabled(self) -> bool:

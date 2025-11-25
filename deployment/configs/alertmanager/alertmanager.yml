@@ -1,0 +1,194 @@
+##################### AlertManager Configuration #####################
+# This file configures Prometheus AlertManager for handling and routing alerts
+# Documentation: https://prometheus.io/docs/alerting/latest/configuration/
+
+# Global configuration - applies to all alerts
+global:
+  # Time to wait before sending a notification about new alerts (default: 30s)
+  # Allows multiple alerts to be grouped together
+  resolve_timeout: 5m
+
+  # SMTP configuration (currently disabled - uncomment to enable email notifications)
+  # smtp_smarthost: 'smtp.gmail.com:587'
+  # smtp_from: 'alertmanager@example.com'
+  # smtp_auth_username: 'your-email@example.com'
+  # smtp_auth_password: 'your-app-password'
+  # smtp_require_tls: true
+
+  # Slack configuration (currently disabled - uncomment to enable)
+  # slack_api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'
+
+  # PagerDuty configuration (currently disabled - uncomment to enable)
+  # pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+
+# Templates for notification messages
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree for alert routing
+route:
+  # Default receiver for all alerts
+  receiver: 'default'
+
+  # Time to wait before sending a notification about new alerts that share group_by labels
+  group_wait: 10s
+
+  # Time to wait before sending notification about new alerts added to a group
+  group_interval: 10s
+
+  # Time to wait before re-sending a notification for an alert
+  repeat_interval: 12h
+
+  # Group alerts by these labels
+  # Alerts with the same label values will be grouped together
+  group_by: ['alertname', 'severity', 'component']
+
+  # Child routes - allows different routing based on alert properties
+  routes:
+    # Critical alerts - could be routed to PagerDuty in the future
+    - match:
+        severity: critical
+      receiver: 'critical'
+      group_wait: 5s
+      repeat_interval: 4h
+
+    # Warning alerts - could be routed to Slack in the future
+    - match:
+        severity: warning
+      receiver: 'warning'
+      repeat_interval: 12h
+
+    # Component-specific routing examples (commented out for now)
+    # - match:
+    #     component: database
+    #   receiver: 'database-team'
+    #
+    # - match:
+    #     component: auth
+    #   receiver: 'security-team'
+
+# Inhibition rules - suppress certain alerts based on other alerts
+inhibit_rules:
+  # Suppress warning alerts if critical alert is firing for same issue
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'component']
+
+  # Suppress high error rate warnings if critical error rate is firing
+  - source_match:
+      alertname: 'CriticalErrorRate'
+    target_match:
+      alertname: 'HighErrorRate'
+    equal: ['endpoint']
+
+  # Suppress performance warnings if there are critical alerts
+  - source_match:
+      alertname: 'VeryHighResponseTime'
+    target_match:
+      alertname: 'HighResponseTime'
+    equal: ['endpoint', 'method']
+
+# Receivers - define notification destinations
+receivers:
+  # Default receiver - logs to AlertManager UI only
+  - name: 'default'
+    # Add notification configs here when needed
+    # webhook_configs:
+    #   - url: 'http://localhost:5001/webhook'
+
+  # Critical alerts receiver
+  - name: 'critical'
+    # Currently no external notifications - visible in AlertManager UI
+    # Future: add PagerDuty, on-call rotations, etc.
+
+    # Example PagerDuty configuration (commented out):
+    # pagerduty_configs:
+    #   - service_key: 'YOUR_PAGERDUTY_SERVICE_KEY'
+    #     description: '{{ .GroupLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+
+    # Example Slack configuration (commented out):
+    # slack_configs:
+    #   - channel: '#critical-alerts'
+    #     title: '{{ .GroupLabels.alertname }}'
+    #     text: '{{ .CommonAnnotations.description }}'
+    #     send_resolved: true
+
+  # Warning alerts receiver
+  - name: 'warning'
+    # Currently no external notifications - visible in AlertManager UI
+    # Future: add Slack, email, etc.
+
+    # Example Slack configuration (commented out):
+    # slack_configs:
+    #   - channel: '#alerts'
+    #     title: '{{ .GroupLabels.alertname }}'
+    #     text: '{{ .CommonAnnotations.description }}'
+    #     send_resolved: true
+    #     color: '{{ if eq .Status "firing" }}warning{{ else }}good{{ end }}'
+
+    # Example Email configuration (commented out):
+    # email_configs:
+    #   - to: 'team@example.com'
+    #     subject: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}'
+    #     html: |
+    #       <h2>Alert: {{ .GroupLabels.alertname }}</h2>
+    #       <p><strong>Severity:</strong> {{ .GroupLabels.severity }}</p>
+    #       <p><strong>Summary:</strong> {{ .CommonAnnotations.summary }}</p>
+    #       <p><strong>Description:</strong> {{ .CommonAnnotations.description }}</p>
+
+  # Example: Database team receiver (commented out)
+  # - name: 'database-team'
+  #   slack_configs:
+  #     - channel: '#database-alerts'
+  #   email_configs:
+  #     - to: 'database-team@example.com'
+
+  # Example: Security team receiver (commented out)
+  # - name: 'security-team'
+  #   slack_configs:
+  #     - channel: '#security-alerts'
+  #   email_configs:
+  #     - to: 'security-team@example.com'
+
+  # Example: Webhook receiver (commented out)
+  # - name: 'webhook'
+  #   webhook_configs:
+  #     - url: 'http://your-service:5000/alerts'
+  #       send_resolved: true
+  #       http_config:
+  #         basic_auth:
+  #           username: 'alertmanager'
+  #           password: 'secret'
+
+##################################################################
+# Configuration Tips:
+##################################################################
+#
+# 1. SLACK INTEGRATION:
+#    - Create a Slack app with Incoming Webhooks
+#    - Add webhook URL to global.slack_api_url
+#    - Configure slack_configs in receivers with channel names
+#
+# 2. EMAIL INTEGRATION:
+#    - Configure SMTP settings in global section
+#    - For Gmail: enable 2FA and use App Password
+#    - Add email_configs in receivers with recipient addresses
+#
+# 3. PAGERDUTY INTEGRATION:
+#    - Create a service in PagerDuty
+#    - Get the Integration Key (service_key)
+#    - Add pagerduty_configs in receivers
+#
+# 4. WEBHOOK INTEGRATION:
+#    - Create an HTTP endpoint to receive POST requests
+#    - AlertManager sends JSON payload with alert data
+#    - Use for custom integrations (MS Teams, Discord, etc.)
+#
+# 5. TESTING:
+#    - Use AlertManager UI at http://localhost:9093
+#    - Use amtool CLI: docker exec -it alertmanager amtool check-config
+#    - Test notifications: docker exec -it alertmanager amtool alert add test
+#
+##################################################################

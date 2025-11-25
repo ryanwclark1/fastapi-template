@@ -9,7 +9,7 @@ from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ._sanitizers import sanitize_inline_numeric
-from .sources import backup_source
+from .yaml_sources import create_backup_yaml_source
 
 
 class BackupSettings(BaseSettings):
@@ -113,18 +113,21 @@ class BackupSettings(BaseSettings):
         frozen=True,
         populate_by_name=True,
         extra="ignore",
+        env_ignore_empty=True,  # Ignore empty string env vars
     )
 
     @classmethod
     def settings_customise_sources(
         cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings
     ):
-        """Customize settings source precedence."""
-
-        def files_source(*_: BaseSettings) -> dict[str, Any]:
-            return backup_source()
-
-        return (init_settings, files_source, env_settings, dotenv_settings, file_secret_settings)
+        """Customize settings source precedence: init > yaml > env > dotenv > secrets."""
+        return (
+            init_settings,
+            create_backup_yaml_source(settings_cls),
+            env_settings,
+            dotenv_settings,
+            file_secret_settings,
+        )
 
     @field_validator("retention_days", "s3_retention_days", "schedule_hour", "schedule_minute", mode="before")
     @classmethod

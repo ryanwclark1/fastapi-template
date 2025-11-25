@@ -1,16 +1,20 @@
 # Grafana Dashboard Provisioning
 # Auto-loads dashboards from filesystem on startup
+# Dashboards are organized into folders based on the directory structure:
+#   - infrastructure/  → Infrastructure dashboards
+#   - application/     → Application-level dashboards
+#   - observability/   → Logging, tracing, and monitoring dashboards
 
 apiVersion: 1
 
 providers:
-  - name: 'FastAPI Observability'
+  - name: 'Provisioned Dashboards'
     orgId: 1
-    folder: 'FastAPI Observability'
+    folder: ''  # Root folder; subfolders created from directory structure
     type: file
-    disableDeletion: false
-    updateIntervalSeconds: 30
-    allowUiUpdates: true
+    disableDeletion: true       # Prevent deletion via UI
+    updateIntervalSeconds: 30   # Check for updates every 30 seconds
+    allowUiUpdates: false       # Make dashboards read-only
     options:
-      path: /etc/grafana/provisioning/dashboards/dashboards
-      foldersFromFilesStructure: false
+      path: /var/lib/grafana/dashboards/provisioned
+      foldersFromFilesStructure: true  # Auto-create folders from directory structure

@@ -6,7 +6,7 @@ import sys
 import click
 
 from example_service.cli.utils import error, info, success, warning
-from example_service.core.settings import get_settings
+from example_service.core.settings import get_app_settings
 
 
 @click.group(name="server")
@@ -54,7 +54,7 @@ def dev(
     info("Starting development server...")
 
     # Get settings for defaults
-    settings = get_settings()
+    settings = get_app_settings()
     host = host or settings.app.host
     port = port or settings.app.port
 
@@ -126,7 +126,7 @@ def prod(
     info("Starting production server...")
 
     # Get settings for defaults
-    settings = get_settings()
+    settings = get_app_settings()
     host = host or settings.app.host
     port = port or settings.app.port
 

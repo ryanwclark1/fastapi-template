@@ -318,9 +318,9 @@ async def database_stats() -> None:
     try:
         from sqlalchemy import text
         from example_service.infra.database import get_session
-        from example_service.core.settings import get_settings
+        from example_service.core.settings import get_app_settings
 
-        settings = get_settings()
+        settings = get_app_settings()
         db_settings = settings.database
 
         async with get_session() as session:

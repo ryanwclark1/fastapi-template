@@ -12,19 +12,9 @@ Each backend supports:
 - Custom key prefixes for namespace isolation
 """
 
-import sys
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    AsyncIterator,
-    Dict,
-    List,
-    Optional,
-    Tuple,
-    TypeVar,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from redis.asyncio import BlockingConnectionPool, Redis, Sentinel
 from redis.asyncio.cluster import RedisCluster
@@ -42,17 +32,12 @@ from example_service.infra.results.exceptions import (
     ResultIsMissingError,
 )
 
-if sys.version_info >= (3, 10):
-    from typing import TypeAlias
-else:
-    from typing_extensions import TypeAlias
-
 if TYPE_CHECKING:
-    _Redis: TypeAlias = Redis[bytes]  # type: ignore
-    _BlockingConnectionPool: TypeAlias = BlockingConnectionPool[Connection]  # type: ignore
+    type _Redis = Redis[bytes]  # type: ignore
+    type _BlockingConnectionPool = BlockingConnectionPool[Connection]  # type: ignore
 else:
-    _Redis: TypeAlias = Redis
-    _BlockingConnectionPool: TypeAlias = BlockingConnectionPool
+    type _Redis = Redis
+    type _BlockingConnectionPool = BlockingConnectionPool
 
 _ReturnType = TypeVar("_ReturnType")
 
@@ -84,11 +69,11 @@ class RedisAsyncResultBackend(AsyncResultBackend[_ReturnType]):
         self,
         redis_url: str,
         keep_results: bool = True,
-        result_ex_time: Optional[int] = None,
-        result_px_time: Optional[int] = None,
-        max_connection_pool_size: Optional[int] = None,
-        serializer: Optional[TaskiqSerializer] = None,
-        prefix_str: Optional[str] = None,
+        result_ex_time: int | None = None,
+        result_px_time: int | None = None,
+        max_connection_pool_size: int | None = None,
+        serializer: TaskiqSerializer | None = None,
+        prefix_str: str | None = None,
         **connection_kwargs: Any,
     ) -> None:
         """Constructs a new result backend.
@@ -165,7 +150,7 @@ class RedisAsyncResultBackend(AsyncResultBackend[_ReturnType]):
             task_id: ID of the task.
             result: TaskiqResult instance containing the task's outcome.
         """
-        redis_set_params: Dict[str, Union[str, int, bytes]] = {
+        redis_set_params: dict[str, str | int | bytes] = {
             "name": self._task_name(task_id),
             "value": self.serializer.dumpb(model_dump(result)),
         }
@@ -244,7 +229,7 @@ class RedisAsyncResultBackend(AsyncResultBackend[_ReturnType]):
             task_id: ID of the task.
             progress: TaskProgress instance with current task progress.
         """
-        redis_set_params: Dict[str, Union[str, int, bytes]] = {
+        redis_set_params: dict[str, str | int | bytes] = {
             "name": self._task_name(task_id) + PROGRESS_KEY_SUFFIX,
             "value": self.serializer.dumpb(model_dump(progress)),
         }
@@ -259,7 +244,7 @@ class RedisAsyncResultBackend(AsyncResultBackend[_ReturnType]):
     async def get_progress(
         self,
         task_id: str,
-    ) -> Union[TaskProgress[_ReturnType], None]:
+    ) -> TaskProgress[_ReturnType] | None:
         """Retrieves task progress from Redis.
 
         Args:
@@ -301,10 +286,10 @@ class RedisAsyncClusterResultBackend(AsyncResultBackend[_ReturnType]):
         self,
         redis_url: str,
         keep_results: bool = True,
-        result_ex_time: Optional[int] = None,
-        result_px_time: Optional[int] = None,
-        serializer: Optional[TaskiqSerializer] = None,
-        prefix_str: Optional[str] = None,
+        result_ex_time: int | None = None,
+        result_px_time: int | None = None,
+        serializer: TaskiqSerializer | None = None,
+        prefix_str: str | None = None,
         **connection_kwargs: Any,
     ) -> None:
         """Constructs a new Redis Cluster result backend.
@@ -322,7 +307,7 @@ class RedisAsyncClusterResultBackend(AsyncResultBackend[_ReturnType]):
             DuplicateExpireTimeSelectedError: If both expiration times are set.
             ExpireTimeMustBeMoreThanZeroError: If expiration time is <= 0.
         """
-        self.redis: "RedisCluster" = RedisCluster.from_url(
+        self.redis: RedisCluster = RedisCluster.from_url(
             redis_url,
             **connection_kwargs,
         )
@@ -361,7 +346,7 @@ class RedisAsyncClusterResultBackend(AsyncResultBackend[_ReturnType]):
         result: TaskiqResult[_ReturnType],
     ) -> None:
         """Sets task result in Redis cluster."""
-        redis_set_params: Dict[str, Union[str, bytes, int]] = {
+        redis_set_params: dict[str, str | bytes | int] = {
             "name": self._task_name(task_id),
             "value": self.serializer.dumpb(model_dump(result)),
         }
@@ -411,7 +396,7 @@ class RedisAsyncClusterResultBackend(AsyncResultBackend[_ReturnType]):
         progress: TaskProgress[_ReturnType],
     ) -> None:
         """Sets task progress in Redis cluster."""
-        redis_set_params: Dict[str, Union[str, int, bytes]] = {
+        redis_set_params: dict[str, str | int | bytes] = {
             "name": self._task_name(task_id) + PROGRESS_KEY_SUFFIX,
             "value": self.serializer.dumpb(model_dump(progress)),
         }
@@ -425,7 +410,7 @@ class RedisAsyncClusterResultBackend(AsyncResultBackend[_ReturnType]):
     async def get_progress(
         self,
         task_id: str,
-    ) -> Union[TaskProgress[_ReturnType], None]:
+    ) -> TaskProgress[_ReturnType] | None:
         """Retrieves task progress from Redis cluster."""
         result_value = await self.redis.get(
             name=self._task_name(task_id) + PROGRESS_KEY_SUFFIX,
@@ -458,15 +443,15 @@ class RedisAsyncSentinelResultBackend(AsyncResultBackend[_ReturnType]):
 
     def __init__(
         self,
-        sentinels: List[Tuple[str, int]],
+        sentinels: list[tuple[str, int]],
         master_name: str,
         keep_results: bool = True,
-        result_ex_time: Optional[int] = None,
-        result_px_time: Optional[int] = None,
+        result_ex_time: int | None = None,
+        result_px_time: int | None = None,
         min_other_sentinels: int = 0,
-        sentinel_kwargs: Optional[Any] = None,
-        serializer: Optional[TaskiqSerializer] = None,
-        prefix_str: Optional[str] = None,
+        sentinel_kwargs: Any | None = None,
+        serializer: TaskiqSerializer | None = None,
+        prefix_str: str | None = None,
         **connection_kwargs: Any,
     ) -> None:
         """Constructs a new Redis Sentinel result backend.
@@ -530,7 +515,7 @@ class RedisAsyncSentinelResultBackend(AsyncResultBackend[_ReturnType]):
         result: TaskiqResult[_ReturnType],
     ) -> None:
         """Sets task result in Redis via Sentinel."""
-        redis_set_params: Dict[str, Union[str, bytes, int]] = {
+        redis_set_params: dict[str, str | bytes | int] = {
             "name": self._task_name(task_id),
             "value": self.serializer.dumpb(model_dump(result)),
         }
@@ -583,7 +568,7 @@ class RedisAsyncSentinelResultBackend(AsyncResultBackend[_ReturnType]):
         progress: TaskProgress[_ReturnType],
     ) -> None:
         """Sets task progress in Redis via Sentinel."""
-        redis_set_params: Dict[str, Union[str, int, bytes]] = {
+        redis_set_params: dict[str, str | int | bytes] = {
             "name": self._task_name(task_id) + PROGRESS_KEY_SUFFIX,
             "value": self.serializer.dumpb(model_dump(progress)),
         }
@@ -598,7 +583,7 @@ class RedisAsyncSentinelResultBackend(AsyncResultBackend[_ReturnType]):
     async def get_progress(
         self,
         task_id: str,
-    ) -> Union[TaskProgress[_ReturnType], None]:
+    ) -> TaskProgress[_ReturnType] | None:
         """Retrieves task progress from Redis via Sentinel."""
         async with self._acquire_master_conn() as redis:
             result_value = await redis.get(

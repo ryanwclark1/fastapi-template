@@ -8,8 +8,8 @@ import click
 from sqlalchemy import text
 
 from example_service.cli.utils import coro, error, info, success, warning
-from example_service.core.settings import get_settings
-from example_service.infra.database import get_session
+from example_service.core.settings import get_app_settings
+from example_service.infra.database import get_async_session
 
 
 @click.group(name="db")
@@ -24,12 +24,12 @@ async def init() -> None:
     info("Initializing database connection...")
 
     try:
-        settings = get_settings()
+        settings = get_app_settings()
         db_settings = settings.database
 
         info(f"Connecting to: {db_settings.db_host}:{db_settings.db_port}/{db_settings.db_name}")
 
-        async with get_session() as session:
+        async with get_async_session() as session:
             result = await session.execute(text("SELECT version()"))
             version = result.scalar_one()
             success(f"Database connected successfully!")
@@ -187,7 +187,7 @@ async def shell() -> None:
     info("Opening database shell...")
 
     try:
-        settings = get_settings()
+        settings = get_app_settings()
         db_settings = settings.database
 
         # Build psql connection string
@@ -238,7 +238,7 @@ async def seed(sample_size: int) -> None:
 
     # Example implementation:
     # try:
-    #     async with get_session() as session:
+    #     async with get_async_session() as session:
     #         for i in range(sample_size):
     #             # Create your sample records here
     #             pass
@@ -580,7 +580,7 @@ async def info_cmd(output_format: str) -> None:
     header("Database Information")
 
     try:
-        settings = get_settings()
+        settings = get_app_settings()
         db_settings = settings.database
 
         if output_format == "json":
@@ -605,7 +605,7 @@ async def info_cmd(output_format: str) -> None:
         click.echo(f"  Max Overflow: {db_settings.db_max_overflow}")
 
         # Try to connect and get version
-        async with get_session() as session:
+        async with get_async_session() as session:
             result = await session.execute(text("SELECT version()"))
             version = result.scalar_one()
 

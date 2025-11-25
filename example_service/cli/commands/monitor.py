@@ -26,9 +26,9 @@ async def application_status() -> None:
     """Show overall application status and health."""
     header("Application Status")
 
-    from example_service.core.settings import get_settings
+    from example_service.core.settings import get_app_settings
 
-    settings = get_settings()
+    settings = get_app_settings()
 
     click.echo()
     section("Application Info")

@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import Boolean, DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from example_service.infra.database.base import TimestampedBase
+from example_service.core.database import TimestampedBase
 
 
 class Reminder(TimestampedBase):

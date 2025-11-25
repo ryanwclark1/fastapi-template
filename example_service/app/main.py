@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
+from example_service.app.exception_handlers import configure_exception_handlers
 from example_service.app.lifespan import lifespan
 from example_service.app.middleware import configure_middleware
 from example_service.app.router import setup_routers
@@ -32,6 +33,9 @@ def create_app() -> FastAPI:
         root_path=settings.root_path,
         lifespan=lifespan,
     )
+
+    # Configure exception handlers (must be before middleware)
+    configure_exception_handlers(app)
 
     # Configure middleware (CORS, logging, etc.)
     configure_middleware(app)

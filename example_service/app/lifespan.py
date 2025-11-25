@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from example_service.core.settings import (
     get_app_settings,
     get_db_settings,
+    get_logging_settings,
     get_otel_settings,
     get_rabbit_settings,
     get_redis_settings,
@@ -113,11 +114,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     redis_settings = get_redis_settings()
     rabbit_settings = get_rabbit_settings()
     otel_settings = get_otel_settings()
+    log_settings = get_logging_settings()
     taskiq_module: ModuleType | None = None
     scheduler_module: ModuleType | None = None
 
-    # Startup
-    configure_logging()
+    # Startup - Configure logging with settings
+    configure_logging(**log_settings.to_logging_kwargs())
     logger.info(
         "Application starting",
         extra={
@@ -147,17 +149,43 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Initialize database connection with retry
     if db_settings.is_configured:
-        await init_database()
-        logger.info("Database connection initialized")
+        try:
+            await init_database()
+            logger.info("Database connection initialized")
+        except Exception as e:
+            if db_settings.startup_require_db:
+                logger.error(
+                    "Database required but unavailable, failing startup",
+                    extra={"error": str(e), "startup_require_db": True},
+                )
+                raise
+            else:
+                logger.warning(
+                    "Database unavailable, continuing in degraded mode",
+                    extra={"error": str(e), "startup_require_db": False},
+                )
 
     # Initialize Redis cache
     if redis_settings.is_configured:
-        await start_cache()
-        logger.info("Redis cache initialized")
+        try:
+            await start_cache()
+            logger.info("Redis cache initialized")
 
-        # Initialize task execution tracker (for querying task history via REST API)
-        await start_tracker()
-        logger.info("Task execution tracker initialized")
+            # Initialize task execution tracker (for querying task history via REST API)
+            await start_tracker()
+            logger.info("Task execution tracker initialized")
+        except Exception as e:
+            if redis_settings.startup_require_cache:
+                logger.error(
+                    "Redis cache required but unavailable, failing startup",
+                    extra={"error": str(e), "startup_require_cache": True},
+                )
+                raise
+            else:
+                logger.warning(
+                    "Redis cache unavailable, continuing in degraded mode",
+                    extra={"error": str(e), "startup_require_cache": False},
+                )
 
     # Initialize RabbitMQ/FastStream broker for event-driven messaging
     if rabbit_settings.is_configured:

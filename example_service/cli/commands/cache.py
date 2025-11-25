@@ -5,8 +5,7 @@ import sys
 import click
 
 from example_service.cli.utils import coro, error, info, success, warning
-from example_service.core.settings import get_settings
-from example_service.infra.cache import get_redis
+from example_service.core.settings import get_redis_settings
 
 
 @click.group(name="cache")
@@ -21,12 +20,11 @@ async def test() -> None:
     info("Testing Redis connection...")
 
     try:
-        settings = get_settings()
-        cache_settings = settings.cache
+        redis_settings = get_redis_settings()
 
-        info(f"Connecting to: {cache_settings.redis_url}")
+        info(f"Connecting to: {redis_settings.redis_url}")
 
-        redis = await get_redis()
+        redis = get_cache()
 
         # Test ping
         response = await redis.ping()
@@ -55,7 +53,7 @@ async def info_cmd() -> None:
     info("Fetching Redis server information...")
 
     try:
-        redis = await get_redis()
+        redis = get_cache()
 
         # Get server info
         server_info = await redis.info("server")
@@ -125,7 +123,7 @@ async def flush(pattern: str, force: bool) -> None:
     info("Flushing cache...")
 
     try:
-        redis = await get_redis()
+        redis = get_cache()
 
         if pattern == "*":
             # Flush all keys
@@ -172,7 +170,7 @@ async def keys(pattern: str, limit: int) -> None:
     info(f"Searching for keys matching pattern: {pattern}")
 
     try:
-        redis = await get_redis()
+        redis = get_cache()
 
         all_keys = []
         cursor = 0
@@ -217,7 +215,7 @@ async def get(key: str) -> None:
     info(f"Retrieving value for key: {key}")
 
     try:
-        redis = await get_redis()
+        redis = get_cache()
 
         # Check if key exists
         exists = await redis.exists(key)

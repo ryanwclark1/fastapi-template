@@ -7,6 +7,8 @@ from example_service.cli.commands import (
     config,
     data,
     database,
+    dev,
+    generate,
     monitor,
     scheduler,
     server,
@@ -38,6 +40,8 @@ def cli(ctx: click.Context) -> None:
       users      User account management
       data       Data import/export operations
       monitor    Monitoring and observability
+      generate   Code generation and scaffolding
+      dev        Development workflow commands
 
     \b
     Quick Start:
@@ -45,6 +49,8 @@ def cli(ctx: click.Context) -> None:
       example-service db upgrade        # Apply migrations
       example-service config validate   # Check all dependencies
       example-service health-check      # Check service health
+      example-service generate resource Product --all  # Generate CRUD resource
+      example-service dev quality       # Run all quality checks
     """
     ctx.ensure_object(dict)
 
@@ -65,6 +71,10 @@ cli.add_command(data.data)
 
 # Register command groups - Monitoring
 cli.add_command(monitor.monitor)
+
+# Register command groups - Development tools
+cli.add_command(generate.generate)
+cli.add_command(dev.dev)
 
 # Register standalone utility commands
 cli.add_command(utils.shell)

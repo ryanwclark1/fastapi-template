@@ -7,7 +7,7 @@ import click
 import httpx
 
 from example_service.cli.utils import coro, error, info, section, success, warning
-from example_service.core.settings import get_settings
+from example_service.core.settings import get_app_settings
 
 
 @click.command()
@@ -20,7 +20,7 @@ def shell() -> None:
         import asyncio
 
         from example_service.app.main import app
-        from example_service.core.settings import get_settings
+        from example_service.core.settings import get_app_settings
         from example_service.infra.cache import get_redis
         from example_service.infra.database import get_session
 
@@ -38,7 +38,7 @@ Available imports:
   • asyncio        - Async runtime
 
 Example usage:
-  settings = get_settings()
+  settings = get_app_settings()
   print(settings.app.service_name)
 
   async with get_session() as session:
@@ -128,7 +128,7 @@ async def health_check() -> None:
     # Check RabbitMQ (if accessible)
     click.echo("\n📨 Message Broker (RabbitMQ):")
     try:
-        settings = get_settings()
+        settings = get_app_settings()
         rabbit_url = settings.messaging.rabbit_url
 
         # Try to connect using httpx to management API (if available)
@@ -143,7 +143,7 @@ async def health_check() -> None:
     # Check API endpoints
     click.echo("\n🌐 API Endpoints:")
     try:
-        settings = get_settings()
+        settings = get_app_settings()
         base_url = f"http://{settings.app.host}:{settings.app.port}"
 
         async with httpx.AsyncClient() as client:
@@ -170,7 +170,7 @@ async def health_check() -> None:
     # Configuration validation
     click.echo("\n⚙️  Configuration:")
     try:
-        settings = get_settings()
+        settings = get_app_settings()
         success("  ✓ Settings loaded successfully")
         info(f"  Environment: {settings.app.environment}")
         info(f"  Service: {settings.app.service_name}")

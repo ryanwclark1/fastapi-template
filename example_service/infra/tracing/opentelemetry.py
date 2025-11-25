@@ -31,10 +31,14 @@ def setup_tracing() -> None:
     """Configure OpenTelemetry tracing for the service.
 
     Sets up:
-    - OTLP exporter to send traces to collector
-    - Resource attributes (service name, version)
-    - TracerProvider with batch span processor
-    - Automatic instrumentation for FastAPI, HTTPX, SQLAlchemy, psycopg
+    - OTLP exporter with compression, auth headers, and TLS (from settings)
+    - Resource attributes with service info and environment detection
+    - TracerProvider with configured sampler
+    - Batch span processor with performance-tuned settings
+    - Automatic instrumentation (respecting toggle settings)
+
+    Uses helper methods from OtelSettings for all configuration,
+    making the setup fully settings-driven.
 
     This should be called once at application startup, before creating
     the FastAPI app.
@@ -55,34 +59,52 @@ def setup_tracing() -> None:
         return
 
     try:
-        # Create resource with service information
-        resource = Resource(
-            attributes={
-                SERVICE_NAME: otel_settings.service_name,
-                SERVICE_VERSION: otel_settings.service_version,
-                "environment": "production" if not app_settings.debug else "development",
-            }
+        # Build resource with automatic detection if enabled
+        resource_attrs = otel_settings.resource_attributes()
+
+        if otel_settings.enable_resource_detector:
+            # Automatically detect host, process, container, k8s attributes
+            from opentelemetry.sdk.resources import get_aggregated_resources
+            resource = get_aggregated_resources([Resource(attributes=resource_attrs)])
+        else:
+            resource = Resource(attributes=resource_attrs)
+
+        # Configure OTLP exporter using settings helper method
+        otlp_exporter = OTLPSpanExporter(**otel_settings.exporter_kwargs())
+
+        # Get configured sampler
+        sampler = otel_settings.get_sampler()
+
+        # Create tracer provider with sampler and resource
+        tracer_provider = TracerProvider(
+            resource=resource,
+            sampler=sampler,
         )
 
-        # Configure OTLP exporter
-        otlp_exporter = OTLPSpanExporter(
-            endpoint=str(otel_settings.endpoint),
-            insecure=otel_settings.insecure,
+        # Add batch processor with performance-tuned settings
+        batch_processor = BatchSpanProcessor(
+            otlp_exporter,
+            **otel_settings.batch_processor_kwargs(),
         )
-
-        # Create tracer provider with batch processor
-        tracer_provider = TracerProvider(resource=resource)
-        tracer_provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
+        tracer_provider.add_span_processor(batch_processor)
 
         # Set global tracer provider
         trace.set_tracer_provider(tracer_provider)
 
-        # Setup automatic instrumentation
+        # Setup automatic instrumentation (respects toggle settings)
         _setup_instrumentations()
 
         logger.info(
-            f"OpenTelemetry tracing configured: endpoint={otel_settings.endpoint}",
-            extra={"service": otel_settings.service_name, "endpoint": str(otel_settings.endpoint)},
+            "OpenTelemetry tracing configured",
+            extra={
+                "service": otel_settings.service_name,
+                "endpoint": str(otel_settings.endpoint),
+                "compression": otel_settings.compression,
+                "sampler": otel_settings.sampler_type,
+                "sample_rate": otel_settings.sample_rate,
+                "batch_schedule_delay_ms": otel_settings.batch_schedule_delay,
+                "batch_max_export_size": otel_settings.batch_max_export_batch_size,
+            },
         )
 
     except Exception as e:
@@ -97,7 +119,10 @@ def setup_tracing() -> None:
 def _setup_instrumentations() -> None:
     """Setup automatic instrumentation for common libraries.
 
-    Instruments:
+    Respects otel_settings instrumentation toggles to allow selective
+    instrumentation based on configuration.
+
+    Instruments (if enabled in settings):
     - HTTPX: Traces all outgoing HTTP requests
     - SQLAlchemy: Traces all database queries
     - psycopg: Traces PostgreSQL operations
@@ -106,21 +131,35 @@ def _setup_instrumentations() -> None:
     Note: FastAPI instrumentation happens when you call
     instrument_app(app) after creating the FastAPI instance.
     """
-    # Instrument HTTPX for external API calls
-    HTTPXClientInstrumentor().instrument()
-    logger.debug("HTTPX instrumentation enabled")
+    # Instrument HTTPX for external API calls (if enabled)
+    if otel_settings.instrument_httpx:
+        try:
+            HTTPXClientInstrumentor().instrument()
+            logger.debug("HTTPX instrumentation enabled")
+        except Exception as e:
+            logger.warning(f"Failed to instrument HTTPX: {e}")
 
-    # Instrument SQLAlchemy for database queries
-    SQLAlchemyInstrumentor().instrument()
-    logger.debug("SQLAlchemy instrumentation enabled")
+    # Instrument SQLAlchemy for database queries (if enabled)
+    if otel_settings.instrument_sqlalchemy:
+        try:
+            SQLAlchemyInstrumentor().instrument()
+            logger.debug("SQLAlchemy instrumentation enabled")
+        except Exception as e:
+            logger.warning(f"Failed to instrument SQLAlchemy: {e}")
 
-    # Instrument psycopg for PostgreSQL operations
-    PsycopgInstrumentor().instrument()
-    logger.debug("psycopg instrumentation enabled")
+    # Instrument psycopg for PostgreSQL operations (if enabled)
+    if otel_settings.instrument_psycopg:
+        try:
+            PsycopgInstrumentor().instrument()
+            logger.debug("psycopg instrumentation enabled")
+        except Exception as e:
+            logger.warning(f"Failed to instrument psycopg: {e}")
 
 
 def instrument_app(app: Any) -> None:
     """Instrument FastAPI application for tracing.
+
+    Respects otel_settings.instrument_fastapi toggle.
 
     This should be called after creating the FastAPI app but before
     starting the server.
@@ -137,7 +176,7 @@ def instrument_app(app: Any) -> None:
         instrument_app(app)  # Add tracing to FastAPI
         ```
     """
-    if not otel_settings.enabled:
+    if not otel_settings.enabled or not otel_settings.instrument_fastapi:
         return
 
     try:

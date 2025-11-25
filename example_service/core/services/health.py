@@ -10,7 +10,9 @@ from example_service.core.services.base import BaseService
 from example_service.core.settings import (
     get_app_settings,
     get_auth_settings,
+    get_backup_settings,
     get_db_settings,
+    get_rabbit_settings,
     get_redis_settings,
 )
 
@@ -18,6 +20,8 @@ app_settings = get_app_settings()
 db_settings = get_db_settings()
 redis_settings = get_redis_settings()
 auth_settings = get_auth_settings()
+rabbit_settings = get_rabbit_settings()
+backup_settings = get_backup_settings()
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +175,18 @@ class HealthService(BaseService):
                 "auth", str(auth_settings.service_url)
             )
 
+        # Messaging check (if configured)
+        if rabbit_settings.is_configured:
+            checks["messaging"] = await self._check_messaging()
+        else:
+            checks["messaging"] = True  # Not configured, don't fail
+
+        # Storage check (if configured)
+        if backup_settings.is_s3_configured:
+            checks["storage"] = await self._check_storage()
+        else:
+            checks["storage"] = True  # Not configured, don't fail
+
         return checks
 
     async def _perform_readiness_checks(self) -> dict[str, bool]:
@@ -193,17 +209,28 @@ class HealthService(BaseService):
     async def _check_database(self) -> bool:
         """Check database connectivity.
 
+        Uses health_check_timeout from PostgresSettings to limit check duration.
+
         Returns:
             True if database is accessible, False otherwise.
         """
         try:
             # Import here to avoid circular dependencies
+            import asyncio
+
             from example_service.infra.database.session import engine
             from sqlalchemy import text
 
-            async with engine.connect() as conn:
-                await conn.execute(text("SELECT 1"))
+            async with asyncio.timeout(db_settings.health_check_timeout):
+                async with engine.connect() as conn:
+                    await conn.execute(text("SELECT 1"))
             return True
+        except asyncio.TimeoutError:
+            logger.error(
+                "Database health check timed out",
+                extra={"timeout": db_settings.health_check_timeout},
+            )
+            return False
         except Exception as e:
             logger.error(f"Database health check failed: {e}", extra={"exception": str(e)})
             return False
@@ -244,5 +271,47 @@ class HealthService(BaseService):
             logger.warning(
                 f"External service {name} health check failed: {e}",
                 extra={"service": name, "url": url, "exception": str(e)},
+            )
+            return False
+
+    async def _check_messaging(self) -> bool:
+        """Check messaging broker (RabbitMQ) connectivity.
+
+        Returns:
+            True if messaging broker is accessible, False otherwise.
+        """
+        try:
+            import aio_pika
+
+            connection = await aio_pika.connect_robust(
+                rabbit_settings.get_url(), timeout=5.0
+            )
+            await connection.close()
+            return True
+        except Exception as e:
+            logger.warning(
+                f"Messaging health check failed: {e}",
+                extra={"exception": str(e)},
+            )
+            return False
+
+    async def _check_storage(self) -> bool:
+        """Check storage (S3) connectivity.
+
+        Returns:
+            True if storage is accessible, False otherwise.
+        """
+        try:
+            from example_service.infra.storage.s3 import S3Client
+
+            client = S3Client(backup_settings)
+            # Try to list objects with a limit to verify connectivity
+            # This is a lightweight operation that confirms S3 access
+            await client.list_objects(prefix="", max_keys=1)
+            return True
+        except Exception as e:
+            logger.warning(
+                f"Storage health check failed: {e}",
+                extra={"exception": str(e)},
             )
             return False
