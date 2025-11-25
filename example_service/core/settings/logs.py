@@ -93,6 +93,27 @@ class LoggingSettings(BaseSettings):
         description="Enable console/stdout logging",
     )
 
+    colorize: bool | None = Field(
+        default=None,
+        description="Enable console colors. If None, auto-detect (respects NO_COLOR/FORCE_COLOR env vars).",
+    )
+
+    colorize_message: bool = Field(
+        default=False,
+        description="Colorize entire log message (not just level name). Only applies when colorize is enabled.",
+    )
+
+    level_colors: dict[str, str | tuple[int, int, int]] | None = Field(
+        default=None,
+        description=(
+            "Custom color mapping for log levels. Values can be:\n"
+            "  - ANSI color strings (e.g., '\\033[31m')\n"
+            "  - RGB tuples (e.g., (255, 0, 0) for red)\n"
+            "  - Hex strings (e.g., '#FF0000' or 'FF0000')\n"
+            "If None, uses default color scheme."
+        ),
+    )
+
     # ──────────────────────────────────────────────────────────────
     # Context injection
     # ──────────────────────────────────────────────────────────────
@@ -323,6 +344,9 @@ class LoggingSettings(BaseSettings):
             "file_backup_count": self.file_backup_count,
             # Console logging
             "console_enabled": self.console_enabled,
+            "colorize": self.colorize,
+            "colorize_message": self.colorize_message,
+            "level_colors": self.level_colors,
             # Context
             "include_context": self.include_context,
             # Advanced

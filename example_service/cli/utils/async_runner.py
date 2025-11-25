@@ -5,8 +5,6 @@ from collections.abc import Awaitable, Callable
 from functools import wraps
 from typing import Any, TypeVar
 
-import click
-
 T = TypeVar("T")
 
 

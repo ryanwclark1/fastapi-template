@@ -1,7 +1,8 @@
 """Base schema classes for API responses."""
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -16,12 +17,10 @@ class CustomBase(BaseModel):
     that should be applied across all Pydantic models in the application.
 
     Example:
-        ```python
-        class UserResponse(CustomBase):
+            class UserResponse(CustomBase):
             id: str
             email: str
             created_at: datetime
-        ```
     """
 
     model_config = ConfigDict(
@@ -50,11 +49,11 @@ class TimestampedBase(CustomBase):
     """
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Creation timestamp",
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Last update timestamp",
     )
 
@@ -65,15 +64,13 @@ class APIResponse(BaseModel, Generic[T]):
     Wraps response data in a consistent structure with metadata.
 
     Example:
-        ```python
-        @router.get("/items", response_model=APIResponse[list[Item]])
+            @router.get("/items", response_model=APIResponse[list[Item]])
         async def list_items() -> APIResponse[list[Item]]:
             items = await get_items()
             return APIResponse(
                 data=items,
                 message="Items retrieved successfully"
             )
-        ```
     """
 
     success: bool = Field(default=True, description="Operation success status")
@@ -87,8 +84,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
     Wraps paginated data with pagination metadata.
 
     Example:
-        ```python
-        @router.get("/items", response_model=PaginatedResponse[Item])
+            @router.get("/items", response_model=PaginatedResponse[Item])
         async def list_items(page: int = 1, page_size: int = 20):
             items, total = await get_paginated_items(page, page_size)
             return PaginatedResponse.create(
@@ -97,7 +93,6 @@ class PaginatedResponse(BaseModel, Generic[T]):
                 page=page,
                 page_size=page_size
             )
-        ```
     """
 
     items: list[T] = Field(default_factory=list, description="Paginated items")
@@ -107,9 +102,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
     total_pages: int = Field(ge=0, description="Total number of pages")
 
     @classmethod
-    def create(
-        cls, items: list[T], total: int, page: int, page_size: int
-    ) -> PaginatedResponse[T]:
+    def create(cls, items: list[T], total: int, page: int, page_size: int) -> PaginatedResponse[T]:
         """Create paginated response with calculated total pages.
 
         Args:

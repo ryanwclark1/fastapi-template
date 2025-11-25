@@ -12,7 +12,7 @@ services:
       - APP_LOG_LEVEL=DEBUG
       - DB_DATABASE_URL=postgresql+psycopg://postgres:postgres@db:5432/example_service
       - REDIS_URL=redis://redis:6379/0
-      - RABBIT_RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672/
+      - RABBIT_AMQP_URI=amqp://admin:admin123@rabbitmq:5672/
       - OTEL_ENABLED=true
       - OTEL_ENDPOINT=http://alloy:4317
     depends_on:
@@ -146,9 +146,9 @@ services:
     command:
       - "--config.file=/etc/alertmanager/alertmanager.yml"
       - "--storage.path=/alertmanager"
-      - "--web.external-url=http://localhost:9094"
+      - "--web.external-url=http://localhost:9096"
     ports:
-      - "9094:9093" # AlertManager web UI (host port 9094 to avoid conflict)
+      - "9096:9093" # AlertManager web UI (host port 9096 to avoid conflict)
     volumes:
       - ../configs/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertmanager-data:/alertmanager

@@ -1,9 +1,5 @@
-"""Reminder repository with custom query methods.
+"""Repository for the reminders feature."""
 
-Demonstrates feature-specific repository extending BaseRepository.
-Kept in features/ rather than core/repositories/ since reminders
-is a feature, not a core domain entity.
-"""
 from __future__ import annotations
 
 from datetime import datetime
@@ -12,7 +8,8 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from example_service.core.database import BaseRepository, SearchResult
+from example_service.core.database import SearchFilter
+from example_service.core.database.repository import BaseRepository, SearchResult
 from example_service.features.reminders.models import Reminder
 
 if TYPE_CHECKING:
@@ -22,102 +19,71 @@ if TYPE_CHECKING:
 
 
 class ReminderRepository(BaseRepository[Reminder]):
-    """Reminder-specific repository with custom query methods.
+    """Repository for Reminder model.
 
-    Extends BaseRepository to add domain-specific queries for reminders
-    like filtering by completion status, finding overdue reminders, etc.
+    Inherits from BaseRepository:
+        - get(session, id) -> Reminder | None
+        - get_or_raise(session, id) -> Reminder
+        - get_by(session, attr, value) -> Reminder | None
+        - list(session, limit, offset) -> Sequence[Reminder]
+        - search(session, statement, limit, offset) -> SearchResult[Reminder]
+        - create(session, instance) -> Reminder
+        - create_many(session, instances) -> Sequence[Reminder]
+        - delete(session, instance) -> None
 
-    Inherits all standard CRUD operations:
-    - get(id) / get_by_id(id)
-    - create(reminder)
-    - update(reminder)
-    - delete(reminder)
-    - search(filters, limit, offset)
-    - list_all()
-
-    Example:
-        ```python
-        # Using inherited methods
-        reminder = await reminder_repo.get_by_id(uuid_value)
-        reminder.is_completed = True
-        await reminder_repo.update(reminder)
-
-        # Using custom methods
-        pending = await reminder_repo.find_pending()
-        overdue = await reminder_repo.find_overdue()
-        ```
+    Feature-specific methods below.
     """
 
-    def __init__(self, session: AsyncSession):
-        """Initialize reminder repository.
+    def __init__(self) -> None:
+        """Initialize with Reminder model."""
+        super().__init__(Reminder)
+
+    async def find_pending(
+        self,
+        session: AsyncSession,
+        *,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> Sequence[Reminder]:
+        """Find all pending (not completed) reminders.
 
         Args:
-            session: Async database session
-        """
-        super().__init__(Reminder, session)
-
-    # ========================================================================
-    # Custom Query Methods
-    # ========================================================================
-
-    async def find_pending(self) -> Sequence[Reminder]:
-        """Get all pending (not completed) reminders.
+            session: Database session
+            limit: Maximum results
+            offset: Results to skip
 
         Returns:
-            List of pending reminders ordered by remind_at (soonest first)
-
-        Example:
-            ```python
-            pending = await repo.find_pending()
-            print(f"You have {len(pending)} pending reminders")
-            ```
+            Sequence of pending reminders, ordered by remind_at
         """
         stmt = (
             select(Reminder)
             .where(Reminder.is_completed == False)  # noqa: E712
-            .order_by(Reminder.remind_at.asc().nullslast())
+            .order_by(
+                Reminder.remind_at.asc().nullslast(),
+                Reminder.created_at.desc(),
+            )
+            .limit(limit)
+            .offset(offset)
         )
-        result = await self._session.execute(stmt)
+        result = await session.execute(stmt)
         return result.scalars().all()
 
-    async def find_completed(self) -> Sequence[Reminder]:
-        """Get all completed reminders.
+    async def find_overdue(
+        self,
+        session: AsyncSession,
+        *,
+        as_of: datetime | None = None,
+    ) -> Sequence[Reminder]:
+        """Find overdue reminders (past remind_at, not completed).
+
+        Args:
+            session: Database session
+            as_of: Reference time (defaults to now)
 
         Returns:
-            List of completed reminders ordered by completion date (most recent first)
-
-        Example:
-            ```python
-            completed = await repo.find_completed()
-            ```
+            Sequence of overdue reminders
         """
-        stmt = (
-            select(Reminder)
-            .where(Reminder.is_completed == True)  # noqa: E712
-            .order_by(Reminder.updated_at.desc())
-        )
-        result = await self._session.execute(stmt)
-        return result.scalars().all()
-
-    async def find_overdue(self) -> Sequence[Reminder]:
-        """Get all overdue reminders that haven't been completed.
-
-        A reminder is overdue if:
-        - It has a remind_at date
-        - remind_at is in the past
-        - It's not completed
-
-        Returns:
-            List of overdue reminders
-
-        Example:
-            ```python
-            overdue = await repo.find_overdue()
-            for reminder in overdue:
-                print(f"Overdue: {reminder.title}")
-            ```
-        """
-        now = datetime.utcnow()
+        now = as_of or datetime.utcnow()
         stmt = (
             select(Reminder)
             .where(
@@ -127,66 +93,25 @@ class ReminderRepository(BaseRepository[Reminder]):
             )
             .order_by(Reminder.remind_at.asc())
         )
-        result = await self._session.execute(stmt)
+        result = await session.execute(stmt)
         return result.scalars().all()
 
-    async def find_upcoming(self, hours: int = 24) -> Sequence[Reminder]:
-        """Get reminders due within the next N hours.
+    async def find_pending_notifications(
+        self,
+        session: AsyncSession,
+        *,
+        as_of: datetime | None = None,
+    ) -> Sequence[Reminder]:
+        """Find reminders needing notification (due, not sent, not completed).
 
         Args:
-            hours: Number of hours to look ahead (default: 24)
+            session: Database session
+            as_of: Reference time (defaults to now)
 
         Returns:
-            List of upcoming reminders
-
-        Example:
-            ```python
-            # Get reminders due in next 24 hours
-            upcoming = await repo.find_upcoming()
-
-            # Get reminders due in next 4 hours
-            soon = await repo.find_upcoming(hours=4)
-            ```
+            Sequence of reminders needing notification
         """
-        from datetime import timedelta
-
-        now = datetime.utcnow()
-        future = now + timedelta(hours=hours)
-
-        stmt = (
-            select(Reminder)
-            .where(
-                Reminder.is_completed == False,  # noqa: E712
-                Reminder.remind_at.is_not(None),
-                Reminder.remind_at >= now,
-                Reminder.remind_at <= future,
-            )
-            .order_by(Reminder.remind_at.asc())
-        )
-        result = await self._session.execute(stmt)
-        return result.scalars().all()
-
-    async def find_unsent_notifications(self) -> Sequence[Reminder]:
-        """Get reminders that need notifications sent.
-
-        Finds reminders where:
-        - remind_at has passed
-        - notification_sent is False
-        - not completed
-
-        Returns:
-            List of reminders needing notifications
-
-        Example:
-            ```python
-            reminders = await repo.find_unsent_notifications()
-            for reminder in reminders:
-                await send_notification(reminder)
-                reminder.notification_sent = True
-                await repo.update(reminder)
-            ```
-        """
-        now = datetime.utcnow()
+        now = as_of or datetime.utcnow()
         stmt = (
             select(Reminder)
             .where(
@@ -197,161 +122,132 @@ class ReminderRepository(BaseRepository[Reminder]):
             )
             .order_by(Reminder.remind_at.asc())
         )
-        result = await self._session.execute(stmt)
+        result = await session.execute(stmt)
         return result.scalars().all()
 
-    async def search_by_title(
+    async def search_reminders(
         self,
-        search_term: str,
+        session: AsyncSession,
         *,
-        include_completed: bool = False,
+        query: str | None = None,
+        include_completed: bool = True,
+        before: datetime | None = None,
+        after: datetime | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> SearchResult[Reminder]:
-        """Search reminders by title (case-insensitive partial match).
+        """Search reminders with filters.
 
         Args:
-            search_term: Search term to match against title
-            include_completed: Whether to include completed reminders
-            limit: Maximum results per page
-            offset: Number of results to skip
+            session: Database session
+            query: Search term (searches title and description)
+            include_completed: Include completed reminders
+            before: Filter reminders created before this time
+            after: Filter reminders created after this time
+            limit: Page size
+            offset: Results to skip
 
         Returns:
-            SearchResult with matching reminders
-
-        Example:
-            ```python
-            # Search pending reminders only
-            result = await repo.search_by_title("meeting", limit=10)
-
-            # Search all reminders
-            result = await repo.search_by_title(
-                "meeting",
-                include_completed=True,
-                limit=10
-            )
-
-            for reminder in result.items:
-                print(reminder.title)
-            ```
-        """
-        ilike_term = f"%{search_term}%"
-        stmt = select(Reminder).where(Reminder.title.ilike(ilike_term))
-
-        if not include_completed:
-            stmt = stmt.where(Reminder.is_completed == False)  # noqa: E712
-
-        return await self.search(
-            filters=stmt,
-            limit=limit,
-            offset=offset,
-            order_by=[Reminder.created_at.desc()],
-        )
-
-    async def list_all_ordered(
-        self,
-        *,
-        include_completed: bool = True,
-    ) -> Sequence[Reminder]:
-        """List all reminders with smart ordering.
-
-        Orders by:
-        1. Completion status (pending first)
-        2. remind_at date (soonest first, nulls last)
-        3. created_at (newest first)
-
-        Args:
-            include_completed: Whether to include completed reminders
-
-        Returns:
-            Ordered list of reminders
-
-        Example:
-            ```python
-            # All reminders
-            all_reminders = await repo.list_all_ordered()
-
-            # Only pending
-            pending = await repo.list_all_ordered(include_completed=False)
-            ```
+            SearchResult with reminders and pagination info
         """
         stmt = select(Reminder)
 
+        # Text search
+        if query:
+            stmt = SearchFilter(
+                [Reminder.title, Reminder.description],
+                query,
+                case_insensitive=True,
+            ).apply(stmt)
+
+        # Status filter
         if not include_completed:
             stmt = stmt.where(Reminder.is_completed == False)  # noqa: E712
 
+        # Date range
+        if after:
+            stmt = stmt.where(Reminder.created_at > after)
+        if before:
+            stmt = stmt.where(Reminder.created_at < before)
+
+        # Default ordering
         stmt = stmt.order_by(
-            Reminder.is_completed.asc(),  # Pending first
-            Reminder.remind_at.asc().nullslast(),  # Soonest dates first
-            Reminder.created_at.desc(),  # Newest first
+            Reminder.is_completed.asc(),
+            Reminder.remind_at.asc().nullslast(),
+            Reminder.created_at.desc(),
         )
 
-        result = await self._session.execute(stmt)
-        return result.scalars().all()
+        return await self.search(session, stmt, limit=limit, offset=offset)
 
-    # ========================================================================
-    # Business Logic Helpers
-    # ========================================================================
-
-    async def mark_completed(self, reminder_id: UUID) -> Reminder:
+    async def mark_completed(
+        self,
+        session: AsyncSession,
+        reminder_id: UUID,
+    ) -> Reminder | None:
         """Mark a reminder as completed.
 
-        Convenience method that combines get + update.
-
         Args:
+            session: Database session
             reminder_id: Reminder UUID
 
         Returns:
-            Updated reminder
-
-        Raises:
-            NotFoundError: If reminder doesn't exist
-
-        Example:
-            ```python
-            reminder = await repo.mark_completed(reminder_id)
-            print(f"Marked '{reminder.title}' as completed")
-            ```
+            Updated reminder or None if not found
         """
-        reminder = await self.get_by_id(reminder_id)
-        reminder.is_completed = True
-        return await self.update(reminder)
+        reminder = await self.get(session, reminder_id)
+        if reminder is None:
+            return None
 
-    async def mark_notification_sent(self, reminder_id: UUID) -> Reminder:
+        reminder.is_completed = True
+        await session.flush()
+        await session.refresh(reminder)
+        return reminder
+
+    async def mark_notification_sent(
+        self,
+        session: AsyncSession,
+        reminder_id: UUID,
+    ) -> Reminder | None:
         """Mark notification as sent for a reminder.
 
         Args:
+            session: Database session
             reminder_id: Reminder UUID
 
         Returns:
-            Updated reminder
-
-        Raises:
-            NotFoundError: If reminder doesn't exist
-
-        Example:
-            ```python
-            reminder = await repo.mark_notification_sent(reminder_id)
-            ```
+            Updated reminder or None if not found
         """
-        reminder = await self.get_by_id(reminder_id)
+        reminder = await self.get(session, reminder_id)
+        if reminder is None:
+            return None
+
         reminder.notification_sent = True
-        return await self.update(reminder)
+        await session.flush()
+        await session.refresh(reminder)
+        return reminder
 
-    async def count_pending(self) -> int:
-        """Count pending reminders.
 
-        Returns:
-            Number of pending reminders
+# Factory function for dependency injection
+_reminder_repository: ReminderRepository | None = None
 
-        Example:
-            ```python
-            count = await repo.count_pending()
-            print(f"You have {count} pending reminders")
-            ```
-        """
-        from sqlalchemy import func
 
-        stmt = select(func.count()).select_from(Reminder).where(Reminder.is_completed == False)  # noqa: E712
-        result = await self._session.execute(stmt)
-        return result.scalar_one()
+def get_reminder_repository() -> ReminderRepository:
+    """Get ReminderRepository instance.
+
+    Usage in FastAPI routes:
+            from example_service.features.reminders.repository import (
+            ReminderRepository,
+            get_reminder_repository,
+        )
+
+        @router.get("/{reminder_id}")
+        async def get_reminder(
+            reminder_id: UUID,
+            session: AsyncSession = Depends(get_db_session),
+            repo: ReminderRepository = Depends(get_reminder_repository),
+        ):
+            return await repo.get_or_raise(session, reminder_id)
+    """
+    global _reminder_repository
+    if _reminder_repository is None:
+        _reminder_repository = ReminderRepository()
+    return _reminder_repository

@@ -33,6 +33,7 @@ readonly DEFAULT_PORTS=(
     4317   # OTLP gRPC
     4318   # OTLP HTTP
     9091   # Prometheus web UI
+    9096   # AlertManager web UI
     12346  # Grafana Alloy UI
 )
 

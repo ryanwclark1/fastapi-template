@@ -1,4 +1,5 @@
 """Advanced caching strategies including cache-aside, write-through, and write-behind."""
+
 from __future__ import annotations
 
 import asyncio
@@ -6,7 +7,6 @@ import hashlib
 import json
 import logging
 from collections.abc import Callable
-from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from enum import Enum
 from functools import wraps
@@ -63,8 +63,7 @@ class CacheManager:
     caching patterns with automatic serialization and metrics tracking.
 
     Example:
-        ```python
-        cache = CacheManager()
+            cache = CacheManager()
 
         # Cache-aside pattern
         user = await cache.get_or_fetch(
@@ -79,7 +78,6 @@ class CacheManager:
             value=user,
             write_func=lambda: db.save_user(user)
         )
-        ```
     """
 
     def __init__(self, config: CacheConfig | None = None) -> None:
@@ -206,13 +204,11 @@ class CacheManager:
             Cached or fetched value
 
         Example:
-            ```python
-            user = await cache.get_or_fetch(
+                    user = await cache.get_or_fetch(
                 key="user:123",
                 fetch_func=lambda: database.get_user(123),
                 ttl=300
             )
-            ```
         """
         # Try to get from cache
         cached = await self.get(key)
@@ -258,13 +254,11 @@ class CacheManager:
             True if both cache and source writes succeeded
 
         Example:
-            ```python
-            success = await cache.set_write_through(
+                    success = await cache.set_write_through(
                 key="user:123",
                 value=user_data,
                 write_func=lambda v: database.save_user(v)
             )
-            ```
         """
         try:
             # Write to source first
@@ -309,13 +303,11 @@ class CacheManager:
             True if cache write succeeded (source write is async)
 
         Example:
-            ```python
-            await cache.set_write_behind(
+                    await cache.set_write_behind(
                 key="user:123",
                 value=user_data,
                 write_func=lambda v: database.save_user(v)
             )
-            ```
         """
         # Write to cache immediately
         success = await self.set(key, value, ttl)
@@ -355,7 +347,7 @@ class CacheManager:
 
                 self._write_queue.task_done()
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # No items in queue, check if we should keep running
                 if self._write_queue.empty():
                     break
@@ -386,14 +378,12 @@ class CacheManager:
             Cached or fetched value
 
         Example:
-            ```python
-            # Automatically refreshes when 80% of TTL has elapsed
+                    # Automatically refreshes when 80% of TTL has elapsed
             config = await cache.get_with_refresh(
                 key="app:config",
                 fetch_func=lambda: fetch_config_from_db(),
                 ttl=3600
             )
-            ```
         """
         cache = get_cache()
         cache_key = self._make_key(self._hash_key(key))
@@ -422,9 +412,7 @@ class CacheManager:
             # Fall back to fetch
             return await fetch_func() if asyncio.iscoroutinefunction(fetch_func) else fetch_func()
 
-    async def _refresh_cache(
-        self, key: str, fetch_func: Callable[[], Any], ttl: int
-    ) -> None:
+    async def _refresh_cache(self, key: str, fetch_func: Callable[[], Any], ttl: int) -> None:
         """Refresh cache in background.
 
         Args:
@@ -454,9 +442,7 @@ class CacheManager:
             Dictionary of key -> value (only includes found keys)
 
         Example:
-            ```python
-            users = await cache.get_many(["user:1", "user:2", "user:3"])
-            ```
+                    users = await cache.get_many(["user:1", "user:2", "user:3"])
         """
         cache = get_cache()
         cache_keys = [self._make_key(self._hash_key(k)) for k in keys]
@@ -471,7 +457,7 @@ class CacheManager:
 
             # Build result dictionary
             output = {}
-            for key, result in zip(keys, results):
+            for key, result in zip(keys, results, strict=False):
                 if result:
                     output[key] = self.config.deserialize(result)
 
@@ -480,9 +466,7 @@ class CacheManager:
             logger.error(f"Batch get failed: {e}", exc_info=True)
             return {}
 
-    async def set_many(
-        self, items: dict[str, Any], ttl: int | None = None
-    ) -> bool:
+    async def set_many(self, items: dict[str, Any], ttl: int | None = None) -> bool:
         """Set multiple values in cache.
 
         Args:
@@ -493,13 +477,11 @@ class CacheManager:
             True if all sets succeeded
 
         Example:
-            ```python
-            await cache.set_many({
+                    await cache.set_many({
                 "user:1": user1,
                 "user:2": user2,
                 "user:3": user3
             }, ttl=300)
-            ```
         """
         cache = get_cache()
         ttl = ttl or self.config.ttl
@@ -532,10 +514,8 @@ class CacheManager:
             Number of keys deleted
 
         Example:
-            ```python
-            # Invalidate all user caches
+                    # Invalidate all user caches
             deleted = await cache.invalidate_pattern("user:*")
-            ```
         """
         cache = get_cache()
         full_pattern = self._make_key(pattern)
@@ -579,8 +559,7 @@ def cached(
         Decorated function
 
     Example:
-        ```python
-        @cached(key_prefix="user", ttl=300)
+            @cached(key_prefix="user", ttl=300)
         async def get_user(user_id: int):
             return await db.query(User).filter(User.id == user_id).first()
 
@@ -592,7 +571,6 @@ def cached(
         )
         async def get_user_with_posts(user_id: int, include_posts: bool = False):
             # ...
-        ```
     """
     cache_manager = CacheManager(CacheConfig(key_prefix=key_prefix, ttl=ttl, strategy=strategy))
 
@@ -604,16 +582,22 @@ def cached(
                 key_suffix = key_func(*args, **kwargs)
             else:
                 # Default: use function arguments
-                key_parts = [str(arg) for arg in args] + [f"{k}={v}" for k, v in sorted(kwargs.items())]
+                key_parts = [str(arg) for arg in args] + [
+                    f"{k}={v}" for k, v in sorted(kwargs.items())
+                ]
                 key_suffix = ":".join(key_parts) if key_parts else "default"
 
             cache_key = f"{func.__name__}:{key_suffix}"
 
             # Use appropriate strategy
             if strategy == CacheStrategy.REFRESH_AHEAD:
-                return await cache_manager.get_with_refresh(cache_key, lambda: func(*args, **kwargs), ttl)
+                return await cache_manager.get_with_refresh(
+                    cache_key, lambda: func(*args, **kwargs), ttl
+                )
             else:
-                return await cache_manager.get_or_fetch(cache_key, lambda: func(*args, **kwargs), ttl)
+                return await cache_manager.get_or_fetch(
+                    cache_key, lambda: func(*args, **kwargs), ttl
+                )
 
         return wrapper
 

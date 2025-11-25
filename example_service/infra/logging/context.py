@@ -33,8 +33,7 @@ def set_log_context(**kwargs: Any) -> None:
             Common examples: request_id, user_id, trace_id, session_id
 
     Example:
-        ```python
-        # In middleware
+            # In middleware
         set_log_context(request_id="abc-123", path="/api/users")
 
         # In auth dependency
@@ -42,7 +41,6 @@ def set_log_context(**kwargs: Any) -> None:
 
         # All subsequent logs automatically include this context:
         logger.info("Processing request")  # Includes request_id, user_id, etc.
-        ```
     """
     current = _log_context.get().copy()
     current.update(kwargs)
@@ -56,10 +54,8 @@ def get_log_context() -> dict[str, Any]:
         Dictionary of current context key-value pairs.
 
     Example:
-        ```python
-        context = get_log_context()
+            context = get_log_context()
         print(context)  # {'request_id': 'abc-123', 'user_id': 42}
-        ```
     """
     return _log_context.get().copy()
 
@@ -71,8 +67,7 @@ def clear_log_context() -> None:
     but can be useful in tests or long-running background tasks.
 
     Example:
-        ```python
-        # In test teardown
+            # In test teardown
         clear_log_context()
 
         # In background task that processes multiple items
@@ -80,7 +75,6 @@ def clear_log_context() -> None:
             clear_log_context()
             set_log_context(item_id=item.id)
             process_item(item)
-        ```
     """
     _log_context.set({})
 
@@ -94,10 +88,8 @@ def update_log_context(**kwargs: Any) -> None:
         **kwargs: Key-value pairs to add/update in logging context.
 
     Example:
-        ```python
-        set_log_context(request_id="abc-123")
+            set_log_context(request_id="abc-123")
         update_log_context(user_id=42)  # Now has both request_id and user_id
-        ```
     """
     set_log_context(**kwargs)
 
@@ -109,10 +101,8 @@ def remove_from_log_context(*keys: str) -> None:
         *keys: Keys to remove from context.
 
     Example:
-        ```python
-        set_log_context(request_id="abc-123", temp="value")
+            set_log_context(request_id="abc-123", temp="value")
         remove_from_log_context("temp")  # Only request_id remains
-        ```
     """
     current = _log_context.get().copy()
     for key in keys:
@@ -131,8 +121,7 @@ class ContextInjectingFilter(logging.Filter):
     from automatic context injection.
 
     Example:
-        ```python
-        # In logging config
+            # In logging config
         config = {
             "filters": {
                 "context": {
@@ -145,7 +134,6 @@ class ContextInjectingFilter(logging.Filter):
                 "filters": ["context"]  # Auto-inject context
             }
         }
-        ```
     """
 
     def filter(self, record: logging.LogRecord) -> bool:
@@ -178,8 +166,7 @@ class ContextBoundLogger(logging.LoggerAdapter):
     permanent context that doesn't use the global ContextVar.
 
     Example:
-        ```python
-        # Create base logger
+            # Create base logger
         logger = logging.getLogger(__name__)
 
         # Bind context to create specialized logger
@@ -189,7 +176,6 @@ class ContextBoundLogger(logging.LoggerAdapter):
         # Can chain bindings
         payment_logger = user_logger.bind(payment_id="pay-789")
         payment_logger.info("Processing payment")  # Includes all context
-        ```
     """
 
     def __init__(self, logger: logging.Logger, **context: Any) -> None:
@@ -211,11 +197,9 @@ class ContextBoundLogger(logging.LoggerAdapter):
             New ContextBoundLogger with combined context.
 
         Example:
-            ```python
-            base = ContextBoundLogger(logger, service="api")
+                    base = ContextBoundLogger(logger, service="api")
             request = base.bind(request_id="123")
             request.info("Processing")  # Has both service and request_id
-            ```
         """
         # Merge existing context with new context
         merged = {**self.extra, **context}
@@ -248,10 +232,8 @@ def get_logger(name: str, **context: Any) -> ContextBoundLogger:
         Logger adapter with context.
 
     Example:
-        ```python
-        logger = get_logger(__name__, request_id="r-123", tenant="acme")
+            logger = get_logger(__name__, request_id="r-123", tenant="acme")
         logger.info("User logged in", extra={"user_id": "u-456"})
-        ```
     """
     base_logger = logging.getLogger(name)
     return ContextBoundLogger(base_logger, **context)

@@ -3,6 +3,7 @@
 This module defines the data structures for events published to
 and consumed from the message broker.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -28,11 +29,9 @@ class BaseEvent(BaseModel):
         default="example-service",
         min_length=1,
         max_length=100,
-        description="Service that generated the event"
+        description="Service that generated the event",
     )
-    metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Additional event metadata"
-    )
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional event metadata")
 
     model_config = ConfigDict(
         json_encoders={datetime: lambda v: v.isoformat()},
@@ -44,17 +43,14 @@ class ExampleCreatedEvent(BaseEvent):
     """Event published when an example entity is created.
 
     Example:
-        ```python
-        event = ExampleCreatedEvent(
+            event = ExampleCreatedEvent(
             data={"id": "123", "name": "Example"}
         )
         await broker.publish(event, queue="example-events")
-        ```
     """
 
     event_type: Literal["example.created"] = Field(
-        default="example.created",
-        description="Event type"
+        default="example.created", description="Event type"
     )
     data: dict[str, Any] = Field(description="Entity data")
 
@@ -63,17 +59,14 @@ class ExampleUpdatedEvent(BaseEvent):
     """Event published when an example entity is updated.
 
     Example:
-        ```python
-        event = ExampleUpdatedEvent(
+            event = ExampleUpdatedEvent(
             data={"id": "123", "changes": {"name": "New Name"}}
         )
         await broker.publish(event, queue="example-events")
-        ```
     """
 
     event_type: Literal["example.updated"] = Field(
-        default="example.updated",
-        description="Event type"
+        default="example.updated", description="Event type"
     )
     data: dict[str, Any] = Field(description="Entity data with changes")
 
@@ -82,16 +75,13 @@ class ExampleDeletedEvent(BaseEvent):
     """Event published when an example entity is deleted.
 
     Example:
-        ```python
-        event = ExampleDeletedEvent(
+            event = ExampleDeletedEvent(
             data={"id": "123"}
         )
         await broker.publish(event, queue="example-events")
-        ```
     """
 
     event_type: Literal["example.deleted"] = Field(
-        default="example.deleted",
-        description="Event type"
+        default="example.deleted", description="Event type"
     )
     data: dict[str, Any] = Field(description="Entity identifier")

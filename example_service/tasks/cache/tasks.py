@@ -8,7 +8,7 @@ This module provides:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import func, select
 
@@ -37,13 +37,11 @@ if broker is not None:
             Dictionary with list of warmed cache keys.
 
         Example:
-            ```python
-            from example_service.tasks.cache import warm_cache
+                    from example_service.tasks.cache import warm_cache
             task = await warm_cache.kiq()
             result = await task.wait_result()
             print(result)
             # {'status': 'success', 'keys_warmed': ['app:settings', 'stats:active_reminders']}
-            ```
         """
         cache = get_cache()
         if cache is None:
@@ -60,7 +58,7 @@ if broker is not None:
                 "service_name": app_settings.service_name,
                 "environment": app_settings.environment,
                 "version": app_settings.version,
-                "warmed_at": datetime.now(timezone.utc).isoformat(),
+                "warmed_at": datetime.now(UTC).isoformat(),
             }
             await cache.set("app:info", app_info, ttl=3600)
             warmed_keys.append("app:info")
@@ -75,9 +73,7 @@ if broker is not None:
             async with get_async_session() as session:
                 # Count active (incomplete) reminders
                 stmt = (
-                    select(func.count())
-                    .select_from(Reminder)
-                    .where(Reminder.is_completed == False)  # noqa: E712
+                    select(func.count()).select_from(Reminder).where(Reminder.is_completed == False)  # noqa: E712
                 )
                 result = await session.execute(stmt)
                 active_count = result.scalar() or 0
@@ -88,7 +84,7 @@ if broker is not None:
                 total_count = total_result.scalar() or 0
 
                 # Count due reminders
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 due_stmt = (
                     select(func.count())
                     .select_from(Reminder)
@@ -104,7 +100,7 @@ if broker is not None:
                 "active_reminders": active_count,
                 "total_reminders": total_count,
                 "due_reminders": due_count,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(UTC).isoformat(),
             }
             await cache.set("stats:reminders", stats, ttl=300)  # 5 min TTL
             warmed_keys.append("stats:reminders")
@@ -116,7 +112,7 @@ if broker is not None:
         result = {
             "status": "success" if not errors else "partial",
             "keys_warmed": warmed_keys,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         if errors:
@@ -142,14 +138,12 @@ if broker is not None:
             Dictionary with pattern and count of deleted keys.
 
         Example:
-            ```python
-            from example_service.tasks.cache import invalidate_cache_pattern
+                    from example_service.tasks.cache import invalidate_cache_pattern
             # Invalidate all stats cache
             task = await invalidate_cache_pattern.kiq(pattern="stats:*")
             result = await task.wait_result()
             print(result)
             # {'pattern': 'stats:*', 'deleted_count': 3}
-            ```
         """
         cache = get_cache()
         if cache is None:

@@ -3,12 +3,11 @@
 This module contains the actual background tasks that can be scheduled
 and executed asynchronously using Taskiq.
 """
+
 from __future__ import annotations
 
 import logging
 from typing import Any
-
-from taskiq import TaskiqDepends
 
 from example_service.tasks.broker import broker
 
@@ -30,8 +29,7 @@ async def example_task(data: dict[str, Any]) -> dict[str, Any]:
         Processed result data.
 
     Example:
-        ```python
-        # Schedule the task
+            # Schedule the task
         task = await example_task.kiq(data={"key": "value"})
 
         # Get the task ID
@@ -39,7 +37,6 @@ async def example_task(data: dict[str, Any]) -> dict[str, Any]:
 
         # Later, retrieve the result
         result = await task.wait_result()
-        ```
     """
     logger.info("Executing example_task", extra={"data": data})
 

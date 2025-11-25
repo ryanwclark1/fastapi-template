@@ -160,7 +160,7 @@ async def run_task(task_name: str, arg: tuple, wait: bool, timeout: int) -> None
             else:
                 task_handle = await task_func.kiq()
 
-            success(f"Task triggered successfully!")
+            success("Task triggered successfully!")
             click.echo(f"  Task ID: {task_handle.task_id}")
 
             if wait:

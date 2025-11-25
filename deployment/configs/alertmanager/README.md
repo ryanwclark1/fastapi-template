@@ -47,7 +47,7 @@ AlertManager → Receives alerts from Prometheus
 
 ## Access
 
-- **AlertManager UI**: http://localhost:9093
+- **AlertManager UI**: http://localhost:9096
 - **Prometheus UI**: http://localhost:9091 (see alert status)
 - **Grafana**: http://localhost:3003 (can query alert metrics)
 
@@ -178,7 +178,7 @@ receivers:
 curl http://localhost:9091/api/v1/alerts
 
 # Check AlertManager alerts
-curl http://localhost:9093/api/v2/alerts
+curl http://localhost:9096/api/v2/alerts
 ```
 
 ### Send Test Alert
@@ -230,7 +230,7 @@ docker exec -it alertmanager amtool silence add \
 
 ### Via Web UI
 
-1. Go to http://localhost:9093
+1. Go to http://localhost:9096
 2. Click on an alert
 3. Click "Silence" button
 4. Set duration and add comment
@@ -275,7 +275,7 @@ time_intervals:
 
 ### Metrics
 
-AlertManager exposes metrics at http://localhost:9093/metrics:
+AlertManager exposes metrics at http://localhost:9096/metrics:
 
 - `alertmanager_alerts`: Number of active alerts
 - `alertmanager_notifications_total`: Total notifications sent
@@ -286,10 +286,10 @@ AlertManager exposes metrics at http://localhost:9093/metrics:
 
 ```bash
 # Check AlertManager health
-curl http://localhost:9093/-/healthy
+curl http://localhost:9096/-/healthy
 
 # Check readiness
-curl http://localhost:9093/-/ready
+curl http://localhost:9096/-/ready
 ```
 
 ## Troubleshooting

@@ -60,15 +60,28 @@ async def publish_user_created_event(
 
     This function demonstrates how to publish messages to RabbitMQ using Faststream.
 
+    IMPORTANT: This function assumes the broker is already connected.
+    Use this from FastAPI endpoints where the broker lifecycle is managed
+    by the application lifespan.
+
+    For Taskiq workers, use broker_context() instead:
+            from example_service.infra.messaging.broker import broker_context
+
+        @taskiq_broker.task()
+        async def my_task():
+            async with broker_context() as broker:
+                if broker is not None:
+                    event = UserCreatedEvent(user_id=1, email="...", username="...")
+                    await broker.publish(event, queue=USER_EVENTS_QUEUE)
+
     Args:
         user_id: ID of the created user
         email: User email
         username: Username
         full_name: Optional full name
 
-    Example:
-        ```python
-        # In your FastAPI endpoint or service layer
+    Example (FastAPI endpoint):
+            # In your FastAPI endpoint or service layer
         from example_service.infra.messaging.examples.trigger import publish_user_created_event
 
         @router.post("/users")
@@ -85,7 +98,9 @@ async def publish_user_created_event(
             )
 
             return user
-        ```
+
+    Raises:
+        IncorrectState: If broker is not connected (e.g., called from Taskiq worker)
     """
     if not rabbit_settings.is_configured or broker is None:
         logger.warning("RabbitMQ not configured, skipping event publishing")
@@ -124,15 +139,33 @@ async def publish_user_notification(
 ) -> None:
     """Publish a user notification event.
 
+    IMPORTANT: This function assumes the broker is already connected.
+    Use this from FastAPI endpoints where the broker lifecycle is managed
+    by the application lifespan.
+
+    For Taskiq workers, use broker_context() instead:
+            from example_service.infra.messaging.broker import broker_context
+
+        @taskiq_broker.task()
+        async def send_notification_task():
+            async with broker_context() as broker:
+                if broker is not None:
+                    event = UserNotificationEvent(
+                        user_id=123,
+                        notification_type="email",
+                        message="Hello!",
+                        metadata={},
+                    )
+                    await broker.publish(event, queue=USER_NOTIFICATIONS_QUEUE)
+
     Args:
         user_id: ID of the user to notify
         notification_type: Type of notification (email, sms, push)
         message: Notification message
         **metadata: Additional metadata
 
-    Example:
-        ```python
-        # Send a welcome email after user creation
+    Example (FastAPI endpoint):
+            # Send a welcome email after user creation
         await publish_user_notification(
             user_id=user.id,
             notification_type="email",
@@ -140,7 +173,9 @@ async def publish_user_notification(
             template="welcome",
             priority="high",
         )
-        ```
+
+    Raises:
+        IncorrectState: If broker is not connected (e.g., called from Taskiq worker)
     """
     if not rabbit_settings.is_configured or broker is None:
         logger.warning("RabbitMQ not configured, skipping notification")
@@ -324,7 +359,8 @@ if rabbit_settings.is_configured and broker is not None:
                 extra={
                     "user_id": event.user_id,
                     "notification_type": event.notification_type,
-                    "error": str(e)},
+                    "error": str(e),
+                },
             )
             # Re-raise to trigger message requeue
             raise

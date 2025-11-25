@@ -8,11 +8,10 @@ This module provides CLI commands for managing users:
 """
 
 import sys
-from getpass import getpass
 
 import click
 
-from example_service.cli.utils import coro, error, header, info, section, success, warning
+from example_service.cli.utils import coro, error, header, info, success, warning
 
 
 def hash_password(password: str) -> str:
@@ -185,7 +184,7 @@ async def create_user(email: str, username: str, full_name: str | None, password
             await session.commit()
             await session.refresh(user)
 
-            success(f"User created successfully!")
+            success("User created successfully!")
             click.echo(f"  ID:       {user.id}")
             click.echo(f"  Username: {user.username}")
             click.echo(f"  Email:    {user.email}")
@@ -242,11 +241,11 @@ async def create_superuser(email: str, username: str, full_name: str | None, pas
             await session.commit()
             await session.refresh(user)
 
-            success(f"Superuser created successfully!")
+            success("Superuser created successfully!")
             click.echo(f"  ID:       {user.id}")
             click.echo(f"  Username: {user.username}")
             click.echo(f"  Email:    {user.email}")
-            click.secho(f"  Role:     Superuser", fg="cyan", bold=True)
+            click.secho("  Role:     Superuser", fg="cyan", bold=True)
 
     except Exception as e:
         error(f"Failed to create superuser: {e}")
@@ -268,7 +267,7 @@ async def deactivate_user(identifier: str) -> None:
         return
 
     try:
-        from sqlalchemy import select, update
+        from sqlalchemy import select
 
         from example_service.core.models.user import User
         from example_service.infra.database import get_session
@@ -518,7 +517,6 @@ async def show_user(identifier: str) -> None:
     """
     try:
         from sqlalchemy import select
-        from sqlalchemy.orm import selectinload
 
         from example_service.core.models.user import User
         from example_service.infra.database import get_session

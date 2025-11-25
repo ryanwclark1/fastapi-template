@@ -1,4 +1,5 @@
 """Status and health check response schemas."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -23,7 +24,6 @@ class HealthResponse(BaseModel):
                 "cache": true
             }
         }
-        ```
     """
 
     status: HealthStatus = Field(description="Health status (healthy, degraded, unhealthy)")
@@ -31,8 +31,7 @@ class HealthResponse(BaseModel):
     service: str = Field(min_length=1, max_length=100, description="Service name")
     version: str = Field(min_length=1, max_length=50, description="Service version")
     checks: dict[str, bool] = Field(
-        default_factory=dict,
-        description="Individual dependency health checks"
+        default_factory=dict, description="Individual dependency health checks"
     )
 
     model_config = ConfigDict(
@@ -63,13 +62,11 @@ class ReadinessResponse(BaseModel):
             },
             "timestamp": "2025-01-01T00:00:00Z"
         }
-        ```
     """
 
     ready: bool = Field(description="Overall readiness status")
     checks: dict[str, bool] = Field(
-        default_factory=dict,
-        description="Individual dependency checks"
+        default_factory=dict, description="Individual dependency checks"
     )
     timestamp: datetime = Field(description="Check timestamp")
 
@@ -95,7 +92,6 @@ class LivenessResponse(BaseModel):
             "timestamp": "2025-01-01T00:00:00Z",
             "service": "example-service"
         }
-        ```
     """
 
     alive: bool = Field(description="Liveness status")
@@ -124,7 +120,6 @@ class StartupResponse(BaseModel):
             "started": true,
             "timestamp": "2025-01-01T00:00:00Z"
         }
-        ```
     """
 
     started: bool = Field(description="Startup completion status")

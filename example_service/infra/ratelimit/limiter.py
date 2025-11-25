@@ -1,4 +1,5 @@
 """Redis-backed rate limiting implementation using token bucket algorithm."""
+
 from __future__ import annotations
 
 import hashlib
@@ -29,8 +30,7 @@ class RateLimiter:
         default_window: Default time window in seconds.
 
     Example:
-        ```python
-        limiter = RateLimiter(redis_client)
+            limiter = RateLimiter(redis_client)
 
         # Check rate limit for a user
         await limiter.check_limit(
@@ -38,7 +38,6 @@ class RateLimiter:
             limit=100,
             window=60  # 100 requests per minute
         )
-        ```
     """
 
     def __init__(
@@ -104,11 +103,9 @@ class RateLimiter:
             RateLimitException: If rate limit is exceeded.
 
         Example:
-            ```python
-            allowed, meta = await limiter.check_limit("user:123", limit=100, window=60)
+                    allowed, meta = await limiter.check_limit("user:123", limit=100, window=60)
             if not allowed:
                 print(f"Rate limited. Retry after {meta['retry_after']} seconds")
-            ```
         """
         limit = limit or self.default_limit
         window = window or self.default_window
@@ -207,9 +204,7 @@ class RateLimiter:
             True if reset was successful.
 
         Example:
-            ```python
-            await limiter.reset_limit("user:123")
-            ```
+                    await limiter.reset_limit("user:123")
         """
         redis_key = self._make_key(key)
         try:
@@ -235,10 +230,8 @@ class RateLimiter:
                 - current: Current number of requests in window
 
         Example:
-            ```python
-            info = await limiter.get_limit_info("user:123")
+                    info = await limiter.get_limit_info("user:123")
             print(f"Remaining: {info['remaining']}/{info['limit']}")
-            ```
         """
         limit = self.default_limit
         window = window or self.default_window
@@ -299,14 +292,12 @@ async def check_rate_limit(
         RateLimitException: If rate limit is exceeded.
 
     Example:
-        ```python
-        try:
+            try:
             meta = await check_rate_limit(limiter, "user:123", limit=100, window=60)
             # Request allowed, continue processing
         except RateLimitException as e:
             # Handle rate limit error
             pass
-        ```
     """
     allowed, metadata = await limiter.check_limit(key, limit, window, cost)
 

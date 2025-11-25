@@ -6,7 +6,9 @@ from typing import TYPE_CHECKING
 
 from fastapi.middleware.cors import CORSMiddleware
 
+from example_service.app.middleware.constants import EXEMPT_PATHS
 from example_service.app.middleware.metrics import MetricsMiddleware
+from example_service.app.middleware.rate_limit import RateLimitMiddleware
 from example_service.app.middleware.request_id import RequestIDMiddleware
 from example_service.app.middleware.request_logging import (
     PIIMasker,
@@ -14,7 +16,6 @@ from example_service.app.middleware.request_logging import (
 )
 from example_service.app.middleware.security_headers import SecurityHeadersMiddleware
 from example_service.app.middleware.size_limit import RequestSizeLimitMiddleware
-from example_service.app.middleware.timing import TimingMiddleware
 from example_service.core.settings import (
     get_app_settings,
     get_logging_settings,
@@ -29,11 +30,11 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "MetricsMiddleware",
     "PIIMasker",
+    "RateLimitMiddleware",
     "RequestIDMiddleware",
     "RequestLoggingMiddleware",
     "RequestSizeLimitMiddleware",
     "SecurityHeadersMiddleware",
-    "TimingMiddleware",
     "configure_middleware",
 ]
 
@@ -44,11 +45,16 @@ def configure_middleware(app: FastAPI) -> None:
     Uses modular settings for CORS and other configuration.
     Middleware execution order (last registered = outermost = first to run):
     1. CORS (outermost)
-    2. Security Headers (add security headers to all responses)
-    3. Request Logging (detailed request/response logging with PII masking)
-    4. RequestID (provides context for metrics/logging)
-    5. Metrics (collects request metrics with trace correlation)
-    6. Timing (adds performance headers)
+    2. Rate Limit (optional, early rejection for DDoS protection)
+    3. Request Size Limit (early rejection for large payload DoS)
+    4. Security Headers (add security headers to all responses)
+    5. RequestID (generates/extracts ID, sets logging context)
+    6. Request Logging (detailed request/response logging with PII masking)
+    7. Metrics (collects metrics + trace correlation + timing header)
+
+    IMPORTANT:
+    - Rate limiting and size limits run early for fast rejection
+    - RequestID MUST run before Request Logging so request_id is in context
 
     Args:
         app: FastAPI application instance.
@@ -70,6 +76,43 @@ def configure_middleware(app: FastAPI) -> None:
         max_age=3600,
     )
 
+    # Rate limiting middleware (optional, requires Redis)
+    # Must be early in the chain for fast rejection before expensive processing
+    if app_settings.enable_rate_limiting:
+        try:
+            from example_service.infra.cache import get_cache
+            from example_service.infra.ratelimit import RateLimiter
+
+            redis = get_cache()
+            limiter = RateLimiter(redis)
+
+            app.add_middleware(
+                RateLimitMiddleware,
+                limiter=limiter,
+                default_limit=app_settings.rate_limit_per_minute,
+                default_window=app_settings.rate_limit_window_seconds,
+                exempt_paths=EXEMPT_PATHS,
+            )
+            logger.info(
+                f"Rate limiting enabled: {app_settings.rate_limit_per_minute}/min "
+                f"(window: {app_settings.rate_limit_window_seconds}s)"
+            )
+        except Exception as e:
+            logger.error(f"Failed to enable rate limiting: {e}", exc_info=True)
+            logger.warning("Continuing without rate limiting")
+
+    # Request size limit middleware (protects against DoS via large payloads)
+    # Must be early for fast rejection before reading request body
+    if app_settings.enable_request_size_limit:
+        app.add_middleware(
+            RequestSizeLimitMiddleware,
+            max_size=app_settings.request_size_limit,
+        )
+        logger.info(
+            f"Request size limit enabled: {app_settings.request_size_limit} bytes "
+            f"({app_settings.request_size_limit / (1024 * 1024):.1f}MB)"
+        )
+
     # Security headers middleware (protects against common vulnerabilities)
     app.add_middleware(
         SecurityHeadersMiddleware,
@@ -88,9 +131,16 @@ def configure_middleware(app: FastAPI) -> None:
     )
     logger.info("Security headers middleware enabled")
 
+    # Custom middleware (order matters - see docstring above)
+    # RequestID must run BEFORE logging so request_id is available in logs
+    if log_settings.include_request_id:
+        app.add_middleware(RequestIDMiddleware)
+        logger.info("Request ID middleware enabled")
+
     # Request/response logging middleware (with PII masking)
     # Only enable in debug mode or when explicitly configured
-    if app_settings.debug or log_settings.log_level == "DEBUG":
+    # IMPORTANT: Runs AFTER RequestIDMiddleware so logs contain request_id
+    if app_settings.debug or log_settings.level == "DEBUG":
         app.add_middleware(
             RequestLoggingMiddleware,
             log_request_body=True,
@@ -99,14 +149,8 @@ def configure_middleware(app: FastAPI) -> None:
         )
         logger.info("Request logging middleware enabled")
 
-    # Custom middleware (order matters - see docstring above)
-    if log_settings.include_request_id:
-        app.add_middleware(RequestIDMiddleware)
-
-    # Metrics middleware (with trace correlation via exemplars)
+    # Metrics middleware (with trace correlation via exemplars + timing header)
+    # Note: Consolidates timing functionality from old TimingMiddleware
     if otel_settings.is_configured:
         app.add_middleware(MetricsMiddleware)
-        logger.info("Metrics middleware enabled with trace correlation")
-
-    if log_settings.log_slow_requests:
-        app.add_middleware(TimingMiddleware)
+        logger.info("Metrics middleware enabled with trace correlation and timing header")

@@ -1,4 +1,5 @@
 """RFC 7807 Problem Details schemas for error responses."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -23,8 +24,7 @@ class ProblemDetail(BaseModel):
         instance: URI reference identifying the specific occurrence.
 
     Example:
-        ```python
-        problem = ProblemDetail(
+            problem = ProblemDetail(
             type="https://example.com/problems/resource-not-found",
             title="Resource Not Found",
             status=404,
@@ -32,7 +32,6 @@ class ProblemDetail(BaseModel):
             instance="/api/v1/users/abc123",
             user_id="abc123"
         )
-        ```
     """
 
     type: str = Field(
@@ -106,14 +105,12 @@ class ValidationError(BaseModel):
         value: The invalid value that was provided (optional).
 
     Example:
-        ```python
-        error = ValidationError(
+            error = ValidationError(
             field="email",
             message="Email address format is invalid",
             type="format",
             value="invalid@"
         )
-        ```
     """
 
     field: str = Field(
@@ -142,8 +139,7 @@ class ValidationProblemDetail(ProblemDetail):
         errors: List of field-specific validation errors.
 
     Example:
-        ```python
-        problem = ValidationProblemDetail(
+            problem = ValidationProblemDetail(
             type="validation-error",
             title="Validation Error",
             status=422,
@@ -164,7 +160,6 @@ class ValidationProblemDetail(ProblemDetail):
                 ),
             ]
         )
-        ```
     """
 
     errors: list[ValidationError] = Field(

@@ -1,4 +1,5 @@
 """Rate limiting dependencies for FastAPI routes."""
+
 from __future__ import annotations
 
 import logging
@@ -20,14 +21,12 @@ async def get_rate_limiter() -> RateLimiter:
         RateLimiter instance using Redis cache.
 
     Example:
-        ```python
-        @router.get("/data")
+            @router.get("/data")
         async def get_data(
             limiter: Annotated[RateLimiter, Depends(get_rate_limiter)]
         ):
             await check_rate_limit(limiter, "endpoint:get_data", limit=10, window=60)
             return {"data": "value"}
-        ```
     """
     redis = get_cache()
     return RateLimiter(redis)
@@ -53,8 +52,7 @@ def rate_limit(
         Dependency function that enforces the rate limit.
 
     Example:
-        ```python
-        @router.get("/expensive-operation")
+            @router.get("/expensive-operation")
         async def expensive_op(
             _: Annotated[None, Depends(rate_limit(limit=5, window=60))]
         ):
@@ -72,7 +70,6 @@ def rate_limit(
         ):
             # 10 requests per hour per user
             return {"status": "ok"}
-        ```
     """
 
     async def _rate_limit_dependency(
@@ -123,15 +120,13 @@ def per_user_rate_limit(limit: int, window: int = 60) -> Callable:
         Dependency function that enforces the rate limit per user.
 
     Example:
-        ```python
-        @router.post("/user/profile")
+            @router.post("/user/profile")
         async def update_profile(
             _: Annotated[None, Depends(per_user_rate_limit(limit=20, window=60))],
             user: Annotated[User, Depends(get_current_user)]
         ):
             # 20 updates per minute per user
             return {"status": "updated"}
-        ```
     """
 
     def user_key_func(request: Request) -> str:
@@ -168,14 +163,12 @@ def per_api_key_rate_limit(limit: int, window: int = 60) -> Callable:
         Dependency function that enforces the rate limit per API key.
 
     Example:
-        ```python
-        @router.get("/api/data")
+            @router.get("/api/data")
         async def get_api_data(
             _: Annotated[None, Depends(per_api_key_rate_limit(limit=1000, window=3600))],
         ):
             # 1000 requests per hour per API key
             return {"data": "value"}
-        ```
     """
 
     def api_key_func(request: Request) -> str:

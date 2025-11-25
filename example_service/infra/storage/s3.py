@@ -7,7 +7,7 @@ in S3-compatible storage (AWS S3, MinIO, LocalStack, etc.).
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -40,8 +40,7 @@ class S3Client:
     Supports AWS S3, MinIO, LocalStack, and other S3-compatible services.
 
     Example:
-        ```python
-        from example_service.core.settings import get_backup_settings
+            from example_service.core.settings import get_backup_settings
 
         settings = get_backup_settings()
         client = S3Client(settings)
@@ -57,7 +56,6 @@ class S3Client:
 
         # Delete old backups
         deleted = await client.delete_old_objects(prefix="backups/", retention_days=30)
-        ```
     """
 
     def __init__(self, settings: BackupSettings) -> None:
@@ -71,8 +69,7 @@ class S3Client:
         """
         if not AIOBOTO3_AVAILABLE:
             raise S3ClientError(
-                "aioboto3 is required for S3 support. "
-                "Install with: pip install aioboto3"
+                "aioboto3 is required for S3 support. Install with: pip install aioboto3"
             )
 
         if not settings.is_s3_configured:
@@ -276,7 +273,7 @@ class S3Client:
         if retention_days is None:
             retention_days = self.settings.s3_retention_days
 
-        cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+        cutoff = datetime.now(UTC) - timedelta(days=retention_days)
         objects = await self.list_objects(prefix=prefix)
 
         deleted_count = 0
@@ -284,7 +281,7 @@ class S3Client:
             last_modified = obj["LastModified"]
             # Ensure timezone aware comparison
             if last_modified.tzinfo is None:
-                last_modified = last_modified.replace(tzinfo=timezone.utc)
+                last_modified = last_modified.replace(tzinfo=UTC)
 
             if last_modified < cutoff:
                 try:

@@ -1,6 +1,13 @@
 # Optional YAML configuration for RabbitMQ settings
 # These settings are overridden by environment variables (RABBIT_*)
 
+# Connection settings (matches docker-compose.yml configuration)
+host: localhost
+port: 5672
+username: admin
+password: admin123
+vhost: /
+
 # Queue configuration
 queue_prefix: example-service
 exchange: example-service

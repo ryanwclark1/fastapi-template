@@ -179,6 +179,12 @@ class PostgresSettings(BaseSettings):
         le=60.0,
         description="Delay (seconds) between startup retry attempts.",
     )
+    startup_retry_timeout: float = Field(
+        default=60.0,
+        ge=5.0,
+        le=300.0,
+        description="Maximum total time (seconds) for startup retry attempts (stop_after_delay).",
+    )
     startup_require_db: bool = Field(
         default=True,
         description=(
@@ -223,7 +229,7 @@ class PostgresSettings(BaseSettings):
         return value
 
     @model_validator(mode="after")
-    def _apply_dsn(self) -> "PostgresSettings":
+    def _apply_dsn(self) -> PostgresSettings:
         """Populate connection components from DSN if provided.
 
         Parses the DSN and sets host, port, user, password, and name.
@@ -282,9 +288,9 @@ class PostgresSettings(BaseSettings):
 
         params: list[str] = [f"application_name={safe_app_name}"]
 
-        # psycopg 3 async usage requires async_=1 in query parameters
-        if self.driver.startswith("psycopg") and not self.driver.endswith("2"):
-            params.append("async_=1")
+        # Note: psycopg3 async mode is determined by the driver scheme (postgresql+psycopg://),
+        # NOT by an async_=1 query parameter. The async_=1 parameter was used by asyncpg.
+        # For psycopg3, the async behavior is automatic when using create_async_engine.
 
         return base + "?" + "&".join(params)
 
@@ -352,13 +358,12 @@ class PostgresSettings(BaseSettings):
 
         base = f"{scheme}://{self.user}:{safe_password}@{self.host}:{self.port}/{self.name}"
 
-        # Determine async flag
-        is_psycopg3 = self.driver.startswith("psycopg") and not self.driver.endswith("2")
-        async_flag = async_enabled if async_enabled is not None else is_psycopg3
+        # Note: For psycopg3, async mode is determined by using create_async_engine,
+        # not by a query parameter. The async_=1 parameter was used by asyncpg.
+        # We keep the async_enabled parameter for API compatibility but don't use it
+        # as a query parameter with psycopg3.
 
         params: list[str] = [f"application_name={safe_app}"]
-        if async_flag and include_driver:
-            params.append("async_=1")
 
         return base + "?" + "&".join(params)
 

@@ -24,14 +24,12 @@ class LazyString:
     log message is formatted).
 
     Example:
-        ```python
-        def expensive_computation():
+            def expensive_computation():
             # Heavy processing...
             return f"Result: {complex_data}"
 
         logger.debug("Status: %s", LazyString(expensive_computation))
         # If DEBUG is disabled, expensive_computation() never runs!
-        ```
     """
 
     __slots__ = ("_func",)
@@ -70,8 +68,7 @@ class LazyLoggerAdapter(logging.LoggerAdapter):
     evaluation without requiring the full loguru library.
 
     Example:
-        ```python
-        # Create lazy logger
+            # Create lazy logger
         base_logger = logging.getLogger(__name__)
         logger = LazyLoggerAdapter(base_logger)
 
@@ -81,7 +78,6 @@ class LazyLoggerAdapter(logging.LoggerAdapter):
 
         # Works with format args too
         logger.info("Status: %s", lambda: compute_status())
-        ```
     """
 
     def log(
@@ -109,9 +105,7 @@ class LazyLoggerAdapter(logging.LoggerAdapter):
 
         # Evaluate any lazy args
         if args:
-            evaluated_args = tuple(
-                arg() if callable(arg) else arg for arg in args
-            )
+            evaluated_args = tuple(arg() if callable(arg) else arg for arg in args)
         else:
             evaluated_args = args
 
@@ -127,9 +121,7 @@ class LazyLoggerAdapter(logging.LoggerAdapter):
             **kwargs: Additional kwargs for logging.
 
         Example:
-            ```python
-            logger.debug(lambda: f"State: {expensive_state_dump()}")
-            ```
+                    logger.debug(lambda: f"State: {expensive_state_dump()}")
         """
         self.log(logging.DEBUG, msg, *args, **kwargs)
 
@@ -199,8 +191,7 @@ def get_lazy_logger(name: str, **context: Any) -> LazyLoggerAdapter:
         Logger adapter with lazy evaluation support.
 
     Example:
-        ```python
-        logger = get_lazy_logger(__name__, service="api")
+            logger = get_lazy_logger(__name__, service="api")
 
         # Lazy evaluation with lambda
         logger.debug(lambda: f"Request data: {expensive_serialize(data)}")
@@ -210,7 +201,6 @@ def get_lazy_logger(name: str, **context: Any) -> LazyLoggerAdapter:
 
         # With format args
         logger.debug("Value: %s", lambda: compute_value())
-        ```
     """
     base_logger = logging.getLogger(name)
     return LazyLoggerAdapter(base_logger, context or {})
@@ -229,9 +219,7 @@ def lazy(func: Callable[[], Any]) -> LazyString:
         LazyString wrapper around the callable.
 
     Example:
-        ```python
-        logger.debug("Data: %s", lazy(lambda: expensive_dump(data)))
+            logger.debug("Data: %s", lazy(lambda: expensive_dump(data)))
         # More concise than: LazyString(lambda: expensive_dump(data))
-        ```
     """
     return LazyString(func)

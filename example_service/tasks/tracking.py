@@ -14,11 +14,11 @@ Redis Key Structure:
 - task:index:name:{name} - Sorted set of task IDs by task name
 - task:index:status:{status} - Sorted set of task IDs by status
 """
+
 from __future__ import annotations
 
 import json
 import logging
-import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -42,8 +42,7 @@ class TaskExecutionTracker:
     methods to query task history, running tasks, and statistics.
 
     Example:
-        ```python
-        tracker = TaskExecutionTracker()
+            tracker = TaskExecutionTracker()
         await tracker.connect()
 
         # Record task start
@@ -62,7 +61,6 @@ class TaskExecutionTracker:
         history = await tracker.get_task_history(limit=100)
 
         await tracker.disconnect()
-        ```
     """
 
     # Key prefixes
@@ -107,7 +105,9 @@ class TaskExecutionTracker:
             await self._client.ping()
             logger.info("Task tracking Redis connection established")
         except Exception as e:
-            logger.exception("Failed to connect to Redis for task tracking", extra={"error": str(e)})
+            logger.exception(
+                "Failed to connect to Redis for task tracking", extra={"error": str(e)}
+            )
             raise
 
     async def disconnect(self) -> None:
@@ -343,13 +343,15 @@ class TaskExecutionTracker:
                         except ValueError:
                             pass
 
-                    tasks.append({
-                        "task_id": task_data.get("task_id", task_id),
-                        "task_name": task_data.get("task_name", "unknown"),
-                        "started_at": started_at,
-                        "running_for_ms": running_for_ms,
-                        "worker_id": task_data.get("worker_id", ""),
-                    })
+                    tasks.append(
+                        {
+                            "task_id": task_data.get("task_id", task_id),
+                            "task_name": task_data.get("task_name", "unknown"),
+                            "started_at": started_at,
+                            "running_for_ms": running_for_ms,
+                            "worker_id": task_data.get("worker_id", ""),
+                        }
+                    )
 
             return tasks
         except (RedisConnectionError, RedisTimeoutError) as e:
@@ -424,17 +426,19 @@ class TaskExecutionTracker:
                         except ValueError:
                             pass
 
-                    tasks.append({
-                        "task_id": task_data.get("task_id", task_id),
-                        "task_name": task_data.get("task_name", "unknown"),
-                        "status": task_data.get("status", "unknown"),
-                        "started_at": task_data.get("started_at", ""),
-                        "finished_at": task_data.get("finished_at", "") or None,
-                        "duration_ms": duration_ms,
-                        "return_value": return_value,
-                        "error_message": task_data.get("error_message", "") or None,
-                        "error_type": task_data.get("error_type", "") or None,
-                    })
+                    tasks.append(
+                        {
+                            "task_id": task_data.get("task_id", task_id),
+                            "task_name": task_data.get("task_name", "unknown"),
+                            "status": task_data.get("status", "unknown"),
+                            "started_at": task_data.get("started_at", ""),
+                            "finished_at": task_data.get("finished_at", "") or None,
+                            "duration_ms": duration_ms,
+                            "return_value": return_value,
+                            "error_message": task_data.get("error_message", "") or None,
+                            "error_type": task_data.get("error_type", "") or None,
+                        }
+                    )
 
             return tasks
         except (RedisConnectionError, RedisTimeoutError) as e:

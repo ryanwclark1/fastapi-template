@@ -23,12 +23,12 @@ global:
 
 # Templates for notification messages
 templates:
-  - '/etc/alertmanager/templates/*.tmpl'
+  - "/etc/alertmanager/templates/*.tmpl"
 
 # Route tree for alert routing
 route:
   # Default receiver for all alerts
-  receiver: 'default'
+  receiver: "default"
 
   # Time to wait before sending a notification about new alerts that share group_by labels
   group_wait: 10s
@@ -41,21 +41,21 @@ route:
 
   # Group alerts by these labels
   # Alerts with the same label values will be grouped together
-  group_by: ['alertname', 'severity', 'component']
+  group_by: ["alertname", "severity", "component"]
 
   # Child routes - allows different routing based on alert properties
   routes:
     # Critical alerts - could be routed to PagerDuty in the future
     - match:
         severity: critical
-      receiver: 'critical'
+      receiver: "critical"
       group_wait: 5s
       repeat_interval: 4h
 
     # Warning alerts - could be routed to Slack in the future
     - match:
         severity: warning
-      receiver: 'warning'
+      receiver: "warning"
       repeat_interval: 12h
 
     # Component-specific routing examples (commented out for now)
@@ -71,35 +71,35 @@ route:
 inhibit_rules:
   # Suppress warning alerts if critical alert is firing for same issue
   - source_match:
-      severity: 'critical'
+      severity: "critical"
     target_match:
-      severity: 'warning'
-    equal: ['alertname', 'component']
+      severity: "warning"
+    equal: ["alertname", "component"]
 
   # Suppress high error rate warnings if critical error rate is firing
   - source_match:
-      alertname: 'CriticalErrorRate'
+      alertname: "CriticalErrorRate"
     target_match:
-      alertname: 'HighErrorRate'
-    equal: ['endpoint']
+      alertname: "HighErrorRate"
+    equal: ["endpoint"]
 
   # Suppress performance warnings if there are critical alerts
   - source_match:
-      alertname: 'VeryHighResponseTime'
+      alertname: "VeryHighResponseTime"
     target_match:
-      alertname: 'HighResponseTime'
-    equal: ['endpoint', 'method']
+      alertname: "HighResponseTime"
+    equal: ["endpoint", "method"]
 
 # Receivers - define notification destinations
 receivers:
   # Default receiver - logs to AlertManager UI only
-  - name: 'default'
+  - name: "default"
     # Add notification configs here when needed
     # webhook_configs:
     #   - url: 'http://localhost:5001/webhook'
 
   # Critical alerts receiver
-  - name: 'critical'
+  - name: "critical"
     # Currently no external notifications - visible in AlertManager UI
     # Future: add PagerDuty, on-call rotations, etc.
 
@@ -116,7 +116,7 @@ receivers:
     #     send_resolved: true
 
   # Warning alerts receiver
-  - name: 'warning'
+  - name: "warning"
     # Currently no external notifications - visible in AlertManager UI
     # Future: add Slack, email, etc.
 
@@ -161,7 +161,6 @@ receivers:
   #         basic_auth:
   #           username: 'alertmanager'
   #           password: 'secret'
-
 ##################################################################
 # Configuration Tips:
 ##################################################################
@@ -187,7 +186,7 @@ receivers:
 #    - Use for custom integrations (MS Teams, Discord, etc.)
 #
 # 5. TESTING:
-#    - Use AlertManager UI at http://localhost:9093
+#    - Use AlertManager UI at http://localhost:9096
 #    - Use amtool CLI: docker exec -it alertmanager amtool check-config
 #    - Test notifications: docker exec -it alertmanager amtool alert add test
 #

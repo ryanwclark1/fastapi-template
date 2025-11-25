@@ -1,4 +1,5 @@
 """Custom exception classes for the application."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -19,8 +20,7 @@ class AppException(Exception):
         extra: Additional context-specific information about the error.
 
     Example:
-        ```python
-        raise AppException(
+            raise AppException(
             status_code=404,
             detail="Resource not found",
             type="resource-not-found",
@@ -28,7 +28,6 @@ class AppException(Exception):
             instance="/api/v1/users/abc123",
             extra={"resource_id": "abc123", "resource_type": "user"}
         )
-        ```
     """
 
     def __init__(
@@ -88,13 +87,11 @@ class NotFoundException(AppException):
     """Exception raised when a resource is not found.
 
     Example:
-        ```python
-        raise NotFoundException(
+            raise NotFoundException(
             detail="User with ID abc123 not found",
             type="user-not-found",
             extra={"user_id": "abc123"}
         )
-        ```
     """
 
     def __init__(
@@ -126,13 +123,11 @@ class ValidationException(AppException):
     """Exception raised for validation errors.
 
     Example:
-        ```python
-        raise ValidationException(
+            raise ValidationException(
             detail="Email address is invalid",
             type="validation-error",
             extra={"field": "email", "value": "invalid@"}
         )
-        ```
     """
 
     def __init__(
@@ -164,13 +159,11 @@ class UnauthorizedException(AppException):
     """Exception raised for authentication failures.
 
     Example:
-        ```python
-        raise UnauthorizedException(
+            raise UnauthorizedException(
             detail="Invalid credentials",
             type="unauthorized",
             extra={"auth_method": "bearer"}
         )
-        ```
     """
 
     def __init__(
@@ -202,13 +195,11 @@ class ForbiddenException(AppException):
     """Exception raised for authorization failures.
 
     Example:
-        ```python
-        raise ForbiddenException(
+            raise ForbiddenException(
             detail="Insufficient permissions",
             type="forbidden",
             extra={"required_permission": "admin", "user_role": "user"}
         )
-        ```
     """
 
     def __init__(
@@ -240,13 +231,11 @@ class ConflictException(AppException):
     """Exception raised for resource conflicts.
 
     Example:
-        ```python
-        raise ConflictException(
+            raise ConflictException(
             detail="User with email already exists",
             type="resource-conflict",
             extra={"field": "email", "value": "user@example.com"}
         )
-        ```
     """
 
     def __init__(
@@ -278,13 +267,11 @@ class BadRequestException(AppException):
     """Exception raised for malformed requests.
 
     Example:
-        ```python
-        raise BadRequestException(
+            raise BadRequestException(
             detail="Invalid request format",
             type="bad-request",
             extra={"reason": "missing required field"}
         )
-        ```
     """
 
     def __init__(
@@ -316,13 +303,11 @@ class RateLimitException(AppException):
     """Exception raised when rate limit is exceeded.
 
     Example:
-        ```python
-        raise RateLimitException(
+            raise RateLimitException(
             detail="Too many requests",
             type="rate-limit-exceeded",
             extra={"retry_after": 60, "limit": 100, "window": "minute"}
         )
-        ```
     """
 
     def __init__(
@@ -354,13 +339,11 @@ class ServiceUnavailableException(AppException):
     """Exception raised when a service is temporarily unavailable.
 
     Example:
-        ```python
-        raise ServiceUnavailableException(
+            raise ServiceUnavailableException(
             detail="Database is temporarily unavailable",
             type="service-unavailable",
             extra={"service": "postgresql", "retry_after": 30}
         )
-        ```
     """
 
     def __init__(
@@ -392,12 +375,10 @@ class CircuitBreakerOpenException(ServiceUnavailableException):
     """Exception raised when circuit breaker is open.
 
     Example:
-        ```python
-        raise CircuitBreakerOpenException(
+            raise CircuitBreakerOpenException(
             detail="Auth service circuit breaker is open",
             extra={"service": "auth", "failures": 5, "retry_after": 60}
         )
-        ```
     """
 
     def __init__(
@@ -425,13 +406,11 @@ class InternalServerException(AppException):
     """Exception raised for internal server errors.
 
     Example:
-        ```python
-        raise InternalServerException(
+            raise InternalServerException(
             detail="An unexpected error occurred",
             type="internal-error",
             extra={"error_id": "abc123"}
         )
-        ```
     """
 
     def __init__(

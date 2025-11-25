@@ -11,31 +11,25 @@ Models can mix and match capabilities by inheriting from specific mixins.
 
 Examples:
     Simple model with integer PK and timestamps:
-    ```python
     class User(Base, IntegerPKMixin, TimestampMixin):
         __tablename__ = "users"
         email: Mapped[str] = mapped_column(String(255), unique=True)
-    ```
 
     UUID model with full audit trail:
-    ```python
     class Document(Base, UUIDPKMixin, TimestampMixin, AuditColumnsMixin):
         __tablename__ = "documents"
         title: Mapped[str] = mapped_column(String(255))
-    ```
 
     Soft-deletable model:
-    ```python
     class Post(Base, IntegerPKMixin, TimestampMixin, SoftDeleteMixin):
         __tablename__ = "posts"
         content: Mapped[str] = mapped_column(Text)
-    ```
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any
 
 from sqlalchemy import DateTime, MetaData, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column
@@ -182,8 +176,7 @@ class AuditColumnsMixin:
         updated_by: User ID/email who last modified the record
 
     Usage:
-        ```python
-        # In your repository or service:
+            # In your repository or service:
         user = User(email="user@example.com")
         user.created_by = current_user.email
         session.add(user)
@@ -192,7 +185,6 @@ class AuditColumnsMixin:
         # On update:
         user.name = "New Name"
         user.updated_by = current_user.email
-        ```
 
     Note: These fields are nullable to support anonymous or system operations.
     """
@@ -226,8 +218,7 @@ class SoftDeleteMixin:
         is_deleted: Property to check if record is deleted
 
     Usage:
-        ```python
-        # Soft delete:
+            # Soft delete:
         user.deleted_at = datetime.now(UTC)
         await session.commit()
 
@@ -241,7 +232,6 @@ class SoftDeleteMixin:
         # Recover deleted record:
         user.deleted_at = None
         await session.commit()
-        ```
 
     Note: Queries must explicitly filter out soft-deleted records
     using `.where(Model.deleted_at.is_(None))` or use a query helper.
@@ -274,15 +264,13 @@ class SoftDeleteMixin:
 class TimestampedBase(Base, IntegerPKMixin, TimestampMixin):
     """Convenience base with integer PK and timestamps.
 
-    Equivalent to the original TimestampedBase from infra.database.base.
+    Equivalent to the original TimestampedBase from the legacy infra database module.
     Provided for backward compatibility and common use case.
 
     Example:
-        ```python
-        class User(TimestampedBase):
+            class User(TimestampedBase):
             __tablename__ = "users"
             email: Mapped[str] = mapped_column(String(255), unique=True)
-        ```
     """
 
     __abstract__ = True
@@ -295,11 +283,9 @@ class UUIDTimestampedBase(Base, UUIDPKMixin, TimestampMixin):
     when you need non-sequential, globally unique IDs.
 
     Example:
-        ```python
-        class Document(UUIDTimestampedBase):
+            class Document(UUIDTimestampedBase):
             __tablename__ = "documents"
             title: Mapped[str] = mapped_column(String(255))
-        ```
     """
 
     __abstract__ = True
@@ -312,11 +298,9 @@ class AuditedBase(Base, IntegerPKMixin, TimestampMixin, AuditColumnsMixin):
     Best for models where compliance or audit requirements exist.
 
     Example:
-        ```python
-        class Transaction(AuditedBase):
+            class Transaction(AuditedBase):
             __tablename__ = "transactions"
             amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
-        ```
     """
 
     __abstract__ = True

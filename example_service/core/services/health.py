@@ -1,8 +1,9 @@
 """Health check service."""
+
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from example_service.core.schemas.common import HealthStatus
@@ -44,8 +45,7 @@ class HealthService(BaseService):
             Health check result with status, timestamp, and dependency checks.
 
         Example:
-            ```python
-            service = HealthService()
+                    service = HealthService()
             health = await service.check_health()
             # {
             #   "status": "healthy",
@@ -54,7 +54,6 @@ class HealthService(BaseService):
             #   "version": "0.1.0",
             #   "checks": {"database": true, "cache": true}
             # }
-            ```
         """
         # Perform all health checks
         checks = await self._perform_health_checks()
@@ -72,7 +71,7 @@ class HealthService(BaseService):
 
         return {
             "status": status,
-            "timestamp": datetime.now(timezone.utc),
+            "timestamp": datetime.now(UTC),
             "service": app_settings.service_name,
             "version": "0.1.0",
             "checks": checks,
@@ -93,12 +92,10 @@ class HealthService(BaseService):
             Readiness check result.
 
         Example:
-            ```python
-            result = await service.readiness()
+                    result = await service.readiness()
             if result["ready"]:
                 # Service can accept traffic
                 pass
-            ```
         """
         checks = await self._perform_readiness_checks()
         all_ready = all(checks.values())
@@ -106,7 +103,7 @@ class HealthService(BaseService):
         return {
             "ready": all_ready,
             "checks": checks,
-            "timestamp": datetime.now(timezone.utc),
+            "timestamp": datetime.now(UTC),
         }
 
     async def liveness(self) -> dict[str, Any]:
@@ -122,14 +119,12 @@ class HealthService(BaseService):
             Liveness check result.
 
         Example:
-            ```python
-            result = await service.liveness()
+                    result = await service.liveness()
             # Always returns {"alive": True} if code executes
-            ```
         """
         return {
             "alive": True,
-            "timestamp": datetime.now(timezone.utc),
+            "timestamp": datetime.now(UTC),
             "service": app_settings.service_name,
         }
 
@@ -146,7 +141,7 @@ class HealthService(BaseService):
         # Add initialization checks here if needed
         return {
             "started": True,
-            "timestamp": datetime.now(timezone.utc),
+            "timestamp": datetime.now(UTC),
         }
 
     async def _perform_health_checks(self) -> dict[str, bool]:
@@ -218,14 +213,15 @@ class HealthService(BaseService):
             # Import here to avoid circular dependencies
             import asyncio
 
-            from example_service.infra.database.session import engine
             from sqlalchemy import text
+
+            from example_service.infra.database.session import engine
 
             async with asyncio.timeout(db_settings.health_check_timeout):
                 async with engine.connect() as conn:
                     await conn.execute(text("SELECT 1"))
             return True
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(
                 "Database health check timed out",
                 extra={"timeout": db_settings.health_check_timeout},
@@ -283,9 +279,7 @@ class HealthService(BaseService):
         try:
             import aio_pika
 
-            connection = await aio_pika.connect_robust(
-                rabbit_settings.get_url(), timeout=5.0
-            )
+            connection = await aio_pika.connect_robust(rabbit_settings.get_url(), timeout=5.0)
             await connection.close()
             return True
         except Exception as e:

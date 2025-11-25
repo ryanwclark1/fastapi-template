@@ -1,4 +1,5 @@
 """Authentication and authorization schemas."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -15,25 +16,17 @@ class TokenPayload(BaseModel):
 
     sub: str = Field(min_length=1, max_length=255, description="Subject (user ID or service ID)")
     user_id: str | None = Field(
-        default=None,
-        max_length=255,
-        description="User ID if authenticated as user"
+        default=None, max_length=255, description="User ID if authenticated as user"
     )
     service_id: str | None = Field(
-        default=None,
-        max_length=255,
-        description="Service ID if authenticated as service"
+        default=None, max_length=255, description="Service ID if authenticated as service"
     )
     email: EmailStr | None = Field(default=None, description="User email")
     roles: list[str] = Field(
-        default_factory=list,
-        max_length=50,
-        description="User or service roles"
+        default_factory=list, max_length=50, description="User or service roles"
     )
     permissions: list[str] = Field(
-        default_factory=list,
-        max_length=200,
-        description="Granted permissions"
+        default_factory=list, max_length=200, description="Granted permissions"
     )
     acl: dict[str, Any] = Field(
         default_factory=dict, description="Access Control List with resource permissions"
@@ -76,14 +69,10 @@ class AuthUser(BaseModel):
     service_id: str | None = Field(default=None, max_length=255, description="Service ID")
     email: EmailStr | None = Field(default=None, description="User email")
     roles: list[str] = Field(
-        default_factory=list,
-        max_length=50,
-        description="User or service roles"
+        default_factory=list, max_length=50, description="User or service roles"
     )
     permissions: list[str] = Field(
-        default_factory=list,
-        max_length=200,
-        description="Granted permissions"
+        default_factory=list, max_length=200, description="Granted permissions"
     )
     acl: dict[str, Any] = Field(
         default_factory=dict, description="Access Control List with resource permissions"
@@ -164,11 +153,9 @@ class AuthUser(BaseModel):
             True if access is allowed, False otherwise.
 
         Example:
-            ```python
-            if user.can_access_resource("posts", "delete"):
+                    if user.can_access_resource("posts", "delete"):
                 # Allow deletion
                 pass
-            ```
         """
         if not resource or not resource.strip() or not action or not action.strip():
             return False

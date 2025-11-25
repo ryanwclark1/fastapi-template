@@ -43,49 +43,49 @@ if TYPE_CHECKING:
     from .redis import RedisSettings
 
 
-def _get_app_settings() -> "AppSettings":
+def _get_app_settings() -> AppSettings:
     """Lazy import to avoid circular dependencies."""
     from .app import AppSettings
     return AppSettings()
 
 
-def _get_db_settings() -> "PostgresSettings":
+def _get_db_settings() -> PostgresSettings:
     """Lazy import to avoid circular dependencies."""
     from .postgres import PostgresSettings
     return PostgresSettings()
 
 
-def _get_redis_settings() -> "RedisSettings":
+def _get_redis_settings() -> RedisSettings:
     """Lazy import to avoid circular dependencies."""
     from .redis import RedisSettings
     return RedisSettings()
 
 
-def _get_rabbit_settings() -> "RabbitSettings":
+def _get_rabbit_settings() -> RabbitSettings:
     """Lazy import to avoid circular dependencies."""
     from .rabbit import RabbitSettings
     return RabbitSettings()
 
 
-def _get_logging_settings() -> "LoggingSettings":
+def _get_logging_settings() -> LoggingSettings:
     """Lazy import to avoid circular dependencies."""
     from .logs import LoggingSettings
     return LoggingSettings()
 
 
-def _get_otel_settings() -> "OtelSettings":
+def _get_otel_settings() -> OtelSettings:
     """Lazy import to avoid circular dependencies."""
     from .otel import OtelSettings
     return OtelSettings()
 
 
-def _get_auth_settings() -> "AuthSettings":
+def _get_auth_settings() -> AuthSettings:
     """Lazy import to avoid circular dependencies."""
     from .auth import AuthSettings
     return AuthSettings()
 
 
-def _get_backup_settings() -> "BackupSettings":
+def _get_backup_settings() -> BackupSettings:
     """Lazy import to avoid circular dependencies."""
     from .backup import BackupSettings
     return BackupSettings()
@@ -112,14 +112,14 @@ class Settings(BaseSettings):
     )
 
     # Domain settings - each uses default_factory to create fresh instances
-    app: "AppSettings" = Field(default_factory=_get_app_settings)
-    db: "PostgresSettings" = Field(default_factory=_get_db_settings)
-    redis: "RedisSettings" = Field(default_factory=_get_redis_settings)
-    rabbit: "RabbitSettings" = Field(default_factory=_get_rabbit_settings)
-    logging: "LoggingSettings" = Field(default_factory=_get_logging_settings)
-    otel: "OtelSettings" = Field(default_factory=_get_otel_settings)
-    auth: "AuthSettings" = Field(default_factory=_get_auth_settings)
-    backup: "BackupSettings" = Field(default_factory=_get_backup_settings)
+    app: AppSettings = Field(default_factory=_get_app_settings)
+    db: PostgresSettings = Field(default_factory=_get_db_settings)
+    redis: RedisSettings = Field(default_factory=_get_redis_settings)
+    rabbit: RabbitSettings = Field(default_factory=_get_rabbit_settings)
+    logging: LoggingSettings = Field(default_factory=_get_logging_settings)
+    otel: OtelSettings = Field(default_factory=_get_otel_settings)
+    auth: AuthSettings = Field(default_factory=_get_auth_settings)
+    backup: BackupSettings = Field(default_factory=_get_backup_settings)
 
 
 def _rebuild_model() -> None:

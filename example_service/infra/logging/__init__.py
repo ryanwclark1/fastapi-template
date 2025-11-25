@@ -7,11 +7,11 @@ Provides production-ready structured logging with:
 - Per-handler log levels (console vs file)
 - Lazy evaluation for expensive operations
 - OpenTelemetry trace correlation
+- Loguru-inspired features (catch decorator, opt method, diagnose mode)
 
 Basic usage:
-    ```python
     # Automatic context injection (recommended)
-    from example_service.infra.logging.context import set_log_context
+    from example_service.infra.logging import set_log_context
     import logging
 
     logger = logging.getLogger(__name__)
@@ -21,13 +21,59 @@ Basic usage:
     logger.info("Processing request")  # Automatically includes request_id and user_id
 
     # Lazy evaluation for expensive operations
-    from example_service.infra.logging.lazy import get_lazy_logger
+    from example_service.infra.logging import get_lazy_logger
 
     lazy_logger = get_lazy_logger(__name__)
     lazy_logger.debug(lambda: f"Expensive: {compute_heavy_data()}")  # Only runs if DEBUG enabled
-    ```
+
+    # Catch decorator for automatic exception logging
+    from example_service.infra.logging import catch
+
+    @catch(level="ERROR", message="Division failed")
+    def divide(a: int, b: int) -> float:
+        return a / b  # Exceptions automatically logged
+
+    # Opt method for per-call customization
+    from example_service.infra.logging import get_opt_logger
+
+    opt_logger = get_opt_logger(__name__)
+    opt_logger.opt(lazy=True).debug("Result: {}", expensive_func)
+    opt_logger.opt(exception=True).error("Failed")
 """
-from example_service.infra.logging.config import configure_logging
+
+from example_service.infra.logging.color_convert import (
+    hex_to_ansi,
+    hex_to_ansi_bg,
+    hex_to_rgb,
+    rgb_to_ansi,
+    rgb_to_ansi_16,
+    rgb_to_ansi_256,
+    rgb_to_ansi_bg,
+    rgb_to_ansi_bg_16,
+    rgb_to_ansi_bg_256,
+    rgb_to_ansi_bg_truecolor,
+    rgb_to_ansi_truecolor,
+)
+from example_service.infra.logging.color_formatter import (
+    ColoredConsoleFormatter,
+    MinimalColoredFormatter,
+    create_colored_handler,
+)
+from example_service.infra.logging.color_modes import (
+    ColorMode,
+    color_mode_manager,
+    detect_color_mode,
+    get_color_mode,
+    supports_color,
+)
+from example_service.infra.logging.colors import (
+    ANSIColors,
+    clear_color_cache,
+    is_color_enabled,
+    should_colorize,
+    strip_ansi,
+)
+from example_service.infra.logging.config import complete, configure_logging, shutdown
 from example_service.infra.logging.context import (
     ContextBoundLogger,
     ContextInjectingFilter,
@@ -37,6 +83,12 @@ from example_service.infra.logging.context import (
     set_log_context,
     update_log_context,
 )
+from example_service.infra.logging.decorators import CatchContext, catch, catch_context
+from example_service.infra.logging.diagnose import (
+    DiagnoseFormatter,
+    create_diagnose_handler,
+    should_enable_diagnose,
+)
 from example_service.infra.logging.formatters import JSONFormatter
 from example_service.infra.logging.lazy import (
     LazyLoggerAdapter,
@@ -44,6 +96,7 @@ from example_service.infra.logging.lazy import (
     get_lazy_logger,
     lazy,
 )
+from example_service.infra.logging.opt import OptLoggerAdapter, get_opt_logger
 from example_service.infra.logging.sampling import (
     RateLimitFilter,
     SamplingFilter,
@@ -53,6 +106,8 @@ from example_service.infra.logging.sampling import (
 __all__ = [
     # Configuration
     "configure_logging",
+    "complete",
+    "shutdown",
     # Context management (recommended)
     "set_log_context",
     "get_log_context",
@@ -66,6 +121,44 @@ __all__ = [
     "LazyString",
     "get_lazy_logger",
     "lazy",
+    # Exception catching (loguru-inspired)
+    "catch",
+    "catch_context",
+    "CatchContext",
+    # Opt method (loguru-inspired)
+    "OptLoggerAdapter",
+    "get_opt_logger",
+    # Diagnose mode (loguru-inspired)
+    "DiagnoseFormatter",
+    "create_diagnose_handler",
+    "should_enable_diagnose",
+    # Colors (loguru-inspired)
+    "ANSIColors",
+    "ColoredConsoleFormatter",
+    "MinimalColoredFormatter",
+    "create_colored_handler",
+    "should_colorize",
+    "is_color_enabled",
+    "strip_ansi",
+    "clear_color_cache",
+    # Terminal capability detection
+    "ColorMode",
+    "detect_color_mode",
+    "get_color_mode",
+    "supports_color",
+    "color_mode_manager",
+    # RGB/Hex color conversion
+    "hex_to_rgb",
+    "hex_to_ansi",
+    "hex_to_ansi_bg",
+    "rgb_to_ansi",
+    "rgb_to_ansi_16",
+    "rgb_to_ansi_256",
+    "rgb_to_ansi_truecolor",
+    "rgb_to_ansi_bg",
+    "rgb_to_ansi_bg_16",
+    "rgb_to_ansi_bg_256",
+    "rgb_to_ansi_bg_truecolor",
     # Formatters and filters
     "JSONFormatter",
     "ContextInjectingFilter",

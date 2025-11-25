@@ -1,4 +1,5 @@
 """RFC 7807 Problem Details schema for error responses."""
+
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -13,8 +14,7 @@ class ProblemDetails(BaseModel):
     See: https://datatracker.ietf.org/doc/html/rfc7807
 
     Example:
-        ```python
-        return JSONResponse(
+            return JSONResponse(
             status_code=404,
             content=ProblemDetails(
                 type="user-not-found",
@@ -24,7 +24,6 @@ class ProblemDetails(BaseModel):
                 instance="/api/v1/users/abc123"
             ).model_dump()
         )
-        ```
     """
 
     type: str = Field(
@@ -34,24 +33,18 @@ class ProblemDetails(BaseModel):
         description="URI reference identifying the problem type",
     )
     title: str = Field(
-        min_length=1,
-        max_length=200,
-        description="Short, human-readable summary of the problem"
+        min_length=1, max_length=200, description="Short, human-readable summary of the problem"
     )
-    status: int = Field(
-        ge=100,
-        le=599,
-        description="HTTP status code"
-    )
+    status: int = Field(ge=100, le=599, description="HTTP status code")
     detail: str | None = Field(
         default=None,
         max_length=2000,
-        description="Human-readable explanation specific to this occurrence"
+        description="Human-readable explanation specific to this occurrence",
     )
     instance: str | None = Field(
         default=None,
         max_length=500,
-        description="URI reference identifying the specific occurrence"
+        description="URI reference identifying the specific occurrence",
     )
 
     model_config = ConfigDict(

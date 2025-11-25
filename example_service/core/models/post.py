@@ -42,7 +42,7 @@ class Post(TimestampedBase):
     )
 
     # Relationships
-    author: Mapped["User"] = relationship("User", back_populates="posts")
+    author: Mapped[User] = relationship("User", back_populates="posts")
 
     # Additional indexes
     __table_args__ = (

@@ -11,7 +11,7 @@ from __future__ import annotations
 import csv
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -54,8 +54,7 @@ if broker is not None:
             Export result with file path and record count.
 
         Example:
-            ```python
-            from example_service.tasks.export import export_data_csv
+                    from example_service.tasks.export import export_data_csv
 
             # Export all reminders
             task = await export_data_csv.kiq(model_name="reminders")
@@ -67,11 +66,10 @@ if broker is not None:
             )
             result = await task.wait_result()
             print(result["filepath"])
-            ```
         """
         export_dir = ensure_export_dir()
 
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         filename = f"{model_name}_{timestamp}.csv"
         filepath = export_dir / filename
 
@@ -93,7 +91,16 @@ if broker is not None:
                 db_records = result.scalars().all()
 
                 # Define fields for reminders
-                default_fields = ["id", "title", "description", "remind_at", "is_completed", "notification_sent", "created_at", "updated_at"]
+                default_fields = [
+                    "id",
+                    "title",
+                    "description",
+                    "remind_at",
+                    "is_completed",
+                    "notification_sent",
+                    "created_at",
+                    "updated_at",
+                ]
                 fieldnames = fields or default_fields
 
                 for record in db_records:
@@ -174,7 +181,7 @@ if broker is not None:
         """
         export_dir = ensure_export_dir()
 
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         filename = f"{model_name}_{timestamp}.json"
         filepath = export_dir / filename
 
@@ -193,7 +200,16 @@ if broker is not None:
                 result = await session.execute(stmt)
                 db_records = result.scalars().all()
 
-                default_fields = ["id", "title", "description", "remind_at", "is_completed", "notification_sent", "created_at", "updated_at"]
+                default_fields = [
+                    "id",
+                    "title",
+                    "description",
+                    "remind_at",
+                    "is_completed",
+                    "notification_sent",
+                    "created_at",
+                    "updated_at",
+                ]
                 selected_fields = fields or default_fields
 
                 for record in db_records:
@@ -202,7 +218,9 @@ if broker is not None:
                         value = getattr(record, field, None)
                         if isinstance(value, datetime):
                             value = value.isoformat()
-                        elif hasattr(value, "__str__") and not isinstance(value, (str, int, float, bool, type(None))):
+                        elif hasattr(value, "__str__") and not isinstance(
+                            value, (str, int, float, bool, type(None))
+                        ):
                             value = str(value)
                         row[field] = value
                     records.append(row)
@@ -216,7 +234,7 @@ if broker is not None:
         # Write JSON
         export_data = {
             "model": model_name,
-            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "exported_at": datetime.now(UTC).isoformat(),
             "record_count": len(records),
             "records": records,
         }
@@ -272,13 +290,15 @@ if broker is not None:
         for export_file in sorted(export_dir.glob("*.*"), reverse=True):
             if export_file.is_file():
                 stat = export_file.stat()
-                exports.append({
-                    "filename": export_file.name,
-                    "path": str(export_file),
-                    "size_bytes": stat.st_size,
-                    "size_kb": round(stat.st_size / 1024, 2),
-                    "modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
-                })
+                exports.append(
+                    {
+                        "filename": export_file.name,
+                        "path": str(export_file),
+                        "size_bytes": stat.st_size,
+                        "size_kb": round(stat.st_size / 1024, 2),
+                        "modified": datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat(),
+                    }
+                )
 
         return {
             "status": "success",

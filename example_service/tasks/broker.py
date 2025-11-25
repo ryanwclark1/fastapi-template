@@ -132,14 +132,12 @@ async def get_broker() -> AsyncIterator[AioPikaBrokerType | None]:
         Taskiq broker instance.
 
     Example:
-        ```python
-        from example_service.tasks.tasks import example_task
+            from example_service.tasks.tasks import example_task
 
         @router.post("/schedule")
         async def schedule_task():
             task = await example_task.kiq(data="test")
             return {"task_id": task.task_id}
-        ```
     """
     yield broker
 

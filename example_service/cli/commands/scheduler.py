@@ -8,7 +8,7 @@ This module provides CLI commands for managing APScheduler jobs:
 """
 
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import click
 
@@ -34,7 +34,8 @@ async def list_jobs(output_format: str) -> None:
     header("Scheduled Jobs")
 
     try:
-        from example_service.tasks.scheduler import get_job_status, scheduler as apscheduler
+        from example_service.tasks.scheduler import get_job_status
+        from example_service.tasks.scheduler import scheduler as apscheduler
 
         if not apscheduler.running:
             warning("Scheduler is not running")
@@ -54,7 +55,7 @@ async def list_jobs(output_format: str) -> None:
             return
 
         # Table format
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Calculate column widths
         id_width = max(len(j["id"]) for j in jobs) + 2
@@ -190,7 +191,8 @@ async def pause_job(job_id: str) -> None:
     The job will not run until it is resumed.
     """
     try:
-        from example_service.tasks.scheduler import pause_job as do_pause, scheduler as apscheduler
+        from example_service.tasks.scheduler import pause_job as do_pause
+        from example_service.tasks.scheduler import scheduler as apscheduler
 
         job = apscheduler.get_job(job_id)
         if job is None:
@@ -219,7 +221,8 @@ async def resume_job(job_id: str) -> None:
     JOB_ID is the ID of the scheduled job to resume.
     """
     try:
-        from example_service.tasks.scheduler import resume_job as do_resume, scheduler as apscheduler
+        from example_service.tasks.scheduler import resume_job as do_resume
+        from example_service.tasks.scheduler import scheduler as apscheduler
 
         job = apscheduler.get_job(job_id)
         if job is None:
@@ -343,14 +346,14 @@ async def show_jobs_by_category(category: str | None) -> None:
             click.secho(f"Job: {job.id}", bold=True)
             click.echo(f"  Name:       {job.name}")
             click.echo(f"  Category:   {job_category}")
-            click.echo(f"  Status:     ", nl=False)
+            click.echo("  Status:     ", nl=False)
             click.secho(status, fg=status_color)
             click.echo(f"  Trigger:    {job.trigger}")
 
             if job.next_run_time:
                 click.echo(f"  Next Run:   {job.next_run_time.isoformat()}")
             else:
-                click.echo(f"  Next Run:   N/A (paused)")
+                click.echo("  Next Run:   N/A (paused)")
 
             click.echo()
 

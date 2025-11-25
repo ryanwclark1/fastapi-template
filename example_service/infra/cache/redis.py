@@ -8,6 +8,7 @@ This module provides a high-level Redis cache client that includes:
 - Health checks
 - Prometheus metrics with trace correlation
 """
+
 from __future__ import annotations
 
 import json
@@ -42,8 +43,7 @@ class RedisCache:
     with automatic retry on transient failures.
 
     Example:
-        ```python
-        cache = RedisCache()
+            cache = RedisCache()
         await cache.connect()
 
         # Set a value
@@ -56,7 +56,6 @@ class RedisCache:
         await cache.delete("key")
 
         await cache.disconnect()
-        ```
     """
 
     def __init__(self) -> None:
@@ -133,7 +132,7 @@ class RedisCache:
         initial_delay=redis_settings.retry_delay,
         max_delay=5.0,
         exceptions=(RedisConnectionError, RedisTimeoutError),
-        stop_after_delay=10.0,  # Cache ops should be fast - hard cap at 10 seconds
+        stop_after_delay=redis_settings.retry_timeout,
     )
     async def get(self, key: str) -> Any | None:
         """Get a value from cache with automatic retry and metrics.
@@ -206,7 +205,7 @@ class RedisCache:
         initial_delay=redis_settings.retry_delay,
         max_delay=5.0,
         exceptions=(RedisConnectionError, RedisTimeoutError),
-        stop_after_delay=10.0,  # Cache ops should be fast - hard cap at 10 seconds
+        stop_after_delay=redis_settings.retry_timeout,
     )
     async def set(
         self,
@@ -267,7 +266,7 @@ class RedisCache:
         initial_delay=redis_settings.retry_delay,
         max_delay=5.0,
         exceptions=(RedisConnectionError, RedisTimeoutError),
-        stop_after_delay=10.0,  # Cache ops should be fast - hard cap at 10 seconds
+        stop_after_delay=redis_settings.retry_timeout,
     )
     async def delete(self, key: str) -> bool:
         """Delete a value from cache with automatic retry and metrics.
@@ -317,7 +316,7 @@ class RedisCache:
         initial_delay=redis_settings.retry_delay,
         max_delay=5.0,
         exceptions=(RedisConnectionError, RedisTimeoutError),
-        stop_after_delay=10.0,  # Cache ops should be fast - hard cap at 10 seconds
+        stop_after_delay=redis_settings.retry_timeout,
     )
     async def exists(self, key: str) -> bool:
         """Check if a key exists in cache with automatic retry and metrics.
@@ -389,8 +388,7 @@ async def get_cache() -> AsyncIterator[RedisCache]:
         Redis cache instance.
 
     Example:
-        ```python
-        @router.get("/data")
+            @router.get("/data")
         async def get_data(
             cache: RedisCache = Depends(get_cache)
         ):
@@ -399,7 +397,6 @@ async def get_cache() -> AsyncIterator[RedisCache]:
                 data = fetch_from_database()
                 await cache.set("my-key", data, ttl=3600)
             return data
-        ```
     """
     global _cache
     if _cache is None:

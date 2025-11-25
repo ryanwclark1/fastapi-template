@@ -55,7 +55,7 @@ if broker is not None:
             deleted_count = 0  # Placeholder
             logger.info(f"Cleaned up {deleted_count} expired sessions")
             return {"status": "success", "deleted_count": deleted_count}
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to cleanup sessions")
             raise
 
@@ -76,7 +76,7 @@ if broker is not None:
             }
             logger.info("Hourly metrics generated successfully")
             return {"status": "success", "metrics": metrics}
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to generate metrics")
             raise
 
@@ -93,7 +93,7 @@ if broker is not None:
             synced_count = 0  # Placeholder
             logger.info(f"Synced {synced_count} records from external source")
             return {"status": "success", "synced_count": synced_count}
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to sync external data")
             raise
 
@@ -110,7 +110,7 @@ if broker is not None:
             sent_count = 0  # Placeholder
             logger.info(f"Sent daily digest to {sent_count} users")
             return {"status": "success", "sent_count": sent_count}
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to send daily digest")
             raise
 
@@ -124,9 +124,12 @@ if broker is not None:
         - Scheduled task execution
         - Message bus publishing
         - System health monitoring
+
+        Note: This task runs in a Taskiq worker, so it uses broker_context()
+        to manage the FastStream broker lifecycle.
         """
         from example_service.core.settings import get_rabbit_settings
-        from example_service.infra.messaging.broker import broker as faststream_broker
+        from example_service.infra.messaging.broker import broker_context
 
         rabbit_settings = get_rabbit_settings()
 
@@ -136,15 +139,16 @@ if broker is not None:
             "service": "example-service",
         }
 
-        if faststream_broker is not None and rabbit_settings.is_configured:
-            echo_queue = rabbit_settings.get_prefixed_queue("echo-service")
-            await faststream_broker.publish(
-                message=heartbeat,
-                queue=echo_queue,
-            )
-            logger.info("Heartbeat published to message bus", extra=heartbeat)
-        else:
-            logger.warning("Message broker not available, heartbeat not published")
+        async with broker_context() as faststream_broker:
+            if faststream_broker is not None:
+                echo_queue = rabbit_settings.get_prefixed_queue("echo-service")
+                await faststream_broker.publish(
+                    message=heartbeat,
+                    queue=echo_queue,
+                )
+                logger.info("Heartbeat published to message bus", extra=heartbeat)
+            else:
+                logger.warning("Message broker not available, heartbeat not published")
 
         return {"status": "heartbeat_sent", **heartbeat}
 

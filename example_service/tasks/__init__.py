@@ -17,6 +17,8 @@ Run the worker to execute tasks:
 """
 from __future__ import annotations
 
+# Re-export task modules for convenient access
+from example_service.tasks import backup, cache, cleanup, export, notifications
 from example_service.tasks.broker import broker, get_broker
 from example_service.tasks.scheduler import (
     get_job_status,
@@ -33,13 +35,6 @@ from example_service.tasks.tracking import (
     start_tracker,
     stop_tracker,
 )
-
-# Re-export task modules for convenient access
-from example_service.tasks import backup
-from example_service.tasks import cache
-from example_service.tasks import cleanup
-from example_service.tasks import export
-from example_service.tasks import notifications
 
 __all__ = [
     # Broker

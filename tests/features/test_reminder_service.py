@@ -4,9 +4,9 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from example_service.core.database.base import Base
 from example_service.features.reminders.schemas import ReminderCreate
 from example_service.features.reminders.service import ReminderService
-from example_service.infra.database.base import Base
 
 
 @pytest.fixture

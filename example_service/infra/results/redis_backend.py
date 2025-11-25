@@ -54,15 +54,13 @@ class RedisAsyncResultBackend(AsyncResultBackend[_ReturnType]):
     - Custom key prefixes for multi-tenant scenarios
 
     Example:
-        ```python
-        from example_service.infra.results import RedisAsyncResultBackend
+            from example_service.infra.results import RedisAsyncResultBackend
 
         backend = RedisAsyncResultBackend(
             redis_url="redis://localhost:6379/0",
             result_ex_time=3600,  # Results expire after 1 hour
             prefix_str="myapp",   # All keys prefixed with "myapp:"
         )
-        ```
     """
 
     def __init__(
@@ -274,12 +272,10 @@ class RedisAsyncClusterResultBackend(AsyncResultBackend[_ReturnType]):
     horizontal scalability and high availability.
 
     Example:
-        ```python
-        backend = RedisAsyncClusterResultBackend(
+            backend = RedisAsyncClusterResultBackend(
             redis_url="redis://node1:6379,node2:6379,node3:6379",
             result_ex_time=3600,
         )
-        ```
     """
 
     def __init__(
@@ -432,13 +428,11 @@ class RedisAsyncSentinelResultBackend(AsyncResultBackend[_ReturnType]):
     failover capabilities via Redis Sentinel.
 
     Example:
-        ```python
-        backend = RedisAsyncSentinelResultBackend(
+            backend = RedisAsyncSentinelResultBackend(
             sentinels=[("sentinel1", 26379), ("sentinel2", 26379)],
             master_name="mymaster",
             result_ex_time=3600,
         )
-        ```
     """
 
     def __init__(

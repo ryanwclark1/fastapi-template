@@ -8,6 +8,7 @@ The middleware:
 2. Records task completion (success/failure) in post_execute
 3. Stores all data in Redis via TaskExecutionTracker
 """
+
 from __future__ import annotations
 
 import logging
@@ -35,10 +36,8 @@ class TrackingMiddleware(TaskiqMiddleware):
     - Execution duration
 
     Example usage:
-        ```python
-        broker = AioPikaBroker(...)
+            broker = AioPikaBroker(...)
         broker.add_middlewares(TrackingMiddleware())
-        ```
 
     The tracked data can then be queried via the admin REST API.
     """
@@ -61,8 +60,8 @@ class TrackingMiddleware(TaskiqMiddleware):
 
     async def pre_execute(
         self,
-        message: "TaskiqMessage",
-    ) -> "TaskiqMessage":
+        message: TaskiqMessage,
+    ) -> TaskiqMessage:
         """Record task start event.
 
         This is called before the task function is executed.
@@ -104,8 +103,8 @@ class TrackingMiddleware(TaskiqMiddleware):
 
     async def post_execute(
         self,
-        message: "TaskiqMessage",
-        result: "TaskiqResult[Any]",
+        message: TaskiqMessage,
+        result: TaskiqResult[Any],
     ) -> None:
         """Record task completion event.
 

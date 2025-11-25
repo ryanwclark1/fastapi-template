@@ -20,16 +20,17 @@ def run_fastapi_server() -> NoReturn:
     """
     import uvicorn
 
-    from example_service.core.settings import get_app_settings
+    from example_service.core.settings import get_app_settings, get_logging_settings
 
     settings = get_app_settings()
+    log_settings = get_logging_settings()
 
     uvicorn.run(
         "example_service.app.main:app",
         host=settings.host,
         port=settings.port,
         reload=settings.debug,
-        log_level=settings.log_level.lower(),
+        log_level=log_settings.level.lower(),
     )
     sys.exit(0)
 

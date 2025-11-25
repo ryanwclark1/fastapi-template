@@ -1,6 +1,47 @@
-"""Database infrastructure package."""
+"""Database infrastructure package.
 
-from .base import Base, TimestampedBase
+This package provides database session management and utilities:
+
+- **Session Management**: Async SQLAlchemy engine and session factory
+- **Alembic Commands**: Programmatic migration API
+- **Schema Utilities**: Schema inspection, comparison, and management
+
+Example:
+    from example_service.infra.database import (
+        engine,
+        get_async_session,
+        get_alembic_commands,
+        drop_all,
+        dump_schema,
+    )
+
+    # Use database session
+    async with get_async_session() as session:
+        result = await session.execute(...)
+
+    # Run migrations programmatically
+    commands = get_alembic_commands()
+    await commands.upgrade("head")
+
+    # Schema operations
+    schema_info = await dump_schema(engine)
+"""
+
+# Alembic commands - programmatic migration API
+from .alembic import (
+    AlembicCommandConfig,
+    AlembicCommands,
+    get_alembic_commands,
+)
+
+# Schema utilities
+from .schema import (
+    SchemaDifference,
+    compare_schema,
+    drop_all,
+    dump_schema,
+    truncate_all,
+)
 from .session import (
     AsyncSessionLocal,
     close_database,
@@ -10,11 +51,20 @@ from .session import (
 )
 
 __all__ = [
-    "Base",
-    "TimestampedBase",
+    # Session management
     "engine",
     "AsyncSessionLocal",
     "get_async_session",
     "init_database",
     "close_database",
+    # Alembic commands
+    "AlembicCommandConfig",
+    "AlembicCommands",
+    "get_alembic_commands",
+    # Schema utilities
+    "SchemaDifference",
+    "drop_all",
+    "dump_schema",
+    "truncate_all",
+    "compare_schema",
 ]

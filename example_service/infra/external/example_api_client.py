@@ -24,11 +24,9 @@ class ExampleAPIClient(BaseHTTPClient):
     - Response transformation
 
     Usage:
-        ```python
-        async with ExampleAPIClient() as client:
+            async with ExampleAPIClient() as client:
             data = await client.get_resource("123")
             result = await client.create_resource({"name": "test"})
-        ```
     """
 
     def __init__(
@@ -65,10 +63,8 @@ class ExampleAPIClient(BaseHTTPClient):
             Resource data.
 
         Example:
-            ```python
-            resource = await client.get_resource("123")
+                    resource = await client.get_resource("123")
             print(resource["name"])
-            ```
         """
         return await self.get(f"/resources/{resource_id}")
 
@@ -86,8 +82,7 @@ class ExampleAPIClient(BaseHTTPClient):
             Paginated list of resources.
 
         Example:
-            ```python
-            result = await client.list_resources(
+                    result = await client.list_resources(
                 page=1,
                 page_size=10,
                 filters={"status": "active"}
@@ -95,7 +90,6 @@ class ExampleAPIClient(BaseHTTPClient):
             print(f"Total: {result['total']}")
             for resource in result['items']:
                 print(resource['name'])
-            ```
         """
         params = {
             "page": page,
@@ -117,20 +111,16 @@ class ExampleAPIClient(BaseHTTPClient):
             Created resource data.
 
         Example:
-            ```python
-            resource = await client.create_resource({
+                    resource = await client.create_resource({
                 "name": "My Resource",
                 "type": "example",
                 "metadata": {"key": "value"}
             })
             print(f"Created resource: {resource['id']}")
-            ```
         """
         return await self.post("/resources", json=data)
 
-    async def update_resource(
-        self, resource_id: str, data: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def update_resource(self, resource_id: str, data: dict[str, Any]) -> dict[str, Any]:
         """Update an existing resource.
 
         Args:
@@ -141,12 +131,10 @@ class ExampleAPIClient(BaseHTTPClient):
             Updated resource data.
 
         Example:
-            ```python
-            resource = await client.update_resource(
+                    resource = await client.update_resource(
                 "123",
                 {"name": "Updated Name"}
             )
-            ```
         """
         return await self.put(f"/resources/{resource_id}", json=data)
 
@@ -157,9 +145,7 @@ class ExampleAPIClient(BaseHTTPClient):
             resource_id: Resource identifier.
 
         Example:
-            ```python
-            await client.delete_resource("123")
-            ```
+                    await client.delete_resource("123")
         """
         await self.delete(f"/resources/{resource_id}")
 
@@ -170,11 +156,9 @@ class ExampleAPIClient(BaseHTTPClient):
             True if API is healthy, False otherwise.
 
         Example:
-            ```python
-            is_healthy = await client.health_check()
+                    is_healthy = await client.health_check()
             if is_healthy:
                 print("API is operational")
-            ```
         """
         try:
             response = await self.get("/health")

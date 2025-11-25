@@ -1,9 +1,10 @@
 """Custom logging formatters with trace correlation."""
+
 from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from opentelemetry import trace
@@ -27,7 +28,6 @@ class JSONFormatter(logging.Formatter):
     Example output:
         ```json
         {"timestamp": "2025-01-01T00:00:00.123Z", "level": "INFO", "logger": "app.api", "message": "Request received", "request_id": "abc-123"}
-        ```
 
     Loki label extraction:
         Configure Loki to extract fields as labels:
@@ -41,7 +41,6 @@ class JSONFormatter(logging.Formatter):
             level:
             service:
             logger:
-        ```
     """
 
     def __init__(
@@ -80,13 +79,11 @@ class JSONFormatter(logging.Formatter):
             Single-line JSON string (JSONL format).
         """
         # Build data dict from format keys
-        data: dict[str, Any] = {
-            k: getattr(record, v, None) for k, v in self.fmt_keys.items()
-        }
+        data: dict[str, Any] = {k: getattr(record, v, None) for k, v in self.fmt_keys.items()}
 
         # Add UTC timestamp in ISO 8601 format with 'Z' suffix
         ts = (
-            datetime.fromtimestamp(record.created, tz=timezone.utc)
+            datetime.fromtimestamp(record.created, tz=UTC)
             .isoformat(timespec="milliseconds")
             .replace("+00:00", "Z")
         )

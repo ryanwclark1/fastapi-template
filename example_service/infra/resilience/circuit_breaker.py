@@ -1,4 +1,5 @@
 """Circuit breaker pattern implementation for resilient external service calls."""
+
 from __future__ import annotations
 
 import asyncio
@@ -49,8 +50,7 @@ class CircuitBreaker:
         success_threshold: Successful calls needed in HALF_OPEN to close circuit.
 
     Example:
-        ```python
-        # Create circuit breaker
+            # Create circuit breaker
         breaker = CircuitBreaker(
             name="auth_service",
             failure_threshold=5,
@@ -66,7 +66,6 @@ class CircuitBreaker:
         # Or use as context manager
         async with breaker:
             result = await call_auth_service()
-        ```
     """
 
     def __init__(
@@ -174,8 +173,7 @@ class CircuitBreaker:
                         "service": self.name,
                         "failures": self._failure_count,
                         "retry_after": int(
-                            self.recovery_timeout
-                            - (time.time() - (self._last_failure_time or 0))
+                            self.recovery_timeout - (time.time() - (self._last_failure_time or 0))
                         ),
                     },
                 )
@@ -236,9 +234,7 @@ class CircuitBreaker:
             elif self._state == CircuitState.CLOSED:
                 # Reset failure count on success in CLOSED state
                 if self._failure_count > 0:
-                    logger.info(
-                        f"Circuit breaker '{self.name}' resetting failure count"
-                    )
+                    logger.info(f"Circuit breaker '{self.name}' resetting failure count")
                     self._failure_count = 0
 
     async def _on_failure(self, exception: Exception) -> None:
@@ -264,8 +260,7 @@ class CircuitBreaker:
                 # Any failure in HALF_OPEN reopens the circuit
                 self._open_circuit()
             elif (
-                self._state == CircuitState.CLOSED
-                and self._failure_count >= self.failure_threshold
+                self._state == CircuitState.CLOSED and self._failure_count >= self.failure_threshold
             ):
                 # Threshold exceeded, open the circuit
                 self._open_circuit()
@@ -306,13 +301,11 @@ class CircuitBreaker:
             Wrapped function with circuit breaker protection.
 
         Example:
-            ```python
-            breaker = CircuitBreaker("api")
+                    breaker = CircuitBreaker("api")
 
             @breaker
             async def call_api():
                 return await httpx.get("https://api.example.com")
-            ```
         """
 
         @wraps(func)
@@ -337,8 +330,7 @@ class CircuitBreaker:
                     "service": self.name,
                     "failures": self._failure_count,
                     "retry_after": int(
-                        self.recovery_timeout
-                        - (time.time() - (self._last_failure_time or 0))
+                        self.recovery_timeout - (time.time() - (self._last_failure_time or 0))
                     ),
                 },
             )
@@ -369,10 +361,8 @@ class CircuitBreaker:
             Dictionary containing circuit breaker stats.
 
         Example:
-            ```python
-            stats = breaker.get_stats()
+                    stats = breaker.get_stats()
             print(f"State: {stats['state']}, Failures: {stats['failure_count']}")
-            ```
         """
         return {
             "name": self.name,

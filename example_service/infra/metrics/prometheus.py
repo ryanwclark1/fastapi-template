@@ -23,6 +23,29 @@ DEFAULT_LATENCY_BUCKETS = (
     10.0,
 )
 
+# Middleware-specific latency buckets (optimized for fast middleware operations)
+# Covers execution times from 100μs to 1s
+MIDDLEWARE_LATENCY_BUCKETS = (
+    0.001,  # 1ms
+    0.005,  # 5ms
+    0.01,   # 10ms
+    0.025,  # 25ms
+    0.05,   # 50ms
+    0.1,    # 100ms
+    0.25,   # 250ms
+    0.5,    # 500ms
+    1.0,    # 1s
+)
+
+# Request size buckets (1KB to 10MB)
+REQUEST_SIZE_BUCKETS = (
+    1024,      # 1KB
+    10240,     # 10KB
+    102400,    # 100KB
+    1048576,   # 1MB
+    10485760,  # 10MB
+)
+
 # HTTP metrics
 http_requests_total = Counter(
     "http_requests_total",
@@ -43,6 +66,54 @@ http_requests_in_progress = Gauge(
     "http_requests_in_progress",
     "Number of HTTP requests in progress",
     ["method", "endpoint"],
+    registry=REGISTRY,
+)
+
+# Middleware metrics
+middleware_execution_seconds = Histogram(
+    "middleware_execution_seconds",
+    "Individual middleware execution time in seconds. "
+    "Tracks the performance of each middleware component separately. "
+    "Usage: Instrument at the start and end of each middleware's process_request/process_response.",
+    ["middleware_name"],
+    buckets=MIDDLEWARE_LATENCY_BUCKETS,
+    registry=REGISTRY,
+)
+
+request_size_bytes = Histogram(
+    "request_size_bytes",
+    "Distribution of HTTP request body sizes in bytes. "
+    "Helps identify payload patterns and optimize size limits. "
+    "Usage: Record after reading request body in middleware, before processing.",
+    ["endpoint", "method"],
+    buckets=REQUEST_SIZE_BUCKETS,
+    registry=REGISTRY,
+)
+
+request_size_limit_rejections_total = Counter(
+    "request_size_limit_rejections_total",
+    "Total number of requests rejected due to exceeding size limits. "
+    "Indicates clients sending oversized payloads. "
+    "Usage: Increment when rejecting requests in size validation middleware.",
+    ["endpoint", "method"],
+    registry=REGISTRY,
+)
+
+rate_limit_rejections_total = Counter(
+    "rate_limit_rejections_total",
+    "Total number of requests rejected due to rate limiting. "
+    "Tracks rate limit enforcement by key type (IP, user, API key, etc.). "
+    "Usage: Increment when rate limiter rejects a request with 429 status.",
+    ["endpoint", "limit_key_type"],
+    registry=REGISTRY,
+)
+
+middleware_errors_total = Counter(
+    "middleware_errors_total",
+    "Total number of errors occurring in middleware processing. "
+    "Categorized by middleware name and error type for debugging. "
+    "Usage: Increment in middleware exception handlers with error classification.",
+    ["middleware_name", "error_type"],
     registry=REGISTRY,
 )
 

@@ -8,7 +8,7 @@ This module provides:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select, update
 
@@ -35,18 +35,16 @@ if broker is not None:
             Dictionary with count of due reminders and triggered notifications.
 
         Example:
-            ```python
-            from example_service.tasks.notifications import check_due_reminders
+                    from example_service.tasks.notifications import check_due_reminders
             task = await check_due_reminders.kiq()
             result = await task.wait_result()
             print(result)
             # {'due_count': 3, 'notification_tasks': ['task-id-1', ...]}
-            ```
         """
         from example_service.features.reminders.models import Reminder
 
         async with get_async_session() as session:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
 
             # Find due reminders that haven't been notified
             stmt = select(Reminder).where(
@@ -173,11 +171,7 @@ if broker is not None:
             return {"status": "error", "reason": "invalid_uuid"}
 
         async with get_async_session() as session:
-            stmt = (
-                update(Reminder)
-                .where(Reminder.id == uuid_id)
-                .values(is_completed=True)
-            )
+            stmt = update(Reminder).where(Reminder.id == uuid_id).values(is_completed=True)
             result = await session.execute(stmt)
             await session.commit()
 

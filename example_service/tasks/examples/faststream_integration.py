@@ -171,7 +171,7 @@ if taskiq_broker is not None:
             # TODO: Send notification (email, push, etc.)
             logger.info(f"Notification sent for {task_type} completion")
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to send notification")
             # Don't raise - notification failure shouldn't fail the whole flow
 
@@ -223,9 +223,7 @@ if faststream_router is not None and rabbit_settings.is_configured:
             logger.exception(f"Failed to handle data processing event: {e}")
             raise
 
-    @faststream_broker.subscriber(
-        RabbitQueue(USER_ACTIONS_QUEUE, durable=True, auto_delete=False)
-    )
+    @faststream_broker.subscriber(RabbitQueue(USER_ACTIONS_QUEUE, durable=True, auto_delete=False))
     async def handle_user_action_event(event: UserActionEvent) -> None:
         """Handle user action events by triggering Taskiq tasks.
 
@@ -285,20 +283,36 @@ async def publish_data_processing_event(
     This event will be consumed by handle_data_processing_event,
     which will fan out to multiple Taskiq tasks.
 
-    Example:
-        ```python
-        # In your FastAPI endpoint or service
-        await publish_data_processing_event(
-            data_source="external_api",
-            batch_size=100,
-            priority="high",
-        )
-        ```
+    IMPORTANT: This function assumes the broker is already connected.
+    Use this from FastAPI endpoints where the broker lifecycle is managed
+    by the application lifespan.
+
+    For Taskiq workers, use broker_context() instead:
+            from example_service.infra.messaging.broker import broker_context
+
+        @taskiq_broker.task()
+        async def my_task():
+            async with broker_context() as broker:
+                if broker is not None:
+                    await broker.publish(event, queue=DATA_PROCESSING_QUEUE)
+
+    Example (FastAPI endpoint):
+            # In your FastAPI endpoint
+        @router.post("/process")
+        async def trigger_processing():
+            await publish_data_processing_event(
+                data_source="external_api",
+                batch_size=100,
+                priority="high",
+            )
 
     Args:
         data_source: Source of data to process
         batch_size: Batch size for processing
         priority: Processing priority
+
+    Raises:
+        IncorrectState: If broker is not connected (e.g., called from Taskiq worker)
     """
     if faststream_broker is None:
         logger.warning("Faststream broker not configured")
@@ -331,21 +345,38 @@ async def publish_user_action_event(
     This event will be consumed by handle_user_action_event,
     which will trigger a Taskiq task with retry logic.
 
-    Example:
-        ```python
-        # In your FastAPI endpoint
-        await publish_user_action_event(
-            user_id=123,
-            action="data_export",
-            format="csv",
-            include_history=True,
-        )
-        ```
+    IMPORTANT: This function assumes the broker is already connected.
+    Use this from FastAPI endpoints where the broker lifecycle is managed
+    by the application lifespan.
+
+    For Taskiq workers, use broker_context() instead:
+            from example_service.infra.messaging.broker import broker_context
+
+        @taskiq_broker.task()
+        async def my_task():
+            async with broker_context() as broker:
+                if broker is not None:
+                    event = UserActionEvent(user_id=123, action="test", payload={})
+                    await broker.publish(event, queue=USER_ACTIONS_QUEUE)
+
+    Example (FastAPI endpoint):
+            # In your FastAPI endpoint
+        @router.post("/users/{user_id}/actions")
+        async def create_action(user_id: int):
+            await publish_user_action_event(
+                user_id=user_id,
+                action="data_export",
+                format="csv",
+                include_history=True,
+            )
 
     Args:
         user_id: User ID
         action: Action type
         **payload: Action payload
+
+    Raises:
+        IncorrectState: If broker is not connected (e.g., called from Taskiq worker)
     """
     if faststream_broker is None:
         logger.warning("Faststream broker not configured")

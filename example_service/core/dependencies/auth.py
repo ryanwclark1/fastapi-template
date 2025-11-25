@@ -6,6 +6,7 @@ This module provides FastAPI dependencies for:
 - Caching validated tokens to reduce external calls
 - Checking permissions and ACLs
 """
+
 from __future__ import annotations
 
 import logging
@@ -42,11 +43,11 @@ def _is_retryable_auth_error(exc: Exception) -> bool:
 
 
 @retry(
-    max_attempts=3,
+    max_attempts=auth_settings.max_retries,
     initial_delay=0.5,
-    max_delay=5.0,
-    retry_if=_is_retryable_auth_error,  # Retry on network errors AND gateway errors
-    stop_after_delay=10.0,  # Auth validation should be fast - hard cap at 10 seconds
+    max_delay=auth_settings.request_timeout,
+    retry_if=_is_retryable_auth_error,
+    stop_after_delay=auth_settings.request_timeout * 2,  # 2x single request timeout
 )
 async def validate_token_with_auth_service(token: str) -> TokenPayload:
     """Validate token with external auth service.
@@ -141,13 +142,11 @@ async def get_current_user(
         HTTPException: If authentication fails.
 
     Example:
-        ```python
-        @router.get("/protected")
+            @router.get("/protected")
         async def protected_endpoint(
             user: Annotated[AuthUser, Depends(get_current_user)]
         ):
             return {"user_id": user.identifier}
-        ```
     """
     if not credentials:
         raise HTTPException(
@@ -238,15 +237,13 @@ async def get_current_user_optional(
         Authenticated user/service or None if not authenticated.
 
     Example:
-        ```python
-        @router.get("/optional-auth")
+            @router.get("/optional-auth")
         async def optional_auth_endpoint(
             user: Annotated[AuthUser | None, Depends(get_current_user_optional)]
         ):
             if user:
                 return {"message": f"Hello, {user.identifier}"}
             return {"message": "Hello, anonymous"}
-        ```
     """
     if not credentials:
         return None
@@ -267,19 +264,15 @@ def require_permission(permission: str):
         Dependency function that checks for the permission.
 
     Example:
-        ```python
-        @router.delete("/users/{user_id}")
+            @router.delete("/users/{user_id}")
         async def delete_user(
             user: Annotated[AuthUser, Depends(require_permission("users:delete"))]
         ):
             # Only users with "users:delete" permission can access
             pass
-        ```
     """
 
-    async def permission_checker(
-        user: Annotated[AuthUser, Depends(get_current_user)]
-    ) -> AuthUser:
+    async def permission_checker(user: Annotated[AuthUser, Depends(get_current_user)]) -> AuthUser:
         if not user.has_permission(permission):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -300,14 +293,12 @@ def require_role(role: str):
         Dependency function that checks for the role.
 
     Example:
-        ```python
-        @router.get("/admin")
+            @router.get("/admin")
         async def admin_endpoint(
             user: Annotated[AuthUser, Depends(require_role("admin"))]
         ):
             # Only users with "admin" role can access
             pass
-        ```
     """
 
     async def role_checker(user: Annotated[AuthUser, Depends(get_current_user)]) -> AuthUser:
@@ -332,14 +323,12 @@ def require_resource_access(resource: str, action: str):
         Dependency function that checks ACL for resource access.
 
     Example:
-        ```python
-        @router.delete("/posts/{post_id}")
+            @router.delete("/posts/{post_id}")
         async def delete_post(
             user: Annotated[AuthUser, Depends(require_resource_access("posts", "delete"))]
         ):
             # Only users with ACL permission to delete posts can access
             pass
-        ```
     """
 
     async def acl_checker(user: Annotated[AuthUser, Depends(get_current_user)]) -> AuthUser:

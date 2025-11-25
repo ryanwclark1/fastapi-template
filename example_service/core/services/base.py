@@ -1,4 +1,5 @@
 """Base service class for business logic."""
+
 from __future__ import annotations
 
 import logging
@@ -12,8 +13,7 @@ class BaseService(ABC):
     for business logic services.
 
     Example:
-        ```python
-        class UserService(BaseService):
+            class UserService(BaseService):
             def __init__(self, repository: UserRepository):
                 super().__init__()
                 self.repository = repository
@@ -21,7 +21,6 @@ class BaseService(ABC):
             async def get_user(self, user_id: str) -> User:
                 self.logger.info("Fetching user", extra={"user_id": user_id})
                 return await self.repository.find(user_id)
-        ```
     """
 
     def __init__(self):

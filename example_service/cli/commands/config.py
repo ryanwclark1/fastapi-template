@@ -75,8 +75,7 @@ def show(output_format: str, show_secrets: bool) -> None:
                 "access_token_expire_minutes": settings.auth.access_token_expire_minutes,
             },
             "logging": {
-                "level": settings.logging.log_level,
-                "format": settings.logging.log_format,
+                "level": settings.logging.level,
                 "json_logs": settings.logging.json_logs,
             },
             "observability": {
@@ -143,7 +142,7 @@ def validate() -> None:
         click.echo("\n🔄 Cache Configuration:")
         try:
             cache_url = settings.cache.redis_url
-            info(f"  Redis URL configured")
+            info("  Redis URL configured")
             success("  ✓ Cache settings valid")
         except Exception as e:
             error(f"  ✗ Cache configuration error: {e}")
@@ -153,7 +152,7 @@ def validate() -> None:
         click.echo("\n📨 Messaging Configuration:")
         try:
             rabbit_url = settings.messaging.rabbit_url
-            info(f"  RabbitMQ URL configured")
+            info("  RabbitMQ URL configured")
             success("  ✓ Messaging settings valid")
         except Exception as e:
             error(f"  ✗ Messaging configuration error: {e}")
@@ -173,14 +172,14 @@ def validate() -> None:
 
         # Check logging configuration
         click.echo("\n📝 Logging Configuration:")
-        info(f"  Log level: {settings.logging.log_level}")
+        info(f"  Log level: {settings.logging.level}")
         info(f"  JSON logs: {settings.logging.json_logs}")
         success("  ✓ Logging settings valid")
 
         # Check observability configuration
         click.echo("\n📊 Observability Configuration:")
         if settings.otel.otel_enabled:
-            info(f"  OpenTelemetry: enabled")
+            info("  OpenTelemetry: enabled")
             info(f"  Service name: {settings.otel.otel_service_name}")
             info(f"  Exporter endpoint: {settings.otel.otel_exporter_otlp_endpoint}")
             success("  ✓ Observability configured")

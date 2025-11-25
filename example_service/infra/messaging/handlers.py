@@ -15,7 +15,7 @@ from datetime import datetime
 from faststream.rabbit import RabbitQueue
 
 from example_service.core.settings import get_rabbit_settings
-from example_service.infra.messaging.broker import broker, router
+from example_service.infra.messaging.broker import router
 from example_service.infra.messaging.events import (
     ExampleCreatedEvent,
     ExampleDeletedEvent,
@@ -157,7 +157,7 @@ if router is not None:
         """
         logger.info(
             "Echo service received message",
-            extra={"message": message},
+            extra={"payload": message},
         )
 
         # Create and return echo response (auto-published via @router.publisher)

@@ -138,7 +138,6 @@ if broker is not None:
             curl -X POST http://localhost:8000/api/tasks/process \\
                 -H "Content-Type: application/json" \\
                 -d '{"data": {"value": "test", "count": 42}}'
-            ```
 
         Args:
             request: Task input data
@@ -183,7 +182,6 @@ if broker is not None:
         Example:
             ```bash
             curl -X POST "http://localhost:8000/api/tasks/notify/123?message=Hello&notification_type=email"
-            ```
 
         Args:
             user_id: User ID to notify
@@ -234,7 +232,6 @@ if broker is not None:
 
             # Then check status
             curl http://localhost:8000/api/tasks/status/$TASK_ID
-            ```
 
         Args:
             task_id: Task ID to check
@@ -280,7 +277,6 @@ if broker is not None:
         Example:
             ```bash
             curl -X DELETE http://localhost:8000/api/tasks/cancel/$TASK_ID
-            ```
 
         Args:
             task_id: Task ID to cancel

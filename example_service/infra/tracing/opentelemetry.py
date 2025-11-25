@@ -5,6 +5,7 @@ for FastAPI, HTTPX, SQLAlchemy, and psycopg.
 
 Traces are exported via OTLP to collectors like Jaeger, Tempo, or Zipkin.
 """
+
 from __future__ import annotations
 
 import logging
@@ -16,7 +17,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.instrumentation.psycopg import PsycopgInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
-from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, Resource
+from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
@@ -44,15 +45,13 @@ def setup_tracing() -> None:
     the FastAPI app.
 
     Example:
-        ```python
-        # app/lifespan.py
+            # app/lifespan.py
         from example_service.infra.tracing.opentelemetry import setup_tracing
 
         @asynccontextmanager
         async def lifespan(app: FastAPI):
             setup_tracing()  # Setup tracing first
             yield
-        ```
     """
     if not otel_settings.enabled or not otel_settings.endpoint:
         logger.info("OpenTelemetry tracing is disabled")
@@ -65,6 +64,7 @@ def setup_tracing() -> None:
         if otel_settings.enable_resource_detector:
             # Automatically detect host, process, container, k8s attributes
             from opentelemetry.sdk.resources import get_aggregated_resources
+
             resource = get_aggregated_resources([Resource(attributes=resource_attrs)])
         else:
             resource = Resource(attributes=resource_attrs)
@@ -168,13 +168,11 @@ def instrument_app(app: Any) -> None:
         app: FastAPI application instance.
 
     Example:
-        ```python
-        # app/main.py
+            # app/main.py
         from example_service.infra.tracing.opentelemetry import instrument_app
 
         app = create_app()
         instrument_app(app)  # Add tracing to FastAPI
-        ```
     """
     if not otel_settings.enabled or not otel_settings.instrument_fastapi:
         return
@@ -199,8 +197,7 @@ def get_tracer(name: str) -> trace.Tracer:
         Tracer instance for creating spans.
 
     Example:
-        ```python
-        from example_service.infra.tracing.opentelemetry import get_tracer
+            from example_service.infra.tracing.opentelemetry import get_tracer
 
         tracer = get_tracer(__name__)
 
@@ -209,7 +206,6 @@ def get_tracer(name: str) -> trace.Tracer:
                 span.set_attribute("data.size", len(data))
                 # Processing logic here
                 return result
-        ```
     """
     return trace.get_tracer(name)
 
@@ -221,8 +217,7 @@ def add_span_attributes(attributes: dict[str, Any]) -> None:
         attributes: Dictionary of attributes to add to current span.
 
     Example:
-        ```python
-        from example_service.infra.tracing.opentelemetry import add_span_attributes
+            from example_service.infra.tracing.opentelemetry import add_span_attributes
 
         async def create_user(user_data: dict):
             add_span_attributes({
@@ -230,7 +225,6 @@ def add_span_attributes(attributes: dict[str, Any]) -> None:
                 "user.role": user_data["role"],
             })
             # Create user logic
-        ```
     """
     span = trace.get_current_span()
     if span.is_recording():
@@ -246,15 +240,13 @@ def add_span_event(name: str, attributes: dict[str, Any] | None = None) -> None:
         attributes: Optional event attributes.
 
     Example:
-        ```python
-        from example_service.infra.tracing.opentelemetry import add_span_event
+            from example_service.infra.tracing.opentelemetry import add_span_event
 
         async def send_notification(user_id: str):
             add_span_event("notification.queued", {
                 "user_id": user_id,
                 "type": "email"
             })
-        ```
     """
     span = trace.get_current_span()
     if span.is_recording():
@@ -268,15 +260,13 @@ def record_exception(exception: Exception) -> None:
         exception: Exception to record.
 
     Example:
-        ```python
-        from example_service.infra.tracing.opentelemetry import record_exception
+            from example_service.infra.tracing.opentelemetry import record_exception
 
         try:
             await risky_operation()
         except Exception as e:
             record_exception(e)
             raise
-        ```
     """
     span = trace.get_current_span()
     if span.is_recording():

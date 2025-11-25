@@ -11,8 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import shutil
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from example_service.core.settings import get_backup_settings, get_db_settings
@@ -27,7 +26,9 @@ class BackupError(Exception):
     pass
 
 
-async def run_pg_dump(database_url: str, output_path: Path, exclude_tables: list[str] | None = None) -> None:
+async def run_pg_dump(
+    database_url: str, output_path: Path, exclude_tables: list[str] | None = None
+) -> None:
     """Execute pg_dump asynchronously.
 
     Args:
@@ -119,7 +120,7 @@ def cleanup_old_local_backups(backup_dir: Path, retention_days: int) -> int:
     if not backup_dir.exists():
         return 0
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+    cutoff = datetime.now(UTC) - timedelta(days=retention_days)
     deleted_count = 0
 
     for backup_file in backup_dir.glob("backup_*.sql*"):
@@ -127,7 +128,7 @@ def cleanup_old_local_backups(backup_dir: Path, retention_days: int) -> int:
             # Get file modification time
             mtime = datetime.fromtimestamp(
                 backup_file.stat().st_mtime,
-                tz=timezone.utc,
+                tz=UTC,
             )
 
             if mtime < cutoff:
@@ -175,14 +176,12 @@ if broker is not None:
             Backup result dictionary with status, paths, and cleanup info.
 
         Example:
-            ```python
-            # Manually trigger backup
+                    # Manually trigger backup
             from example_service.tasks.backup import backup_database
             task = await backup_database.kiq()
             result = await task.wait_result()
             print(result)
             # {'status': 'success', 'local_path': '/var/backups/...', 's3_uri': 's3://...', ...}
-            ```
         """
         backup_settings = get_backup_settings()
         db_settings = get_db_settings()
@@ -197,7 +196,7 @@ if broker is not None:
             return {"status": "skipped", "reason": "database_not_configured"}
 
         # Generate timestamp and filename
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         filename = backup_settings.get_backup_filename(timestamp)
         local_path = backup_settings.get_local_path(filename)
 
@@ -298,13 +297,15 @@ if broker is not None:
                 reverse=True,
             ):
                 stat = backup_file.stat()
-                result["local_backups"].append({
-                    "filename": backup_file.name,
-                    "path": str(backup_file),
-                    "size_bytes": stat.st_size,
-                    "size_mb": round(stat.st_size / (1024 * 1024), 2),
-                    "modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
-                })
+                result["local_backups"].append(
+                    {
+                        "filename": backup_file.name,
+                        "path": str(backup_file),
+                        "size_bytes": stat.st_size,
+                        "size_mb": round(stat.st_size / (1024 * 1024), 2),
+                        "modified": datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat(),
+                    }
+                )
 
         # List S3 backups
         if backup_settings.is_s3_configured:
@@ -315,12 +316,14 @@ if broker is not None:
                 s3_objects = await s3_client.list_objects(prefix=backup_settings.s3_prefix)
 
                 for obj in s3_objects:
-                    result["s3_backups"].append({
-                        "key": obj["Key"],
-                        "size_bytes": obj["Size"],
-                        "size_mb": round(obj["Size"] / (1024 * 1024), 2),
-                        "modified": obj["LastModified"].isoformat(),
-                    })
+                    result["s3_backups"].append(
+                        {
+                            "key": obj["Key"],
+                            "size_bytes": obj["Size"],
+                            "size_mb": round(obj["Size"] / (1024 * 1024), 2),
+                            "modified": obj["LastModified"].isoformat(),
+                        }
+                    )
             except Exception as e:
                 logger.warning(f"Failed to list S3 backups: {e}")
                 result["s3_error"] = str(e)

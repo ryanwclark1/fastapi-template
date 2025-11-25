@@ -20,7 +20,6 @@ def shell() -> None:
         import asyncio
 
         from example_service.app.main import app
-        from example_service.core.settings import get_app_settings
         from example_service.infra.cache import get_redis
         from example_service.infra.database import get_session
 

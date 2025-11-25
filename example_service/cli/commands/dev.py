@@ -370,7 +370,7 @@ def info(show_all: bool) -> None:
     try:
         import example_service
 
-        click.echo(f"Project: example-service (version: 0.1.0)")
+        click.echo("Project: example-service (version: 0.1.0)")
     except ImportError:
         click.echo("Project: example-service (not installed)")
 

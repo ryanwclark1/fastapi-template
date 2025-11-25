@@ -147,6 +147,13 @@ class RedisSettings(BaseSettings):
         description="Initial retry delay in seconds (with exponential backoff)",
     )
 
+    retry_timeout: float = Field(
+        default=10.0,
+        ge=1.0,
+        le=60.0,
+        description="Maximum total time for retry attempts in seconds (stop_after_delay)",
+    )
+
     # ──────────────────────────────────────────────────────────────
     # Health check and startup settings
     # ──────────────────────────────────────────────────────────────
@@ -201,7 +208,7 @@ class RedisSettings(BaseSettings):
     # ──────────────────────────────────────────────────────────────
 
     @model_validator(mode="after")
-    def _apply_url(self) -> "RedisSettings":
+    def _apply_url(self) -> RedisSettings:
         """Parse redis_url into component fields if provided.
 
         This enables bidirectional configuration: you can provide a URL and the

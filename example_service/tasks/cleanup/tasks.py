@@ -10,7 +10,7 @@ This module provides:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy import delete
@@ -37,20 +37,18 @@ if broker is not None:
             Cleanup result with counts and sizes.
 
         Example:
-            ```python
-            from example_service.tasks.cleanup import cleanup_temp_files
+                    from example_service.tasks.cleanup import cleanup_temp_files
             task = await cleanup_temp_files.kiq(max_age_hours=12)
             result = await task.wait_result()
             print(result)
             # {'deleted_count': 5, 'deleted_size_mb': 12.5}
-            ```
         """
         temp_dirs = [
             Path("/tmp/exports"),
             Path("/tmp/uploads"),
         ]
 
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+        cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
         deleted_count = 0
         deleted_size = 0
         errors = []
@@ -64,7 +62,7 @@ if broker is not None:
                     try:
                         mtime = datetime.fromtimestamp(
                             file_path.stat().st_mtime,
-                            tz=timezone.utc,
+                            tz=UTC,
                         )
 
                         if mtime < cutoff:
@@ -172,7 +170,7 @@ if broker is not None:
                 "reason": "export_dir_not_found",
             }
 
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+        cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
         deleted_count = 0
         deleted_size = 0
 
@@ -181,7 +179,7 @@ if broker is not None:
                 try:
                     mtime = datetime.fromtimestamp(
                         export_file.stat().st_mtime,
-                        tz=timezone.utc,
+                        tz=UTC,
                     )
 
                     if mtime < cutoff:
@@ -224,7 +222,7 @@ if broker is not None:
         from example_service.features.reminders.models import Reminder
 
         results = {}
-        cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+        cutoff = datetime.now(UTC) - timedelta(days=retention_days)
 
         async with get_async_session() as session:
             # Clean old completed reminders
@@ -287,6 +285,6 @@ if broker is not None:
 
         return {
             "status": "success",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "results": results,
         }

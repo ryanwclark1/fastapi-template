@@ -46,7 +46,7 @@ class User(TimestampedBase):
     )
 
     # Relationships
-    posts: Mapped[list["Post"]] = relationship(
+    posts: Mapped[list[Post]] = relationship(
         "Post", back_populates="author", cascade="all, delete-orphan"
     )
 

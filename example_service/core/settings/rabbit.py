@@ -239,7 +239,7 @@ class RabbitSettings(BaseSettings):
     # URI parsing validator
     # ─────────────────────────────────────────────────────
     @model_validator(mode="after")
-    def _apply_uri(self) -> "RabbitSettings":
+    def _apply_uri(self) -> RabbitSettings:
         """Populate connection components from AMQP URI if provided.
 
         Parses the URI and sets host, port, username, password, and vhost.

@@ -14,12 +14,18 @@ import logging
 from typing import Any
 
 import httpx
+
 from example_service.utils.retry import retry
 
 logger = logging.getLogger(__name__)
 
 # Retry predicate for HTTP operations: retry on network errors AND transient HTTP status codes
-RETRYABLE_HTTP_STATUS_CODES = {429, 502, 503, 504}  # Rate limit, Bad Gateway, Service Unavailable, Gateway Timeout
+RETRYABLE_HTTP_STATUS_CODES = {
+    429,
+    502,
+    503,
+    504,
+}  # Rate limit, Bad Gateway, Service Unavailable, Gateway Timeout
 
 
 def _is_retryable_http_error(exc: Exception) -> bool:
@@ -38,8 +44,7 @@ class BaseHTTPClient:
     with retry logic, timeout handling, and structured logging.
 
     Example:
-        ```python
-        class WeatherAPIClient(BaseHTTPClient):
+            class WeatherAPIClient(BaseHTTPClient):
             def __init__(self):
                 super().__init__(
                     base_url="https://api.weather.com",
@@ -48,7 +53,6 @@ class BaseHTTPClient:
 
             async def get_weather(self, city: str) -> dict:
                 return await self.get(f"/weather/{city}")
-        ```
     """
 
     def __init__(

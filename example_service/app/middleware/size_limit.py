@@ -1,14 +1,13 @@
 """Request size limit middleware."""
 from __future__ import annotations
 
-from fastapi import Request, status
-from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
+import json
 
 
-class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
+class RequestSizeLimitMiddleware:
     """Limit the size of incoming requests.
 
+    Pure ASGI middleware implementation for optimal performance.
     Rejects requests that exceed the configured maximum size.
     """
 
@@ -19,27 +18,46 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
             app: ASGI application.
             max_size: Maximum request size in bytes.
         """
-        super().__init__(app)
+        self.app = app
         self.max_size = max_size
 
-    async def dispatch(self, request: Request, call_next):
-        """Check request size before processing.
+    async def __call__(self, scope, receive, send):
+        """Process ASGI request and check size limits.
 
         Args:
-            request: Incoming HTTP request.
-            call_next: Next middleware/handler in chain.
-
-        Returns:
-            Response or error if request is too large.
+            scope: ASGI connection scope.
+            receive: ASGI receive callable.
+            send: ASGI send callable.
         """
-        if "content-length" in request.headers:
-            content_length = int(request.headers["content-length"])
-            if content_length > self.max_size:
-                return JSONResponse(
-                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                    content={
-                        "detail": f"Request size {content_length} exceeds maximum {self.max_size} bytes"
-                    },
-                )
+        # Only process HTTP requests
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
 
-        return await call_next(request)
+        # Check content-length header
+        headers = scope.get("headers", [])
+        for header_name, header_value in headers:
+            if header_name == b"content-length":
+                try:
+                    content_length = int(header_value.decode())
+                    if content_length > self.max_size:
+                        # Send 413 error response
+                        await send({
+                            "type": "http.response.start",
+                            "status": 413,
+                            "headers": [[b"content-type", b"application/json"]],
+                        })
+                        await send({
+                            "type": "http.response.body",
+                            "body": json.dumps({
+                                "detail": f"Request size {content_length} exceeds maximum {self.max_size} bytes"
+                            }).encode(),
+                        })
+                        return
+                except (ValueError, UnicodeDecodeError):
+                    # Invalid content-length header, pass through
+                    pass
+                break
+
+        # Size is OK or no content-length header, pass through
+        await self.app(scope, receive, send)

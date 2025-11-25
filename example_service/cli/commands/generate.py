@@ -1,7 +1,6 @@
 """Code generation and scaffolding commands."""
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
 from typing import Any
@@ -666,13 +665,13 @@ def resource(
     # Next steps
     if generated_files:
         click.echo("\n📋 Next steps:")
-        click.echo(f"1. Review and customize generated files")
+        click.echo("1. Review and customize generated files")
         if model:
-            click.echo(f"2. Add model to example_service/core/models/__init__.py")
+            click.echo("2. Add model to example_service/core/models/__init__.py")
         if router:
-            click.echo(f"3. Register router in example_service/app/routers/__init__.py")
+            click.echo("3. Register router in example_service/app/routers/__init__.py")
         if crud:
-            click.echo(f"4. Import CRUD functions in example_service/core/crud/__init__.py")
+            click.echo("4. Import CRUD functions in example_service/core/crud/__init__.py")
         if model:
             click.echo(f"5. Create database migration: example-service db revision -m 'add {ctx['table_name']}'")
         if tests:
@@ -720,7 +719,7 @@ async def health_check() -> dict[str, str]:
     router_path.write_text(router_content)
 
     click.echo(f"✅ Generated router: {router_path}")
-    click.echo(f"\n📋 Next step: Register in example_service/app/routers/__init__.py")
+    click.echo("\n📋 Next step: Register in example_service/app/routers/__init__.py")
     click.echo(f"   from example_service.app.routers import {router_name}")
 
 
@@ -810,10 +809,10 @@ class {class_name}(BaseHTTPMiddleware):
     middleware_path.write_text(middleware_content)
 
     click.echo(f"✅ Generated middleware: {middleware_path}")
-    click.echo(f"\n📋 Next steps:")
+    click.echo("\n📋 Next steps:")
     click.echo(f"1. Implement your middleware logic in {class_name}")
-    click.echo(f"2. Register in example_service/app/middleware/__init__.py")
-    click.echo(f"3. Add to configure_middleware() function")
+    click.echo("2. Register in example_service/app/middleware/__init__.py")
+    click.echo("3. Add to configure_middleware() function")
 
 
 @generate.command()
@@ -875,8 +874,8 @@ def downgrade() -> None:
     migration_file.write_text(migration_content)
 
     click.echo(f"✅ Generated migration: {migration_file}")
-    click.echo(f"\n📋 Next steps:")
-    click.echo(f"1. Update 'down_revision' with the previous migration ID")
-    click.echo(f"2. Implement upgrade() and downgrade() functions")
-    click.echo(f"3. Test migration: example-service db upgrade")
-    click.echo(f"4. Test rollback: example-service db downgrade")
+    click.echo("\n📋 Next steps:")
+    click.echo("1. Update 'down_revision' with the previous migration ID")
+    click.echo("2. Implement upgrade() and downgrade() functions")
+    click.echo("3. Test migration: example-service db upgrade")
+    click.echo("4. Test rollback: example-service db downgrade")

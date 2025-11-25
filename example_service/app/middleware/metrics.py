@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import time
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import Request, Response
 from opentelemetry import trace
@@ -25,9 +25,13 @@ class MetricsMiddleware(BaseHTTPMiddleware):
     - Links metrics to traces via exemplars (trace IDs)
     - Uses route path templates for low cardinality labels
     - Ensures accurate in-progress gauge tracking with try/finally
+    - Adds X-Process-Time header for client-side performance monitoring
 
     The exemplar pattern enables click-through from Grafana metrics
     to corresponding traces in Tempo for deep debugging.
+
+    Note: This middleware consolidates timing functionality that was
+    previously in TimingMiddleware, eliminating duplicate timing measurements.
     """
 
     async def dispatch(
@@ -61,8 +65,14 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
             status_code = response.status_code
+
+            # Add timing header for client debugging (consolidated from TimingMiddleware)
+            duration = time.time() - start_time
+            response.headers["X-Process-Time"] = str(duration)
+
             return response
         finally:
+            # Calculate duration for metrics (in case of exception before response)
             duration = time.time() - start_time
 
             # Extract current trace ID for exemplar linking

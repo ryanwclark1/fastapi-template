@@ -8,7 +8,7 @@ This module provides CLI commands for monitoring:
 """
 
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import click
 
@@ -104,6 +104,7 @@ async def _check_database() -> dict:
 
     try:
         from sqlalchemy import text
+
         from example_service.infra.database import get_session
 
         async with get_session() as session:
@@ -182,6 +183,7 @@ async def show_connections() -> None:
 
     try:
         from sqlalchemy import text
+
         from example_service.infra.database import get_session
 
         async with get_session() as session:
@@ -327,10 +329,11 @@ async def show_metrics() -> None:
     header("Application Metrics")
 
     try:
-        from sqlalchemy import text, func, select
-        from example_service.infra.database import get_session
+        from sqlalchemy import func, select, text
+
         from example_service.core.models.user import User
         from example_service.features.reminders.models import Reminder
+        from example_service.infra.database import get_session
 
         async with get_session() as session:
             # User metrics
@@ -359,7 +362,7 @@ async def show_metrics() -> None:
             result = await session.execute(
                 select(func.count()).select_from(Reminder).where(
                     Reminder.is_completed == False,  # noqa: E712
-                    Reminder.remind_at <= datetime.now(timezone.utc)
+                    Reminder.remind_at <= datetime.now(UTC)
                 )
             )
             overdue_reminders = result.scalar_one()
@@ -413,6 +416,7 @@ def view_logs(lines: int, follow: bool, level: str | None) -> None:
     """
     import subprocess
     from pathlib import Path
+
     from example_service.core.settings import get_logging_settings
 
     log_settings = get_logging_settings()

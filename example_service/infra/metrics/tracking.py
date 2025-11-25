@@ -1,4 +1,5 @@
 """Helper functions for tracking business and operational metrics."""
+
 from __future__ import annotations
 
 import logging
@@ -31,9 +32,7 @@ def track_error(
         extra: Additional context for logging
 
     Example:
-        ```python
-        track_error("validation", "/api/v1/users", 422, {"field": "email"})
-        ```
+            track_error("validation", "/api/v1/users", 422, {"field": "email"})
     """
     business.errors_total.labels(
         error_type=error_type,
@@ -55,9 +54,7 @@ def track_validation_error(endpoint: str, field: str) -> None:
         field: Field that failed validation
 
     Example:
-        ```python
-        track_validation_error("/api/v1/users", "email")
-        ```
+            track_validation_error("/api/v1/users", "email")
     """
     business.validation_errors_total.labels(
         endpoint=endpoint,
@@ -73,9 +70,7 @@ def track_unhandled_exception(exception_type: str, endpoint: str) -> None:
         endpoint: API endpoint where exception occurred
 
     Example:
-        ```python
-        track_unhandled_exception("ValueError", "/api/v1/data")
-        ```
+            track_unhandled_exception("ValueError", "/api/v1/data")
     """
     business.exceptions_unhandled_total.labels(
         exception_type=exception_type,
@@ -96,9 +91,7 @@ def track_rate_limit_hit(endpoint: str, limit_type: str = "ip") -> None:
         limit_type: Type of rate limit (ip, user, api_key)
 
     Example:
-        ```python
-        track_rate_limit_hit("/api/v1/data", "user")
-        ```
+            track_rate_limit_hit("/api/v1/data", "user")
     """
     business.rate_limit_hits_total.labels(
         endpoint=endpoint,
@@ -114,9 +107,7 @@ def track_rate_limit_check(endpoint: str, allowed: bool) -> None:
         allowed: Whether the request was allowed
 
     Example:
-        ```python
-        track_rate_limit_check("/api/v1/data", allowed=True)
-        ```
+            track_rate_limit_check("/api/v1/data", allowed=True)
     """
     result = "allowed" if allowed else "denied"
     business.rate_limit_checks_total.labels(
@@ -134,9 +125,7 @@ def update_rate_limit_remaining(key: str, endpoint: str, remaining: int) -> None
         remaining: Number of remaining tokens
 
     Example:
-        ```python
-        update_rate_limit_remaining("user:123", "/api/v1/data", 47)
-        ```
+            update_rate_limit_remaining("user:123", "/api/v1/data", 47)
     """
     business.rate_limit_remaining.labels(
         key=key,
@@ -157,14 +146,10 @@ def update_circuit_breaker_state(circuit_name: str, state: str) -> None:
         state: Current state ('closed', 'half_open', 'open')
 
     Example:
-        ```python
-        update_circuit_breaker_state("auth_service", "open")
-        ```
+            update_circuit_breaker_state("auth_service", "open")
     """
     state_map = {"closed": 0, "half_open": 1, "open": 2}
-    business.circuit_breaker_state.labels(circuit_name=circuit_name).set(
-        state_map.get(state, 0)
-    )
+    business.circuit_breaker_state.labels(circuit_name=circuit_name).set(state_map.get(state, 0))
 
 
 def track_circuit_breaker_failure(circuit_name: str) -> None:
@@ -174,9 +159,7 @@ def track_circuit_breaker_failure(circuit_name: str) -> None:
         circuit_name: Name of the circuit breaker
 
     Example:
-        ```python
-        track_circuit_breaker_failure("auth_service")
-        ```
+            track_circuit_breaker_failure("auth_service")
     """
     business.circuit_breaker_failures_total.labels(circuit_name=circuit_name).inc()
 
@@ -188,16 +171,12 @@ def track_circuit_breaker_success(circuit_name: str) -> None:
         circuit_name: Name of the circuit breaker
 
     Example:
-        ```python
-        track_circuit_breaker_success("auth_service")
-        ```
+            track_circuit_breaker_success("auth_service")
     """
     business.circuit_breaker_successes_total.labels(circuit_name=circuit_name).inc()
 
 
-def track_circuit_breaker_state_change(
-    circuit_name: str, from_state: str, to_state: str
-) -> None:
+def track_circuit_breaker_state_change(circuit_name: str, from_state: str, to_state: str) -> None:
     """Track a circuit breaker state change.
 
     Args:
@@ -206,9 +185,7 @@ def track_circuit_breaker_state_change(
         to_state: New state
 
     Example:
-        ```python
-        track_circuit_breaker_state_change("auth_service", "closed", "open")
-        ```
+            track_circuit_breaker_state_change("auth_service", "closed", "open")
     """
     business.circuit_breaker_state_changes_total.labels(
         circuit_name=circuit_name,
@@ -224,9 +201,7 @@ def track_circuit_breaker_rejected(circuit_name: str) -> None:
         circuit_name: Name of the circuit breaker
 
     Example:
-        ```python
-        track_circuit_breaker_rejected("auth_service")
-        ```
+            track_circuit_breaker_rejected("auth_service")
     """
     business.circuit_breaker_rejected_total.labels(circuit_name=circuit_name).inc()
 
@@ -244,9 +219,7 @@ def track_retry_attempt(operation: str, attempt_number: int) -> None:
         attempt_number: Current attempt number (1-indexed)
 
     Example:
-        ```python
-        track_retry_attempt("fetch_user_data", 2)
-        ```
+            track_retry_attempt("fetch_user_data", 2)
     """
     business.retry_attempts_total.labels(
         operation=operation,
@@ -261,9 +234,7 @@ def track_retry_exhausted(operation: str) -> None:
         operation: Name of the operation that failed
 
     Example:
-        ```python
-        track_retry_exhausted("fetch_user_data")
-        ```
+            track_retry_exhausted("fetch_user_data")
     """
     business.retry_exhausted_total.labels(operation=operation).inc()
 
@@ -276,9 +247,7 @@ def track_retry_success(operation: str, attempts_needed: int) -> None:
         attempts_needed: Number of attempts needed to succeed
 
     Example:
-        ```python
-        track_retry_success("fetch_user_data", 3)
-        ```
+            track_retry_success("fetch_user_data", 3)
     """
     business.retry_success_after_failure_total.labels(
         operation=operation,
@@ -300,9 +269,7 @@ def track_api_call(endpoint: str, method: str, is_authenticated: bool) -> None:
         is_authenticated: Whether user is authenticated
 
     Example:
-        ```python
-        track_api_call("/api/v1/users", "GET", True)
-        ```
+            track_api_call("/api/v1/users", "GET", True)
     """
     user_type = "authenticated" if is_authenticated else "anonymous"
     business.api_endpoint_calls_total.labels(
@@ -321,9 +288,7 @@ def track_response_size(endpoint: str, method: str, size_bytes: int) -> None:
         size_bytes: Response size in bytes
 
     Example:
-        ```python
-        track_response_size("/api/v1/users", "GET", 1024)
-        ```
+            track_response_size("/api/v1/users", "GET", 1024)
     """
     business.api_response_size_bytes.labels(
         endpoint=endpoint,
@@ -340,9 +305,7 @@ def track_request_size(endpoint: str, method: str, size_bytes: int) -> None:
         size_bytes: Request size in bytes
 
     Example:
-        ```python
-        track_request_size("/api/v1/users", "POST", 512)
-        ```
+            track_request_size("/api/v1/users", "POST", 512)
     """
     business.api_request_size_bytes.labels(
         endpoint=endpoint,
@@ -363,9 +326,7 @@ def track_auth_attempt(method: str, success: bool) -> None:
         success: Whether authentication succeeded
 
     Example:
-        ```python
-        track_auth_attempt("token", True)
-        ```
+            track_auth_attempt("token", True)
     """
     result = "success" if success else "failure"
     business.auth_attempts_total.labels(
@@ -381,9 +342,7 @@ def track_token_validation(result: str) -> None:
         result: Validation result (valid, invalid, expired)
 
     Example:
-        ```python
-        track_token_validation("valid")
-        ```
+            track_token_validation("valid")
     """
     business.auth_token_validations_total.labels(result=result).inc()
 
@@ -395,9 +354,7 @@ def track_token_cache(is_hit: bool) -> None:
         is_hit: Whether cache was hit
 
     Example:
-        ```python
-        track_token_cache(True)
-        ```
+            track_token_cache(True)
     """
     result = "hit" if is_hit else "miss"
     business.auth_token_cache_hits_total.labels(result=result).inc()
@@ -411,9 +368,7 @@ def track_permission_check(permission: str, allowed: bool) -> None:
         allowed: Whether permission was granted
 
     Example:
-        ```python
-        track_permission_check("admin", False)
-        ```
+            track_permission_check("admin", False)
     """
     result = "allowed" if allowed else "denied"
     business.permission_checks_total.labels(
@@ -436,10 +391,8 @@ async def track_external_service_call(service_name: str, endpoint: str):
         endpoint: Service endpoint being called
 
     Example:
-        ```python
-        async with track_external_service_call("auth_service", "/verify"):
+            async with track_external_service_call("auth_service", "/verify"):
             result = await httpx.get("https://auth.example.com/verify")
-        ```
     """
     start_time = time.time()
     status = "success"
@@ -476,9 +429,7 @@ def track_external_service_timeout(service_name: str) -> None:
         service_name: Name of the external service
 
     Example:
-        ```python
-        track_external_service_timeout("auth_service")
-        ```
+            track_external_service_timeout("auth_service")
     """
     business.external_service_timeouts_total.labels(service_name=service_name).inc()
 
@@ -496,9 +447,7 @@ def track_user_action(action_type: str, is_authenticated: bool) -> None:
         is_authenticated: Whether user is authenticated
 
     Example:
-        ```python
-        track_user_action("create", True)
-        ```
+            track_user_action("create", True)
     """
     user_type = "authenticated" if is_authenticated else "anonymous"
     business.user_actions_total.labels(
@@ -515,9 +464,7 @@ def track_feature_usage(feature_name: str, is_authenticated: bool) -> None:
         is_authenticated: Whether user is authenticated
 
     Example:
-        ```python
-        track_feature_usage("export_data", True)
-        ```
+            track_feature_usage("export_data", True)
     """
     user_type = "authenticated" if is_authenticated else "anonymous"
     business.feature_usage_total.labels(
@@ -533,9 +480,7 @@ def track_slow_query(operation: str) -> None:
         operation: Database operation
 
     Example:
-        ```python
-        track_slow_query("select_users")
-        ```
+            track_slow_query("select_users")
     """
     business.slow_queries_total.labels(operation=operation).inc()
 
@@ -548,9 +493,7 @@ def track_slow_request(endpoint: str, method: str) -> None:
         method: HTTP method
 
     Example:
-        ```python
-        track_slow_request("/api/v1/reports", "GET")
-        ```
+            track_slow_request("/api/v1/reports", "GET")
     """
     business.slow_requests_total.labels(
         endpoint=endpoint,
@@ -563,9 +506,7 @@ def track_slow_request(endpoint: str, method: str) -> None:
 # ============================================================================
 
 
-def update_dependency_health(
-    dependency_name: str, dependency_type: str, is_healthy: bool
-) -> None:
+def update_dependency_health(dependency_name: str, dependency_type: str, is_healthy: bool) -> None:
     """Update dependency health status.
 
     Args:
@@ -574,9 +515,7 @@ def update_dependency_health(
         is_healthy: Whether dependency is healthy
 
     Example:
-        ```python
-        update_dependency_health("postgres", "database", True)
-        ```
+            update_dependency_health("postgres", "database", True)
     """
     health_value = 1 if is_healthy else 0
     business.dependency_health.labels(
@@ -593,10 +532,8 @@ async def track_dependency_check(dependency_name: str):
         dependency_name: Name of the dependency
 
     Example:
-        ```python
-        async with track_dependency_check("postgres"):
+            async with track_dependency_check("postgres"):
             await db.execute("SELECT 1")
-        ```
     """
     start_time = time.time()
 
@@ -604,6 +541,6 @@ async def track_dependency_check(dependency_name: str):
         yield
     finally:
         duration = time.time() - start_time
-        business.dependency_check_duration_seconds.labels(
-            dependency_name=dependency_name
-        ).observe(duration)
+        business.dependency_check_duration_seconds.labels(dependency_name=dependency_name).observe(
+            duration
+        )

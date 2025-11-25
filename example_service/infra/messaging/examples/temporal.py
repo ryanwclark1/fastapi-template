@@ -59,10 +59,8 @@ async def scheduled_health_check() -> None:
     to check the health of various components and publish the results.
 
     Example usage:
-        ```python
-        # In application startup or background task
+            # In application startup or background task
         asyncio.create_task(start_health_check_scheduler())
-        ```
     """
     if not rabbit_settings.is_configured or broker is None:
         logger.debug("RabbitMQ not configured, skipping health check publishing")
@@ -72,8 +70,8 @@ async def scheduled_health_check() -> None:
 
     try:
         # Perform health checks
-        from example_service.infra.database import engine
         from example_service.infra.cache import redis_client
+        from example_service.infra.database import engine
 
         checks = {}
 
@@ -144,8 +142,7 @@ async def schedule_periodic_task(
         **task_data: Additional task data
 
     Example:
-        ```python
-        # Schedule data sync every 5 minutes
+            # Schedule data sync every 5 minutes
         asyncio.create_task(
             schedule_periodic_task(
                 task_name="data_sync",
@@ -163,14 +160,13 @@ async def schedule_periodic_task(
                 retention_days=30,
             )
         )
-        ```
     """
     if not rabbit_settings.is_configured or broker is None:
         logger.warning(f"RabbitMQ not configured, skipping periodic task: {task_name}")
         return
 
     logger.info(
-        f"Starting periodic task scheduler",
+        "Starting periodic task scheduler",
         extra={"task_name": task_name, "interval_seconds": interval_seconds},
     )
 
@@ -188,13 +184,13 @@ async def schedule_periodic_task(
             )
 
             logger.info(
-                f"Periodic task published",
+                "Periodic task published",
                 extra={"task_name": task_name},
             )
 
         except Exception as e:
             logger.exception(
-                f"Failed to publish periodic task",
+                "Failed to publish periodic task",
                 extra={"task_name": task_name, "error": str(e)},
             )
 
@@ -209,8 +205,7 @@ async def start_health_check_scheduler(interval_seconds: int = 300) -> None:
         interval_seconds: Interval between health checks (default: 5 minutes)
 
     Example:
-        ```python
-        # In application startup (lifespan)
+            # In application startup (lifespan)
         @asynccontextmanager
         async def lifespan(app: FastAPI):
             # Start health check scheduler
@@ -226,7 +221,6 @@ async def start_health_check_scheduler(interval_seconds: int = 300) -> None:
                 await health_check_task
             except asyncio.CancelledError:
                 pass
-        ```
     """
     logger.info(
         "Starting health check scheduler",
@@ -245,10 +239,8 @@ async def start_periodic_task_scheduler() -> None:
     concurrently using asyncio.gather.
 
     Example:
-        ```python
-        # In application startup
+            # In application startup
         asyncio.create_task(start_periodic_task_scheduler())
-        ```
     """
     logger.info("Starting all periodic task schedulers")
 

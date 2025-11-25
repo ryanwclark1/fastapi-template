@@ -7,6 +7,7 @@ Provides production-ready logging configuration using:
 - All handlers on root logger (child loggers propagate)
 - JSONL format for machine parsing (Loki-ready)
 """
+
 from __future__ import annotations
 
 import atexit
@@ -20,6 +21,84 @@ from typing import Any
 # Global queue and listener for async logging
 _log_queue: Queue[logging.LogRecord] | None = None
 _listener: QueueListener | None = None
+
+
+def complete() -> None:
+    """Wait for all queued log records to be processed.
+
+    Inspired by loguru's logger.complete() method. Ensures all logs
+    in the queue are flushed and written before continuing. Useful
+    for graceful shutdown to avoid losing logs.
+
+    This function blocks until the QueueListener has processed all
+    pending log records. Call this before application exit to ensure
+    all logs are written.
+
+    Example:
+            from example_service.infra.logging import configure_logging, complete
+        import logging
+
+        # Configure logging
+        configure_logging(log_level="INFO", file_path="app.log")
+
+        logger = logging.getLogger(__name__)
+        logger.info("Starting application")
+
+        # ... application code ...
+
+        logger.info("Shutting down")
+        complete()  # Wait for all logs to be written
+
+    Note:
+        - This is automatically called on process exit via atexit handler
+        - Only needed if you want to ensure logs are flushed mid-execution
+        - Blocks until queue is empty (usually <1 second)
+    """
+    global _log_queue, _listener
+
+    if _log_queue is None or _listener is None:
+        return
+
+    # Wait for queue to be empty
+    # The queue.join() waits for all tasks to be marked done
+    # However, Queue from queue module doesn't have join() method
+    # So we just wait for the queue to be empty
+    import time
+
+    max_wait = 5.0  # Maximum 5 seconds
+    start = time.time()
+
+    while not _log_queue.empty() and (time.time() - start) < max_wait:
+        time.sleep(0.01)  # 10ms polling interval
+
+    # Give a bit more time for last records to be written
+    time.sleep(0.05)
+
+
+def shutdown() -> None:
+    """Shutdown logging system and stop QueueListener.
+
+    Stops the QueueListener and flushes all pending logs. This is
+    automatically called via atexit handler, but can be called manually
+    if needed.
+
+    Example:
+            from example_service.infra.logging import shutdown
+
+        # Explicitly shutdown logging
+        shutdown()
+    """
+    global _log_queue, _listener
+
+    if _listener is not None:
+        # Complete any pending logs first
+        complete()
+
+        # Stop the listener
+        _listener.stop()
+        _listener = None
+
+    _log_queue = None
 
 
 def configure_logging(
@@ -42,6 +121,9 @@ def configure_logging(
     sampling_rate_default: float = 1.0,
     enable_rate_limit: bool = False,
     rate_limit_max_per_second: int = 100,
+    colorize: bool | None = None,
+    colorize_message: bool = False,
+    level_colors: dict[str, str | tuple[int, int, int]] | None = None,
     **kwargs: Any,
 ) -> None:
     """Configure logging with dictConfig and QueueHandler pattern.
@@ -70,11 +152,14 @@ def configure_logging(
         sampling_rate_default: Default sample rate (1.0 = 100%).
         enable_rate_limit: Enable rate limiting to prevent log storms.
         rate_limit_max_per_second: Max logs per second when rate limiting.
+        colorize: Enable console colors. If None, auto-detect (respects NO_COLOR/FORCE_COLOR).
+        colorize_message: If True, colorize entire message (not just level name).
+        level_colors: Custom color mapping for log levels. Values can be ANSI strings,
+            RGB tuples (e.g., (255, 0, 0)), or hex strings (e.g., "#FF0000").
         **kwargs: Additional settings (include_uvicorn, etc.).
 
     Example:
-        ```python
-        # Recommended: Use LoggingSettings
+            # Recommended: Use LoggingSettings
         from example_service.core.settings import get_logging_settings
         log_settings = get_logging_settings()
         configure_logging(**log_settings.to_logging_kwargs())
@@ -86,7 +171,6 @@ def configure_logging(
             file_level="INFO",      # Info+ to file
             json_logs=True
         )
-        ```
     """
     global _log_queue, _listener
 
@@ -114,6 +198,9 @@ def configure_logging(
         sampling_rate_default=sampling_rate_default,
         enable_rate_limit=enable_rate_limit,
         rate_limit_max_per_second=rate_limit_max_per_second,
+        colorize=colorize,
+        colorize_message=colorize_message,
+        level_colors=level_colors,
     )
 
 
@@ -136,6 +223,9 @@ def _configure_with_dictconfig(
     sampling_rate_default: float,
     enable_rate_limit: bool,
     rate_limit_max_per_second: int,
+    colorize: bool | None,
+    colorize_message: bool,
+    level_colors: dict[str, str | tuple[int, int, int]] | None,
 ) -> None:
     """Configure logging using dictConfig with QueueHandler pattern.
 
@@ -158,6 +248,8 @@ def _configure_with_dictconfig(
         include_thread_info: Include thread info in logs.
         file_max_bytes: Max file size before rotation.
         file_backup_count: Number of backup files to keep.
+        colorize: Enable console colors (None=auto-detect).
+        colorize_message: Colorize entire message vs just level.
     """
     global _log_queue, _listener
 
@@ -232,6 +324,8 @@ def _configure_with_dictconfig(
         file_max_bytes=file_max_bytes,
         file_backup_count=file_backup_count,
         json_logs=json_logs,
+        colorize=colorize,
+        colorize_message=colorize_message,
     )
 
 
@@ -396,6 +490,8 @@ def _setup_queue_logging(
     file_max_bytes: int,
     file_backup_count: int,
     json_logs: bool,
+    colorize: bool | None,
+    colorize_message: bool,
 ) -> None:
     """Set up QueueHandler + QueueListener for non-blocking logging.
 
@@ -411,9 +507,12 @@ def _setup_queue_logging(
         file_max_bytes: Max file size.
         file_backup_count: Backup count.
         json_logs: Use JSON format.
+        colorize: Enable colors (None=auto-detect).
+        colorize_message: Colorize entire message.
     """
     global _log_queue, _listener
 
+    from example_service.infra.logging.color_formatter import ColoredConsoleFormatter
     from example_service.infra.logging.formatters import JSONFormatter
 
     # Create queue for async logging
@@ -421,7 +520,6 @@ def _setup_queue_logging(
 
     # Create handlers list
     handlers: list[logging.Handler] = []
-    formatter_name = "json" if json_logs else "text"
 
     # Console handler
     if console_enabled:
@@ -429,6 +527,7 @@ def _setup_queue_logging(
         console_handler.setLevel(getattr(logging, console_level.upper()))
 
         if json_logs:
+            # JSON logs don't get colors (for machine parsing)
             console_handler.setFormatter(
                 JSONFormatter(
                     fmt_keys={"level": "levelname", "logger": "name", "message": "message"},
@@ -436,10 +535,14 @@ def _setup_queue_logging(
                 )
             )
         else:
+            # Use colored formatter for human-readable logs
             console_handler.setFormatter(
-                logging.Formatter(
+                ColoredConsoleFormatter(
                     fmt="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
                     datefmt="%Y-%m-%d %H:%M:%S",
+                    colorize=colorize,
+                    colorize_message=colorize_message,
+                    level_colors=level_colors,
                 )
             )
         handlers.append(console_handler)
@@ -474,11 +577,9 @@ def _setup_queue_logging(
     if handlers:
         _listener = QueueListener(_log_queue, *handlers, respect_handler_level=True)
         _listener.start()
-        atexit.register(_listener.stop)
+        atexit.register(shutdown)  # Use shutdown() instead of _listener.stop
 
     # Add QueueHandler to root logger
     root = logging.getLogger()
     queue_handler = QueueHandler(_log_queue)
     root.addHandler(queue_handler)
-
-

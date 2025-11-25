@@ -1,4 +1,5 @@
 """Pytest configuration and fixtures."""
+
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
@@ -20,7 +21,7 @@ async def app():
 
 
 @pytest.fixture
-async def client(app) -> AsyncGenerator[AsyncClient, None]:
+async def client(app) -> AsyncGenerator[AsyncClient]:
     """Create async HTTP client for testing.
 
     Args:
@@ -30,15 +31,11 @@ async def client(app) -> AsyncGenerator[AsyncClient, None]:
         Async HTTP client for making test requests.
 
     Example:
-        ```python
-        async def test_health_check(client):
+            async def test_health_check(client):
             response = await client.get("/api/v1/health/")
             assert response.status_code == 200
-        ```
     """
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
 

@@ -6,15 +6,22 @@ using FastStream with RabbitMQ. It includes:
 - Queue and exchange configuration
 - Publisher and subscriber setup
 - Automatic lifespan management
+- Context manager for safe publishing from Taskiq workers
 
 AsyncAPI Documentation:
 - /asyncapi - Interactive documentation UI
 - /asyncapi.json - JSON schema download
 - /asyncapi.yaml - YAML schema download
+
+Usage Patterns:
+- FastAPI endpoints: Use `Depends(get_broker)` - broker is auto-connected
+- Taskiq workers: Use `async with broker_context()` to manage lifecycle
 """
+
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
 from example_service.core.settings import get_rabbit_settings
@@ -35,7 +42,7 @@ rabbit_settings = get_rabbit_settings()
 # Initialize RabbitMQ router with AsyncAPI documentation
 # RabbitRouter wraps RabbitBroker and provides FastAPI integration
 router: RabbitRouterType | None = None
-broker: "RabbitBroker | None" = None
+broker: RabbitBroker | None = None
 
 if rabbit_settings.is_configured:
     from faststream.rabbit.fastapi import RabbitRouter
@@ -55,7 +62,7 @@ else:
     logger.warning("RabbitMQ not configured - messaging features disabled")
 
 
-async def get_broker() -> "AsyncIterator[RabbitBroker | None]":
+async def get_broker() -> AsyncIterator[RabbitBroker | None]:
     """Get the RabbitMQ broker instance.
 
     This is a dependency that can be used in FastAPI endpoints
@@ -65,8 +72,7 @@ async def get_broker() -> "AsyncIterator[RabbitBroker | None]":
         RabbitMQ broker instance or None if not configured.
 
     Example:
-        ```python
-        @router.post("/publish")
+            @router.post("/publish")
         async def publish_event(
             broker: RabbitBroker = Depends(get_broker)
         ):
@@ -74,7 +80,6 @@ async def get_broker() -> "AsyncIterator[RabbitBroker | None]":
                 message={"event": "user.created"},
                 queue="user-events"
             )
-        ```
     """
     yield broker
 
@@ -90,6 +95,7 @@ def get_router() -> RabbitRouterType | None:
 
 # Legacy functions for backward compatibility
 # Note: With RabbitRouter, lifecycle is managed automatically by FastAPI
+
 
 async def start_broker() -> None:
     """Start the RabbitMQ broker connection.
@@ -130,3 +136,51 @@ async def stop_broker() -> None:
         logger.info("RabbitMQ broker stopped successfully")
     except Exception as e:
         logger.exception("Error stopping RabbitMQ broker", extra={"error": str(e)})
+
+
+@asynccontextmanager
+async def broker_context() -> AsyncIterator[RabbitBroker | None]:
+    """Context manager for safe broker access from Taskiq workers.
+
+    This context manager handles the broker lifecycle for code running
+    outside of FastAPI's lifespan (e.g., Taskiq worker tasks). It ensures
+    the broker is connected before use and properly closed afterward.
+
+    Yields:
+        RabbitBroker instance or None if not configured.
+
+    Example:
+            from example_service.infra.messaging.broker import broker_context
+
+        @taskiq_broker.task()
+        async def my_task():
+            async with broker_context() as broker:
+                if broker is not None:
+                    await broker.publish(
+                        message={"event": "task.completed"},
+                        queue="task-events"
+                    )
+
+    Note:
+        - In FastAPI endpoints, use `Depends(get_broker)` instead
+        - The context manager is idempotent - safe to use even if
+          broker is already connected (e.g., in tests)
+    """
+    if not rabbit_settings.is_configured or broker is None:
+        logger.warning("RabbitMQ not configured, broker_context yielding None")
+        yield None
+        return
+
+    try:
+        await broker.start()
+        logger.debug("Broker connected via context manager")
+        yield broker
+    except Exception as e:
+        logger.exception("Failed to connect broker", extra={"error": str(e)})
+        raise
+    finally:
+        try:
+            await broker.close()
+            logger.debug("Broker disconnected via context manager")
+        except Exception as e:
+            logger.warning("Error closing broker in context manager", extra={"error": str(e)})

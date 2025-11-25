@@ -1,4 +1,5 @@
 """Global exception handlers for FastAPI application."""
+
 from __future__ import annotations
 
 import logging
@@ -317,10 +318,8 @@ def configure_exception_handlers(app: FastAPI) -> None:
         app: The FastAPI application instance.
 
     Example:
-        ```python
-        app = FastAPI()
+            app = FastAPI()
         configure_exception_handlers(app)
-        ```
     """
     # Custom application exceptions
     app.add_exception_handler(AppException, app_exception_handler)
@@ -329,9 +328,7 @@ def configure_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
     # Pydantic validation errors
-    app.add_exception_handler(
-        PydanticValidationError, pydantic_validation_exception_handler
-    )
+    app.add_exception_handler(PydanticValidationError, pydantic_validation_exception_handler)
 
     # Catch-all for unexpected exceptions
     app.add_exception_handler(Exception, generic_exception_handler)

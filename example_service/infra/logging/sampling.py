@@ -30,8 +30,7 @@ class SamplingFilter(logging.Filter):
     - Time-based rate limiting option
 
     Example:
-        ```python
-        # Sample 1% of INFO logs from health check endpoint
+            # Sample 1% of INFO logs from health check endpoint
         sampling_filter = SamplingFilter(
             sample_rates={
                 "app.api.health": 0.01,    # 1% sampling
@@ -42,7 +41,6 @@ class SamplingFilter(logging.Filter):
 
         # Add to handler
         handler.addFilter(sampling_filter)
-        ```
     """
 
     def __init__(
@@ -127,8 +125,7 @@ class SamplingFilter(logging.Filter):
             Dict mapping logger names to stats (total, sampled, dropped).
 
         Example:
-            ```python
-            stats = sampling_filter.get_stats()
+                    stats = sampling_filter.get_stats()
             print(stats)
             # {
             #     "app.api.health": {
@@ -137,7 +134,6 @@ class SamplingFilter(logging.Filter):
             #         "dropped": 9900
             #     }
             # }
-            ```
         """
         with self._lock:
             return {
@@ -164,14 +160,12 @@ class RateLimitFilter(logging.Filter):
     preventing a single error from flooding logs.
 
     Example:
-        ```python
-        # Allow max 10 logs per second per logger
+            # Allow max 10 logs per second per logger
         rate_limit = RateLimitFilter(
             max_logs_per_window=10,
             window_seconds=1.0
         )
         handler.addFilter(rate_limit)
-        ```
     """
 
     def __init__(

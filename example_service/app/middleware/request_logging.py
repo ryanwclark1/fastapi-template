@@ -1,4 +1,9 @@
-"""Request/response logging middleware with PII masking capabilities."""
+"""Request/response logging middleware with PII masking capabilities.
+
+This middleware is responsible for logging only. Metrics collection is handled
+by MetricsMiddleware to avoid duplication.
+"""
+
 from __future__ import annotations
 
 import json
@@ -12,8 +17,7 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
-from example_service.infra.logging.context import clear_log_context, set_log_context
-from example_service.infra.metrics import tracking
+from example_service.infra.logging.context import set_log_context
 
 logger = logging.getLogger(__name__)
 
@@ -25,15 +29,13 @@ class PIIMasker:
     SSNs, API keys, and custom patterns.
 
     Example:
-        ```python
-        masker = PIIMasker()
+            masker = PIIMasker()
         masked_data = masker.mask_dict({
             "email": "user@example.com",
             "phone": "555-123-4567",
             "name": "John Doe"
         })
         # Result: {"email": "***@***.com", "phone": "***-***-4567", "name": "John Doe"}
-        ```
     """
 
     # Regex patterns for common PII
@@ -104,7 +106,9 @@ class PIIMasker:
         local, domain = email.split("@", 1)
 
         if self.preserve_domain:
-            masked_local = local[0] + self.mask_char * (len(local) - 1) if len(local) > 1 else self.mask_char
+            masked_local = (
+                local[0] + self.mask_char * (len(local) - 1) if len(local) > 1 else self.mask_char
+            )
             return f"{masked_local}@{domain}"
         else:
             return f"{self.mask_char * 3}@{self.mask_char * 3}.com"
@@ -175,24 +179,16 @@ class PIIMasker:
             String with PII masked
         """
         # Mask emails
-        value = self.EMAIL_PATTERN.sub(
-            lambda m: self.mask_email(m.group()), value
-        )
+        value = self.EMAIL_PATTERN.sub(lambda m: self.mask_email(m.group()), value)
 
         # Mask credit cards (before phone to avoid false positives)
-        value = self.CREDIT_CARD_PATTERN.sub(
-            lambda m: self.mask_credit_card(m.group()), value
-        )
+        value = self.CREDIT_CARD_PATTERN.sub(lambda m: self.mask_credit_card(m.group()), value)
 
         # Mask phone numbers
-        value = self.PHONE_PATTERN.sub(
-            lambda m: self.mask_phone(m.group()), value
-        )
+        value = self.PHONE_PATTERN.sub(lambda m: self.mask_phone(m.group()), value)
 
         # Mask SSNs
-        value = self.SSN_PATTERN.sub(
-            lambda m: self.mask_char * len(m.group()), value
-        )
+        value = self.SSN_PATTERN.sub(lambda m: self.mask_char * len(m.group()), value)
 
         # Mask custom patterns
         for pattern in self.custom_patterns.values():
@@ -200,7 +196,9 @@ class PIIMasker:
 
         return value
 
-    def mask_dict(self, data: dict[str, Any], depth: int = 0, max_depth: int = 10) -> dict[str, Any]:
+    def mask_dict(
+        self, data: dict[str, Any], depth: int = 0, max_depth: int = 10
+    ) -> dict[str, Any]:
         """Recursively mask PII in dictionary.
 
         Args:
@@ -228,8 +226,10 @@ class PIIMasker:
                 masked[key] = self.mask_dict(value, depth + 1, max_depth)
             elif isinstance(value, list):
                 masked[key] = [
-                    self.mask_dict(item, depth + 1, max_depth) if isinstance(item, dict)
-                    else self.mask_string(item) if isinstance(item, str)
+                    self.mask_dict(item, depth + 1, max_depth)
+                    if isinstance(item, dict)
+                    else self.mask_string(item)
+                    if isinstance(item, str)
                     else item
                     for item in value
                 ]
@@ -245,6 +245,11 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     Logs request and response details while automatically masking sensitive
     information. Useful for debugging, auditing, and monitoring.
 
+    Note:
+        This middleware handles logging only. Metrics collection (API calls,
+        slow requests, response sizes) is handled separately by MetricsMiddleware
+        to avoid duplication.
+
     Attributes:
         masker: PIIMasker instance for masking sensitive data
         log_request_body: Whether to log request bodies
@@ -253,14 +258,12 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         exempt_paths: Paths to exclude from logging
 
     Example:
-        ```python
-        app.add_middleware(
+            app.add_middleware(
             RequestLoggingMiddleware,
             log_request_body=True,
             log_response_body=True,
             max_body_size=10000
         )
-        ```
     """
 
     def __init__(
@@ -385,11 +388,10 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         start_time = time.time()
         request_id = getattr(request.state, "request_id", "unknown")
 
-        # Set logging context for this request
-        # All logs from this point forward will automatically include these fields
-        clear_log_context()  # Clear any stale context from previous request
+        # Add logging-specific context fields
+        # Note: request_id is already set by RequestIDMiddleware
+        # We only add HTTP-specific fields here for logging purposes
         set_log_context(
-            request_id=request_id,
             method=request.method,
             path=request.url.path,
             client_ip=request.client.host if request.client else None,
@@ -459,19 +461,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             )
             raise
 
-        # Calculate duration
+        # Calculate duration for logging purposes
+        # Note: Duration metrics are tracked separately by MetricsMiddleware
         duration = time.time() - start_time
-
-        # Track metrics
-        tracking.track_api_call(
-            endpoint=request.url.path,
-            method=request.method,
-            is_authenticated=hasattr(request.state, "user"),
-        )
-
-        # Track slow requests
-        if duration > 5.0:
-            tracking.track_slow_request(request.url.path, request.method)
 
         # Log response
         response_log: dict[str, Any] = {
@@ -487,7 +479,6 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         if hasattr(response, "headers") and "content-length" in response.headers:
             response_size = int(response.headers["content-length"])
             response_log["response_size"] = response_size
-            tracking.track_response_size(request.url.path, request.method, response_size)
 
         logger.log(self.log_level, "HTTP Response", extra=response_log)
 

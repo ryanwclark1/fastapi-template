@@ -9,7 +9,7 @@ This module provides CLI commands for data management:
 import csv
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -91,7 +91,8 @@ async def export_data(
         module = importlib.import_module(module_path)
         Model = getattr(module, class_name)
 
-        from sqlalchemy import select, inspect
+        from sqlalchemy import inspect, select
+
         from example_service.infra.database import get_session
 
         async with get_session() as session:
@@ -317,8 +318,9 @@ async def database_stats() -> None:
 
     try:
         from sqlalchemy import text
-        from example_service.infra.database import get_session
+
         from example_service.core.settings import get_app_settings
+        from example_service.infra.database import get_session
 
         settings = get_app_settings()
         db_settings = settings.database
@@ -412,6 +414,7 @@ async def list_tables() -> None:
 
     try:
         from sqlalchemy import text
+
         from example_service.infra.database import get_session
 
         async with get_session() as session:
@@ -433,7 +436,7 @@ async def list_tables() -> None:
                 section(f"Table: {table_name}")
 
                 # Get columns
-                result = await session.execute(text(f"""
+                result = await session.execute(text("""
                     SELECT
                         column_name,
                         data_type,
@@ -470,6 +473,7 @@ async def count_records(table: str | None) -> None:
     """
     try:
         from sqlalchemy import text
+
         from example_service.infra.database import get_session
 
         async with get_session() as session:
@@ -537,6 +541,7 @@ async def truncate_table(table: str, cascade: bool) -> None:
 
     try:
         from sqlalchemy import text
+
         from example_service.infra.database import get_session
 
         async with get_session() as session:
