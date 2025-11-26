@@ -148,6 +148,16 @@ class AppSettings(BaseSettings):
         default=60, ge=1, le=3600, description="Rate limit window in seconds"
     )
 
+    # Security settings
+    strict_csp: bool = Field(
+        default=True,
+        description=(
+            "Use strict CSP without 'unsafe-inline'/'unsafe-eval'. "
+            "Auto-enabled when docs are disabled. Set to False to allow "
+            "relaxed CSP even in production (not recommended)."
+        ),
+    )
+
     @model_validator(mode="after")
     def validate_production_settings(self) -> AppSettings:
         """Validate settings for production environment."""

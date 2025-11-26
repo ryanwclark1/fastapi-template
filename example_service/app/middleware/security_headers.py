@@ -91,6 +91,10 @@ class SecurityHeadersMiddleware:
     def _default_csp_directives() -> dict[str, str]:
         """Get default Content-Security-Policy directives.
 
+        These directives allow Swagger UI and ReDoc documentation to function
+        by permitting 'unsafe-inline' and 'unsafe-eval'. Use strict CSP in
+        production with docs disabled.
+
         Returns:
             Dictionary of CSP directives.
         """
@@ -110,6 +114,33 @@ class SecurityHeadersMiddleware:
             "img-src": "'self' data: https:",
             "font-src": f"'self' data: {swagger_cdn} {google_fonts_assets}",
             "connect-src": f"'self' {swagger_cdn}",
+            "frame-ancestors": "'none'",
+            "base-uri": "'self'",
+            "form-action": "'self'",
+            "worker-src": "'self' blob:",
+        }
+
+    @staticmethod
+    def _strict_csp_directives() -> dict[str, str]:
+        """Get strict Content-Security-Policy directives for production.
+
+        These directives do NOT include 'unsafe-inline' or 'unsafe-eval',
+        providing maximum XSS protection. Use when API documentation is
+        disabled in production (APP_DISABLE_DOCS=true).
+
+        Note: Swagger UI requires 'unsafe-eval' to function, so this CSP
+        will break documentation pages. Only use when docs are disabled.
+
+        Returns:
+            Dictionary of strict CSP directives.
+        """
+        return {
+            "default-src": "'self'",
+            "script-src": "'self'",
+            "style-src": "'self'",
+            "img-src": "'self' data:",
+            "font-src": "'self'",
+            "connect-src": "'self'",
             "frame-ancestors": "'none'",
             "base-uri": "'self'",
             "form-action": "'self'",

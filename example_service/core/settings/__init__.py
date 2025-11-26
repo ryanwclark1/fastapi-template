@@ -38,6 +38,7 @@ from .loader import (
     get_otel_settings,
     get_rabbit_settings,
     get_redis_settings,
+    get_storage_settings,
 )
 from .unified import Settings, get_settings
 
@@ -52,6 +53,7 @@ __all__ = [
     "get_otel_settings",
     "get_rabbit_settings",
     "get_redis_settings",
+    "get_storage_settings",
     # Unified settings (convenient for development/testing)
     "Settings",
     "get_settings",

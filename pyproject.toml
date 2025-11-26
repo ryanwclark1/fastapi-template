@@ -111,6 +111,10 @@ omit = [
     "example_service/features/admin/*",
     "example_service/features/metrics/*",
     "example_service/features/status/*",
+    "example_service/features/health/*",
+    "example_service/features/reminders/*",
+    "example_service/features/files/*",
+    "example_service/features/webhooks/*",
     "example_service/utils/*",
 ]
 

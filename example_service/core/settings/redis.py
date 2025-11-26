@@ -196,6 +196,22 @@ class RedisSettings(BaseSettings):
     )
 
     # ──────────────────────────────────────────────────────────────
+    # Rate limiting observability settings
+    # ──────────────────────────────────────────────────────────────
+
+    critical_for_readiness: bool = Field(
+        default=False,
+        description="Include Redis in readiness probe. If true, pod will be marked not-ready when Redis is unavailable (fail-closed for rate limiting).",
+    )
+
+    rate_limit_failure_threshold: int = Field(
+        default=3,
+        ge=1,
+        le=20,
+        description="Consecutive Redis failures before marking rate limiting protection as degraded.",
+    )
+
+    # ──────────────────────────────────────────────────────────────
     # Application-specific settings
     # ──────────────────────────────────────────────────────────────
 

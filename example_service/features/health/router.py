@@ -22,8 +22,10 @@ from example_service.features.health.schemas import (
     HealthResponse,
     HealthStatsResponse,
     LivenessResponse,
-    ProviderStatsDetail,
+    ProtectionDetail,
+    ProtectionHealthResponse,
     ProvidersResponse,
+    ProviderStatsDetail,
     ReadinessResponse,
     StartupResponse,
 )
@@ -169,6 +171,64 @@ async def startup_check(service: HealthServiceDep) -> StartupResponse:
     """
     result = await service.startup()
     return StartupResponse(**result)
+
+
+# =============================================================================
+# Security Protection Endpoint
+# =============================================================================
+
+
+@router.get(
+    "/protection",
+    response_model=ProtectionHealthResponse,
+    summary="Security protection health",
+    description="Returns status of security protection mechanisms (rate limiting)",
+)
+async def protection_status(aggregator: HealthAggregatorDep) -> ProtectionHealthResponse:
+    """Security protection health endpoint.
+
+    Returns the health status of security protection mechanisms,
+    primarily rate limiting. Useful for security dashboards and alerting
+    when protection is degraded (fail-open mode) or disabled.
+
+    Returns:
+        ProtectionHealthResponse with rate limiter status and details.
+    """
+    from datetime import UTC, datetime
+
+    from example_service.core.schemas.common import HealthStatus
+
+    # Check rate limiter provider
+    rate_limiter_result = await aggregator.check_provider("rate_limiter")
+
+    protections = {}
+    overall_status = HealthStatus.HEALTHY
+
+    if rate_limiter_result:
+        protections["rate_limiter"] = ProtectionDetail(
+            status=rate_limiter_result.status,
+            message=rate_limiter_result.message,
+            metadata=rate_limiter_result.metadata,
+        )
+        # Overall status is worst of all protections
+        if rate_limiter_result.status == HealthStatus.UNHEALTHY:
+            overall_status = HealthStatus.UNHEALTHY
+        elif rate_limiter_result.status == HealthStatus.DEGRADED and overall_status != HealthStatus.UNHEALTHY:
+            overall_status = HealthStatus.DEGRADED
+    else:
+        # Rate limiter not configured
+        protections["rate_limiter"] = ProtectionDetail(
+            status=HealthStatus.UNHEALTHY,
+            message="Rate limiter not configured",
+            metadata={"reason": "provider_not_registered"},
+        )
+        overall_status = HealthStatus.UNHEALTHY
+
+    return ProtectionHealthResponse(
+        status=overall_status,
+        timestamp=datetime.now(UTC),
+        protections=protections,
+    )
 
 
 # =============================================================================

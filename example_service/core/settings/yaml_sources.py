@@ -256,3 +256,20 @@ def create_consul_yaml_source(settings_cls: type[BaseSettings]) -> ConfDYamlConf
         confd_dir="consul.d",
         config_dir_env="CONSUL_CONFIG_DIR",
     )
+
+
+def create_storage_yaml_source(settings_cls: type[BaseSettings]) -> ConfDYamlConfigSettingsSource:
+    """Create YAML source for StorageSettings.
+
+    Loads from:
+    - conf/storage.yaml (base)
+    - conf/storage.d/*.yaml (overrides)
+
+    Override directory with: STORAGE_CONFIG_DIR=/custom/path
+    """
+    return ConfDYamlConfigSettingsSource(
+        settings_cls,
+        yaml_file="storage.yaml",
+        confd_dir="storage.d",
+        config_dir_env="STORAGE_CONFIG_DIR",
+    )

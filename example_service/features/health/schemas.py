@@ -499,6 +499,79 @@ class ProvidersResponse(BaseModel):
     )
 
 
+class ProtectionDetail(BaseModel):
+    """Detail for a single protection mechanism."""
+
+    status: HealthStatus = Field(description="Protection status")
+    message: str = Field(description="Status message")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional details")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "healthy",
+                "message": "Rate limiting protection active",
+                "metadata": {
+                    "protection_status": "active",
+                    "consecutive_failures": 0,
+                },
+            }
+        }
+    )
+
+
+class ProtectionHealthResponse(BaseModel):
+    """Security protection health response.
+
+    Returns the status of security protection mechanisms like
+    rate limiting. Used for security dashboards and alerting.
+
+    Example:
+        ```json
+        {
+            "status": "healthy",
+            "timestamp": "2025-01-01T00:00:00Z",
+            "protections": {
+                "rate_limiter": {
+                    "status": "healthy",
+                    "message": "Rate limiting protection active",
+                    "metadata": {
+                        "protection_status": "active",
+                        "consecutive_failures": 0
+                    }
+                }
+            }
+        }
+        ```
+    """
+
+    status: HealthStatus = Field(description="Overall protection status")
+    timestamp: datetime = Field(description="Check timestamp")
+    protections: dict[str, ProtectionDetail] = Field(
+        default_factory=dict, description="Individual protection mechanism statuses"
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "healthy",
+                "timestamp": "2025-01-01T00:00:00Z",
+                "protections": {
+                    "rate_limiter": {
+                        "status": "healthy",
+                        "message": "Rate limiting protection active",
+                        "metadata": {
+                            "protection_status": "active",
+                            "consecutive_failures": 0,
+                        },
+                    }
+                },
+            }
+        },
+        json_encoders={datetime: lambda v: v.isoformat()},
+    )
+
+
 __all__ = [
     "CacheInfoResponse",
     "ComponentHealthDetail",
@@ -508,6 +581,8 @@ __all__ = [
     "HealthResponse",
     "HealthStatsResponse",
     "LivenessResponse",
+    "ProtectionDetail",
+    "ProtectionHealthResponse",
     "ProviderStatsDetail",
     "ProvidersResponse",
     "ReadinessResponse",

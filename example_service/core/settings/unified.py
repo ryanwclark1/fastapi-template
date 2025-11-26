@@ -42,6 +42,7 @@ if TYPE_CHECKING:
     from .postgres import PostgresSettings
     from .rabbit import RabbitSettings
     from .redis import RedisSettings
+    from .storage import StorageSettings
 
 
 def _get_app_settings() -> AppSettings:
@@ -98,6 +99,12 @@ def _get_consul_settings() -> ConsulSettings:
     return ConsulSettings()
 
 
+def _get_storage_settings() -> StorageSettings:
+    """Lazy import to avoid circular dependencies."""
+    from .storage import StorageSettings
+    return StorageSettings()
+
+
 class Settings(BaseSettings):
     """Unified settings composing all domain settings.
 
@@ -128,6 +135,7 @@ class Settings(BaseSettings):
     auth: AuthSettings = Field(default_factory=_get_auth_settings)
     backup: BackupSettings = Field(default_factory=_get_backup_settings)
     consul: ConsulSettings = Field(default_factory=_get_consul_settings)
+    storage: StorageSettings = Field(default_factory=_get_storage_settings)
 
 
 def _rebuild_model() -> None:
@@ -146,6 +154,7 @@ def _rebuild_model() -> None:
     from .postgres import PostgresSettings
     from .rabbit import RabbitSettings
     from .redis import RedisSettings
+    from .storage import StorageSettings
 
     Settings.model_rebuild(
         _types_namespace={
@@ -158,6 +167,7 @@ def _rebuild_model() -> None:
             "AuthSettings": AuthSettings,
             "BackupSettings": BackupSettings,
             "ConsulSettings": ConsulSettings,
+            "StorageSettings": StorageSettings,
         }
     )
 

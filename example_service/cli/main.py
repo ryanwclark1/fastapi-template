@@ -12,10 +12,12 @@ from example_service.cli.commands import (
     monitor,
     scheduler,
     server,
+    storage,
     tasks,
     users,
     utils,
 )
+from example_service.infra.logging.config import setup_logging
 
 
 @click.group()
@@ -33,6 +35,7 @@ def cli(ctx: click.Context) -> None:
     Command Groups:
       db         Database migrations and management
       cache      Redis cache operations
+      storage    S3-compatible object storage management
       server     Development and production servers
       config     Configuration management
       tasks      Background task management
@@ -58,6 +61,7 @@ def cli(ctx: click.Context) -> None:
 # Register command groups - Core infrastructure
 cli.add_command(database.db)
 cli.add_command(cache.cache)
+cli.add_command(storage.storage)
 cli.add_command(server.server)
 cli.add_command(config.config)
 
@@ -84,6 +88,7 @@ cli.add_command(utils.export_openapi)
 
 def main() -> None:
     """Entry point for CLI."""
+    setup_logging()
     cli(obj={})
 
 

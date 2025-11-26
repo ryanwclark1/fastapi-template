@@ -189,18 +189,43 @@ class RateLimitMiddleware:
             # Store metadata for response headers
             rate_limit_metadata = metadata
 
+            # Track successful Redis operation for protection status
+            try:
+                from example_service.infra.ratelimit.tracker import (
+                    get_rate_limit_tracker,
+                )
+
+                tracker = get_rate_limit_tracker()
+                if tracker:
+                    tracker.record_success()
+            except Exception:
+                pass  # Don't let tracker errors affect request processing
+
         except RateLimitException as exc:
             await self._send_rate_limit_response(exc, scope, receive, send)
             return
         except Exception as e:
-            # Log error but allow request to proceed
+            # Log error but allow request to proceed (fail-open pattern)
             # This ensures the application continues to function if Redis fails
+            # Track the failure in the rate limit state tracker
+            try:
+                from example_service.infra.ratelimit.tracker import (
+                    get_rate_limit_tracker,
+                )
+
+                tracker = get_rate_limit_tracker()
+                if tracker:
+                    tracker.record_failure(str(e))
+            except Exception:
+                pass  # Don't let tracker errors affect request processing
+
             logger.error(
-                "Rate limit check failed, allowing request",
+                "Rate limit check failed, allowing request (fail-open)",
                 extra={
                     "path": path,
                     "key": limit_key,
                     "error": str(e),
+                    "protection_status": "degraded",
                 },
                 exc_info=True,
             )

@@ -124,6 +124,17 @@ def configure_middleware(app: FastAPI) -> None:
         )
 
     # Security headers middleware (protects against common vulnerabilities)
+    # Use strict CSP when docs are disabled OR strict_csp is explicitly enabled
+    # Strict CSP removes 'unsafe-inline' and 'unsafe-eval' for maximum XSS protection
+    use_strict_csp = app_settings.disable_docs or (
+        app_settings.strict_csp and not app_settings.debug
+    )
+    csp_directives = (
+        SecurityHeadersMiddleware._strict_csp_directives()
+        if use_strict_csp
+        else SecurityHeadersMiddleware._default_csp_directives()
+    )
+
     app.add_middleware(
         SecurityHeadersMiddleware,
         enable_hsts=not app_settings.debug,  # Disable HSTS in debug mode
@@ -131,6 +142,7 @@ def configure_middleware(app: FastAPI) -> None:
         hsts_include_subdomains=True,
         hsts_preload=False,
         enable_csp=True,
+        csp_directives=csp_directives,
         enable_frame_options=True,
         frame_options="DENY",
         enable_xss_protection=True,
@@ -139,7 +151,8 @@ def configure_middleware(app: FastAPI) -> None:
         referrer_policy="strict-origin-when-cross-origin",
         enable_permissions_policy=True,
     )
-    logger.info("Security headers middleware enabled")
+    csp_mode = "strict (no unsafe-inline/eval)" if use_strict_csp else "relaxed (docs-compatible)"
+    logger.info(f"Security headers middleware enabled with {csp_mode} CSP")
 
     # Correlation ID middleware (for distributed tracing across services)
     # Sets correlation_id in logging context for transaction-level tracking

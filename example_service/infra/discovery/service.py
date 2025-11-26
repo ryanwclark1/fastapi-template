@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from example_service.core.settings.consul import ConsulSettings, HealthCheckMode
@@ -219,7 +219,7 @@ class ConsulService:
             try:
                 # Wait for task to finish with timeout
                 await asyncio.wait_for(self._heartbeat_task, timeout=5.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("Heartbeat task did not stop in time, cancelling")
                 self._heartbeat_task.cancel()
                 try:
@@ -306,7 +306,7 @@ class ConsulService:
                 )
                 # If we get here, stop was signaled
                 break
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Normal case - continue loop
                 continue
 

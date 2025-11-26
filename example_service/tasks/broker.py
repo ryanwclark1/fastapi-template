@@ -23,6 +23,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from example_service.infra.logging.config import setup_logging
 from example_service.infra.results import RedisAsyncResultBackend
 
 if TYPE_CHECKING:
@@ -54,6 +55,7 @@ logger = logging.getLogger(__name__)
 # Get settings from modular configuration
 redis_settings = get_redis_settings()
 rabbit_settings = get_rabbit_settings()
+setup_logging()
 
 # =============================================================================
 # Background Task Broker (taskiq-aio-pika)
@@ -65,7 +67,7 @@ rabbit_settings = get_rabbit_settings()
 broker: AioPikaBrokerType | None = None
 
 if AioPikaBroker is not None and rabbit_settings.is_configured and redis_settings.is_configured:
-    from example_service.tasks.middleware import TrackingMiddleware, TracingMiddleware
+    from example_service.tasks.middleware import TracingMiddleware, TrackingMiddleware
 
     broker = (
         AioPikaBroker(
@@ -204,8 +206,10 @@ if broker is not None:
     import example_service.tasks.cache.tasks  # noqa: F401
     import example_service.tasks.cleanup.tasks  # noqa: F401
     import example_service.tasks.export.tasks  # noqa: F401
+    import example_service.tasks.files.tasks  # noqa: F401
     import example_service.tasks.notifications.tasks  # noqa: F401
     import example_service.tasks.scheduler  # noqa: F401
     import example_service.tasks.tasks  # noqa: F401
+    import example_service.tasks.webhooks.tasks  # noqa: F401
 
     logger.debug("All task modules imported and registered with broker")

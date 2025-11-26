@@ -133,6 +133,47 @@ def update_rate_limit_remaining(key: str, endpoint: str, remaining: int) -> None
     ).set(remaining)
 
 
+def update_rate_limiter_protection_status(status: str) -> None:
+    """Update rate limiter protection status gauge.
+
+    Args:
+        status: Protection status ('active', 'degraded', 'disabled')
+
+    Example:
+            update_rate_limiter_protection_status("degraded")
+    """
+    status_map = {"active": 1.0, "degraded": 0.5, "disabled": 0.0}
+    business.rate_limiter_protection_status.set(status_map.get(status, 0.0))
+
+
+def track_rate_limiter_state_transition(from_state: str, to_state: str) -> None:
+    """Track rate limiter state transition.
+
+    Args:
+        from_state: Previous state
+        to_state: New state
+
+    Example:
+            track_rate_limiter_state_transition("active", "degraded")
+    """
+    business.rate_limiter_state_transitions_total.labels(
+        from_state=from_state,
+        to_state=to_state,
+    ).inc()
+
+
+def track_rate_limiter_redis_error(error_type: str) -> None:
+    """Track Redis error during rate limit check.
+
+    Args:
+        error_type: Type of error ('timeout', 'connection', 'auth', 'other')
+
+    Example:
+            track_rate_limiter_redis_error("connection")
+    """
+    business.rate_limiter_redis_errors_total.labels(error_type=error_type).inc()
+
+
 # ============================================================================
 # Circuit Breaker Tracking
 # ============================================================================

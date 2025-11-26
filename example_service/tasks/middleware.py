@@ -20,7 +20,7 @@ from taskiq import TaskiqMiddleware
 if TYPE_CHECKING:
     from taskiq import TaskiqMessage, TaskiqResult
 
-from example_service.infra.tracing.opentelemetry import get_tracer, record_exception
+from example_service.infra.tracing.opentelemetry import get_tracer
 from example_service.tasks.tracking import get_tracker, start_tracker, stop_tracker
 
 logger = logging.getLogger(__name__)

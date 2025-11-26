@@ -10,13 +10,20 @@ otelcol.receiver.otlp "default" {
     endpoint = "0.0.0.0:4318"
   }
   output {
-    traces = [otelcol.processor.batch.default.input]
+    traces  = [otelcol.processor.batch.traces.input]
+    metrics = [otelcol.processor.batch.metrics.input]
   }
 }
 
-otelcol.processor.batch "default" {
+otelcol.processor.batch "traces" {
   output {
     traces = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+otelcol.processor.batch "metrics" {
+  output {
+    metrics = [otelcol.exporter.prometheus.prom_bridge.input]
   }
 }
 
@@ -27,6 +34,10 @@ otelcol.exporter.otlp "tempo" {
       insecure = true
     }
   }
+}
+
+otelcol.exporter.prometheus "prom_bridge" {
+  forward_to = [prometheus.remote_write.prometheus.receiver]
 }
 
 // ============================================================================
@@ -86,5 +97,30 @@ loki.process "app_logs" {
 loki.write "loki" {
   endpoint {
     url = "http://loki:3101/loki/api/v1/push"
+  }
+}
+
+// ============================================================================
+// Metrics scraping and forwarding -> Prometheus
+// ============================================================================
+
+prometheus.scrape "api" {
+  scrape_interval = "15s"
+  scrape_timeout  = "10s"
+
+  targets = [{
+    "__address__"      = "api:8000",
+    "__scheme__"       = "http",
+    "__metrics_path__" = "/metrics",
+    "service"          = "example-service",
+    "job"              = "example-service",
+  }]
+
+  forward_to = [prometheus.remote_write.prometheus.receiver]
+}
+
+prometheus.remote_write "prometheus" {
+  endpoint {
+    url = "http://prometheus:9090/api/v1/write"
   }
 }

@@ -16,12 +16,16 @@ import logging.config
 from logging.handlers import QueueHandler, QueueListener, RotatingFileHandler
 from pathlib import Path
 from queue import Queue
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 # Global queue and listener for async logging
 _log_queue: Queue[logging.LogRecord] | None = None
 _listener: QueueListener | None = None
 logger = logging.getLogger(__name__)
+_LOGGING_INITIALIZED = False
+
+if TYPE_CHECKING:
+    from example_service.core.settings.logs import LoggingSettings
 
 
 def complete() -> None:
@@ -100,6 +104,42 @@ def shutdown() -> None:
         _listener = None
 
     _log_queue = None
+
+
+def setup_logging(
+    log_settings: LoggingSettings | None = None,
+    *,
+    force: bool = False,
+    **configure_kwargs: Any,
+) -> None:
+    """Ensure logging is configured once across entrypoints.
+
+    Args:
+        log_settings: Optional logging settings instance. If omitted, settings
+            are loaded via get_logging_settings().
+        force: Reconfigure logging even if it was already initialized.
+        **configure_kwargs: Explicit overrides for configure_logging().
+    """
+    global _LOGGING_INITIALIZED
+
+    if _LOGGING_INITIALIZED and not force:
+        return
+
+    settings_obj = log_settings
+    if settings_obj is None:
+        from example_service.core.settings import get_logging_settings
+
+        settings_obj = get_logging_settings()
+
+    log_config: dict[str, Any] = {}
+    if hasattr(settings_obj, "to_logging_kwargs"):
+        log_config = settings_obj.to_logging_kwargs()  # type: ignore[attr-defined]
+
+    if configure_kwargs:
+        log_config = {**log_config, **configure_kwargs}
+
+    configure_logging(**log_config)
+    _LOGGING_INITIALIZED = True
 
 
 def configure_logging(

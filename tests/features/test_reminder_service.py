@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from example_service.core.database.base import Base
+from example_service.features.reminders.models import Reminder
 from example_service.features.reminders.schemas import ReminderCreate
 from example_service.features.reminders.service import ReminderService
 
@@ -14,7 +14,7 @@ async def session() -> AsyncSession:
     """Provide an isolated in-memory database session."""
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(lambda sync_conn: Reminder.metadata.create_all(sync_conn, tables=[Reminder.__table__]))
 
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with session_factory() as session:
@@ -44,3 +44,18 @@ async def test_get_reminder_round_trip(session: AsyncSession) -> None:
     assert fetched is not None
     assert fetched.id == created.id
     assert fetched.title == "Submit report"
+
+
+@pytest.mark.asyncio
+async def test_mark_completed_and_notification(session: AsyncSession) -> None:
+    service = ReminderService(session)
+
+    reminder = await service.create_reminder(ReminderCreate(title="Call mom"))
+    assert reminder.is_completed is False
+    assert reminder.notification_sent is False
+
+    completed = await service.mark_completed(reminder.id)
+    assert completed is not None and completed.is_completed
+
+    notified = await service.mark_notification_sent(reminder.id)
+    assert notified is not None and notified.notification_sent

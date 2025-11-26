@@ -73,7 +73,12 @@ from example_service.infra.logging.colors import (
     should_colorize,
     strip_ansi,
 )
-from example_service.infra.logging.config import complete, configure_logging, shutdown
+from example_service.infra.logging.config import (
+    complete,
+    configure_logging,
+    setup_logging,
+    shutdown,
+)
 from example_service.infra.logging.context import (
     ContextBoundLogger,
     ContextInjectingFilter,
@@ -115,6 +120,7 @@ from example_service.infra.logging.sampling import (
 __all__ = [
     # Configuration
     "configure_logging",
+    "setup_logging",
     "complete",
     "shutdown",
     # Context management (recommended)

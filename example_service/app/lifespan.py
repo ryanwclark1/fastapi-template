@@ -7,7 +7,6 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from importlib import import_module
 from types import ModuleType
-from typing import Any
 
 from fastapi import FastAPI
 
@@ -23,7 +22,7 @@ from example_service.core.settings import (
 from example_service.infra.cache.redis import start_cache, stop_cache
 from example_service.infra.database.session import close_database, init_database
 from example_service.infra.discovery import start_discovery, stop_discovery
-from example_service.infra.logging.config import configure_logging
+from example_service.infra.logging.config import setup_logging
 from example_service.infra.messaging.broker import start_broker, stop_broker
 from example_service.infra.metrics.prometheus import application_info
 from example_service.infra.tracing.opentelemetry import setup_tracing
@@ -125,11 +124,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     scheduler_module: ModuleType | None = None
 
     # Startup - Configure logging with settings
-    log_config: dict[str, Any] = {}
-    if hasattr(log_settings, "to_logging_kwargs"):
-        # Allow DummySettings (used in tests) to bypass logging configuration
-        log_config = log_settings.to_logging_kwargs()  # type: ignore[attr-defined]
-    configure_logging(**log_config)
+    setup_logging(log_settings=log_settings, force=True)
     logger.info(
         "Application starting",
         extra={
@@ -198,6 +193,38 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             # Initialize task execution tracker (for querying task history via REST API)
             await start_tracker()
             logger.info("Task execution tracker initialized")
+
+            # Initialize rate limit state tracker for protection observability
+            try:
+                from example_service.infra.ratelimit import (
+                    RateLimitStateTracker,
+                    set_rate_limit_tracker,
+                )
+
+                rate_limit_tracker = RateLimitStateTracker(
+                    failure_threshold=redis_settings.rate_limit_failure_threshold,
+                )
+                set_rate_limit_tracker(rate_limit_tracker)
+                logger.info(
+                    "Rate limit state tracker initialized",
+                    extra={"failure_threshold": redis_settings.rate_limit_failure_threshold},
+                )
+
+                # Register rate limiter health provider with aggregator
+                from example_service.features.health.rate_limit_provider import (
+                    RateLimiterHealthProvider,
+                )
+                from example_service.features.health.service import get_health_aggregator
+
+                aggregator = get_health_aggregator()
+                if aggregator:
+                    aggregator.add_provider(RateLimiterHealthProvider(rate_limit_tracker))
+                    logger.info("Rate limiter health provider registered")
+            except Exception as e:
+                logger.warning(
+                    "Failed to initialize rate limit state tracker",
+                    extra={"error": str(e)},
+                )
         except Exception as e:
             if redis_settings.startup_require_cache:
                 logger.error(
@@ -210,6 +237,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                     "Redis cache unavailable, continuing in degraded mode",
                     extra={"error": str(e), "startup_require_cache": False},
                 )
+                # Mark rate limiter as disabled when Redis is unavailable
+                try:
+                    from example_service.infra.ratelimit import (
+                        RateLimitStateTracker,
+                        set_rate_limit_tracker,
+                    )
+
+                    tracker = RateLimitStateTracker()
+                    tracker.mark_disabled()
+                    set_rate_limit_tracker(tracker)
+                except Exception:
+                    pass
 
     # Initialize RabbitMQ/FastStream broker for event-driven messaging
     if rabbit_settings.is_configured:

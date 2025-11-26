@@ -285,8 +285,13 @@ class HealthService(BaseService):
         aggregator = self._get_aggregator()
 
         # For readiness, we only check critical dependencies
-        # Database is critical; cache/messaging are not
+        # Database is critical by default; cache can be made critical via config
         critical_providers = ["database"]
+
+        # Add cache to critical providers if configured
+        if self._redis_settings.critical_for_readiness:
+            critical_providers.append("cache")
+
         checks: dict[str, bool] = {}
 
         for name in critical_providers:

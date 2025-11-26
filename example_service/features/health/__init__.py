@@ -101,8 +101,8 @@ from example_service.features.health.schemas import (
     HealthResponse,
     HealthStatsResponse,
     LivenessResponse,
-    ProviderStatsDetail,
     ProvidersResponse,
+    ProviderStatsDetail,
     ReadinessResponse,
     StartupResponse,
 )

@@ -15,39 +15,39 @@ This guide provides detailed instructions for setting up comprehensive monitorin
 ## Architecture Overview
 
 ```
-┌─────────────────┐
-│   FastAPI App   │
-│   + Middleware  │
-└────────┬────────┘
-         │
-         ├─────────────────────────────────┐
-         │                                 │
-         ▼                                 ▼
-┌────────────────┐                ┌────────────────┐
-│   Prometheus   │                │ OpenTelemetry  │
-│   (Metrics)    │                │   (Traces)     │
-└────────┬───────┘                └────────┬───────┘
-         │                                 │
-         │ Exemplars link to traces        │
-         └──────────────┬──────────────────┘
-                        │
-                        ▼
-                ┌───────────────┐
-                │    Grafana    │
-                │  (Dashboards  │
-                │   + Alerts)   │
-                └───────────────┘
+┌─────────────────┐            ┌──────────────────────┐
+│   FastAPI App   │ send OTLP  │   Grafana Alloy      │
+│   + Middleware  │ traces/logs│  (Collector/Agent)   │
+└────────┬────────┘            └────────┬──────┬──────┘
+         │                               │      │
+         │ scrape /metrics               │      │
+         ▼                               ▼      ▼
+┌────────────────┐             ┌────────────┐ ┌────────────┐
+│ Prometheus     │◄────────────┤ Tempo       │ │   Loki     │
+│ (metrics via   │  remote write│ (traces)   │ │  (logs)    │
+│ Alloy ingest)  │             └────────────┘ └────────────┘
+└────────┬───────┘                    │              │
+         └────────────────────────────┴──────┬───────┘
+                                            ▼
+                                    ┌───────────────┐
+                                    │    Grafana    │
+                                    │  (Dashboards  │
+                                    │   + Alerts)   │
+                                    └───────────────┘
 ```
 
 ### Key Components
 
-- **Prometheus**: Metrics collection and storage
+- **Grafana Alloy**: Single collector that scrapes `/metrics`, receives OTLP telemetry, and forwards everything to the proper backends
+- **Prometheus**: Metrics storage, now ingesting data through Alloy’s remote write pipeline
 - **Grafana**: Visualization and dashboards
 - **OpenTelemetry**: Distributed tracing
 - **Tempo**: Trace storage (optional)
 - **Loki**: Log aggregation (optional)
 
 ## Metrics Collection
+
+Grafana Alloy functions as the single collector for metrics. It scrapes `api:8000/metrics`, accepts OTLP metrics on `4317/4318`, and forwards every series to Prometheus through the remote write receiver. This keeps the application configuration simple (only expose `/metrics`) while still letting other services push OTLP metrics into the stack without talking to Prometheus directly.
 
 ### Available Metrics
 
@@ -110,42 +110,49 @@ http_request_duration_seconds_count{method="GET",endpoint="/api/v1/status"} 1523
 
 ### Prometheus Configuration
 
-Add the following to your `prometheus.yml`:
+Grafana Alloy owns all scraping duties and forwards the samples to Prometheus via remote write. The relevant blocks live in `deployment/configs/alloy/config.alloy`:
 
-```yaml
-global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
-  # Enable exemplar storage for trace correlation
-  external_labels:
-    cluster: 'production'
+```alloy
+prometheus.scrape "api" {
+  targets = [{
+    "__address__" = "api:8000"
+    "__metrics_path__" = "/metrics"
+    "job" = "example-service"
+  }]
+  forward_to = [prometheus.remote_write.prometheus.receiver]
+}
 
-scrape_configs:
-  - job_name: 'example-service'
-    scrape_interval: 10s
-    metrics_path: /metrics
-    static_configs:
-      - targets: ['example-service:8000']
-        labels:
-          service: 'example-service'
-          environment: 'production'
-
-# Enable exemplar storage
-storage:
-  exemplars:
-    max_exemplars: 100000
+prometheus.remote_write "prometheus" {
+  endpoint {
+    url = "http://prometheus:9090/api/v1/write"
+  }
+}
 ```
 
-### Scraping Validation
+Because Prometheus receives metrics over remote write, it no longer needs a direct `example-service` job in `prometheus.yml`. The only required Prometheus-side change is enabling the built-in remote write receiver (already set in `deployment/docker/docker-compose.yml`):
 
-Verify Prometheus is scraping metrics:
+```yaml
+command:
+  - "--config.file=/etc/prometheus/prometheus.yml"
+  - "--storage.tsdb.path=/prometheus"
+  - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+  - "--web.console.templates=/usr/share/prometheus/consoles"
+  - "--web.enable-remote-write-receiver"
+```
+
+Adding external labels or exemplar settings is still optional, but they apply to every remote-written series just like traditional scrapes.
+
+### Remote Write Validation
+
+Verify Prometheus is ingesting the remote written samples:
 
 ```bash
-# Check Prometheus targets
-curl http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | select(.labels.job=="example-service")'
+# Check remote-write ingestion counters
+curl -G http://localhost:9091/api/v1/query \
+  --data-urlencode 'query=prometheus_remote_storage_samples_total' | jq
 
-# Query metrics
-curl -G http://localhost:9090/api/v1/query \
+# Query application metrics
+curl -G http://localhost:9091/api/v1/query \
   --data-urlencode 'query=http_requests_total{job="example-service"}' | jq
 ```
 

@@ -55,6 +55,27 @@ rate_limit_checks_total = Counter(
     registry=REGISTRY,
 )
 
+# Rate limiter protection status metrics
+rate_limiter_protection_status = Gauge(
+    "rate_limiter_protection_status",
+    "Rate limiter protection status (1=active, 0.5=degraded, 0=disabled)",
+    registry=REGISTRY,
+)
+
+rate_limiter_state_transitions_total = Counter(
+    "rate_limiter_state_transitions_total",
+    "Total number of rate limiter state transitions",
+    ["from_state", "to_state"],
+    registry=REGISTRY,
+)
+
+rate_limiter_redis_errors_total = Counter(
+    "rate_limiter_redis_errors_total",
+    "Total Redis errors during rate limit checks",
+    ["error_type"],  # error_type: timeout, connection, auth, other
+    registry=REGISTRY,
+)
+
 # ============================================================================
 # Circuit Breaker Metrics
 # ============================================================================

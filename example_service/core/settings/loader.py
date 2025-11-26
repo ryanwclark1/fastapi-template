@@ -34,6 +34,7 @@ from .otel import OtelSettings
 from .postgres import PostgresSettings
 from .rabbit import RabbitSettings
 from .redis import RedisSettings
+from .storage import StorageSettings
 
 
 @lru_cache(maxsize=1)
@@ -126,6 +127,16 @@ def get_consul_settings() -> ConsulSettings:
     return ConsulSettings()
 
 
+@lru_cache(maxsize=1)
+def get_storage_settings() -> StorageSettings:
+    """Get cached object storage settings.
+
+    Returns:
+        Validated and frozen StorageSettings instance.
+    """
+    return StorageSettings()
+
+
 def clear_all_caches() -> None:
     """Clear all settings caches.
 
@@ -141,3 +152,4 @@ def clear_all_caches() -> None:
     get_auth_settings.cache_clear()
     get_backup_settings.cache_clear()
     get_consul_settings.cache_clear()
+    get_storage_settings.cache_clear()
