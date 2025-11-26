@@ -31,7 +31,7 @@ dependencies = [
     "opentelemetry-instrumentation-psycopg>=0.48b0",
     "opentelemetry-exporter-otlp>=1.27.0",
     # Messaging and Tasks
-    "faststream[rabbit]>=0.5.0",
+    "faststream[otel,prometheus,rabbit]>=0.5.0",
     "taskiq>=0.11.0",
     "taskiq-faststream>=0.3.0",
     "apscheduler>=3.10.0",
@@ -75,10 +75,29 @@ addopts = [
     "--cov=example_service",
     "--cov-report=term-missing",
     "--cov-report=html",
+    "--cov-branch",
+    "-v",
+]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Slow running tests",
+    "asyncio: Async tests",
+]
+norecursedirs = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "*.egg-info",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "htmlcov",
+    "logs",
 ]
 
 [tool.coverage.run]
-source = ["example_service/app/middleware"]
+source = ["example_service"]
 omit = [
     "*/tests/*",
     "*/__pycache__/*",

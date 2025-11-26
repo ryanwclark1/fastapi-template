@@ -20,6 +20,7 @@ deployment/configs/grafana/
     │   └── service-overview.json
     └── observability/             # Logging, tracing, and monitoring
         ├── log-browser.json
+        ├── metrics-overview.json
         └── trace-explorer.json
 ```
 
@@ -106,7 +107,7 @@ Dashboard provisioning is configured in `provisioning/dashboards/dashboards.yaml
 2. Place it in the appropriate category folder:
    - `infrastructure/` - System resources, containers, networks
    - `application/` - Application metrics, service health
-   - `observability/` - Logs, traces, monitoring tools
+   - `observability/` - Metrics rollups plus logging & tracing tooling
 3. Commit to version control
 4. Grafana automatically loads it within 30 seconds
 

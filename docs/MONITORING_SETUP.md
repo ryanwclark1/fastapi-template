@@ -151,6 +151,18 @@ curl -G http://localhost:9090/api/v1/query \
 
 ## Grafana Dashboards
 
+### Provisioned Dashboards
+
+The observability stack auto-loads the following dashboards from `deployment/configs/grafana/dashboards`:
+
+| Dashboard | Path | Data Source(s) | Focus |
+|-----------|------|----------------|-------|
+| **Metrics Overview** | `observability/metrics-overview.json` | Prometheus | Request throughput, latency, errors, rate-limit activity, and top endpoints with links to logs/traces |
+| **Log Browser** | `observability/log-browser.json` | Loki + Tempo derived fields | Full-text log stream with level/logger filters, histogram, and trace jump links |
+| **Trace Explorer** | `observability/trace-explorer.json` | Tempo + Prometheus spanmetrics | Service map, trace search, cross-service latency/error panels, exemplar-aware filters |
+
+Place the JSON into Grafana via provisioning (already wired through docker compose) or import manually through the UI. Each dashboard ships read-only so changes should be exported back to Git if tweaks are required.
+
 ### Dashboard 1: HTTP Request Overview
 
 **Purpose**: High-level view of HTTP traffic, latency, and errors

@@ -12,7 +12,6 @@ from .yaml_sources import create_app_yaml_source
 Environment = Literal["development", "staging", "production", "test"]
 
 
-
 class AppSettings(BaseSettings):
     """FastAPI application settings.
 
@@ -65,12 +64,8 @@ class AppSettings(BaseSettings):
     debug: bool = Field(default=False, description="Enable debug mode")
     docs_url: str | None = Field(default="/docs", description="Swagger UI path")
     redoc_url: str | None = Field(default="/redoc", description="ReDoc path")
-    openapi_url: str | None = Field(
-        default="/openapi.json", description="OpenAPI schema path"
-    )
-    disable_docs: bool = Field(
-        default=False, description="Disable all API documentation"
-    )
+    openapi_url: str | None = Field(default="/openapi.json", description="OpenAPI schema path")
+    disable_docs: bool = Field(default=False, description="Disable all API documentation")
     root_path: str = Field(
         default="",
         description="Root path for proxy/ingress (set when behind a reverse proxy)",
@@ -116,17 +111,9 @@ class AppSettings(BaseSettings):
 
     # Server configuration
     host: str = Field(
-        default="0.0.0.0",
-        min_length=1,
-        max_length=255,
-        description="Server bind host"
+        default="0.0.0.0", min_length=1, max_length=255, description="Server bind host"
     )
-    port: int = Field(
-        default=8000,
-        ge=1,
-        le=65535,
-        description="Server port"
-    )
+    port: int = Field(default=8000, ge=1, le=65535, description="Server port")
 
     # CORS configuration
     cors_origins: list[str] = Field(
@@ -143,46 +130,38 @@ class AppSettings(BaseSettings):
 
     # Middleware configuration
     enable_request_size_limit: bool = Field(
-        default=True,
-        description="Enable request size limit middleware"
+        default=True, description="Enable request size limit middleware"
     )
     request_size_limit: int = Field(
         default=10 * 1024 * 1024,  # 10MB
         ge=1024,  # Min 1KB
         le=100 * 1024 * 1024,  # Max 100MB
-        description="Maximum request size in bytes"
+        description="Maximum request size in bytes",
     )
     enable_rate_limiting: bool = Field(
-        default=False,
-        description="Enable rate limiting middleware (requires Redis)"
+        default=False, description="Enable rate limiting middleware (requires Redis)"
     )
     rate_limit_per_minute: int = Field(
-        default=100,
-        ge=1,
-        le=10000,
-        description="Rate limit per minute"
+        default=100, ge=1, le=10000, description="Rate limit per minute"
     )
     rate_limit_window_seconds: int = Field(
-        default=60,
-        ge=1,
-        le=3600,
-        description="Rate limit window in seconds"
+        default=60, ge=1, le=3600, description="Rate limit window in seconds"
     )
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> AppSettings:
         """Validate settings for production environment."""
-        if self.environment == "production":
-            # In production, debug should be disabled
-            if self.debug:
-                raise ValueError("Debug mode cannot be enabled in production environment")
+        if self.environment == "production" and self.debug:
+            raise ValueError("Debug mode cannot be enabled in production environment")
         return self
 
     @model_validator(mode="after")
     def validate_port_range(self) -> AppSettings:
         """Validate port is not using privileged range in production."""
         if self.environment == "production" and self.port < 1024:
-            raise ValueError("Cannot use privileged port (<1024) in production without proper setup")
+            raise ValueError(
+                "Cannot use privileged port (<1024) in production without proper setup"
+            )
         return self
 
     model_config = SettingsConfigDict(

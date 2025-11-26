@@ -24,7 +24,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
-from example_service.core.settings import get_rabbit_settings
+from example_service.core.settings import get_otel_settings, get_rabbit_settings
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -33,6 +33,8 @@ if TYPE_CHECKING:
     from faststream.rabbit.fastapi import RabbitRouter as RabbitRouterType
 else:
     RabbitRouterType = Any
+
+otel_settings = get_otel_settings()
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +49,25 @@ broker: RabbitBroker | None = None
 if rabbit_settings.is_configured:
     from faststream.rabbit.fastapi import RabbitRouter
 
+    # Build middleware list - conditionally add TelemetryMiddleware if OTel is enabled
+    middlewares = []
+    if otel_settings.enabled:
+        try:
+            from faststream.rabbit.opentelemetry import RabbitTelemetryMiddleware
+
+            middlewares.append(RabbitTelemetryMiddleware())
+            logger.debug("FastStream RabbitTelemetryMiddleware enabled for distributed tracing")
+        except ImportError:
+            logger.warning(
+                "faststream.rabbit.opentelemetry not available - "
+                "install faststream[rabbit] >= 0.5.0 for telemetry support"
+            )
+
     router = RabbitRouter(
         url=rabbit_settings.get_url(),
         graceful_timeout=rabbit_settings.graceful_timeout,
         logger=logger,
+        middlewares=middlewares,  # Add telemetry middleware for distributed tracing
         # AsyncAPI documentation configuration
         schema_url="/asyncapi",
         include_in_schema=True,

@@ -185,7 +185,7 @@ services:
       - "3003:3000" # Grafana UI
     environment:
       - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer # Admin role deprecated in Grafana 12+, only Viewer supported
       - GF_AUTH_DISABLE_LOGIN_FORM=true
     volumes:
       - grafana-data:/var/lib/grafana # User data: dashboards, preferences, etc.
