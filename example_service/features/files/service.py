@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, BinaryIO
 
 from sqlalchemy.orm import selectinload
@@ -15,6 +15,12 @@ from example_service.features.files.repository import (
     get_file_repository,
 )
 from example_service.features.files.schemas import FileCreate
+from example_service.features.webhooks.dispatcher import dispatch_event
+from example_service.features.webhooks.events import (
+    FileEvents,
+    build_file_event_payload,
+    generate_event_id,
+)
 from example_service.infra.storage.client import (
     InvalidFileError,
     StorageClient,
@@ -106,7 +112,7 @@ class FileService(BaseService):
             key_parts.append(owner_id)
 
         # Add year/month for time-based partitioning
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         key_parts.append(f"{now.year}/{now.month:02d}")
 
         # Add unique file identifier
@@ -197,6 +203,14 @@ class FileService(BaseService):
         # TODO: Dispatch background task for thumbnail generation if image
         # if content_type.startswith("image/"):
         #     await self._dispatch_thumbnail_task(created.id)
+
+        # Dispatch webhook event
+        await dispatch_event(
+            session=self._session,
+            event_type=FileEvents.UPLOADED,
+            event_id=generate_event_id(FileEvents.UPLOADED),
+            payload=build_file_event_payload(created, FileEvents.UPLOADED),
+        )
 
         return created
 
@@ -469,6 +483,14 @@ class FileService(BaseService):
                 "File soft deleted",
                 extra={"file_id": str(file_id), "operation": "service.delete_file"},
             )
+
+        # Dispatch webhook event
+        await dispatch_event(
+            session=self._session,
+            event_type=FileEvents.DELETED,
+            event_id=generate_event_id(FileEvents.DELETED),
+            payload=build_file_event_payload(file, FileEvents.DELETED),
+        )
 
         return True
 
@@ -788,19 +810,31 @@ class FileService(BaseService):
         )
 
         file = File(**file_create.model_dump())
-        created = await self._repository.create(self._session, file)
+        new_file = await self._repository.create(self._session, file)
 
         self.logger.info(
             "File copied",
             extra={
                 "source_file_id": str(file_id),
-                "new_file_id": str(created.id),
+                "new_file_id": str(new_file.id),
                 "new_filename": new_filename,
                 "operation": "service.copy_file",
             },
         )
 
-        return created
+        # Dispatch webhook event
+        await dispatch_event(
+            session=self._session,
+            event_type=FileEvents.COPIED,
+            event_id=generate_event_id(FileEvents.COPIED),
+            payload=build_file_event_payload(
+                new_file,
+                FileEvents.COPIED,
+                extra={"source_file_id": str(source_file.id)},
+            ),
+        )
+
+        return new_file
 
     async def move_file(
         self,
@@ -821,6 +855,9 @@ class FileService(BaseService):
         """
         file = await self._repository.get_or_raise(self._session, file_id)
 
+        # Store old filename for webhook event
+        old_filename = file.original_filename
+
         # Update filename in database
         file.original_filename = new_filename
         await self._session.flush()
@@ -833,6 +870,18 @@ class FileService(BaseService):
                 "new_filename": new_filename,
                 "operation": "service.move_file",
             },
+        )
+
+        # Dispatch webhook event
+        await dispatch_event(
+            session=self._session,
+            event_type=FileEvents.MOVED,
+            event_id=generate_event_id(FileEvents.MOVED),
+            payload=build_file_event_payload(
+                file,
+                FileEvents.MOVED,
+                extra={"old_filename": old_filename},
+            ),
         )
 
         return file

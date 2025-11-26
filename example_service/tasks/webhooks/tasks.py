@@ -12,7 +12,15 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import UUID
 
+from example_service.features.webhooks.client import WebhookClient
+from example_service.features.webhooks.repository import (
+    get_webhook_delivery_repository,
+    get_webhook_repository,
+)
+from example_service.features.webhooks.schemas import DeliveryStatus
+from example_service.infra.database.session import get_async_session
 from example_service.tasks.broker import broker
 
 logger = logging.getLogger(__name__)
@@ -45,61 +53,59 @@ def calculate_backoff(attempt_count: int) -> int:
     return min(backoff, MAX_BACKOFF)
 
 
-async def get_webhook_delivery(delivery_id: str) -> dict[str, Any]:
+async def get_webhook_delivery(delivery_id: str) -> dict[str, Any] | None:
     """Retrieve webhook delivery record from database.
 
     Args:
         delivery_id: Unique delivery identifier.
 
     Returns:
-        Dictionary containing delivery metadata.
-
-    Raises:
-        FileNotFoundError: If delivery does not exist.
+        Dictionary containing delivery metadata, or None if not found.
     """
-    # TODO: Replace with actual database query
-    # Example:
-    # async with get_db_session() as session:
-    #     result = await session.execute(
-    #         select(WebhookDelivery).where(WebhookDelivery.id == delivery_id)
-    #     )
-    #     delivery = result.scalar_one_or_none()
-    #     if not delivery:
-    #         raise FileNotFoundError(f"Delivery {delivery_id} not found")
-    #     return {
-    #         "id": delivery.id,
-    #         "webhook_id": delivery.webhook_id,
-    #         "url": delivery.url,
-    #         "event": delivery.event,
-    #         "payload": delivery.payload,
-    #         "attempt_count": delivery.attempt_count,
-    #         "status": delivery.status,
-    #         "headers": delivery.headers,
-    #     }
+    async with get_async_session() as session:
+        delivery_repo = get_webhook_delivery_repository()
+        delivery = await delivery_repo.get(session, UUID(delivery_id))
 
-    logger.warning(
-        "Using placeholder webhook delivery storage - replace with actual implementation",
-        extra={"delivery_id": delivery_id},
-    )
+        if not delivery:
+            return None
 
-    # Placeholder implementation
-    return {
-        "id": delivery_id,
-        "webhook_id": "webhook_123",
-        "url": "https://example.com/webhook",
-        "event": "user.created",
-        "payload": {"user_id": "123", "email": "user@example.com"},
-        "attempt_count": 0,
-        "status": "pending",
-        "headers": {"X-Webhook-Event": "user.created"},
-    }
+        # Get associated webhook for URL and secret
+        webhook_repo = get_webhook_repository()
+        webhook = await webhook_repo.get(session, delivery.webhook_id)
+
+        if not webhook:
+            logger.error(
+                "Webhook configuration not found for delivery",
+                extra={
+                    "delivery_id": delivery_id,
+                    "webhook_id": str(delivery.webhook_id),
+                },
+            )
+            return None
+
+        return {
+            "id": str(delivery.id),
+            "webhook_id": str(delivery.webhook_id),
+            "webhook": webhook,  # Pass entire webhook object for client
+            "url": webhook.url,
+            "secret": webhook.secret,
+            "event_type": delivery.event_type,
+            "event_id": delivery.event_id,
+            "payload": delivery.payload,
+            "attempt_count": delivery.attempt_count,
+            "max_attempts": delivery.max_attempts,
+            "status": delivery.status,
+            "custom_headers": webhook.custom_headers,
+            "timeout": webhook.timeout_seconds,
+        }
 
 
 async def update_delivery_status(
     delivery_id: str,
     status: str,
-    response_status: int | None = None,
+    response_status_code: int | None = None,
     response_body: str | None = None,
+    response_time_ms: int | None = None,
     error_message: str | None = None,
     next_retry_at: datetime | None = None,
 ) -> None:
@@ -108,111 +114,38 @@ async def update_delivery_status(
     Args:
         delivery_id: Unique delivery identifier.
         status: New status (delivered, retrying, failed).
-        response_status: HTTP response status code.
+        response_status_code: HTTP response status code.
         response_body: HTTP response body.
+        response_time_ms: Response time in milliseconds.
         error_message: Error message if delivery failed.
         next_retry_at: Timestamp for next retry attempt.
     """
-    # TODO: Replace with actual database update
-    # Example:
-    # async with get_db_session() as session:
-    #     result = await session.execute(
-    #         select(WebhookDelivery).where(WebhookDelivery.id == delivery_id)
-    #     )
-    #     delivery = result.scalar_one()
-    #     delivery.status = status
-    #     delivery.response_status = response_status
-    #     delivery.response_body = response_body
-    #     delivery.error_message = error_message
-    #     delivery.next_retry_at = next_retry_at
-    #     delivery.updated_at = datetime.now(UTC)
-    #     await session.commit()
+    async with get_async_session() as session:
+        repo = get_webhook_delivery_repository()
+        await repo.update_status(
+            session,
+            UUID(delivery_id),
+            status,
+            response_status_code=response_status_code,
+            response_body=response_body,
+            response_time_ms=response_time_ms,
+            error_message=error_message,
+            next_retry_at=next_retry_at,
+        )
+        await session.commit()
 
     logger.info(
-        "Delivery status updated (placeholder)",
+        "Delivery status updated",
         extra={
             "delivery_id": delivery_id,
             "status": status,
-            "response_status": response_status,
+            "response_status_code": response_status_code,
             "error_message": error_message,
             "next_retry_at": next_retry_at.isoformat() if next_retry_at else None,
         },
     )
 
 
-async def increment_attempt_count(delivery_id: str) -> int:
-    """Increment delivery attempt count and return new value.
-
-    Args:
-        delivery_id: Unique delivery identifier.
-
-    Returns:
-        New attempt count.
-    """
-    # TODO: Replace with actual database update
-    # Example:
-    # async with get_db_session() as session:
-    #     result = await session.execute(
-    #         select(WebhookDelivery).where(WebhookDelivery.id == delivery_id)
-    #     )
-    #     delivery = result.scalar_one()
-    #     delivery.attempt_count += 1
-    #     await session.commit()
-    #     return delivery.attempt_count
-
-    logger.info(
-        "Attempt count incremented (placeholder)",
-        extra={"delivery_id": delivery_id},
-    )
-
-    # Placeholder: return 1
-    return 1
-
-
-async def send_webhook_request(
-    url: str,
-    payload: dict[str, Any],
-    headers: dict[str, str] | None = None,
-) -> dict[str, Any]:
-    """Send webhook HTTP POST request using WebhookClient.
-
-    Args:
-        url: Webhook endpoint URL.
-        payload: JSON payload to send.
-        headers: Optional HTTP headers.
-
-    Returns:
-        Dictionary with response status and body.
-
-    Raises:
-        WebhookDeliveryError: If request fails.
-    """
-    # TODO: Replace with actual WebhookClient
-    # Example:
-    # from example_service.features.webhooks.client import WebhookClient
-    # client = WebhookClient()
-    # response = await client.send(
-    #     url=url,
-    #     payload=payload,
-    #     headers=headers,
-    # )
-    # return {
-    #     "status": response.status_code,
-    #     "body": response.text,
-    #     "headers": dict(response.headers),
-    # }
-
-    logger.warning(
-        "Using placeholder webhook client - replace with actual implementation",
-        extra={"url": url, "payload": payload},
-    )
-
-    # Placeholder: simulate success
-    return {
-        "status": 200,
-        "body": '{"success": true}',
-        "headers": {"Content-Type": "application/json"},
-    }
 
 
 async def find_deliveries_for_retry() -> list[dict[str, Any]]:
@@ -221,31 +154,18 @@ async def find_deliveries_for_retry() -> list[dict[str, Any]]:
     Returns:
         List of delivery dictionaries ready for retry.
     """
-    # TODO: Replace with actual database query
-    # Example:
-    # async with get_db_session() as session:
-    #     now = datetime.now(UTC)
-    #     result = await session.execute(
-    #         select(WebhookDelivery)
-    #         .where(WebhookDelivery.status == "retrying")
-    #         .where(WebhookDelivery.next_retry_at <= now)
-    #         .where(WebhookDelivery.attempt_count <= MAX_RETRIES)
-    #     )
-    #     return [
-    #         {
-    #             "id": delivery.id,
-    #             "attempt_count": delivery.attempt_count,
-    #             "next_retry_at": delivery.next_retry_at,
-    #         }
-    #         for delivery in result.scalars()
-    #     ]
+    async with get_async_session() as session:
+        repo = get_webhook_delivery_repository()
+        deliveries = await repo.find_retries_due(session)
 
-    logger.warning(
-        "Using placeholder retry query - replace with actual implementation",
-    )
-
-    # Placeholder: return empty list
-    return []
+        return [
+            {
+                "id": str(delivery.id),
+                "attempt_count": delivery.attempt_count,
+                "next_retry_at": delivery.next_retry_at,
+            }
+            for delivery in deliveries
+        ]
 
 
 if broker is not None:
@@ -291,19 +211,26 @@ if broker is not None:
             # Step 1: Retrieve delivery record
             delivery = await get_webhook_delivery(delivery_id)
 
+            if not delivery:
+                logger.error(
+                    "Webhook delivery not found",
+                    extra={"delivery_id": delivery_id},
+                )
+                raise WebhookDeliveryError(f"Delivery not found: {delivery_id}")
+
             # Step 2: Check if max retries exceeded
-            if delivery["attempt_count"] > MAX_RETRIES:
+            if delivery["attempt_count"] >= delivery["max_attempts"]:
                 logger.warning(
                     "Max retries exceeded for webhook delivery",
                     extra={
                         "delivery_id": delivery_id,
                         "attempt_count": delivery["attempt_count"],
-                        "max_retries": MAX_RETRIES,
+                        "max_attempts": delivery["max_attempts"],
                     },
                 )
                 await update_delivery_status(
                     delivery_id,
-                    status="failed",
+                    status=DeliveryStatus.FAILED.value,
                     error_message="Max retries exceeded",
                 )
                 return {
@@ -313,62 +240,63 @@ if broker is not None:
                     "attempt_count": delivery["attempt_count"],
                 }
 
-            # Step 3: Increment attempt count
-            new_attempt_count = await increment_attempt_count(delivery_id)
-
             logger.info(
                 "Attempting webhook delivery",
                 extra={
                     "delivery_id": delivery_id,
-                    "attempt": new_attempt_count,
+                    "attempt": delivery["attempt_count"] + 1,
                     "url": delivery["url"],
-                    "event": delivery["event"],
+                    "event_type": delivery["event_type"],
                 },
             )
 
-            # Step 4: Send webhook request
+            # Step 3: Send webhook request using WebhookClient
             try:
-                response = await send_webhook_request(
-                    url=delivery["url"],
+                client = WebhookClient(timeout_seconds=delivery["timeout"])
+                result = await client.deliver(
+                    webhook=delivery["webhook"],
+                    event_type=delivery["event_type"],
+                    event_id=delivery["event_id"],
                     payload=delivery["payload"],
-                    headers=delivery.get("headers"),
                 )
 
-                # Step 5: Check if successful (2xx status code)
-                is_success = 200 <= response["status"] < 300
-
-                if is_success:
+                # Step 4: Check if successful
+                if result.success:
                     # Success: Update status to delivered
                     await update_delivery_status(
                         delivery_id,
-                        status="delivered",
-                        response_status=response["status"],
-                        response_body=response["body"],
+                        status=DeliveryStatus.DELIVERED.value,
+                        response_status_code=result.status_code,
+                        response_body=result.response_body,
+                        response_time_ms=result.response_time_ms,
                     )
 
-                    result = {
+                    response_data = {
                         "status": "delivered",
                         "delivery_id": delivery_id,
-                        "attempt_count": new_attempt_count,
-                        "response_status": response["status"],
+                        "attempt_count": delivery["attempt_count"] + 1,
+                        "response_status_code": result.status_code,
+                        "response_time_ms": result.response_time_ms,
                         "url": delivery["url"],
                     }
 
                     logger.info(
                         "Webhook delivered successfully",
-                        extra=result,
+                        extra=response_data,
                     )
 
-                    return result
+                    return response_data
 
                 else:
-                    # Non-2xx response: Schedule retry
+                    # Non-2xx response or error: Schedule retry
                     raise WebhookDeliveryError(
-                        f"HTTP {response['status']}: {response['body']}"
+                        result.error_message or f"HTTP {result.status_code}"
                     )
 
             except Exception as e:
-                # Step 6: Handle delivery failure
+                # Step 5: Handle delivery failure
+                new_attempt_count = delivery["attempt_count"] + 1
+
                 logger.warning(
                     "Webhook delivery attempt failed",
                     extra={
@@ -379,7 +307,7 @@ if broker is not None:
                 )
 
                 # Calculate next retry time
-                if new_attempt_count <= MAX_RETRIES:
+                if new_attempt_count < delivery["max_attempts"]:
                     backoff_seconds = calculate_backoff(new_attempt_count - 1)
                     next_retry_at = datetime.now(UTC) + timedelta(
                         seconds=backoff_seconds
@@ -387,7 +315,7 @@ if broker is not None:
 
                     await update_delivery_status(
                         delivery_id,
-                        status="retrying",
+                        status=DeliveryStatus.RETRYING.value,
                         error_message=str(e),
                         next_retry_at=next_retry_at,
                     )
@@ -413,7 +341,7 @@ if broker is not None:
                     # Max retries exceeded
                     await update_delivery_status(
                         delivery_id,
-                        status="failed",
+                        status=DeliveryStatus.FAILED.value,
                         error_message=str(e),
                     )
 
@@ -432,13 +360,6 @@ if broker is not None:
                         "attempt_count": new_attempt_count,
                         "error": str(e),
                     }
-
-        except FileNotFoundError as e:
-            logger.error(
-                "Webhook delivery not found",
-                extra={"delivery_id": delivery_id, "error": str(e)},
-            )
-            raise WebhookDeliveryError(f"Delivery not found: {delivery_id}") from e
 
         except Exception as e:
             logger.exception(

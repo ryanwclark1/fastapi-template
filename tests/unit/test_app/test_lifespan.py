@@ -25,6 +25,7 @@ class DummySettings:
     base_url: str = "http://consul.test"
     application_name: str = "example-service"
     driver: str = "psycopg"
+    endpoint: str = "http://otel.test"
 
 
 @pytest.mark.asyncio
@@ -204,6 +205,70 @@ async def test_lifespan_raises_when_cache_required(monkeypatch: pytest.MonkeyPat
     with pytest.raises(RuntimeError):
         async with lifespan(FastAPI()):
             pass
+
+
+@pytest.mark.asyncio
+async def test_lifespan_initializes_messaging_and_taskiq(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When messaging components are enabled all startup/shutdown hooks run."""
+    calls: list[str] = []
+
+    def _recorder(name: str):
+        async def _run(*_: Any, **__: Any) -> None:
+            calls.append(name)
+
+        return _run
+
+    rabbit = DummySettings(is_configured=True)
+    redis = DummySettings(is_configured=True)
+    otel = DummySettings(is_configured=True)
+    consul = DummySettings(is_configured=True)
+
+    _patch_setting_getters(
+        monkeypatch,
+        app=DummySettings(),
+        log=DummySettings(),
+        consul=consul,
+        db=DummySettings(),
+        redis=redis,
+        rabbit=rabbit,
+        otel=otel,
+    )
+
+    taskiq_module = SimpleNamespace(broker=True, stop_taskiq=_recorder("stop_taskiq"))
+    scheduler_module = SimpleNamespace(stop_scheduler=_recorder("stop_scheduler"))
+
+    _patch_common_dependencies(
+        monkeypatch,
+        start_cache=_recorder("start_cache"),
+        stop_cache=_recorder("stop_cache"),
+        start_tracker=_recorder("start_tracker"),
+        stop_tracker=_recorder("stop_tracker"),
+        start_broker=_recorder("start_broker"),
+        stop_broker=_recorder("stop_broker"),
+        start_discovery=_async_stub(True),
+        stop_discovery=_recorder("stop_discovery"),
+        taskiq_result=(taskiq_module, scheduler_module),
+    )
+    monkeypatch.setattr(
+        "example_service.app.lifespan.setup_tracing", lambda: calls.append("setup_tracing")
+    )
+
+    async with lifespan(FastAPI()):
+        pass
+
+    expected = {
+        "start_cache",
+        "start_tracker",
+        "start_broker",
+        "stop_broker",
+        "stop_tracker",
+        "stop_cache",
+        "stop_taskiq",
+        "stop_scheduler",
+        "setup_tracing",
+        "stop_discovery",
+    }
+    assert expected.issubset(calls)
 
 
 def _patch_common_dependencies(monkeypatch: pytest.MonkeyPatch, **overrides: Any) -> None:

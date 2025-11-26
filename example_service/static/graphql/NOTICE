@@ -1,0 +1,12 @@
+GraphQL Playground assets
+-------------------------
+
+These files are redistributed from the GraphQL Playground project (MIT License).
+Source: https://github.com/graphql/graphql-playground
+Package: graphql-playground-react
+Version: 1.8.10 (CDN snapshot)
+
+Files included:
+- playground.css
+- playground.js
+- favicon.png

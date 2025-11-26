@@ -1,6 +1,7 @@
 """Tests for the file service layer."""
 
 from __future__ import annotations
+import os
 from collections.abc import AsyncGenerator
 from hashlib import sha256
 from io import BytesIO
@@ -16,6 +17,24 @@ from example_service.features.files.service import FileService
 from example_service.infra.storage.client import InvalidFileError, StorageClientError
 
 pytestmark = pytest.mark.asyncio
+
+
+if os.getenv("RUN_POSTGRES_TESTS") != "1":  # pragma: no cover - default skip
+    pytest.skip(
+        "Set RUN_POSTGRES_TESTS=1 to run Postgres-backed file service tests",
+        allow_module_level=True,
+    )
+@pytest.fixture(autouse=True)
+def disable_webhook_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Prevent webhook dispatcher from running during unit tests."""
+
+    async def _noop(*args, **kwargs) -> int:
+        return 0
+
+    monkeypatch.setattr(
+        "example_service.features.files.service.dispatch_event",
+        _noop,
+    )
 
 
 class FakeStorageClient:
@@ -99,10 +118,25 @@ def fake_storage_client(storage_settings: StorageSettings) -> FakeStorageClient:
     return FakeStorageClient(storage_settings)
 
 
+@pytest.fixture(scope="session")
+def postgres_dsn():
+    pytest.importorskip("testcontainers.postgres")
+    from testcontainers.postgres import PostgresContainer
+
+    container = PostgresContainer("postgres:16-alpine")
+    try:
+        container.start()
+    except Exception as exc:  # pragma: no cover - environment dependent
+        pytest.skip(f"Postgres container unavailable: {exc}", allow_module_level=True)
+    url = container.get_connection_url().replace("postgresql://", "postgresql+psycopg://")
+    yield url
+    container.stop()
+
+
 @pytest.fixture
-async def session() -> AsyncGenerator[AsyncSession]:
-    """Provide an isolated in-memory SQLite session with file tables."""
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+async def session(postgres_dsn) -> AsyncGenerator[AsyncSession, None]:
+    """Provide an isolated PostgreSQL-backed session with file tables."""
+    engine = create_async_engine(postgres_dsn)
     async with engine.begin() as conn:
         await conn.run_sync(
             lambda sync_conn: File.metadata.create_all(

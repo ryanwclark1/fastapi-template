@@ -154,6 +154,8 @@ docker-compose down
 
 ### Running Tests
 
+See [`development/testing.md`](testing.md) for a full breakdown of the testing matrix, pytest markers, and the Docker-backed integration suite. The quick-reference commands below cover the most common workflows.
+
 ```bash
 # Run all tests
 uv run pytest

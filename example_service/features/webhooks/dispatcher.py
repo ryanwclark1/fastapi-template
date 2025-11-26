@@ -8,7 +8,7 @@ background job system (Celery, RQ, etc.) rather than executing synchronously.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from example_service.features.webhooks.client import WebhookClient
@@ -75,7 +75,7 @@ async def dispatch_event(
             status=DeliveryStatus.PENDING.value,
             attempt_count=0,
             max_attempts=webhook.max_retries,
-            next_retry_at=datetime.utcnow(),  # Schedule immediate delivery
+            next_retry_at=datetime.now(UTC),  # Schedule immediate delivery
         )
         deliveries.append(delivery)
 
@@ -170,7 +170,7 @@ async def process_pending_deliveries(
             if delivery.attempt_count + 1 < delivery.max_attempts:
                 # Calculate exponential backoff
                 retry_delay_seconds = min(2 ** delivery.attempt_count * 60, 3600)  # Max 1 hour
-                next_retry_at = datetime.utcnow() + timedelta(seconds=retry_delay_seconds)
+                next_retry_at = datetime.now(UTC) + timedelta(seconds=retry_delay_seconds)
 
                 await delivery_repo.update_status(
                     session,

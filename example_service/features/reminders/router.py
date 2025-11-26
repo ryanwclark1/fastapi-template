@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
@@ -157,7 +157,7 @@ async def get_overdue_reminders(
     session: AsyncSession = Depends(get_db_session),
 ) -> list[ReminderResponse]:
     """Get overdue reminders that haven't been completed."""
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     stmt = (
         select(Reminder)
         .where(

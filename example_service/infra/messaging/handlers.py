@@ -10,7 +10,7 @@ AsyncAPI Documentation:
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from faststream.rabbit import RabbitQueue
 
@@ -163,7 +163,7 @@ if router is not None:
         # Create and return echo response (auto-published via @router.publisher)
         echo_response = {
             "original": message,
-            "echo_timestamp": datetime.utcnow().isoformat(),
+            "echo_timestamp": datetime.now(UTC).isoformat(),
             "service": "echo-service",
         }
 

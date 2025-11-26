@@ -23,7 +23,7 @@ Run the scheduler:
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from example_service.core.settings import get_rabbit_settings
 from example_service.tasks.broker import stream_broker
@@ -49,7 +49,7 @@ if stream_broker is not None and rabbit_settings.is_configured:
         """
         return {
             "event_type": "scheduled_heartbeat",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "service": "example-service",
             "source": "taskiq-scheduler",
         }
@@ -78,7 +78,7 @@ if stream_broker is not None and rabbit_settings.is_configured:
             yield {
                 "event_type": "batch_message",
                 "batch_id": i,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
     # Uncomment to enable batch message publishing every 5 minutes

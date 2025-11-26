@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -88,7 +88,7 @@ class ReminderRepository(BaseRepository[Reminder]):
         Returns:
             Sequence of overdue reminders
         """
-        now = as_of or datetime.utcnow()
+        now = as_of or datetime.now(UTC)
         stmt = (
             select(Reminder)
             .where(
@@ -130,7 +130,7 @@ class ReminderRepository(BaseRepository[Reminder]):
         Returns:
             Sequence of reminders needing notification
         """
-        now = as_of or datetime.utcnow()
+        now = as_of or datetime.now(UTC)
         stmt = (
             select(Reminder)
             .where(

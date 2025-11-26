@@ -4,7 +4,11 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+pytest.importorskip("dateutil.rrule", reason="Reminder schemas require python-dateutil")
+
 from example_service.features.reminders.models import Reminder
+
+from example_service.features.tags.models import Tag, reminder_tags
 from example_service.features.reminders.schemas import ReminderCreate
 from example_service.features.reminders.service import ReminderService
 
@@ -13,8 +17,9 @@ from example_service.features.reminders.service import ReminderService
 async def session() -> AsyncSession:
     """Provide an isolated in-memory database session."""
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    tables = [Reminder.__table__, Tag.__table__, reminder_tags]
     async with engine.begin() as conn:
-        await conn.run_sync(lambda sync_conn: Reminder.metadata.create_all(sync_conn, tables=[Reminder.__table__]))
+        await conn.run_sync(lambda sync_conn: Reminder.metadata.create_all(sync_conn, tables=tables))
 
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with session_factory() as session:

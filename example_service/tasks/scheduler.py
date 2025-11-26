@@ -13,7 +13,7 @@ Architecture:
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -70,7 +70,7 @@ if broker is not None:
         try:
             # TODO: Implement metrics generation
             metrics = {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "active_users": 0,  # Placeholder
                 "requests_per_hour": 0,  # Placeholder
             }
@@ -135,7 +135,7 @@ if broker is not None:
 
         heartbeat = {
             "event_type": "heartbeat",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "service": "example-service",
         }
 

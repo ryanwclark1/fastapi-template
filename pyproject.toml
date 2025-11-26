@@ -12,7 +12,7 @@ license = {text = "MIT"}
 dependencies = [
     "fastapi>=0.122.0",
     "uvicorn[standard]>=0.34.0",
-    "pydantic>=2.9.0",
+    "pydantic[email]>=2.9.0",
     "pydantic-settings>=2.5.0",
     "sqlalchemy[asyncio]>=2.0.44",
     "alembic>=1.17.2",
@@ -36,6 +36,10 @@ dependencies = [
     "taskiq-faststream>=0.3.0",
     "apscheduler>=3.10.0",
     "taskiq-aio-pika>=0.4.4",
+    # GraphQL
+    "strawberry-graphql[fastapi]>=0.235.0",
+    # Recurrence rules (iCalendar RRULE)
+    "python-dateutil>=2.9.0",
 ]
 
 [project.optional-dependencies]
@@ -44,12 +48,25 @@ dev = [
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.0.0",
     "aiosqlite>=0.20.0",
+    "testcontainers>=4.9.0",
     "ruff>=0.7.0",
     "mypy>=1.13.0",
     "pre-commit>=4.0.0",
 ]
 yaml = [
     "pyyaml>=6.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "aiosqlite>=0.20.0",
+    "testcontainers>=4.9.0",
+    "ruff>=0.7.0",
+    "mypy>=1.13.0",
+    "pre-commit>=4.0.0",
 ]
 
 [project.scripts]
@@ -59,6 +76,12 @@ example-service-main = "example_service.main:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build]
+include = [
+    "example_service/static/docs/**",
+    "example_service/static/graphql/**",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["example_service"]
@@ -114,6 +137,7 @@ omit = [
     "example_service/features/health/*",
     "example_service/features/reminders/*",
     "example_service/features/files/*",
+    "example_service/features/graphql/*",
     "example_service/features/webhooks/*",
     "example_service/utils/*",
 ]

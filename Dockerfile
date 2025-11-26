@@ -8,6 +8,8 @@ WORKDIR /app
 
 # Copy dependency files
 COPY pyproject.toml uv.lock* ./
+# Include README so hatch can build the local package during uv sync
+COPY README.md README.md
 
 # Install dependencies
 RUN uv sync --frozen --no-dev

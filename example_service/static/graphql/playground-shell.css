@@ -1,0 +1,22 @@
+body.graphql-playground-body {
+  margin: 0;
+  background-color: #17202f;
+  color: #f8fafc;
+  min-height: 100vh;
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.graphql-playground-shell {
+  min-height: 100vh;
+  display: flex;
+}
+
+#graphql-playground {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100vh;
+}
+
+.docs-loading {
+  color: inherit;
+}

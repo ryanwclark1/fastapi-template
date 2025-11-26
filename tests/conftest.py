@@ -16,6 +16,7 @@ os.environ.setdefault("REDIS_REDIS_URL", "")
 os.environ.setdefault("RABBIT_ENABLED", "false")
 os.environ.setdefault("AUTH_SERVICE_URL", "")
 os.environ.setdefault("OTEL_ENABLED", "false")
+os.environ.setdefault("GRAPHQL_ENABLED", "false")
 
 
 @pytest.fixture
