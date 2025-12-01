@@ -15,27 +15,27 @@ from example_service.cli.utils import coro, error, header, info, success, warnin
 
 
 def hash_password(password: str) -> str:
-    """Hash a password using bcrypt or fallback."""
+    """Hash a password using pwdlib (Argon2)."""
     try:
-        from passlib.context import CryptContext
+        from pwdlib import PasswordHash
 
-        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-        return pwd_context.hash(password)
+        pwd_hash = PasswordHash.recommended()
+        return pwd_hash.hash(password)
     except ImportError:
-        # Fallback to hashlib if passlib not available
+        # Fallback to hashlib if pwdlib not available
         import hashlib
 
-        warning("passlib not installed, using basic hash (not recommended for production)")
+        warning("pwdlib not installed, using basic hash (not recommended for production)")
         return hashlib.sha256(password.encode()).hexdigest()
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     """Verify a password against its hash."""
     try:
-        from passlib.context import CryptContext
+        from pwdlib import PasswordHash
 
-        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-        return pwd_context.verify(plain, hashed)
+        pwd_hash = PasswordHash.recommended()
+        return pwd_hash.verify(plain, hashed)
     except ImportError:
         import hashlib
 
@@ -82,9 +82,9 @@ async def list_users(active_only: bool, superusers: bool, limit: int, output_for
         from sqlalchemy import select
 
         from example_service.core.models.user import User
-        from example_service.infra.database import get_session
+        from example_service.infra.database import get_async_session
 
-        async with get_session() as session:
+        async with get_async_session() as session:
             stmt = select(User).limit(limit)
 
             if active_only:
@@ -166,9 +166,9 @@ async def create_user(email: str, username: str, full_name: str | None, password
         from sqlalchemy import select
 
         from example_service.core.models.user import User
-        from example_service.infra.database import get_session
+        from example_service.infra.database import get_async_session
 
-        async with get_session() as session:
+        async with get_async_session() as session:
             # Check if user exists
             existing = await session.execute(
                 select(User).where((User.email == email) | (User.username == username))
@@ -221,9 +221,9 @@ async def create_superuser(email: str, username: str, full_name: str | None, pas
         from sqlalchemy import select
 
         from example_service.core.models.user import User
-        from example_service.infra.database import get_session
+        from example_service.infra.database import get_async_session
 
-        async with get_session() as session:
+        async with get_async_session() as session:
             # Check if user exists
             existing = await session.execute(
                 select(User).where((User.email == email) | (User.username == username))
@@ -275,9 +275,9 @@ async def deactivate_user(identifier: str) -> None:
         from sqlalchemy import select
 
         from example_service.core.models.user import User
-        from example_service.infra.database import get_session
+        from example_service.infra.database import get_async_session
 
-        async with get_session() as session:
+        async with get_async_session() as session:
             # Find user
             try:
                 user_id = int(identifier)
@@ -323,9 +323,9 @@ async def activate_user(identifier: str) -> None:
         from sqlalchemy import select
 
         from example_service.core.models.user import User
-        from example_service.infra.database import get_session
+        from example_service.infra.database import get_async_session
 
-        async with get_session() as session:
+        async with get_async_session() as session:
             # Find user
             try:
                 user_id = int(identifier)
@@ -378,9 +378,9 @@ async def reset_password(identifier: str, password: str) -> None:
         from sqlalchemy import select
 
         from example_service.core.models.user import User
-        from example_service.infra.database import get_session
+        from example_service.infra.database import get_async_session
 
-        async with get_session() as session:
+        async with get_async_session() as session:
             # Find user
             try:
                 user_id = int(identifier)
@@ -426,9 +426,9 @@ async def promote_to_superuser(identifier: str) -> None:
         from sqlalchemy import select
 
         from example_service.core.models.user import User
-        from example_service.infra.database import get_session
+        from example_service.infra.database import get_async_session
 
-        async with get_session() as session:
+        async with get_async_session() as session:
             # Find user
             try:
                 user_id = int(identifier)
@@ -478,9 +478,9 @@ async def demote_from_superuser(identifier: str) -> None:
         from sqlalchemy import select
 
         from example_service.core.models.user import User
-        from example_service.infra.database import get_session
+        from example_service.infra.database import get_async_session
 
-        async with get_session() as session:
+        async with get_async_session() as session:
             # Find user
             try:
                 user_id = int(identifier)
@@ -524,9 +524,9 @@ async def show_user(identifier: str) -> None:
         from sqlalchemy import select
 
         from example_service.core.models.user import User
-        from example_service.infra.database import get_session
+        from example_service.infra.database import get_async_session
 
-        async with get_session() as session:
+        async with get_async_session() as session:
             # Find user
             try:
                 user_id = int(identifier)

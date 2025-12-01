@@ -134,7 +134,7 @@ docker-compose down
    uv run ruff check . --fix
 
    # Type check
-   uv run mypy example_service
+   uv run mypy
 
    # Run tests
    uv run pytest
@@ -206,14 +206,14 @@ uv run ruff check example_service/app/main.py
 #### MyPy (Type Checking)
 
 ```bash
-# Type check entire project
-uv run mypy example_service
+# Type check application, tests, and alembic scripts (configured defaults)
+uv run mypy
 
 # Type check specific file
 uv run mypy example_service/app/main.py
 
 # Type check with verbose output
-uv run mypy example_service --verbose
+uv run mypy --verbose
 ```
 
 #### Pre-commit

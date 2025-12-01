@@ -18,15 +18,24 @@ Run the worker to execute tasks:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
+    from taskiq_aio_pika import AioPikaBroker as AioPikaBrokerType
+else:
+    AioPikaBrokerType = Any
+
 # Re-export task modules for convenient access
 # Import broker/scheduler lazily to avoid hard dependency during test runs
 try:
     from example_service.tasks.broker import broker, get_broker
-except Exception:  # pragma: no cover - broker optional in some environments
-    broker = None  # type: ignore[assignment]
+except Exception:
+    broker = None
 
-    def get_broker():  # type: ignore[override]
-        return None
+    async def get_broker() -> AsyncIterator[AioPikaBrokerType | None]:
+        yield None
 
 
 try:
@@ -39,17 +48,17 @@ try:
         start_scheduler,
         stop_scheduler,
     )
-except Exception:  # pragma: no cover - scheduler optional without broker
-    scheduler = None  # type: ignore[assignment]
+except Exception:
+    scheduler = None
 
-    def get_job_status():
+    def get_job_status() -> list[dict]:
         return []
 
-    def pause_job(job_id: str) -> None:  # noqa: ARG001
-        return None
+    def pause_job(job_id: str) -> None:
+        pass
 
-    def resume_job(job_id: str) -> None:  # noqa: ARG001
-        return None
+    def resume_job(job_id: str) -> None:
+        pass
 
     def setup_scheduled_jobs() -> None:
         return None

@@ -217,10 +217,11 @@ class ConsulSettings(BaseSettings):
             if value.startswith("["):
                 import json
 
-                return json.loads(value)
+                parsed = json.loads(value)
+                return [str(item) for item in parsed]
             # Otherwise treat as comma-separated
             return [t.strip() for t in value.split(",") if t.strip()]
-        return value if value else []
+        return list(value) if value else []
 
     @field_validator("meta", mode="before")
     @classmethod
@@ -229,14 +230,15 @@ class ConsulSettings(BaseSettings):
         if isinstance(value, str):
             import json
 
-            return json.loads(value)
-        return value if value else {}
+            parsed = json.loads(value)
+            return {str(k): str(v) for k, v in parsed.items()}
+        return dict(value) if value else {}
 
     # ──────────────────────────────────────────────────────────────
     # Computed properties
     # ──────────────────────────────────────────────────────────────
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def is_configured(self) -> bool:
         """Check if Consul service discovery is enabled and configured.
@@ -249,7 +251,7 @@ class ConsulSettings(BaseSettings):
         """
         return self.enabled
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def base_url(self) -> str:
         """Build Consul agent base URL."""
@@ -315,12 +317,12 @@ class ConsulSettings(BaseSettings):
     @classmethod
     def settings_customise_sources(
         cls,
-        settings_cls,
-        init_settings,
-        env_settings,
-        dotenv_settings,
-        file_secret_settings,
-    ):
+        settings_cls: type[BaseSettings],
+        init_settings: Any,
+        env_settings: Any,
+        dotenv_settings: Any,
+        file_secret_settings: Any,
+    ) -> tuple[Any, ...]:
         """Customize settings source precedence: init > yaml > env > dotenv > secrets."""
         return (
             init_settings,

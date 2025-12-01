@@ -10,13 +10,16 @@ import contextlib
 import json
 import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from redis.asyncio import ConnectionPool, Redis
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from example_service.tasks.tracking.base import BaseTaskTracker
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 logger = logging.getLogger(__name__)
 
@@ -123,11 +126,11 @@ class RedisTaskTracker(BaseTaskTracker):
         logger.info("Disconnecting task tracking Redis")
 
         if self._client:
-            await self._client.aclose()
+            await self._client.close()
             self._client = None
 
         if self._pool:
-            await self._pool.aclose()
+            await self._pool.disconnect()
             self._pool = None
 
         logger.info("Task tracking Redis connection closed")
@@ -187,7 +190,7 @@ class RedisTaskTracker(BaseTaskTracker):
                 except (TypeError, ValueError):
                     labels_str = str(labels)
 
-            exec_data = {
+            exec_data: dict[str, str | int | float | bytes] = {
                 "task_id": task_id,
                 "task_name": task_name,
                 "status": "running",
@@ -208,7 +211,13 @@ class RedisTaskTracker(BaseTaskTracker):
             pipe = self.client.pipeline()
 
             # Store execution record
-            pipe.hset(exec_key, mapping=exec_data)
+            pipe.hset(
+                exec_key,
+                mapping=cast(
+                    "Mapping[str | bytes, bytes | float | int | str]",
+                    exec_data,
+                ),
+            )
             pipe.expire(exec_key, self.ttl_seconds)
 
             # Set running marker
@@ -276,7 +285,7 @@ class RedisTaskTracker(BaseTaskTracker):
                 error_message = str(error)
                 error_type = type(error).__name__
 
-            update_data = {
+            update_data: dict[str, str | int | float | bytes] = {
                 "status": status,
                 "finished_at": now.isoformat(),
                 "duration_ms": str(duration_ms),
@@ -288,7 +297,13 @@ class RedisTaskTracker(BaseTaskTracker):
             pipe = self.client.pipeline()
 
             # Update execution record
-            pipe.hset(exec_key, mapping=update_data)
+            pipe.hset(
+                exec_key,
+                mapping=cast(
+                    "Mapping[str | bytes, bytes | float | int | str]",
+                    update_data,
+                ),
+            )
             pipe.expire(exec_key, self.ttl_seconds)  # Refresh TTL
 
             # Remove running marker

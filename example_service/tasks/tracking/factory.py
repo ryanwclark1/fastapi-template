@@ -53,7 +53,7 @@ def create_tracker() -> BaseTaskTracker:
         logger.info("Creating PostgreSQL task tracker")
 
         return PostgresTaskTracker(
-            dsn=db_settings.async_url,
+            dsn=db_settings.url,
             pool_size=5,
             max_overflow=10,
         )

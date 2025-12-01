@@ -313,28 +313,27 @@ async def fulltext_search_reminders(
 
     if mode == "web":
         # Web-style search with operators: "phrase", -exclude, OR
-        search_filter = WebSearchFilter(
+        web_filter = WebSearchFilter(
             Reminder.search_vector,
             q,
             config="english",
             rank_order=True,
         )
-        stmt = search_filter.apply(stmt)
-        # Add rank column for relevance score
-        # Note: WebSearchFilter doesn't have with_rank_column, so we add it manually
+        stmt = web_filter.apply(stmt)
+        # Add rank column for relevance score (web filter does not expose helper)
         ts_query = func.websearch_to_tsquery("english", q)
         stmt = stmt.add_columns(func.ts_rank(Reminder.search_vector, ts_query).label("search_rank"))
     else:
         # Plain text search with optional prefix matching
-        search_filter = FullTextSearchFilter(
+        plain_filter = FullTextSearchFilter(
             Reminder.search_vector,
             q,
             config="english",
             rank_order=True,
             prefix_match=prefix,
         )
-        stmt = search_filter.apply(stmt)
-        stmt = search_filter.with_rank_column(stmt, "search_rank")
+        stmt = plain_filter.apply(stmt)
+        stmt = plain_filter.with_rank_column(stmt, "search_rank")
 
     # Apply pagination
     stmt = LimitOffset(limit=limit, offset=offset).apply(stmt)

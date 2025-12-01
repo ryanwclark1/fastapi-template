@@ -181,7 +181,7 @@ async def keys(pattern: str, limit: int) -> None:
         await cache.connect()
         redis = cache.client
 
-        all_keys = []
+        all_keys: list[str] = []
         cursor = 0
 
         while len(all_keys) < limit:
@@ -249,14 +249,14 @@ async def get(key: str) -> None:
             for idx, val in enumerate(values):
                 click.echo(f"  [{idx}] {val}")
         elif key_type == "set":
-            values = await redis.smembers(key)
-            click.echo(f"\n🔑 {key} (set, {len(values)} items):")
-            for val in values:
+            values_set = await redis.smembers(key)
+            click.echo(f"\n🔑 {key} (set, {len(values_set)} items):")
+            for val in values_set:
                 click.echo(f"  • {val}")
         elif key_type == "hash":
-            values = await redis.hgetall(key)
-            click.echo(f"\n🔑 {key} (hash, {len(values)} fields):")
-            for field, val in values.items():
+            values_dict = await redis.hgetall(key)
+            click.echo(f"\n🔑 {key} (hash, {len(values_dict)} fields):")
+            for field, val in values_dict.items():
                 click.echo(f"  {field}: {val}")
         else:
             info(f"Key type '{key_type}' not fully supported for display")

@@ -11,6 +11,7 @@ This module provides integration with the Accent-Auth service, supporting:
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import httpx
 from pydantic import BaseModel, Field
@@ -18,6 +19,9 @@ from pydantic import BaseModel, Field
 from example_service.core.schemas.auth import AuthUser
 from example_service.core.settings import get_auth_settings
 from example_service.utils.retry import retry
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 logger = logging.getLogger(__name__)
 
@@ -91,12 +95,17 @@ class AccentAuthClient:
             extra={"base_url": base_url, "timeout": timeout},
         )
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> AccentAuthClient:
         """Async context manager entry."""
         self._client = httpx.AsyncClient(timeout=self.timeout)
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         """Async context manager exit."""
         if self._client:
             await self._client.aclose()

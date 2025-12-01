@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from typing import Any
 
 from example_service.core.settings import get_rabbit_settings
 from example_service.tasks.broker import stream_broker
@@ -70,7 +71,7 @@ if stream_broker is not None and rabbit_settings.is_configured:
     )
 
     # Example: Multiple messages per task execution using a generator
-    async def generate_batch_messages():
+    async def generate_batch_messages() -> Any:
         """Generate multiple messages in a single task execution.
 
         Using a generator allows publishing multiple messages per schedule tick.

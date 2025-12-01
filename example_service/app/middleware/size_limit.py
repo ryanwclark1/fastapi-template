@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from starlette.types import ASGIApp, Receive, Scope, Send
 
 
 class RequestSizeLimitMiddleware:
@@ -12,7 +16,7 @@ class RequestSizeLimitMiddleware:
     Rejects requests that exceed the configured maximum size.
     """
 
-    def __init__(self, app, max_size: int = 10 * 1024 * 1024):  # 10MB default
+    def __init__(self, app: ASGIApp, max_size: int = 10 * 1024 * 1024) -> None:  # 10MB default
         """Initialize middleware.
 
         Args:
@@ -22,7 +26,7 @@ class RequestSizeLimitMiddleware:
         self.app = app
         self.max_size = max_size
 
-    async def __call__(self, scope, receive, send):
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Process ASGI request and check size limits.
 
         Args:

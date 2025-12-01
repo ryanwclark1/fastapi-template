@@ -5,7 +5,7 @@ from __future__ import annotations
 import contextlib
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from sqlalchemy.orm import selectinload
 
@@ -48,6 +48,14 @@ class FileService(BaseService):
         self._session = session
         self._storage = storage_client or get_storage_client()
         self._repository = repository or get_file_repository()
+
+    def _ensure_storage(self) -> StorageClient:
+        """Ensure storage client is available, raising error if not configured."""
+        if self._storage is None:
+            from example_service.infra.storage.exceptions import StorageNotConfiguredError
+
+            raise StorageNotConfiguredError("Storage client is not configured")
+        return self._storage
 
         if self._storage is None:
             raise StorageClientError("Storage client not configured")
@@ -97,7 +105,8 @@ class FileService(BaseService):
         Raises:
             InvalidFileError: If validation fails
         """
-        settings = self._storage.settings
+        storage = self._ensure_storage()
+        settings = storage.settings
 
         # Validate content type
         if not settings.is_content_type_allowed(content_type):
@@ -131,7 +140,8 @@ class FileService(BaseService):
         Returns:
             Storage key (S3 path)
         """
-        settings = self._storage.settings
+        storage = self._ensure_storage()
+        settings = storage.settings
         file_id = uuid.uuid4()
 
         # Extract extension
@@ -198,7 +208,8 @@ class FileService(BaseService):
         file_obj.seek(0)
 
         # Upload to storage
-        upload_result = await self._storage.upload_file(
+        storage = self._ensure_storage()
+        upload_result = await storage.upload_file(
             file_obj=file_obj,
             key=storage_key,
             content_type=content_type,
@@ -279,7 +290,8 @@ class FileService(BaseService):
         storage_key = self._generate_storage_key(filename, owner_id)
 
         # Generate presigned upload
-        presigned = await self._storage.generate_presigned_upload(
+        storage = self._ensure_storage()
+        presigned = await storage.generate_presigned_upload(
             key=storage_key,
             content_type=content_type,
         )
@@ -288,7 +300,7 @@ class FileService(BaseService):
         file_create = FileCreate(
             original_filename=filename,
             storage_key=storage_key,
-            bucket=self._storage.settings.bucket,
+            bucket=storage.settings.bucket,
             content_type=content_type,
             size_bytes=size_bytes,
             status=FileStatus.PENDING,  # Waiting for upload completion
@@ -316,7 +328,7 @@ class FileService(BaseService):
             "upload_fields": presigned["fields"],
             "file_id": created.id,
             "storage_key": storage_key,
-            "expires_in": self._storage.settings.presigned_url_expiry_seconds,
+            "expires_in": self._ensure_storage().settings.presigned_url_expiry_seconds,
         }
 
     async def complete_upload(
@@ -343,7 +355,8 @@ class FileService(BaseService):
             raise ValueError(f"File {file_id} is not pending upload (status: {file.status.value})")
 
         # Verify file exists in storage
-        file_info = await self._storage.get_file_info(file.storage_key)
+        storage = self._ensure_storage()
+        file_info = await storage.get_file_info(file.storage_key)
         if file_info is None:
             # File not found - mark as failed
             file.status = FileStatus.FAILED
@@ -450,13 +463,14 @@ class FileService(BaseService):
             )
 
         # Generate presigned download URL
-        download_url = await self._storage.get_presigned_url(file.storage_key)
+        storage = self._ensure_storage()
+        download_url = await storage.get_presigned_url(file.storage_key)
 
         self._lazy.debug(lambda: f"service.get_download_url({file_id}) -> generated presigned URL")
 
         return {
             "download_url": download_url,
-            "expires_in": self._storage.settings.presigned_url_expiry_seconds,
+            "expires_in": self._ensure_storage().settings.presigned_url_expiry_seconds,
             "filename": file.original_filename,
             "content_type": file.content_type,
             "size_bytes": file.size_bytes,
@@ -480,8 +494,9 @@ class FileService(BaseService):
 
         if hard_delete:
             # Delete from storage
+            storage = self._ensure_storage()
             try:
-                await self._storage.delete_file(file.storage_key)
+                await storage.delete_file(file.storage_key)
             except StorageClientError as e:
                 self.logger.warning(
                     "Failed to delete file from storage",
@@ -492,7 +507,7 @@ class FileService(BaseService):
             for thumbnail in file.thumbnails:
                 with contextlib.suppress(StorageClientError):
                     # Continue even if thumbnail deletion fails
-                    await self._storage.delete_file(thumbnail.storage_key)
+                    await storage.delete_file(thumbnail.storage_key)
 
             # Delete from database
             await self._repository.delete(self._session, file)
@@ -608,7 +623,7 @@ class FileService(BaseService):
             "results": results,
         }
 
-    async def batch_download_urls(self, file_ids: list[UUID]) -> dict:
+    async def batch_download_urls(self, file_ids: list[UUID]) -> dict[str, Any]:
         """Generate download URLs for multiple files.
 
         Args:
@@ -617,7 +632,7 @@ class FileService(BaseService):
         Returns:
             Dictionary with batch download results
         """
-        items = []
+        items: list[dict[str, str | bool | UUID | None | int]] = []
         successful = 0
         failed = 0
 
@@ -654,7 +669,8 @@ class FileService(BaseService):
                     failed += 1
                     continue
 
-                download_url = await self._storage.get_presigned_url(file.storage_key)
+                storage = self._ensure_storage()
+                download_url = await storage.get_presigned_url(file.storage_key)
                 items.append(
                     {
                         "file_id": file_id,
@@ -696,7 +712,7 @@ class FileService(BaseService):
             "total": len(file_ids),
             "successful": successful,
             "failed": failed,
-            "expires_in": self._storage.settings.presigned_url_expiry_seconds,
+            "expires_in": self._ensure_storage().settings.presigned_url_expiry_seconds,
             "items": items,
         }
 
@@ -832,13 +848,14 @@ class FileService(BaseService):
         new_storage_key = self._generate_storage_key(new_filename, source_file.owner_id)
 
         # Copy file in storage
-        await self._storage.copy_file(
+        storage = self._ensure_storage()
+        await storage.copy_file(
             source_key=source_file.storage_key,
             dest_key=new_storage_key,
         )
 
         # Get file info to get the new etag
-        file_info = await self._storage.get_file_info(new_storage_key)
+        file_info = await storage.get_file_info(new_storage_key)
 
         # Create new database record
         file_create = FileCreate(

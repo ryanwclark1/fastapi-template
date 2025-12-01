@@ -133,7 +133,7 @@ def setup_logging(
 
     log_config: dict[str, Any] = {}
     if hasattr(settings_obj, "to_logging_kwargs"):
-        log_config = settings_obj.to_logging_kwargs()  # type: ignore[attr-defined]
+        log_config = settings_obj.to_logging_kwargs()
 
     if configure_kwargs:
         log_config = {**log_config, **configure_kwargs}

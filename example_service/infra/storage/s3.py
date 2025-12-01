@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 # Optional aioboto3 dependency
 try:
-    import aioboto3
+    import aioboto3  # type: ignore[import-not-found]
     from botocore.exceptions import ClientError
 
     AIOBOTO3_AVAILABLE = True
@@ -82,11 +82,17 @@ class S3Client:
         self.settings = settings
         self._session = aioboto3.Session()
 
-    def _get_client_config(self) -> dict:
+    def _get_client_config(self) -> dict[str, str]:
         """Get boto3 client configuration."""
-        config = {
-            "aws_access_key_id": self.settings.s3_access_key.get_secret_value(),
-            "aws_secret_access_key": self.settings.s3_secret_key.get_secret_value(),
+        access_key = (
+            self.settings.s3_access_key.get_secret_value() if self.settings.s3_access_key else ""
+        )
+        secret_key = (
+            self.settings.s3_secret_key.get_secret_value() if self.settings.s3_secret_key else ""
+        )
+        config: dict[str, str] = {
+            "aws_access_key_id": access_key,
+            "aws_secret_access_key": secret_key,
             "region_name": self.settings.s3_region,
         }
 
@@ -119,7 +125,7 @@ class S3Client:
         if not local_path.exists():
             raise S3ClientError(f"Local file not found: {local_path}")
 
-        extra_args = {}
+        extra_args: dict[str, str | dict[str, str]] = {}
         if content_type:
             extra_args["ContentType"] = content_type
         elif local_path.suffix == ".gz":

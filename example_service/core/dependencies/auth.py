@@ -23,6 +23,8 @@ from example_service.infra.logging.context import set_log_context
 from example_service.utils.retry import retry
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from example_service.infra.cache.redis import RedisCache
 
 logger = logging.getLogger(__name__)
@@ -254,7 +256,7 @@ async def get_current_user_optional(
         return None
 
 
-def require_permission(permission: str):
+def require_permission(permission: str) -> Callable[[AuthUser], Awaitable[AuthUser]]:
     """Dependency factory to require specific permission.
 
     Args:
@@ -283,7 +285,7 @@ def require_permission(permission: str):
     return permission_checker
 
 
-def require_role(role: str):
+def require_role(role: str) -> Callable[[AuthUser], Awaitable[AuthUser]]:
     """Dependency factory to require specific role.
 
     Args:
@@ -312,7 +314,9 @@ def require_role(role: str):
     return role_checker
 
 
-def require_resource_access(resource: str, action: str):
+def require_resource_access(
+    resource: str, action: str
+) -> Callable[[AuthUser], Awaitable[AuthUser]]:
     """Dependency factory to require resource access.
 
     Args:

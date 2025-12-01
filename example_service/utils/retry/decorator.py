@@ -4,7 +4,7 @@ import asyncio
 import logging
 import time
 from functools import wraps
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, ParamSpec, TypeVar
 
 from example_service.infra.metrics.tracking import (
     track_retry_attempt,
@@ -16,11 +16,12 @@ from .exceptions import RetryError, RetryStatistics
 from .strategies import RetryStrategy
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar("T")
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 def retry(
@@ -34,7 +35,7 @@ def retry(
     retry_if: Callable[[Exception], bool] | None = None,
     stop_after_delay: float | None = None,
     on_retry: Callable[[Exception, int], None] | None = None,
-) -> Callable:
+) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
     strategy = RetryStrategy(
         max_attempts=max_attempts,
         initial_delay=initial_delay,
@@ -47,9 +48,9 @@ def retry(
         stop_after_delay=stop_after_delay,
     )
 
-    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+    def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
         @wraps(func)
-        async def async_wrapper(*args: Any, **kwargs: Any) -> T:
+        async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             statistics = RetryStatistics(start_time=time.monotonic())
 
             for attempt in range(max_attempts):
@@ -114,75 +115,6 @@ def retry(
 
             raise RuntimeError("Retry logic error: exhausted all attempts")
 
-        @wraps(func)
-        def sync_wrapper(*args: Any, **kwargs: Any) -> T:
-            statistics = RetryStatistics(start_time=time.monotonic())
-
-            for attempt in range(max_attempts):
-                try:
-                    result = func(*args, **kwargs)
-                    # Track success after retries
-                    if statistics.attempts > 0:
-                        track_retry_success(func.__name__, statistics.attempts + 1)
-                    return result
-                except Exception as e:
-                    if not strategy.should_retry(e):
-                        logger.warning(
-                            f"Non-retryable exception in {func.__name__}: {e}",
-                            extra={"function": func.__name__, "exception": str(e)},
-                        )
-                        raise
-
-                    elapsed = time.monotonic() - statistics.start_time
-                    if stop_after_delay is not None and elapsed >= stop_after_delay:
-                        statistics.end_time = time.monotonic()
-                        raise RetryError(e, attempt + 1, statistics) from e
-
-                    if attempt >= max_attempts - 1:
-                        statistics.end_time = time.monotonic()
-                        # Track retry exhaustion
-                        track_retry_exhausted(func.__name__)
-                        logger.error(
-                            f"All retry attempts exhausted for {func.__name__}",
-                            extra={
-                                "function": func.__name__,
-                                "attempts": attempt + 1,
-                                "last_exception": str(e),
-                                "total_delay": statistics.total_delay,
-                                "duration": statistics.duration,
-                            },
-                        )
-                        raise RetryError(e, attempt + 1, statistics) from e
-
-                    delay = strategy.calculate_delay(attempt)
-                    statistics.attempts += 1
-                    statistics.total_delay += delay
-                    statistics.exceptions.append(type(e).__name__)
-
-                    # Track retry attempt
-                    track_retry_attempt(func.__name__, attempt + 2)
-
-                    logger.warning(
-                        f"Retrying {func.__name__} after {delay:.2f}s (attempt {attempt + 1}/{max_attempts})",
-                        extra={
-                            "function": func.__name__,
-                            "attempt": attempt + 1,
-                            "max_attempts": max_attempts,
-                            "delay": delay,
-                            "exception": str(e),
-                        },
-                    )
-
-                    if on_retry:
-                        on_retry(e, attempt + 1)
-
-                    time.sleep(delay)
-
-            raise RuntimeError("Retry logic error: exhausted all attempts")
-
-        if asyncio.iscoroutinefunction(func):
-            return async_wrapper  # type: ignore
-        else:
-            return sync_wrapper  # type: ignore
+        return async_wrapper
 
     return decorator

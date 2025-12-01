@@ -6,7 +6,9 @@ Settings can be configured via environment variables with the I18N_ prefix.
 
 from __future__ import annotations
 
-from pydantic import Field, field_validator
+from typing import Any
+
+from pydantic import Field, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .yaml_sources import create_i18n_yaml_source
@@ -138,7 +140,9 @@ class I18nSettings(BaseSettings):
 
     @field_validator("default_locale")
     @classmethod
-    def validate_default_locale_in_supported(cls, v: str, info) -> str:
+    def validate_default_locale_in_supported(
+        cls, v: str, info: ValidationInfo
+    ) -> str:
         """Validate that default locale is in supported locales.
 
         Note: This validator runs before supported_locales is validated,
@@ -193,8 +197,13 @@ class I18nSettings(BaseSettings):
 
     @classmethod
     def settings_customise_sources(
-        cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings
-    ):
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: Any,
+        env_settings: Any,
+        dotenv_settings: Any,
+        file_secret_settings: Any,
+    ) -> tuple[Any, ...]:
         """Customize settings source precedence: init > yaml > env > dotenv > secrets."""
         return (
             init_settings,

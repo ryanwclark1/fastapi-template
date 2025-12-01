@@ -262,7 +262,7 @@ class RedisSettings(BaseSettings):
 
         return self
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def url(self) -> str:
         """Build Redis URL from component fields.
@@ -284,7 +284,7 @@ class RedisSettings(BaseSettings):
 
         return f"{scheme}://{auth}{self.host}:{self.port}/{self.db}"
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def is_configured(self) -> bool:
         """Check if Redis is configured.
@@ -418,8 +418,13 @@ class RedisSettings(BaseSettings):
 
     @classmethod
     def settings_customise_sources(
-        cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings
-    ):
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: Any,
+        env_settings: Any,
+        dotenv_settings: Any,
+        file_secret_settings: Any,
+    ) -> tuple[Any, ...]:
         """Customize settings source precedence: init > yaml > env > dotenv > secrets."""
         return (
             init_settings,

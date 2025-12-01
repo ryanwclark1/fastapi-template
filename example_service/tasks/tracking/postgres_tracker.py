@@ -13,7 +13,12 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import and_, func, select, update
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from example_service.infra.results.models import TaskExecution
 from example_service.tasks.tracking.base import BaseTaskTracker
@@ -68,7 +73,7 @@ class PostgresTaskTracker(BaseTaskTracker):
         self._max_overflow = max_overflow
         self._pool_pre_ping = pool_pre_ping
 
-        self._engine = None
+        self._engine: AsyncEngine | None = None
         self._session_factory: async_sessionmaker[AsyncSession] | None = None
 
     async def connect(self) -> None:
@@ -504,12 +509,12 @@ class PostgresTaskTracker(BaseTaskTracker):
                 total_count = result.scalar() or 0
 
                 # Count by task name
-                stmt = (
+                name_counts_stmt = (
                     select(TaskExecution.task_name, func.count())
                     .where(TaskExecution.created_at >= cutoff)
                     .group_by(TaskExecution.task_name)
                 )
-                result = await session.execute(stmt)
+                result = await session.execute(name_counts_stmt)
                 by_task_name = {row[0]: row[1] for row in result.all()}
 
                 # Average duration (successful tasks only)
@@ -553,8 +558,10 @@ class PostgresTaskTracker(BaseTaskTracker):
             async with self._get_session() as session:
                 async with session.begin():
                     # Check current status
-                    stmt = select(TaskExecution.status).where(TaskExecution.task_id == task_id)
-                    result = await session.execute(stmt)
+                    current_status_stmt = select(TaskExecution.status).where(
+                        TaskExecution.task_id == task_id
+                    )
+                    result = await session.execute(current_status_stmt)
                     current_status = result.scalar_one_or_none()
 
                     if current_status is None:
@@ -564,7 +571,7 @@ class PostgresTaskTracker(BaseTaskTracker):
                         return False  # Can only cancel pending/running tasks
 
                     # Update to cancelled
-                    stmt = (
+                    update_stmt = (
                         update(TaskExecution)
                         .where(TaskExecution.task_id == task_id)
                         .values(
@@ -572,7 +579,7 @@ class PostgresTaskTracker(BaseTaskTracker):
                             finished_at=datetime.now(UTC),
                         )
                     )
-                    await session.execute(stmt)
+                    await session.execute(update_stmt)
 
                 return True
         except Exception as e:

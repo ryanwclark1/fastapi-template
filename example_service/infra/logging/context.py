@@ -14,6 +14,7 @@ This approach is:
 from __future__ import annotations
 
 import logging
+from collections.abc import MutableMapping
 from contextvars import ContextVar
 from typing import Any
 
@@ -206,10 +207,13 @@ class ContextBoundLogger(logging.LoggerAdapter):
             request.info("Processing")  # Has both service and request_id
         """
         # Merge existing context with new context
-        merged = {**self.extra, **context}
+        existing = dict(self.extra) if self.extra is not None else {}
+        merged = {**existing, **context}
         return ContextBoundLogger(self.logger, **merged)
 
-    def process(self, msg: str, kwargs: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    def process(
+        self, msg: object, kwargs: MutableMapping[str, Any]
+    ) -> tuple[object, MutableMapping[str, Any]]:
         """Process log message and kwargs to include bound context.
 
         Args:
@@ -220,8 +224,10 @@ class ContextBoundLogger(logging.LoggerAdapter):
             Tuple of (message, modified kwargs with context in extra).
         """
         # Merge bound context with any extra fields passed to the log call
-        extra = kwargs.get("extra", {})
-        kwargs["extra"] = {**self.extra, **extra}
+        extra_val = kwargs.get("extra", {})
+        extra = dict(extra_val) if isinstance(extra_val, MutableMapping) else {}
+        existing = dict(self.extra) if self.extra is not None else {}
+        kwargs["extra"] = {**existing, **extra}
         return msg, kwargs
 
 

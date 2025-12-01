@@ -147,7 +147,7 @@ uv run ruff check .
 uv run ruff format .
 
 # Run type checker
-uv run mypy example_service
+uv run mypy
 ```
 
 ### Project Structure

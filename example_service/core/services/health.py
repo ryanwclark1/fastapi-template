@@ -128,7 +128,6 @@ class HealthService(BaseService):
                 self._aggregator.add_provider(
                     DatabaseHealthProvider(
                         engine=engine,
-                        config=self._health_settings.database,
                     )
                 )
 
@@ -150,14 +149,13 @@ class HealthService(BaseService):
                 from example_service.features.health.providers import (
                     RedisHealthProvider,
                 )
-                from example_service.infra.cache.redis import get_redis_cache
+                from example_service.infra.cache.redis import _cache as global_cache
 
-                cache = get_redis_cache()
-                if cache is not None:
+                # Use global cache instance if available
+                if global_cache is not None:
                     self._aggregator.add_provider(
                         RedisHealthProvider(
-                            cache=cache,
-                            config=self._health_settings.cache,
+                            cache=global_cache,
                         )
                     )
             except Exception as e:
@@ -173,7 +171,6 @@ class HealthService(BaseService):
                 self._aggregator.add_provider(
                     RabbitMQHealthProvider(
                         connection_url=self._rabbit_settings.get_url(),
-                        config=self._health_settings.rabbitmq,
                     )
                 )
             except Exception as e:
@@ -194,7 +191,6 @@ class HealthService(BaseService):
                     ExternalServiceHealthProvider(
                         name="auth_service",
                         base_url=str(self._auth_settings.service_url),
-                        config=self._health_settings.accent_auth,
                     )
                 )
             except Exception as e:
@@ -212,7 +208,6 @@ class HealthService(BaseService):
                 self._aggregator.add_provider(
                     S3StorageHealthProvider(
                         s3_client=s3_client,
-                        config=self._health_settings.s3,
                     )
                 )
             except Exception as e:
@@ -239,7 +234,7 @@ class HealthService(BaseService):
 
                     self._aggregator.add_provider(
                         ConsulHealthProvider(
-                            consul_client=discovery_service._client,
+                            consul_client=discovery_service._client,  # type: ignore[arg-type]
                             service_name=self._app_settings.service_name,
                             config=config,
                         )

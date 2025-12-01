@@ -98,6 +98,14 @@ class AppSettings(BaseSettings):
         default=None,
         description="Swagger UI display parameters (JSON object)",
     )
+    contact: dict[str, str] | None = Field(
+        default=None,
+        description="OpenAPI contact info (name, url, email)",
+    )
+    license_info: dict[str, str] | None = Field(
+        default=None,
+        description="OpenAPI license info (name, url)",
+    )
 
     # Behavioral settings
     redirect_slashes: bool = Field(
@@ -209,8 +217,13 @@ class AppSettings(BaseSettings):
 
     @classmethod
     def settings_customise_sources(
-        cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings
-    ):
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: Any,
+        env_settings: Any,
+        dotenv_settings: Any,
+        file_secret_settings: Any,
+    ) -> tuple[Any, ...]:
         """Customize settings source precedence: init > yaml > env > dotenv > secrets."""
         return (
             init_settings,
@@ -243,11 +256,11 @@ class AppSettings(BaseSettings):
 
     def get_contact(self) -> dict[str, str] | None:
         """Get contact info as dict for FastAPI, or None if empty."""
-        return self.contact.to_dict()
+        return self.contact if self.contact else None
 
     def get_license_info(self) -> dict[str, str] | None:
         """Get license info as dict for FastAPI, or None if empty."""
-        return self.license_info.to_dict()
+        return self.license_info if self.license_info else None
 
     def get_swagger_ui_parameters(self) -> dict[str, Any] | None:
         """Get Swagger UI parameters, with sensible defaults merged in."""

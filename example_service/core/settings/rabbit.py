@@ -220,12 +220,12 @@ class RabbitSettings(BaseSettings):
     @classmethod
     def settings_customise_sources(
         cls,
-        settings_cls,
-        init_settings,
-        env_settings,
-        dotenv_settings,
-        file_secret_settings,
-    ):
+        settings_cls: type[BaseSettings],
+        init_settings: Any,
+        env_settings: Any,
+        dotenv_settings: Any,
+        file_secret_settings: Any,
+    ) -> tuple[Any, ...]:
         """Customize settings source precedence: init > yaml > env > dotenv > secrets."""
         return (
             init_settings,
@@ -277,7 +277,7 @@ class RabbitSettings(BaseSettings):
     # ─────────────────────────────────────────────────────
     # Computed properties
     # ─────────────────────────────────────────────────────
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def url(self) -> str:
         """Return the effective AMQP URI, derived from component settings.

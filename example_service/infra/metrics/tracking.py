@@ -5,9 +5,12 @@ from __future__ import annotations
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from example_service.infra.metrics import business
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 logger = logging.getLogger(__name__)
 
@@ -424,7 +427,7 @@ def track_permission_check(permission: str, allowed: bool) -> None:
 
 
 @asynccontextmanager
-async def track_external_service_call(service_name: str, endpoint: str):
+async def track_external_service_call(service_name: str, endpoint: str) -> AsyncIterator[None]:
     """Context manager to track external service call with timing.
 
     Args:
@@ -566,7 +569,7 @@ def update_dependency_health(dependency_name: str, dependency_type: str, is_heal
 
 
 @asynccontextmanager
-async def track_dependency_check(dependency_name: str):
+async def track_dependency_check(dependency_name: str) -> AsyncIterator[None]:
     """Context manager to track dependency health check duration.
 
     Args:

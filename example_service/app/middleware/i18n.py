@@ -126,9 +126,9 @@ class I18nMiddleware(BaseHTTPMiddleware):
         """
         # 1. Check user preference if available (highest priority)
         if self.use_user_preference and hasattr(request.state, "user") and request.state.user:
-            user_locale = getattr(request.state.user, "preferred_language", None)
+            user_locale: str | None = getattr(request.state.user, "preferred_language", None)
             if user_locale and user_locale in self.supported_locales:
-                return user_locale
+                return str(user_locale)
 
         # 2. Check Accept-Language header
         if self.use_accept_language:

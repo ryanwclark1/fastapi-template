@@ -28,8 +28,9 @@ class TokenPayload(BaseModel):
     permissions: list[str] = Field(
         default_factory=list, max_length=200, description="Granted permissions"
     )
-    acl: dict[str, Any] = Field(
-        default_factory=dict, description="Access Control List with resource permissions"
+    acl: dict[str, list[str] | dict[str, bool]] = Field(
+        default_factory=dict,
+        description="Access Control List with resource permissions",
     )
     exp: int | None = Field(default=None, ge=0, description="Token expiration timestamp")
     iat: int | None = Field(default=None, ge=0, description="Token issued at timestamp")
@@ -74,8 +75,9 @@ class AuthUser(BaseModel):
     permissions: list[str] = Field(
         default_factory=list, max_length=200, description="Granted permissions"
     )
-    acl: dict[str, Any] = Field(
-        default_factory=dict, description="Access Control List with resource permissions"
+    acl: dict[str, list[str] | dict[str, bool]] = Field(
+        default_factory=dict,
+        description="Access Control List with resource permissions",
     )
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="Additional user/service metadata"
@@ -167,6 +169,6 @@ class AuthUser(BaseModel):
         if isinstance(resource_acl, list):
             return action in resource_acl
         elif isinstance(resource_acl, dict):
-            return resource_acl.get(action, False)
+            return bool(resource_acl.get(action, False))
 
         return False

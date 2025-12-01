@@ -97,7 +97,7 @@ def typecheck(strict: bool) -> None:
 
         example-service dev typecheck --strict
     """
-    cmd = ["uv", "run", "mypy", "example_service"]
+    cmd = ["uv", "run", "mypy"]
 
     if strict:
         cmd.append("--strict")

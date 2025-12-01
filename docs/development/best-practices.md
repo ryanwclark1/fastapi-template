@@ -794,7 +794,7 @@ uv run ruff format .
 uv run ruff check . --fix
 
 # Type check
-uv run mypy example_service
+uv run mypy
 ```
 
 ### Pre-commit Hooks

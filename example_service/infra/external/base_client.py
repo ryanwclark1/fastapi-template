@@ -11,11 +11,14 @@ Provides a base class for external service clients with:
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
 from example_service.utils.retry import retry
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 logger = logging.getLogger(__name__)
 
@@ -94,9 +97,27 @@ class BaseHTTPClient:
         """Enter async context manager."""
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         """Exit async context manager and close client."""
         await self.close()
+
+    @staticmethod
+    def _json_dict(response: httpx.Response) -> dict[str, Any]:
+        """Safely parse JSON payload as a dict."""
+        try:
+            data = response.json()
+        except Exception:
+            return {}
+
+        if isinstance(data, dict):
+            return dict(data)
+
+        return {}
 
     @retry(
         max_attempts=5,
@@ -143,7 +164,7 @@ class BaseHTTPClient:
         )
 
         response.raise_for_status()
-        return response.json()
+        return self._json_dict(response)
 
     @retry(
         max_attempts=5,
@@ -192,7 +213,7 @@ class BaseHTTPClient:
         )
 
         response.raise_for_status()
-        return response.json()
+        return self._json_dict(response)
 
     @retry(
         max_attempts=5,
@@ -239,7 +260,7 @@ class BaseHTTPClient:
         )
 
         response.raise_for_status()
-        return response.json()
+        return self._json_dict(response)
 
     @retry(
         max_attempts=5,
@@ -289,7 +310,5 @@ class BaseHTTPClient:
         if response.status_code == 204:
             return None
 
-        try:
-            return response.json()
-        except Exception:
-            return None
+        result = self._json_dict(response)
+        return result if result else None

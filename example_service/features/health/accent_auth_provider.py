@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 
 from example_service.core.settings import get_auth_settings
-from example_service.features.health.base import (
+from example_service.features.health.base import (  # type: ignore[import-untyped]
     ComponentHealth,
     ComponentStatus,
     HealthProvider,
@@ -45,7 +45,7 @@ class AccentAuthHealthProvider(HealthProvider):
             logger.info("Accent-Auth health provider registered")
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize Accent-Auth health provider."""
         super().__init__()
         self._settings = get_auth_settings()
@@ -83,6 +83,8 @@ class AccentAuthHealthProvider(HealthProvider):
                 import httpx
 
                 start = time.perf_counter()
+                if client._client is None:
+                    return False
                 response = await client._client.head(
                     f"{client.base_url}/api/auth/0.1/token/check",
                     headers={"X-Auth-Token": "health-check"},  # Invalid token is OK

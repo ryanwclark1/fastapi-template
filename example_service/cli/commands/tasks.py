@@ -35,7 +35,7 @@ async def list_tasks() -> None:
             return
 
         # Get all registered tasks
-        registered_tasks = list(broker.available_tasks.keys())
+        registered_tasks = list(broker.available_tasks.keys())  # type: ignore[attr-defined]
 
         if not registered_tasks:
             info("No tasks registered")
@@ -139,7 +139,7 @@ async def run_task(task_name: str, arg: tuple, wait: bool, timeout: int) -> None
 
         # Find the task
         task_func = None
-        for full_name, task in broker.available_tasks.items():
+        for full_name, task in broker.available_tasks.items():  # type: ignore[attr-defined]
             if full_name.endswith(f":{task_name}") or full_name == task_name:
                 task_func = task
                 break

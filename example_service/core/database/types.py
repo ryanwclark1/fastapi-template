@@ -127,7 +127,7 @@ class EncryptedString(TypeDecorator):
 
         # Encrypt and return as string
         encrypted_bytes = self._fernet.encrypt(value.encode("utf-8"))
-        return encrypted_bytes.decode("utf-8")
+        return str(encrypted_bytes.decode("utf-8"))
 
     def process_result_value(self, value: str | None, dialect: Dialect) -> str | None:
         """Decrypt value after retrieving from database.
@@ -148,7 +148,7 @@ class EncryptedString(TypeDecorator):
 
         # Decrypt and return as string
         decrypted_bytes = self._fernet.decrypt(value.encode("utf-8"))
-        return decrypted_bytes.decode("utf-8")
+        return str(decrypted_bytes.decode("utf-8"))
 
 
 class EncryptedText(EncryptedString):

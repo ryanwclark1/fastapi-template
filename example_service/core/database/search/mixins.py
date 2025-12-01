@@ -82,8 +82,8 @@ class SearchableMixin:
             comment="Full-text search vector",
         )
 
-    @declared_attr
-    def __table_args__(cls) -> tuple:
+    @declared_attr  # type: ignore[arg-type]
+    def __table_args__(cls) -> tuple[Any, ...]:
         """Add GIN index for search vector.
 
         GIN (Generalized Inverted Index) is optimized for TSVECTOR
@@ -94,9 +94,14 @@ class SearchableMixin:
         if not isinstance(existing_args, tuple):
             existing_args = (existing_args,)
 
+        # Get tablename safely
+        tablename = getattr(cls, "__tablename__", None)
+        if tablename is None:
+            return existing_args or ()
+
         # Add GIN index for search vector
         gin_index = Index(
-            f"ix_{cls.__tablename__}_search_vector",
+            f"ix_{tablename}_search_vector",
             cls.search_vector,
             postgresql_using="gin",
         )

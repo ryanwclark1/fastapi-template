@@ -61,13 +61,13 @@ def register_playground_routes(
 
 def _load_assets() -> dict[str, tuple[bytes, str]]:
     base = resources.files("example_service") / "static" / "graphql"
-    if not base.exists():
+    if not base.is_dir():
         raise RuntimeError("GraphQL Playground assets are missing. Reinstall the package.")
 
     assets: dict[str, tuple[bytes, str]] = {}
     for name, media_type in _ASSET_MEDIA_TYPES.items():
         file_ref = base / name
-        if not file_ref.exists():
+        if not file_ref.is_file():
             raise RuntimeError(f"Missing GraphQL Playground asset: {name}")
         assets[name] = (file_ref.read_bytes(), media_type)
     return assets
@@ -83,11 +83,11 @@ def _serve_asset(asset_name: str, assets: dict[str, tuple[bytes, str]]) -> Respo
 
 def _get_static_urls(request: Request) -> _PlaygroundStaticUrls:
     return _PlaygroundStaticUrls(
-        css=request.url_for(_ASSET_ROUTE_NAME, asset_name="playground.css"),
-        shell_css=request.url_for(_ASSET_ROUTE_NAME, asset_name="playground-shell.css"),
-        js=request.url_for(_ASSET_ROUTE_NAME, asset_name="playground.js"),
-        init_js=request.url_for(_ASSET_ROUTE_NAME, asset_name="playground-init.js"),
-        favicon=request.url_for(_ASSET_ROUTE_NAME, asset_name="favicon.png"),
+        css=str(request.url_for(_ASSET_ROUTE_NAME, asset_name="playground.css")),
+        shell_css=str(request.url_for(_ASSET_ROUTE_NAME, asset_name="playground-shell.css")),
+        js=str(request.url_for(_ASSET_ROUTE_NAME, asset_name="playground.js")),
+        init_js=str(request.url_for(_ASSET_ROUTE_NAME, asset_name="playground-init.js")),
+        favicon=str(request.url_for(_ASSET_ROUTE_NAME, asset_name="favicon.png")),
     )
 
 

@@ -24,6 +24,7 @@ from example_service.infra.storage.exceptions import (
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from types import TracebackType
 
     from example_service.core.settings.storage import StorageSettings
 
@@ -31,14 +32,14 @@ logger = logging.getLogger(__name__)
 
 # Optional aioboto3 dependency
 try:
-    import aioboto3
+    import aioboto3  # type: ignore[import-not-found]
     from botocore.config import Config
     from botocore.exceptions import BotoCoreError, ClientError
 
     AIOBOTO3_AVAILABLE = True
 except ImportError:
     aioboto3 = None
-    Config = None  # type: ignore[assignment,misc]
+    Config = None
     ClientError = Exception
     BotoCoreError = Exception
     AIOBOTO3_AVAILABLE = False
@@ -121,11 +122,16 @@ class StorageClient:
         await self.ensure_client()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         """Async context manager exit."""
         await self.close()
 
-    async def ensure_client(self):
+    async def ensure_client(self) -> Any:
         """Ensure S3 client is initialized and return it.
 
         Returns:
@@ -157,6 +163,11 @@ class StorageClient:
             )
 
             # Enter the context manager
+            if self._client_context is None:
+                raise StorageError(
+                    "Failed to create S3 client context",
+                    code="STORAGE_CLIENT_ERROR",
+                )
             self._client = await self._client_context.__aenter__()
 
             logger.info(
@@ -226,9 +237,9 @@ class StorageClient:
         checksum_sha256 = hashlib.sha256(file_data).hexdigest()
 
         # Reset to beginning for upload
-        file_obj = BytesIO(file_data)
+        file_obj_bytes: BinaryIO = BytesIO(file_data)
 
-        extra_args = {}
+        extra_args: dict[str, str | dict[str, str]] = {}
         if content_type:
             extra_args["ContentType"] = content_type
         if metadata:
@@ -239,7 +250,7 @@ class StorageClient:
             response = await s3.put_object(
                 Bucket=bucket,
                 Key=key,
-                Body=file_obj,
+                Body=file_obj_bytes,
                 **extra_args,
             )
 
@@ -292,7 +303,10 @@ class StorageClient:
         try:
             s3 = await self.ensure_client()
             response = await s3.get_object(Bucket=bucket, Key=key)
-            file_data = await response["Body"].read()
+            file_data_raw = await response["Body"].read()
+            file_data: bytes = (
+                bytes(file_data_raw) if not isinstance(file_data_raw, bytes) else file_data_raw
+            )
 
             logger.info(
                 "File downloaded from storage",
@@ -367,11 +381,12 @@ class StorageClient:
 
         try:
             s3 = await self.ensure_client()
-            url = await s3.generate_presigned_url(
+            url_raw = await s3.generate_presigned_url(
                 "get_object",
                 Params={"Bucket": bucket, "Key": key},
                 ExpiresIn=expires_in,
             )
+            url: str = str(url_raw)
 
             logger.debug(f"Generated presigned download URL for {key} (expires in {expires_in}s)")
             return url
@@ -420,12 +435,17 @@ class StorageClient:
 
         try:
             s3 = await self.ensure_client()
-            presigned_post = await s3.generate_presigned_post(
+            presigned_post_raw = await s3.generate_presigned_post(
                 Bucket=bucket,
                 Key=key,
                 Fields={"Content-Type": content_type},
                 Conditions=conditions,
                 ExpiresIn=expires_in,
+            )
+            presigned_post: dict[Any, Any] = (
+                dict(presigned_post_raw)
+                if isinstance(presigned_post_raw, dict)
+                else {"url": str(presigned_post_raw), "fields": {}}
             )
 
             logger.info(
@@ -614,7 +634,7 @@ class StorageClient:
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Convert any exceptions to error results
-        processed_results = []
+        processed_results: list[dict[str, Any]] = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 key = files[i][0]
@@ -629,7 +649,8 @@ class StorageClient:
                     }
                 )
             else:
-                processed_results.append(result)
+                # Type narrowing: result is dict[str, Any] here
+                processed_results.append(result)  # type: ignore[arg-type]
 
         successful_count = sum(1 for r in processed_results if r["success"])
         logger.info(
@@ -713,7 +734,7 @@ class StorageClient:
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Convert any exceptions to error results
-        processed_results = []
+        processed_results: list[dict[str, Any]] = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 key = keys[i]
@@ -728,7 +749,8 @@ class StorageClient:
                     }
                 )
             else:
-                processed_results.append(result)
+                # Type narrowing: result is dict[str, Any] here
+                processed_results.append(result)  # type: ignore[arg-type]
 
         successful_count = sum(1 for r in processed_results if r["success"])
         logger.info(
@@ -819,11 +841,17 @@ class StorageClient:
                 logger.error(f"Unexpected error deleting {key}: {error_msg}")
                 failed.append({"key": key, "error": error_msg})
             else:
-                key, success, error = result
-                if success:
-                    deleted.append(key)
+                # Type narrowing: result is tuple[str, bool, str | None] here
+                if isinstance(result, tuple) and len(result) == 3:
+                    key, success, error = result
+                    if success:
+                        deleted.append(key)
+                    else:
+                        failed.append({"key": key, "error": error or "Unknown error"})
                 else:
-                    failed.append({"key": key, "error": error})
+                    # Fallback for unexpected result type
+                    logger.warning(f"Unexpected result type: {type(result)}")
+                    failed.append({"key": keys[i], "error": "Unexpected result format"})
 
         logger.info(
             f"Batch deletion completed: {len(deleted)}/{len(keys)} deleted",

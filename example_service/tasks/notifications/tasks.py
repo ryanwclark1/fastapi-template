@@ -175,7 +175,7 @@ if broker is not None:
             result = await session.execute(stmt)
             await session.commit()
 
-            if result.rowcount == 0:
+            if result.rowcount == 0:  # type: ignore[attr-defined]
                 return {"status": "not_found", "reminder_id": reminder_id}
 
             logger.info(

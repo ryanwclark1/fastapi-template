@@ -50,7 +50,7 @@ def calculate_backoff(attempt_count: int) -> int:
         Seconds to wait before next retry.
     """
     backoff = BACKOFF_BASE * (2**attempt_count)
-    return min(backoff, MAX_BACKOFF)
+    return int(min(backoff, MAX_BACKOFF))
 
 
 async def get_webhook_delivery(delivery_id: str) -> dict[str, Any] | None:

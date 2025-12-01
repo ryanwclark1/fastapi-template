@@ -18,7 +18,7 @@ import asyncio
 from logging.config import fileConfig
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import pool
+from sqlalchemy import Column, pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
@@ -33,9 +33,13 @@ from example_service.core.database.types import EncryptedString, EncryptedText
 from example_service.core.settings import get_db_settings
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from alembic.autogenerate.api import AutogenContext
     from alembic.operations.ops import MigrationScript
     from alembic.runtime.migration import MigrationContext
     from sqlalchemy.engine import Connection
+    from sqlalchemy.sql.type_api import TypeEngine
 
 # Alembic Config object
 config = context.config
@@ -89,10 +93,10 @@ USER_MODULE_PREFIX = get_config_value("user_module_prefix", "example_service.cor
 
 def compare_type(
     context: MigrationContext,
-    inspected_column: Any,
-    metadata_column: Any,
-    inspected_type: Any,
-    metadata_type: Any,
+    inspected_column: Column[Any],
+    metadata_column: Column[Any],
+    inspected_type: TypeEngine[Any],
+    metadata_type: TypeEngine[Any],
 ) -> bool | None:
     """Compare column types including custom types.
 
@@ -173,7 +177,7 @@ def include_object(
 # =============================================================================
 
 
-def render_item(type_: str, obj: Any, autogen_context: Any) -> str | bool:
+def render_item(type_: str, obj: Any, autogen_context: AutogenContext) -> str | bool:
     """Custom rendering for special types in migrations.
 
     Handles EncryptedString and EncryptedText by adding proper imports
@@ -214,7 +218,7 @@ def render_item(type_: str, obj: Any, autogen_context: Any) -> str | bool:
 
 def process_revision_directives(
     context: MigrationContext,
-    revision: tuple[str, ...],
+    revision: str | tuple[str, ...] | Iterable[str | None] | Iterable[str],
     directives: list[MigrationScript],
 ) -> None:
     """Hook to modify revision before writing.
@@ -227,9 +231,9 @@ def process_revision_directives(
         directives: List of migration scripts to process
     """
     _ = context, revision
-    if getattr(config.cmd_opts, "autogenerate", False):
+    if getattr(config.cmd_opts, "autogenerate", False) and directives:
         script = directives[0]
-        if script.upgrade_ops.is_empty():
+        if script.upgrade_ops is not None and script.upgrade_ops.is_empty():
             # Skip creating empty migration
             directives[:] = []
             print("No changes detected, skipping migration creation")

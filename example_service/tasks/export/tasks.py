@@ -86,8 +86,8 @@ if broker is not None:
                 if filters and "is_completed" in filters:
                     stmt = stmt.where(Reminder.is_completed == filters["is_completed"])
 
-                result = await session.execute(stmt)
-                db_records = result.scalars().all()
+                query_result = await session.execute(stmt)
+                db_records = query_result.scalars().all()
 
                 # Define fields for reminders
                 default_fields = [
@@ -195,8 +195,8 @@ if broker is not None:
                 if filters and "is_completed" in filters:
                     stmt = stmt.where(Reminder.is_completed == filters["is_completed"])
 
-                result = await session.execute(stmt)
-                db_records = result.scalars().all()
+                query_result = await session.execute(stmt)
+                db_records = query_result.scalars().all()
 
                 default_fields = [
                     "id",

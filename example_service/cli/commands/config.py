@@ -3,11 +3,17 @@
 import json
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from pydantic_settings import BaseSettings
 
 import click
 
 from example_service.cli.utils import error, info, success, warning
-from example_service.core.settings import get_app_settings
+from example_service.core.settings import get_settings
 
 
 @click.group(name="config")
@@ -33,13 +39,13 @@ def show(output_format: str, show_secrets: bool) -> None:
     info("Loading configuration...")
 
     try:
-        settings = get_app_settings()
+        settings = get_settings()
 
         if not show_secrets:
             warning("⚠ Secrets are hidden. Use --show-secrets to display them.")
 
         # Build config dict
-        config_dict = {
+        config_dict: dict[str, dict[str, object]] = {
             "app": {
                 "name": settings.app.service_name,
                 "environment": settings.app.environment,
@@ -49,43 +55,39 @@ def show(output_format: str, show_secrets: bool) -> None:
                 "api_prefix": settings.app.api_prefix,
             },
             "database": {
-                "host": settings.database.db_host,
-                "port": settings.database.db_port,
-                "name": settings.database.db_name,
-                "user": settings.database.db_user,
-                "password": "***"
-                if not show_secrets
-                else settings.database.db_password.get_secret_value(),
-                "pool_size": settings.database.db_pool_size,
-                "max_overflow": settings.database.db_max_overflow,
+                "host": settings.db.host,
+                "port": settings.db.port,
+                "name": settings.db.name,
+                "user": settings.db.user,
+                "password": "***" if not show_secrets else settings.db.password.get_secret_value(),
+                "pool_size": settings.db.pool_size,
+                "max_overflow": settings.db.max_overflow,
             },
             "cache": {
-                "url": settings.cache.redis_url if show_secrets else "***",
-                "key_prefix": settings.cache.redis_key_prefix,
-                "ttl": settings.cache.redis_ttl,
-                "max_connections": settings.cache.redis_max_connections,
+                "url": settings.redis.get_url() if show_secrets else "***",
+                "key_prefix": settings.redis.key_prefix,
+                "ttl": settings.redis.default_ttl,
+                "max_connections": settings.redis.max_connections,
             },
             "messaging": {
-                "url": settings.messaging.rabbit_url if show_secrets else "***",
-                "queue_name": settings.messaging.rabbit_queue_name,
-                "exchange": settings.messaging.rabbit_exchange,
-                "max_consumers": settings.messaging.rabbit_max_consumers,
+                "url": settings.rabbit.url if show_secrets else "***",
+                "queue_prefix": settings.rabbit.queue_prefix,
+                "default_queue": settings.rabbit.default_queue,
+                "max_consumers": settings.rabbit.max_consumers,
             },
             "auth": {
-                "secret_key": "***"
-                if not show_secrets
-                else settings.auth.secret_key.get_secret_value(),
-                "algorithm": settings.auth.algorithm,
-                "access_token_expire_minutes": settings.auth.access_token_expire_minutes,
+                "service_url": settings.auth.service_url,
+                "token_cache_ttl": settings.auth.token_cache_ttl,
+                "token_header": settings.auth.token_header,
             },
             "logging": {
                 "level": settings.logging.level,
                 "json_logs": settings.logging.json_logs,
             },
             "observability": {
-                "otel_enabled": settings.otel.otel_enabled,
-                "otel_service_name": settings.otel.otel_service_name,
-                "otel_exporter_endpoint": settings.otel.otel_exporter_otlp_endpoint,
+                "otel_enabled": settings.otel.enabled,
+                "otel_service_name": settings.otel.service_name,
+                "otel_exporter_endpoint": settings.otel.endpoint,
             },
         }
 
@@ -129,15 +131,13 @@ def validate() -> None:
 
     try:
         # Load settings (will raise if invalid)
-        settings = get_app_settings()
+        settings = get_settings()
         success("✓ Settings loaded successfully")
 
         # Check database configuration
         click.echo("\n🗄️  Database Configuration:")
         try:
-            info(
-                f"  Database URL: {settings.database.db_host}:{settings.database.db_port}/{settings.database.db_name}"
-            )
+            info(f"  Database URL: {settings.db.host}:{settings.db.port}/{settings.db.name}")
             success("  ✓ Database settings valid")
         except Exception as e:
             error(f"  ✗ Database configuration error: {e}")
@@ -164,11 +164,9 @@ def validate() -> None:
         # Check auth configuration
         click.echo("\n🔐 Authentication Configuration:")
         try:
-            secret_key = settings.auth.secret_key.get_secret_value()
-            if len(secret_key) < 32:
-                warning(f"  ⚠ Secret key is short ({len(secret_key)} chars). Recommend 32+ chars.")
-            else:
-                success(f"  ✓ Secret key configured ({len(secret_key)} chars)")
+            if settings.auth.service_url:
+                info(f"  Service URL: {settings.auth.service_url}")
+            success("  ✓ Auth settings loaded")
         except Exception as e:
             error(f"  ✗ Auth configuration error: {e}")
             errors_found = True
@@ -181,10 +179,10 @@ def validate() -> None:
 
         # Check observability configuration
         click.echo("\n📊 Observability Configuration:")
-        if settings.otel.otel_enabled:
+        if settings.otel.enabled:
             info("  OpenTelemetry: enabled")
-            info(f"  Service name: {settings.otel.otel_service_name}")
-            info(f"  Exporter endpoint: {settings.otel.otel_exporter_otlp_endpoint}")
+            info(f"  Service name: {settings.otel.service_name}")
+            info(f"  Exporter endpoint: {settings.otel.endpoint}")
             success("  ✓ Observability configured")
         else:
             info("  OpenTelemetry: disabled")
@@ -224,10 +222,10 @@ def _extract_defaults_from_settings() -> dict[str, tuple[str, str]]:
     from example_service.core.settings.rabbit import RabbitSettings
     from example_service.core.settings.redis import RedisSettings
 
-    defaults = {}
+    defaults: dict[str, tuple[str, str]] = {}
 
     # Define settings classes with their prefixes
-    settings_map = [
+    settings_map: list[tuple[type[BaseSettings], str]] = [
         (AppSettings, "APP_"),
         (PostgresSettings, "DB_"),
         (RedisSettings, "REDIS_"),
@@ -250,7 +248,9 @@ def _extract_defaults_from_settings() -> dict[str, tuple[str, str]]:
                 if field_info.default_factory is not None:
                     # Call factory to get default
                     try:
-                        default_val = field_info.default_factory()
+                        # Type narrowing: default_factory is Callable[[], Any] when not None
+                        factory = cast("Callable[[], object]", field_info.default_factory)
+                        default_val = factory()
                     except Exception:
                         # Skip if factory fails
                         continue
@@ -473,7 +473,7 @@ def generate_env_with_defaults(output: str, overwrite: bool) -> None:
 def get(key: str) -> None:
     """Get a specific configuration value by key path (e.g., app.service_name)."""
     try:
-        settings = get_app_settings()
+        settings = get_settings()
 
         # Parse key path
         parts = key.split(".")
@@ -597,7 +597,7 @@ def show_env(show_all: bool, filter_prefix: str | None) -> None:
 
             section(category)
             for var in variables:
-                value = os.environ.get(var)
+                value = os.environ.get(var) or ""
                 if value:
                     set_count += 1
                     # Mask sensitive values

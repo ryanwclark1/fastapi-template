@@ -32,7 +32,7 @@ class BaseService:
                 self._lazy.debug(lambda: f"State: {expensive_computation()}")
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize base service with loggers."""
         class_name = self.__class__.__name__
         # Standard logger for INFO/WARNING/ERROR

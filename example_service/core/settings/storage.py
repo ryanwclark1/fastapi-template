@@ -15,7 +15,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import Field, SecretStr, computed_field, field_validator, model_validator
+from pydantic import (
+    Field,
+    SecretStr,
+    ValidationInfo,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .yaml_sources import create_storage_yaml_source
@@ -207,10 +214,12 @@ class StorageSettings(BaseSettings):
             if value.startswith("["):
                 import json
 
-                return json.loads(value)
+                parsed = json.loads(value)
+                # Ensure list of strings
+                return [str(item) for item in parsed]
             # Otherwise treat as comma-separated
             return [t.strip() for t in value.split(",") if t.strip()]
-        return value if value else []
+        return list(value) if value else []
 
     @field_validator("thumbnail_sizes", mode="before")
     @classmethod
@@ -221,10 +230,11 @@ class StorageSettings(BaseSettings):
             if value.startswith("["):
                 import json
 
-                return json.loads(value)
+                parsed = json.loads(value)
+                return [int(size) for size in parsed]
             # Otherwise treat as comma-separated
             return [int(s.strip()) for s in value.split(",") if s.strip()]
-        return value if value else []
+        return list(value) if value else []
 
     @field_validator("retry_mode")
     @classmethod
@@ -237,7 +247,9 @@ class StorageSettings(BaseSettings):
 
     @field_validator("access_key", "secret_key", mode="after")
     @classmethod
-    def _validate_credentials(cls, value: SecretStr | None, info) -> SecretStr | None:  # noqa: ARG003
+    def _validate_credentials(
+        cls, value: SecretStr | None, _info: ValidationInfo
+    ) -> SecretStr | None:
         """Validate that both access_key and secret_key are provided together or neither.
 
         This validator ensures credential consistency - you can't have just one credential.
@@ -276,7 +288,7 @@ class StorageSettings(BaseSettings):
     # Computed Properties
     # ──────────────────────────────────────────────────────────────
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def is_configured(self) -> bool:
         """Check if storage is enabled and properly configured.
@@ -290,13 +302,13 @@ class StorageSettings(BaseSettings):
         """
         return self.enabled
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def is_minio(self) -> bool:
         """Check if configured for MinIO/S3-compatible (has custom endpoint)."""
         return self.endpoint is not None
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def max_file_size_bytes(self) -> int:
         """Get max file size in bytes."""
@@ -362,12 +374,12 @@ class StorageSettings(BaseSettings):
     @classmethod
     def settings_customise_sources(
         cls,
-        settings_cls,
-        init_settings,
-        env_settings,
-        dotenv_settings,
-        file_secret_settings,
-    ):
+        settings_cls: type[BaseSettings],
+        init_settings: Any,
+        env_settings: Any,
+        dotenv_settings: Any,
+        file_secret_settings: Any,
+    ) -> tuple[Any, ...]:
         """Customize settings source precedence: init > yaml > env > dotenv > secrets."""
         return (
             init_settings,

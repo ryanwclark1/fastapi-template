@@ -71,7 +71,7 @@ async def _publish_reminder_event(
             await redis.publish(channel, payload)
             logger.debug(f"Published {event_type} event to {channel}")
         finally:
-            await redis.aclose()
+            await redis.close()
     except Exception as e:
         # Don't fail mutations if publish fails
         logger.warning(f"Failed to publish reminder event: {e}")

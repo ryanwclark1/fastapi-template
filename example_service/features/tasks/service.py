@@ -24,12 +24,12 @@ from example_service.tasks.tracking import get_tracker
 
 # Optional references for patching/testing; actual imports may fail if infra not set up
 try:
-    from example_service.tasks.broker import broker  # type: ignore
+    from example_service.tasks.broker import broker
 except Exception:  # pragma: no cover - best effort
     broker = None
 
 try:
-    from example_service.tasks.scheduler import scheduler  # type: ignore
+    from example_service.tasks.scheduler import scheduler
 except Exception:  # pragma: no cover - best effort
     scheduler = None
 
@@ -58,7 +58,7 @@ class TrackerNotAvailableError(TaskServiceError):
 
 
 if TYPE_CHECKING:
-    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler  # type: ignore[import-untyped]
 
     from example_service.tasks.tracking.base import BaseTaskTracker
 

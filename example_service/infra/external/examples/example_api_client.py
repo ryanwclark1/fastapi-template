@@ -162,7 +162,9 @@ class ExampleAPIClient(BaseHTTPClient):
         """
         try:
             response = await self.get("/health")
-            return response.get("status") == "ok"
+            if isinstance(response, dict):
+                return bool(response.get("status") == "ok")
+            return False
         except Exception as e:
             logger.error(
                 f"External API health check failed: {e}",

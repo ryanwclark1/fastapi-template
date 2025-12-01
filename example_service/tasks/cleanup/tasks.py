@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy import delete
 
@@ -81,7 +82,7 @@ if broker is not None:
                             extra={"path": str(file_path), "error": str(e)},
                         )
 
-        result = {
+        result: dict[str, Any] = {
             "status": "success" if not errors else "partial",
             "deleted_count": deleted_count,
             "deleted_size_bytes": deleted_size,
@@ -235,13 +236,13 @@ if broker is not None:
                 await session.commit()
 
                 results["reminders"] = {
-                    "deleted_count": result.rowcount,
+                    "deleted_count": result.rowcount,  # type: ignore[attr-defined]
                     "retention_days": retention_days,
                 }
 
                 logger.info(
                     "Cleaned old completed reminders",
-                    extra={"deleted_count": result.rowcount},
+                    extra={"deleted_count": result.rowcount},  # type: ignore[attr-defined]
                 )
             except Exception as e:
                 results["reminders"] = {"error": str(e)}

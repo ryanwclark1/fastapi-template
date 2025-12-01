@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from http import HTTPStatus
+from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -20,6 +21,11 @@ from example_service.core.schemas.error import (
 )
 from example_service.infra.metrics import tracking
 
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from starlette.responses import Response
+
 logger = logging.getLogger(__name__)
 ParsedJSON = Any  # Alias for readability
 
@@ -32,11 +38,9 @@ class ProblemJSONResponse(JSONResponse):
     def json(self) -> ParsedJSON:
         """Return parsed JSON body similar to FastAPI TestClient responses."""
         if self._parsed_body is None:
-            body = self.body
-            if isinstance(body, bytes):
-                charset = self.charset or "utf-8"
-                body = body.decode(charset)
-            self._parsed_body = json.loads(body)
+            charset = self.charset or "utf-8"
+            body_bytes = bytes(self.body)
+            self._parsed_body = json.loads(body_bytes.decode(charset))
         return self._parsed_body
 
 
@@ -73,9 +77,14 @@ def _create_problem_detail(
     Returns:
         Dictionary representing the problem detail.
     """
+    try:
+        default_title = HTTPStatus(status_code).phrase
+    except ValueError:
+        default_title = "Error"
+
     problem = ProblemDetail(
         type=type_,
-        title=title or ProblemDetail._default_title(status_code),
+        title=title or default_title,
         status=status_code,
         detail=detail,
         instance=instance,
@@ -89,7 +98,7 @@ def _create_problem_detail(
     return response_data
 
 
-async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
+async def app_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle custom application exceptions.
 
     This handler converts our custom AppException instances into
@@ -102,6 +111,8 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
     Returns:
         JSONResponse with RFC 7807 Problem Details format.
     """
+    if not isinstance(exc, AppException):
+        raise TypeError(f"Expected AppException, got {type(exc).__name__}")
     request_id = _get_request_id(request)
 
     # Track error metric
@@ -151,7 +162,7 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
     )
 
 
-async def not_found_error_handler(request: Request, exc: NotFoundError) -> JSONResponse:
+async def not_found_error_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle database NotFoundError exceptions.
 
     Converts database-layer NotFoundError into HTTP 404 response using
@@ -166,6 +177,8 @@ async def not_found_error_handler(request: Request, exc: NotFoundError) -> JSONR
     Returns:
         JSONResponse with RFC 7807 Problem Details format and 404 status.
     """
+    if not isinstance(exc, NotFoundError):
+        raise TypeError(f"Expected NotFoundError, got {type(exc).__name__}")
     request_id = _get_request_id(request)
 
     # Track error metric
@@ -207,9 +220,7 @@ async def not_found_error_handler(request: Request, exc: NotFoundError) -> JSONR
     )
 
 
-async def validation_exception_handler(
-    request: Request, exc: RequestValidationError
-) -> JSONResponse:
+async def validation_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle FastAPI/Pydantic validation errors.
 
     This handler converts validation errors into RFC 7807 Problem Details
@@ -222,6 +233,8 @@ async def validation_exception_handler(
     Returns:
         JSONResponse with RFC 7807 Problem Details format.
     """
+    if not isinstance(exc, RequestValidationError):
+        raise TypeError(f"Expected RequestValidationError, got {type(exc).__name__}")
     request_id = _get_request_id(request)
 
     # Extract validation errors
@@ -325,9 +338,7 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
     )
 
 
-async def pydantic_validation_exception_handler(
-    request: Request, exc: PydanticValidationError
-) -> JSONResponse:
+async def pydantic_validation_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle Pydantic validation errors outside of FastAPI request validation.
 
     Args:
@@ -337,6 +348,8 @@ async def pydantic_validation_exception_handler(
     Returns:
         JSONResponse with RFC 7807 Problem Details format.
     """
+    if not isinstance(exc, PydanticValidationError):
+        raise TypeError(f"Expected PydanticValidationError, got {type(exc).__name__}")
     request_id = _get_request_id(request)
 
     # Extract validation errors
@@ -415,7 +428,9 @@ def configure_exception_handlers(app: FastAPI) -> None:
     logger.info("Exception handlers configured")
 
     @app.middleware("http")
-    async def _exception_handling_middleware(request: Request, call_next):
+    async def _exception_handling_middleware(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         try:
             return await call_next(request)
         except NotFoundError as exc:
@@ -428,19 +443,3 @@ def configure_exception_handlers(app: FastAPI) -> None:
             return await pydantic_validation_exception_handler(request, exc)
         except Exception as exc:  # pragma: no cover - safety fallback
             return await generic_exception_handler(request, exc)
-
-
-# Helper function to get default title from status code
-ProblemDetail._default_title = lambda status_code: {
-    400: "Bad Request",
-    401: "Unauthorized",
-    403: "Forbidden",
-    404: "Not Found",
-    409: "Conflict",
-    422: "Unprocessable Entity",
-    429: "Too Many Requests",
-    500: "Internal Server Error",
-    502: "Bad Gateway",
-    503: "Service Unavailable",
-    504: "Gateway Timeout",
-}.get(status_code, "Error")

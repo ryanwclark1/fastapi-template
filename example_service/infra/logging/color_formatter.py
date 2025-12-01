@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from example_service.infra.logging.color_convert import hex_to_ansi, rgb_to_ansi
 from example_service.infra.logging.colors import (
@@ -16,6 +16,9 @@ from example_service.infra.logging.colors import (
     ANSIColors,
     ColorSupport,
 )
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 
 class ColoredConsoleFormatter(logging.Formatter):
@@ -57,7 +60,7 @@ class ColoredConsoleFormatter(logging.Formatter):
         self,
         fmt: str | None = None,
         datefmt: str | None = None,
-        style: str = "%",
+        style: Literal["%", "{", "$"] = "%",
         colorize: bool | None = None,
         level_colors: dict[str, str | tuple[int, int, int]] | None = None,
         colorize_message: bool = False,
@@ -213,7 +216,11 @@ class ColoredConsoleFormatter(logging.Formatter):
 
         return formatted
 
-    def formatException(self, ei: tuple[type, BaseException, Any]) -> str:
+    def formatException(
+        self,
+        ei: tuple[type[BaseException], BaseException, TracebackType | None]
+        | tuple[None, None, None],
+    ) -> str:
         """Format exception with colors.
 
         Args:
@@ -254,7 +261,7 @@ class MinimalColoredFormatter(logging.Formatter):
         self,
         fmt: str | None = None,
         datefmt: str | None = None,
-        style: str = "%",
+        style: Literal["%", "{", "$"] = "%",
         colorize: bool | None = None,
     ) -> None:
         """Initialize minimal colored formatter.

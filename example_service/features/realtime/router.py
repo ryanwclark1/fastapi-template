@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import JSONResponse
@@ -31,13 +31,16 @@ from example_service.features.realtime.schemas import (
 )
 from example_service.infra.realtime import get_connection_manager
 
+if TYPE_CHECKING:
+    from example_service.infra.realtime.manager import ConnectionManager
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ws", tags=["realtime"])
 
 ws_settings = get_websocket_settings()
 
 
-def _get_manager_safe():
+def _get_manager_safe() -> ConnectionManager | None:
     """Get connection manager, handling not-initialized case."""
     try:
         return get_connection_manager()
@@ -175,16 +178,16 @@ async def _handle_messages(
                 channels = message.get("channels", [])
                 for channel in channels[: ws_settings.max_channels_per_connection]:
                     if await manager.subscribe(connection_id, channel):
-                        response = SubscribedMessage(channel=channel)
-                        await websocket.send_json(response.model_dump())
+                        subscribed = SubscribedMessage(channel=channel)
+                        await websocket.send_json(subscribed.model_dump())
 
             elif msg_type == ClientMessageType.UNSUBSCRIBE:
                 # Unsubscribe from channels
                 channels = message.get("channels", [])
                 for channel in channels:
                     if await manager.unsubscribe(connection_id, channel):
-                        response = UnsubscribedMessage(channel=channel)
-                        await websocket.send_json(response.model_dump())
+                        unsubscribed = UnsubscribedMessage(channel=channel)
+                        await websocket.send_json(unsubscribed.model_dump())
 
             elif msg_type == ClientMessageType.MESSAGE:
                 # Forward message to channel

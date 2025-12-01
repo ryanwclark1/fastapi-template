@@ -33,13 +33,13 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from example_service.core.schemas.common import HealthStatus
+from example_service.core.settings.health import ProviderConfig
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from sqlalchemy.ext.asyncio import AsyncEngine
 
-    from example_service.core.settings.health import ProviderConfig
     from example_service.infra.discovery.client import ConsulClient
 logger = logging.getLogger(__name__)
 
@@ -470,26 +470,6 @@ class S3StorageHealthProvider:
 
 
 # =============================================================================
-# Provider Configuration
-# =============================================================================
-
-
-@dataclass
-class ProviderConfig:
-    """Configuration for health check providers.
-
-    Attributes:
-        timeout: Health check timeout in seconds
-        latency_threshold_ms: Latency threshold for DEGRADED status
-        enabled: Whether this provider is enabled
-    """
-
-    timeout: float = 5.0
-    latency_threshold_ms: float = DEGRADED_LATENCY_THRESHOLD_MS
-    enabled: bool = True
-
-
-# =============================================================================
 # Metrics Tracking Helpers
 # =============================================================================
 
@@ -633,17 +613,21 @@ class ConsulHealthProvider:
         try:
             async with asyncio.timeout(self._config.timeout):
                 # Run checks in parallel for speed
-                agent_info, leader_info, services_info = await asyncio.gather(
+                results = await asyncio.gather(
                     self._check_agent(),
                     self._check_leader(),
                     self._check_services(),
                     return_exceptions=True,
                 )
 
+            agent_info: dict[str, Any] | BaseException = results[0]
+            leader_info: dict[str, Any] | BaseException = results[1]
+            services_info: dict[str, Any] | BaseException = results[2]
+
             latency_ms = (time.perf_counter() - start_time) * 1000
 
             # Determine overall status from sub-checks
-            if isinstance(agent_info, Exception):
+            if isinstance(agent_info, BaseException):
                 return HealthCheckResult(
                     status=HealthStatus.UNHEALTHY,
                     message=f"Agent unreachable: {agent_info}",
@@ -654,18 +638,18 @@ class ConsulHealthProvider:
             # Build metadata from successful checks
             metadata: dict[str, Any] = {}
 
-            if not isinstance(agent_info, Exception):
+            if not isinstance(agent_info, BaseException):
                 metadata["agent_address"] = agent_info.get("agent_address", "unknown")
                 metadata["datacenter"] = agent_info.get("datacenter", "unknown")
 
-            if not isinstance(leader_info, Exception):
+            if not isinstance(leader_info, BaseException):
                 metadata["leader"] = leader_info.get("leader", "unknown")
                 has_leader = bool(leader_info.get("leader"))
             else:
                 has_leader = False
                 metadata["leader_error"] = str(leader_info)
 
-            if not isinstance(services_info, Exception):
+            if not isinstance(services_info, BaseException):
                 metadata["services_registered"] = services_info.get("count", 0)
                 metadata["service_health"] = services_info.get("service_health", "unknown")
             else:
@@ -680,7 +664,7 @@ class ConsulHealthProvider:
                     metadata=metadata,
                 )
 
-            if latency_ms > self._config.latency_threshold_ms:
+            if latency_ms > self._config.degraded_threshold_ms:
                 return HealthCheckResult(
                     status=HealthStatus.DEGRADED,
                     message=f"High latency: {latency_ms:.2f}ms",
@@ -910,10 +894,11 @@ class DatabasePoolHealthProvider:
 
             # Collect pool statistics
             # QueuePool and related pool types have these methods
-            pool_size = pool.size()  # Total pool size
-            checked_out = pool.checkedout()  # Connections in use
-            overflow = pool.overflow()  # Overflow connections beyond pool_size
-            checked_in = pool.checkedin()  # Idle connections
+            # Type ignore needed because mypy doesn't know about these dynamic attributes
+            pool_size = pool.size()  # type: ignore[attr-defined]  # Total pool size
+            checked_out = pool.checkedout()  # type: ignore[attr-defined]  # Connections in use
+            overflow = pool.overflow()  # type: ignore[attr-defined]  # Overflow connections beyond pool_size
+            checked_in = pool.checkedin()  # type: ignore[attr-defined]  # Idle connections
 
             # Calculate utilization
             total_capacity = pool_size + overflow

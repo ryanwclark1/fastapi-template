@@ -97,7 +97,7 @@ async def update_file_status(
         file.updated_at = datetime.now(UTC)
 
         if hasattr(file, "error_message"):
-            file.error_message = error_message  # type: ignore[attr-defined]
+            file.error_message = error_message
 
         await session.commit()
 
@@ -444,7 +444,7 @@ if broker is not None:
 
         try:
             # Import Pillow
-            from PIL import Image
+            from PIL import Image  # type: ignore[import-not-found]
 
             # Step 1: Retrieve file metadata
             file_data = await get_file_from_storage(file_id)

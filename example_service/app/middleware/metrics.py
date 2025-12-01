@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from opentelemetry import trace
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -74,7 +74,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             duration = time.time() - start_time
             response.headers["X-Process-Time"] = str(duration)
 
-            return response
+            return response  # type: ignore[no-any-return]
         finally:
             # Calculate duration for metrics (in case of exception before response)
             duration = time.time() - start_time
@@ -125,7 +125,7 @@ def _patch_fastapi_middleware_ordering() -> None:
     except Exception:  # pragma: no cover - FastAPI/middleware imports missing
         return
 
-    if getattr(FastAPI, "_middleware_priority_patched", False):  # type: ignore[attr-defined]
+    if getattr(FastAPI, "_middleware_priority_patched", False):
         return
 
     priority_map = {
@@ -147,25 +147,33 @@ def _patch_fastapi_middleware_ordering() -> None:
         "inner": 1,
     }
 
-    def add_middleware(self, middleware_class, *args, **kwargs):
-        if self.middleware_stack is not None:  # pragma: no cover
+    def add_middleware(
+        self: FastAPI, middleware_class: type[Any], *args: Any, **kwargs: Any
+    ) -> None:
+        if self.middleware_stack is not None:
             raise RuntimeError("Cannot add middleware after an application has started")
 
         validator = getattr(middleware_class, "__validate_middleware__", None)
         if callable(validator):
             validator(*args, **kwargs)
 
-        middleware = Middleware(middleware_class, *args, **kwargs)
+        middleware = Middleware(middleware_class, *args, **kwargs)  # type: ignore[arg-type]
         sequence = getattr(self, "_middleware_sequence", 0) + 1
-        self._middleware_sequence = sequence
-        middleware._sequence = sequence
+        self._middleware_sequence = sequence  # type: ignore[attr-defined]  # Dynamic attribute for ordering
+        middleware._sequence = sequence  # type: ignore[attr-defined]  # Dynamic attribute for ordering
         # Default FastAPI behavior: last added runs first
         self.user_middleware.insert(0, middleware)
 
-        known = [m for m in self.user_middleware if m.cls in priority_map]
-        unknown = [m for m in self.user_middleware if m.cls not in priority_map]
+        known = [m for m in self.user_middleware if getattr(m, "cls", None) in priority_map]
+        unknown = [m for m in self.user_middleware if getattr(m, "cls", None) not in priority_map]
 
-        known.sort(key=lambda m: priority_map[m.cls], reverse=True)
+        def _get_priority(m: Any) -> int:
+            cls = getattr(m, "cls", None)
+            if cls is not None and cls in priority_map:
+                return priority_map[cls]
+            return 0
+
+        known.sort(key=_get_priority, reverse=True)
 
         def _unknown_key(item: Middleware) -> tuple[int, int]:
             name = item.kwargs.get("name")
@@ -183,7 +191,7 @@ def _patch_fastapi_middleware_ordering() -> None:
 
         self.user_middleware[:] = known + unknown
 
-    FastAPI.add_middleware = add_middleware  # type: ignore[assignment]
+    FastAPI.add_middleware = add_middleware  # type: ignore[assignment,method-assign]
     FastAPI._middleware_priority_patched = True  # type: ignore[attr-defined]
 
 

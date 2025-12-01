@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import Select, func, insert, select
 from sqlalchemy import delete as sql_delete
@@ -430,7 +430,7 @@ class BaseRepository[T]:
         stmt = sql_delete(self.model).where(pk_attr.in_(ids_list))
         result = await session.execute(stmt)
         await session.flush()
-        deleted_count: int = result.rowcount  # type: ignore[assignment]
+        deleted_count: int = result.rowcount if hasattr(result, "rowcount") else 0
 
         # WARNING level for bulk deletes > 10 (audit-worthy)
         if deleted_count > 10:
@@ -502,14 +502,19 @@ class BaseRepository[T]:
 
         def instance_to_dict(inst: T) -> dict[str, Any]:
             mapper = sa_inspect(type(inst))
-            return {c.key: getattr(inst, c.key) for c in mapper.column_attrs}
+            if mapper is None:
+                return {}
+            column_attrs = getattr(mapper, "column_attrs", None)
+            if column_attrs is None:
+                return {}
+            return {c.key: getattr(inst, c.key) for c in column_attrs}
 
         values = [instance_to_dict(inst) for inst in instances_list]
 
         # Build upsert statement
         stmt = pg_insert(self.model).values(values)
         update_dict = {col: stmt.excluded[col] for col in update_columns}
-        stmt = stmt.on_conflict_do_update(
+        stmt = stmt.on_conflict_do_update(  # type: ignore[assignment]
             index_elements=conflict_columns,
             set_=update_dict,
         ).returning(self.model)
@@ -559,7 +564,12 @@ class BaseRepository[T]:
 
         def instance_to_dict(inst: T) -> dict[str, Any]:
             mapper = sa_inspect(type(inst))
-            return {c.key: getattr(inst, c.key) for c in mapper.column_attrs}
+            if mapper is None:
+                return {}
+            column_attrs = getattr(mapper, "column_attrs", None)
+            if column_attrs is None:
+                return {}
+            return {c.key: getattr(inst, c.key) for c in column_attrs}
 
         instances_list = list(instances)
         if not instances_list:
@@ -598,7 +608,7 @@ class BaseRepository[T]:
         after: str | None = None,
         last: int | None = None,
         before: str | None = None,
-        order_by: list[tuple[InstrumentedAttribute[Any], str]],
+        order_by: Sequence[tuple[InstrumentedAttribute[Any], str]] | None = None,
         include_total: bool = False,
     ) -> Any:  # Returns Connection[T]
         """Execute cursor-paginated query.
@@ -663,9 +673,10 @@ class BaseRepository[T]:
             direction = "after"
 
         # Convert order_by to proper type hints
-        typed_order_by: list[tuple[InstrumentedAttribute[Any], str]] = [
-            (col, dir_) for col, dir_ in order_by
-        ]
+        if order_by is None:
+            typed_order_by: list[tuple[InstrumentedAttribute[Any], str]] = []
+        else:
+            typed_order_by = [(col, dir_) for col, dir_ in order_by]
 
         # Apply cursor filter
         cursor_filter = CursorFilter(
@@ -698,7 +709,7 @@ class BaseRepository[T]:
             total_count = (await session.execute(count_stmt)).scalar_one()
 
         # Build sort field names for cursor creation
-        sort_fields = [col.key for col, _ in order_by]
+        sort_fields = [col.key for col, _ in typed_order_by]
 
         # Build edges with cursors
         edges: list[Edge[T]] = []
@@ -718,7 +729,7 @@ class BaseRepository[T]:
             total_count=total_count,
         )
 
-        connection = Connection(edges=edges, page_info=page_info)
+        connection: Connection[Any] = Connection(edges=edges, page_info=page_info)
 
         self._lazy.debug(
             lambda: f"db.paginate_cursor: {self.model.__name__}(limit={limit}) -> {len(edges)} items, has_next={has_next}"
@@ -736,15 +747,22 @@ class BaseRepository[T]:
 
         try:
             mapper = sa_inspect(self.model)
-            pk_cols = mapper.primary_key
-            if pk_cols:
+            if mapper is None:
+                raise AttributeError("No mapper found")
+            pk_cols = getattr(mapper, "primary_key", None)
+            if pk_cols and len(pk_cols) > 0:
                 # Return the first primary key column's attribute
-                return getattr(self.model, pk_cols[0].name)
+                return cast("InstrumentedAttribute[Any]", getattr(self.model, pk_cols[0].name))
         except Exception:
             pass
 
         # Fallback to 'id'
-        return self.model.id  # type: ignore[return-value]
+        # Most SQLAlchemy models have an 'id' attribute, but type checker doesn't know this
+        # Using getattr with cast to satisfy type checker
+        attr = getattr(self.model, "id", None)
+        if attr is None:
+            raise AttributeError(f"{self.model.__name__} has no 'id' attribute")
+        return cast("InstrumentedAttribute[Any]", attr)
 
 
 __all__ = [

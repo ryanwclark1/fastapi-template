@@ -14,7 +14,8 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import TYPE_CHECKING, Any
+from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING, Any, cast
 
 from opentelemetry import trace
 from redis.asyncio import ConnectionPool, Redis
@@ -30,7 +31,7 @@ from example_service.infra.metrics.prometheus import (
 from example_service.utils.retry import retry
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Awaitable
 
 logger = logging.getLogger(__name__)
 redis_settings = get_redis_settings()
@@ -92,7 +93,7 @@ class RedisCache:
             self._client = Redis(connection_pool=self._pool)
 
             # Test connection
-            await self._client.ping()
+            await cast("Awaitable[bool]", self._client.ping())
 
             logger.info("Redis connection established successfully")
         except Exception as e:
@@ -104,11 +105,11 @@ class RedisCache:
         logger.info("Disconnecting from Redis")
 
         if self._client:
-            await self._client.aclose()
+            await cast("Any", self._client).aclose()
             self._client = None
 
         if self._pool:
-            await self._pool.aclose()
+            await cast("Any", self._pool).aclose()
             self._pool = None
 
         logger.info("Redis connection closed")
@@ -126,6 +127,10 @@ class RedisCache:
         if self._client is None:
             raise RuntimeError("Redis client not connected. Call connect() first.")
         return self._client
+
+    def get_client(self) -> Redis:
+        """Public accessor for the underlying Redis client."""
+        return self.client
 
     @retry(
         max_attempts=redis_settings.max_retries,
@@ -261,6 +266,39 @@ class RedisCache:
             )
             raise
 
+    async def ttl(self, key: str) -> int:
+        """Get the time-to-live for a key in seconds."""
+        if self._client is None:
+            raise RuntimeError("Redis client not connected. Call connect() first.")
+        ttl_value = await self._client.ttl(key)
+        return int(ttl_value) if ttl_value is not None else -1
+
+    def pipeline(self) -> Any:
+        """Return a Redis pipeline for batch operations."""
+        if self._client is None:
+            raise RuntimeError("Redis client not connected. Call connect() first.")
+        return self._client.pipeline()
+
+    def scan_iter(
+        self, match: str | None = None, count: int | None = None
+    ) -> Any:
+        """Iterate over keys matching a pattern."""
+        if self._client is None:
+            raise RuntimeError("Redis client not connected. Call connect() first.")
+        return self._client.scan_iter(match=match, count=count)
+
+    async def delete_pattern(self, pattern: str) -> int:
+        """Delete all keys matching a pattern."""
+        if self._client is None:
+            raise RuntimeError("Redis client not connected. Call connect() first.")
+
+        keys = [key async for key in self.scan_iter(match=pattern)]
+        if not keys:
+            return 0
+
+        deleted = await self._client.delete(*keys)
+        return int(deleted) if deleted is not None else 0
+
     @retry(
         max_attempts=redis_settings.max_retries,
         initial_delay=redis_settings.retry_delay,
@@ -368,7 +406,7 @@ class RedisCache:
             True if healthy, False otherwise.
         """
         try:
-            await self.client.ping()
+            await cast("Awaitable[bool]", self.client.ping())
             return True
         except Exception as e:
             logger.error("Redis health check failed", extra={"error": str(e)})
@@ -379,6 +417,7 @@ class RedisCache:
 _cache: RedisCache | None = None
 
 
+@asynccontextmanager
 async def get_cache() -> AsyncIterator[RedisCache]:
     """Get the global Redis cache instance.
 

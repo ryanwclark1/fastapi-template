@@ -23,15 +23,15 @@ Example:bash
 
 import json
 import sys
+from typing import Any
 
 import click
 from sqlalchemy import text
 
 from example_service.cli.utils import coro, error, header, info, section, success, warning
-from example_service.core.settings import get_app_settings
 
 
-def get_alembic_commands():
+def get_alembic_commands() -> Any:
     """Get AlembicCommands instance with lazy import.
 
     Lazy import avoids circular dependencies and ensures proper
@@ -62,12 +62,12 @@ async def init() -> None:
     info("Initializing database connection...")
 
     try:
+        from example_service.core.settings import get_db_settings
         from example_service.infra.database import get_async_session
 
-        settings = get_app_settings()
-        db_settings = settings.database
+        db_settings = get_db_settings()
 
-        info(f"Connecting to: {db_settings.db_host}:{db_settings.db_port}/{db_settings.db_name}")
+        info(f"Connecting to: {db_settings.host}:{db_settings.port}/{db_settings.name}")
 
         async with get_async_session() as session:
             result = await session.execute(text("SELECT version()"))
@@ -109,28 +109,29 @@ async def info_cmd(output_format: str) -> None:
     header("Database Information")
 
     try:
-        settings = get_app_settings()
-        db_settings = settings.database
+        from example_service.core.settings import get_db_settings
+
+        db_settings = get_db_settings()
 
         if output_format == "json":
             info_dict = {
-                "host": db_settings.db_host,
-                "port": db_settings.db_port,
-                "database": db_settings.db_name,
-                "user": db_settings.db_user,
-                "pool_size": db_settings.db_pool_size,
-                "max_overflow": db_settings.db_max_overflow,
+                "host": db_settings.host,
+                "port": db_settings.port,
+                "database": db_settings.name,
+                "user": db_settings.user,
+                "pool_size": db_settings.pool_size,
+                "max_overflow": db_settings.max_overflow,
             }
             click.echo(json.dumps(info_dict, indent=2))
             return
 
         section("Connection Settings")
-        click.echo(f"  Host:         {db_settings.db_host}")
-        click.echo(f"  Port:         {db_settings.db_port}")
-        click.echo(f"  Database:     {db_settings.db_name}")
-        click.echo(f"  User:         {db_settings.db_user}")
-        click.echo(f"  Pool Size:    {db_settings.db_pool_size}")
-        click.echo(f"  Max Overflow: {db_settings.db_max_overflow}")
+        click.echo(f"  Host:         {db_settings.host}")
+        click.echo(f"  Port:         {db_settings.port}")
+        click.echo(f"  Database:     {db_settings.name}")
+        click.echo(f"  User:         {db_settings.user}")
+        click.echo(f"  Pool Size:    {db_settings.pool_size}")
+        click.echo(f"  Max Overflow: {db_settings.max_overflow}")
 
         # Try to connect and get version
         async with get_async_session() as session:
@@ -687,25 +688,26 @@ async def shell() -> None:
     info("Opening database shell...")
 
     try:
-        settings = get_app_settings()
-        db_settings = settings.database
+        from example_service.core.settings import get_db_settings
+
+        db_settings = get_db_settings()
 
         # Build psql connection string
         psql_cmd = [
             "psql",
             "-h",
-            db_settings.db_host,
+            db_settings.host,
             "-p",
-            str(db_settings.db_port),
+            str(db_settings.port),
             "-U",
-            db_settings.db_user,
+            db_settings.user,
             "-d",
-            db_settings.db_name,
+            db_settings.name,
         ]
 
         # Set password environment variable
         env = os.environ.copy()
-        env["PGPASSWORD"] = db_settings.db_password.get_secret_value()
+        env["PGPASSWORD"] = db_settings.password.get_secret_value()
 
         # Run psql interactively
         subprocess.run(psql_cmd, env=env)

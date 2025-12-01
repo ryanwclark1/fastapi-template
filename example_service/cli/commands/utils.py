@@ -7,7 +7,6 @@ import click
 import httpx
 
 from example_service.cli.utils import coro, error, info, section, success, warning
-from example_service.core.settings import get_app_settings
 from example_service.core.settings.unified import get_settings
 
 
@@ -21,8 +20,8 @@ def shell() -> None:
         import asyncio
 
         from example_service.app.main import app
-        from example_service.infra.cache import get_redis
-        from example_service.infra.database import get_session
+        from example_service.infra.cache import get_cache
+        from example_service.infra.database import get_async_session
 
         # Setup banner
         banner = """
@@ -33,17 +32,20 @@ def shell() -> None:
 Available imports:
   • app            - FastAPI application instance
   • get_settings   - Settings loader
-  • get_session    - Database session context manager
-  • get_redis      - Redis client getter
+  • get_async_session - Database session context manager
+  • get_cache      - Redis cache context manager
   • asyncio        - Async runtime
 
 Example usage:
   settings = get_app_settings()
-  print(settings.app.service_name)
+  print(settings.service_name)
 
-  async with get_session() as session:
+  async with get_async_session() as session:
       result = await session.execute(text("SELECT 1"))
       print(result.scalar())
+
+  async with get_cache() as cache:
+      await cache.set("key", "value")
 
 Use 'exit()' or Ctrl+D to exit the shell.
 """
@@ -57,8 +59,8 @@ Use 'exit()' or Ctrl+D to exit the shell.
                 user_ns={
                     "app": app,
                     "get_settings": get_settings,
-                    "get_session": get_session,
-                    "get_redis": get_redis,
+                    "get_session": get_async_session,
+                    "get_cache": get_cache,
                     "asyncio": asyncio,
                 },
             )
@@ -71,8 +73,8 @@ Use 'exit()' or Ctrl+D to exit the shell.
                 local={
                     "app": app,
                     "get_settings": get_settings,
-                    "get_session": get_session,
-                    "get_redis": get_redis,
+                    "get_session": get_async_session,
+                    "get_cache": get_cache,
                     "asyncio": asyncio,
                 }
             )
@@ -95,9 +97,9 @@ async def health_check() -> None:
     try:
         from sqlalchemy import text
 
-        from example_service.infra.database import get_session
+        from example_service.infra.database import get_async_session
 
-        async with get_session() as session:
+        async with get_async_session() as session:
             result = await session.execute(text("SELECT version()"))
             version = result.scalar_one()
             success("  ✓ Database connection successful")
@@ -109,18 +111,17 @@ async def health_check() -> None:
     # Check Redis cache
     click.echo("\n🔄 Cache (Redis):")
     try:
-        from example_service.infra.cache import get_redis
+        from example_service.infra.cache import get_cache
 
-        redis = await get_redis()
-        pong = await redis.ping()
-        if pong:
-            success("  ✓ Redis connection successful")
+        async with get_cache() as cache:
+            redis_client = cache.client
+            pong: bool = await redis_client.ping()
+            if pong:
+                success("  ✓ Redis connection successful")
 
-            # Get basic info
-            info_dict = await redis.info("server")
-            info(f"  Version: {info_dict.get('redis_version')}")
-
-        await redis.aclose()
+                # Get basic info
+                info_dict = await redis_client.info("server")
+                info(f"  Version: {info_dict.get('redis_version')}")
     except Exception as e:
         error(f"  ✗ Redis check failed: {e}")
         all_healthy = False
@@ -128,8 +129,6 @@ async def health_check() -> None:
     # Check RabbitMQ (if accessible)
     click.echo("\n📨 Message Broker (RabbitMQ):")
     try:
-        settings = get_app_settings()
-
         # Try to connect using httpx to management API (if available)
         # This is a basic check - in production you'd use pika or similar
         info("  RabbitMQ URL configured")
@@ -142,7 +141,9 @@ async def health_check() -> None:
     # Check API endpoints
     click.echo("\n🌐 API Endpoints:")
     try:
-        settings = get_app_settings()
+        from example_service.core.settings.unified import Settings, get_settings
+
+        settings: Settings = get_settings()
         base_url = f"http://{settings.app.host}:{settings.app.port}"
 
         async with httpx.AsyncClient() as client:
@@ -169,10 +170,12 @@ async def health_check() -> None:
     # Configuration validation
     click.echo("\n⚙️  Configuration:")
     try:
-        settings = get_app_settings()
+        from example_service.core.settings.unified import Settings, get_settings
+
+        config_settings: Settings = get_settings()
         success("  ✓ Settings loaded successfully")
-        info(f"  Environment: {settings.app.environment}")
-        info(f"  Service: {settings.app.service_name}")
+        info(f"  Environment: {config_settings.app.environment}")
+        info(f"  Service: {config_settings.app.service_name}")
     except Exception as e:
         error(f"  ✗ Configuration check failed: {e}")
         all_healthy = False

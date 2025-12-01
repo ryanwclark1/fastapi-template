@@ -30,6 +30,7 @@ from sqlalchemy import MetaData, inspect, text
 from sqlalchemy.schema import DropTable
 
 if TYPE_CHECKING:
+    from sqlalchemy.engine import Connection
     from sqlalchemy.ext.asyncio import AsyncEngine
 
 logger = logging.getLogger(__name__)
@@ -172,7 +173,7 @@ async def dump_schema(
         schema = await dump_schema(engine, include_row_counts=True)
     """
 
-    def _inspect(conn) -> dict[str, Any]:
+    def _inspect(conn: Connection) -> dict[str, Any]:
         inspector = inspect(conn)
         result: dict[str, Any] = {"tables": {}, "dialect": conn.dialect.name}
 
@@ -373,7 +374,7 @@ async def compare_schema(
     """
     differences: list[SchemaDifference] = []
 
-    def _compare(conn) -> list[SchemaDifference]:
+    def _compare(conn: Connection) -> list[SchemaDifference]:
         inspector = inspect(conn)
         diffs: list[SchemaDifference] = []
 

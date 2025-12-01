@@ -34,8 +34,8 @@ from example_service.infra.results.exceptions import (
 if TYPE_CHECKING:
     from redis.asyncio.connection import Connection
 
-    type _Redis = Redis[bytes]  # type: ignore
-    type _BlockingConnectionPool = BlockingConnectionPool[Connection]  # type: ignore
+    type _Redis = Redis[bytes]
+    type _BlockingConnectionPool = BlockingConnectionPool[Connection]
 else:
     type _Redis = Redis
     type _BlockingConnectionPool = BlockingConnectionPool
@@ -149,17 +149,13 @@ class RedisAsyncResultBackend(AsyncResultBackend[_ReturnType]):
             task_id: ID of the task.
             result: TaskiqResult instance containing the task's outcome.
         """
-        redis_set_params: dict[str, str | int | bytes] = {
-            "name": self._task_name(task_id),
-            "value": self.serializer.dumpb(model_dump(result)),
-        }
-        if self.result_ex_time:
-            redis_set_params["ex"] = self.result_ex_time
-        elif self.result_px_time:
-            redis_set_params["px"] = self.result_px_time
+        key = self._task_name(task_id)
+        value = self.serializer.dumpb(model_dump(result))
+        ex = self.result_ex_time if self.result_ex_time else None
+        px = self.result_px_time if self.result_px_time else None
 
         async with Redis(connection_pool=self.redis_pool) as redis:
-            await redis.set(**redis_set_params)
+            await redis.set(key, value, ex=ex, px=px)
 
     async def is_result_ready(self, task_id: str) -> bool:
         """Checks if a task result is available in Redis.
@@ -228,17 +224,13 @@ class RedisAsyncResultBackend(AsyncResultBackend[_ReturnType]):
             task_id: ID of the task.
             progress: TaskProgress instance with current task progress.
         """
-        redis_set_params: dict[str, str | int | bytes] = {
-            "name": self._task_name(task_id) + PROGRESS_KEY_SUFFIX,
-            "value": self.serializer.dumpb(model_dump(progress)),
-        }
-        if self.result_ex_time:
-            redis_set_params["ex"] = self.result_ex_time
-        elif self.result_px_time:
-            redis_set_params["px"] = self.result_px_time
+        key = self._task_name(task_id) + PROGRESS_KEY_SUFFIX
+        value = self.serializer.dumpb(model_dump(progress))
+        ex = self.result_ex_time if self.result_ex_time else None
+        px = self.result_px_time if self.result_px_time else None
 
         async with Redis(connection_pool=self.redis_pool) as redis:
-            await redis.set(**redis_set_params)
+            await redis.set(key, value, ex=ex, px=px)
 
     async def get_progress(
         self,
@@ -304,7 +296,7 @@ class RedisAsyncClusterResultBackend(AsyncResultBackend[_ReturnType]):
             DuplicateExpireTimeSelectedError: If both expiration times are set.
             ExpireTimeMustBeMoreThanZeroError: If expiration time is <= 0.
         """
-        self.redis: RedisCluster = RedisCluster.from_url(
+        self.redis: Any = RedisCluster.from_url(
             redis_url,
             **connection_kwargs,
         )
@@ -334,7 +326,7 @@ class RedisAsyncClusterResultBackend(AsyncResultBackend[_ReturnType]):
 
     async def shutdown(self) -> None:
         """Closes Redis cluster connection."""
-        await self.redis.aclose()
+        await self.redis.close()
         await super().shutdown()
 
     async def set_result(
@@ -343,16 +335,11 @@ class RedisAsyncClusterResultBackend(AsyncResultBackend[_ReturnType]):
         result: TaskiqResult[_ReturnType],
     ) -> None:
         """Sets task result in Redis cluster."""
-        redis_set_params: dict[str, str | bytes | int] = {
-            "name": self._task_name(task_id),
-            "value": self.serializer.dumpb(model_dump(result)),
-        }
-        if self.result_ex_time:
-            redis_set_params["ex"] = self.result_ex_time
-        elif self.result_px_time:
-            redis_set_params["px"] = self.result_px_time
-
-        await self.redis.set(**redis_set_params)  # type: ignore
+        key = self._task_name(task_id)
+        value = self.serializer.dumpb(model_dump(result))
+        ex = self.result_ex_time if self.result_ex_time else None
+        px = self.result_px_time if self.result_px_time else None
+        await self.redis.set(key, value, ex=ex, px=px)
 
     async def is_result_ready(self, task_id: str) -> bool:
         """Checks if result is available in Redis cluster."""
@@ -367,11 +354,11 @@ class RedisAsyncClusterResultBackend(AsyncResultBackend[_ReturnType]):
         task_name = self._task_name(task_id)
         if self.keep_results:
             result_value = await self.redis.get(
-                name=task_name,
+                task_name,
             )
         else:
             result_value = await self.redis.getdel(
-                name=task_name,
+                task_name,
             )
 
         if result_value is None:
@@ -393,16 +380,11 @@ class RedisAsyncClusterResultBackend(AsyncResultBackend[_ReturnType]):
         progress: TaskProgress[_ReturnType],
     ) -> None:
         """Sets task progress in Redis cluster."""
-        redis_set_params: dict[str, str | int | bytes] = {
-            "name": self._task_name(task_id) + PROGRESS_KEY_SUFFIX,
-            "value": self.serializer.dumpb(model_dump(progress)),
-        }
-        if self.result_ex_time:
-            redis_set_params["ex"] = self.result_ex_time
-        elif self.result_px_time:
-            redis_set_params["px"] = self.result_px_time
-
-        await self.redis.set(**redis_set_params)  # type: ignore
+        key = self._task_name(task_id) + PROGRESS_KEY_SUFFIX
+        value = self.serializer.dumpb(model_dump(progress))
+        ex = self.result_ex_time if self.result_ex_time else None
+        px = self.result_px_time if self.result_px_time else None
+        await self.redis.set(key, value, ex=ex, px=px)
 
     async def get_progress(
         self,
@@ -410,7 +392,7 @@ class RedisAsyncClusterResultBackend(AsyncResultBackend[_ReturnType]):
     ) -> TaskProgress[_ReturnType] | None:
         """Retrieves task progress from Redis cluster."""
         result_value = await self.redis.get(
-            name=self._task_name(task_id) + PROGRESS_KEY_SUFFIX,
+            self._task_name(task_id) + PROGRESS_KEY_SUFFIX,
         )
 
         if result_value is None:
@@ -510,17 +492,13 @@ class RedisAsyncSentinelResultBackend(AsyncResultBackend[_ReturnType]):
         result: TaskiqResult[_ReturnType],
     ) -> None:
         """Sets task result in Redis via Sentinel."""
-        redis_set_params: dict[str, str | bytes | int] = {
-            "name": self._task_name(task_id),
-            "value": self.serializer.dumpb(model_dump(result)),
-        }
-        if self.result_ex_time:
-            redis_set_params["ex"] = self.result_ex_time
-        elif self.result_px_time:
-            redis_set_params["px"] = self.result_px_time
+        key = self._task_name(task_id)
+        value = self.serializer.dumpb(model_dump(result))
+        ex = self.result_ex_time if self.result_ex_time else None
+        px = self.result_px_time if self.result_px_time else None
 
         async with self._acquire_master_conn() as redis:
-            await redis.set(**redis_set_params)  # type: ignore
+            await redis.set(key, value, ex=ex, px=px)
 
     async def is_result_ready(self, task_id: str) -> bool:
         """Checks if result is available in Redis via Sentinel."""
@@ -563,17 +541,13 @@ class RedisAsyncSentinelResultBackend(AsyncResultBackend[_ReturnType]):
         progress: TaskProgress[_ReturnType],
     ) -> None:
         """Sets task progress in Redis via Sentinel."""
-        redis_set_params: dict[str, str | int | bytes] = {
-            "name": self._task_name(task_id) + PROGRESS_KEY_SUFFIX,
-            "value": self.serializer.dumpb(model_dump(progress)),
-        }
-        if self.result_ex_time:
-            redis_set_params["ex"] = self.result_ex_time
-        elif self.result_px_time:
-            redis_set_params["px"] = self.result_px_time
+        key = self._task_name(task_id) + PROGRESS_KEY_SUFFIX
+        value = self.serializer.dumpb(model_dump(progress))
+        ex = self.result_ex_time if self.result_ex_time else None
+        px = self.result_px_time if self.result_px_time else None
 
         async with self._acquire_master_conn() as redis:
-            await redis.set(**redis_set_params)  # type: ignore
+            await redis.set(key, value, ex=ex, px=px)
 
     async def get_progress(
         self,
@@ -596,5 +570,5 @@ class RedisAsyncSentinelResultBackend(AsyncResultBackend[_ReturnType]):
     async def shutdown(self) -> None:
         """Shutdown sentinel connections."""
         for sentinel in self.sentinel.sentinels:
-            await sentinel.aclose()
+            await sentinel.close()
         await super().shutdown()

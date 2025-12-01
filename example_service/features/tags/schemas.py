@@ -77,7 +77,7 @@ class TagWithCountResponse(TagResponse):
 class TagListResponse(BaseModel):
     """Response containing a list of tags."""
 
-    tags: list[TagResponse]
+    tags: list[TagWithCountResponse]
     total: int
 
 

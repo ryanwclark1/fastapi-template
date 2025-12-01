@@ -28,7 +28,7 @@ def _generate_uuid7() -> str:
     making it ideal for event IDs where chronological order matters.
     """
     try:
-        from uuid_utils import uuid7
+        from uuid_utils import uuid7  # type: ignore[import-not-found]
 
         return str(uuid7())
     except ImportError:

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import func, select
 
@@ -43,87 +44,89 @@ if broker is not None:
             print(result)
             # {'status': 'success', 'keys_warmed': ['app:settings', 'stats:active_reminders']}
         """
-        cache = get_cache()
-        if cache is None:
-            logger.warning("Redis cache not available, skipping cache warming")
-            return {"status": "skipped", "reason": "cache_not_available"}
+        async with get_cache() as cache:
+            if cache is None:
+                logger.warning("Redis cache not available, skipping cache warming")
+                return {"status": "skipped", "reason": "cache_not_available"}
 
-        warmed_keys = []
-        errors = []
+            warmed_keys = []
+            errors = []
 
-        # Cache application info
-        try:
-            app_settings = get_app_settings()
-            app_info = {
-                "service_name": app_settings.service_name,
-                "environment": app_settings.environment,
-                "version": app_settings.version,
-                "warmed_at": datetime.now(UTC).isoformat(),
-            }
-            await cache.set("app:info", app_info, ttl=3600)
-            warmed_keys.append("app:info")
-        except Exception as e:
-            logger.warning(f"Failed to cache app info: {e}")
-            errors.append({"key": "app:info", "error": str(e)})
+            # Cache application info
+            try:
+                app_settings = get_app_settings()
+                app_info = {
+                    "service_name": app_settings.service_name,
+                    "environment": app_settings.environment,
+                    "version": app_settings.version,
+                    "warmed_at": datetime.now(UTC).isoformat(),
+                }
+                await cache.set("app:info", app_info, ttl=3600)
+                warmed_keys.append("app:info")
+            except Exception as e:
+                logger.warning(f"Failed to cache app info: {e}")
+                errors.append({"key": "app:info", "error": str(e)})
 
-        # Cache database statistics
-        try:
-            from example_service.features.reminders.models import Reminder
+            # Cache database statistics
+            try:
+                from example_service.features.reminders.models import Reminder
 
-            async with get_async_session() as session:
-                # Count active (incomplete) reminders
-                stmt = (
-                    select(func.count()).select_from(Reminder).where(Reminder.is_completed == False)  # noqa: E712
-                )
-                result = await session.execute(stmt)
-                active_count = result.scalar() or 0
-
-                # Count total reminders
-                total_stmt = select(func.count()).select_from(Reminder)
-                total_result = await session.execute(total_stmt)
-                total_count = total_result.scalar() or 0
-
-                # Count due reminders
-                now = datetime.now(UTC)
-                due_stmt = (
-                    select(func.count())
-                    .select_from(Reminder)
-                    .where(
-                        Reminder.remind_at <= now,
-                        Reminder.is_completed == False,  # noqa: E712
+                async with get_async_session() as session:
+                    # Count active (incomplete) reminders
+                    stmt = (
+                        select(func.count())
+                        .select_from(Reminder)
+                        .where(Reminder.is_completed == False)  # noqa: E712
                     )
-                )
-                due_result = await session.execute(due_stmt)
-                due_count = due_result.scalar() or 0
+                    query_result = await session.execute(stmt)
+                    active_count = query_result.scalar() or 0
 
-            stats = {
-                "active_reminders": active_count,
-                "total_reminders": total_count,
-                "due_reminders": due_count,
-                "updated_at": datetime.now(UTC).isoformat(),
+                    # Count total reminders
+                    total_stmt = select(func.count()).select_from(Reminder)
+                    total_result = await session.execute(total_stmt)
+                    total_count = total_result.scalar() or 0
+
+                    # Count due reminders
+                    now = datetime.now(UTC)
+                    due_stmt = (
+                        select(func.count())
+                        .select_from(Reminder)
+                        .where(
+                            Reminder.remind_at <= now,
+                            Reminder.is_completed == False,  # noqa: E712
+                        )
+                    )
+                    due_result = await session.execute(due_stmt)
+                    due_count = due_result.scalar() or 0
+
+                stats = {
+                    "active_reminders": active_count,
+                    "total_reminders": total_count,
+                    "due_reminders": due_count,
+                    "updated_at": datetime.now(UTC).isoformat(),
+                }
+                await cache.set("stats:reminders", stats, ttl=300)  # 5 min TTL
+                warmed_keys.append("stats:reminders")
+
+            except Exception as e:
+                logger.warning(f"Failed to cache reminder stats: {e}")
+                errors.append({"key": "stats:reminders", "error": str(e)})
+
+            result: dict[str, Any] = {
+                "status": "success" if not errors else "partial",
+                "keys_warmed": warmed_keys,
+                "timestamp": datetime.now(UTC).isoformat(),
             }
-            await cache.set("stats:reminders", stats, ttl=300)  # 5 min TTL
-            warmed_keys.append("stats:reminders")
 
-        except Exception as e:
-            logger.warning(f"Failed to cache reminder stats: {e}")
-            errors.append({"key": "stats:reminders", "error": str(e)})
+            if errors:
+                result["errors"] = errors
 
-        result = {
-            "status": "success" if not errors else "partial",
-            "keys_warmed": warmed_keys,
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
+            logger.info(
+                "Cache warming completed",
+                extra=result,
+            )
 
-        if errors:
-            result["errors"] = errors
-
-        logger.info(
-            "Cache warming completed",
-            extra=result,
-        )
-
-        return result
+            return result
 
     @broker.task()
     async def invalidate_cache_pattern(pattern: str) -> dict:
@@ -145,35 +148,35 @@ if broker is not None:
             print(result)
             # {'pattern': 'stats:*', 'deleted_count': 3}
         """
-        cache = get_cache()
-        if cache is None:
-            logger.warning("Redis cache not available, skipping invalidation")
-            return {"status": "skipped", "reason": "cache_not_available", "pattern": pattern}
+        async with get_cache() as cache:
+            if cache is None:
+                logger.warning("Redis cache not available, skipping invalidation")
+                return {"status": "skipped", "reason": "cache_not_available", "pattern": pattern}
 
-        try:
-            # Use SCAN to find matching keys (safe for production)
-            deleted_count = await cache.delete_pattern(pattern)
+            try:
+                # Use SCAN to find matching keys (safe for production)
+                deleted_count = await cache.delete_pattern(pattern)
 
-            logger.info(
-                "Cache invalidation completed",
-                extra={"pattern": pattern, "deleted_count": deleted_count},
-            )
+                logger.info(
+                    "Cache invalidation completed",
+                    extra={"pattern": pattern, "deleted_count": deleted_count},
+                )
 
-            return {
-                "status": "success",
-                "pattern": pattern,
-                "deleted_count": deleted_count,
-            }
-        except Exception as e:
-            logger.exception(
-                "Cache invalidation failed",
-                extra={"pattern": pattern, "error": str(e)},
-            )
-            return {
-                "status": "error",
-                "pattern": pattern,
-                "error": str(e),
-            }
+                return {
+                    "status": "success",
+                    "pattern": pattern,
+                    "deleted_count": deleted_count,
+                }
+            except Exception as e:
+                logger.exception(
+                    "Cache invalidation failed",
+                    extra={"pattern": pattern, "error": str(e)},
+                )
+                return {
+                    "status": "error",
+                    "pattern": pattern,
+                    "error": str(e),
+                }
 
     @broker.task()
     async def get_cached_stats() -> dict:
@@ -182,15 +185,15 @@ if broker is not None:
         Returns:
             Dictionary with reminder statistics.
         """
-        cache = get_cache()
-        if cache is None:
-            return {"status": "cache_unavailable"}
+        async with get_cache() as cache:
+            if cache is None:
+                return {"status": "cache_unavailable"}
 
-        # Try to get from cache first
-        cached = await cache.get("stats:reminders")
-        if cached:
-            return {"status": "cached", "data": cached}
+            # Try to get from cache first
+            cached = await cache.get("stats:reminders")
+            if cached:
+                return {"status": "cached", "data": cached}
 
-        # If not cached, trigger warming and return empty
-        await warm_cache.kiq()
-        return {"status": "warming_triggered", "data": None}
+            # If not cached, trigger warming and return empty
+            await warm_cache.kiq()
+            return {"status": "warming_triggered", "data": None}

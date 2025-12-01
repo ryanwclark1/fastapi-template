@@ -38,7 +38,7 @@ import inspect
 import json
 import logging
 from functools import wraps
-from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
 
 from example_service.infra.cache.redis import get_cache
 
@@ -190,7 +190,7 @@ def cached[R, **P](
                         f"Cache hit for {func_name}",
                         extra={"function": func_name, "key": full_key},
                     )
-                    return cached_value  # type: ignore[return-value]
+                    return cast("R", cached_value)
 
                 logger.debug(
                     f"Cache miss for {func_name}",

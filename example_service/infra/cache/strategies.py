@@ -125,20 +125,20 @@ class CacheManager:
         Returns:
             Cached value or None if not found
         """
-        cache = get_cache()
-        cache_key = self._make_key(self._hash_key(key))
+        async with get_cache() as cache:
+            cache_key = self._make_key(self._hash_key(key))
 
-        try:
-            cached = await cache.get(cache_key)
-            if cached:
-                tracking.track_token_cache(True)  # Reusing cache hit metric
-                return self.config.deserialize(cached)
-            else:
-                tracking.track_token_cache(False)
+            try:
+                cached = await cache.get(cache_key)
+                if cached:
+                    tracking.track_token_cache(True)  # Reusing cache hit metric
+                    return self.config.deserialize(cached)
+                else:
+                    tracking.track_token_cache(False)
+                    return None
+            except Exception as e:
+                logger.error(f"Cache get failed for key {key}: {e}", exc_info=True)
                 return None
-        except Exception as e:
-            logger.error(f"Cache get failed for key {key}: {e}", exc_info=True)
-            return None
 
     async def set(self, key: str, value: Any, ttl: int | None = None) -> bool:
         """Set value in cache.
@@ -151,17 +151,17 @@ class CacheManager:
         Returns:
             True if successful
         """
-        cache = get_cache()
-        cache_key = self._make_key(self._hash_key(key))
-        ttl = ttl or self.config.ttl
+        async with get_cache() as cache:
+            cache_key = self._make_key(self._hash_key(key))
+            ttl = ttl or self.config.ttl
 
-        try:
-            serialized = self.config.serialize(value)
-            await cache.set(cache_key, serialized, ex=ttl)
-            return True
-        except Exception as e:
-            logger.error(f"Cache set failed for key {key}: {e}", exc_info=True)
-            return False
+            try:
+                serialized = self.config.serialize(value)
+                await cache.set(cache_key, serialized, ttl=ttl)
+                return True
+            except Exception as e:
+                logger.error(f"Cache set failed for key {key}: {e}", exc_info=True)
+                return False
 
     async def delete(self, key: str) -> bool:
         """Delete value from cache.
@@ -172,15 +172,15 @@ class CacheManager:
         Returns:
             True if successful
         """
-        cache = get_cache()
-        cache_key = self._make_key(self._hash_key(key))
+        async with get_cache() as cache:
+            cache_key = self._make_key(self._hash_key(key))
 
-        try:
-            await cache.delete(cache_key)
-            return True
-        except Exception as e:
-            logger.error(f"Cache delete failed for key {key}: {e}", exc_info=True)
-            return False
+            try:
+                await cache.delete(cache_key)
+                return True
+            except Exception as e:
+                logger.error(f"Cache delete failed for key {key}: {e}", exc_info=True)
+                return False
 
     # ============================================================================
     # Cache-Aside Pattern (Read-Through)
@@ -387,32 +387,35 @@ class CacheManager:
                 ttl=3600
             )
         """
-        cache = get_cache()
-        cache_key = self._make_key(self._hash_key(key))
-        ttl = ttl or self.config.ttl
+        async with get_cache() as cache:
+            cache_key = self._make_key(self._hash_key(key))
+            ttl = ttl or self.config.ttl
 
-        try:
-            # Get value and TTL
-            cached = await cache.get(cache_key)
+            try:
+                # Get value and TTL
+                remaining_ttl = -1
+                cached = await cache.get(cache_key)
 
-            if cached:
-                # Check remaining TTL
-                remaining_ttl = await cache.ttl(cache_key)
+                if cached:
+                    # Check remaining TTL
+                    remaining_ttl = await cache.ttl(cache_key)
 
-                # Refresh if below threshold
-                if remaining_ttl > 0 and remaining_ttl < (ttl * self.config.refresh_threshold):
-                    # Trigger async refresh
-                    asyncio.create_task(self._refresh_cache(key, fetch_func, ttl))
+                    # Refresh if below threshold
+                    if 0 < remaining_ttl < (ttl * self.config.refresh_threshold):
+                        # Trigger async refresh
+                        asyncio.create_task(self._refresh_cache(key, fetch_func, ttl))
 
-                return self.config.deserialize(cached)
-            else:
-                # Cache miss - fetch and store
+                        return self.config.deserialize(cached)
+
+                # Cache miss or no refresh needed - fetch and store
                 return await self.get_or_fetch(key, fetch_func, ttl)
 
-        except Exception as e:
-            logger.error(f"Refresh-ahead get failed for key {key}: {e}", exc_info=True)
-            # Fall back to fetch
-            return await fetch_func() if asyncio.iscoroutinefunction(fetch_func) else fetch_func()
+            except Exception as e:
+                logger.error(f"Refresh-ahead get failed for key {key}: {e}", exc_info=True)
+                # Fall back to fetch
+                return (
+                    await fetch_func() if asyncio.iscoroutinefunction(fetch_func) else fetch_func()
+                )
 
     async def _refresh_cache(self, key: str, fetch_func: Callable[[], Any], ttl: int) -> None:
         """Refresh cache in background.
@@ -446,27 +449,27 @@ class CacheManager:
         Example:
                     users = await cache.get_many(["user:1", "user:2", "user:3"])
         """
-        cache = get_cache()
-        cache_keys = [self._make_key(self._hash_key(k)) for k in keys]
+        async with get_cache() as cache:
+            cache_keys = [self._make_key(self._hash_key(k)) for k in keys]
 
-        try:
-            # Use pipeline for efficiency
-            pipe = cache.pipeline()
-            for cache_key in cache_keys:
-                pipe.get(cache_key)
+            try:
+                # Use pipeline for efficiency
+                pipe = cache.pipeline()
+                for cache_key in cache_keys:
+                    pipe.get(cache_key)
 
-            results = await pipe.execute()
+                results = await pipe.execute()
 
-            # Build result dictionary
-            output = {}
-            for key, result in zip(keys, results, strict=False):
-                if result:
-                    output[key] = self.config.deserialize(result)
+                # Build result dictionary
+                output = {}
+                for key, result in zip(keys, results, strict=False):
+                    if result:
+                        output[key] = self.config.deserialize(result)
 
-            return output
-        except Exception as e:
-            logger.error(f"Batch get failed: {e}", exc_info=True)
-            return {}
+                return output
+            except Exception as e:
+                logger.error(f"Batch get failed: {e}", exc_info=True)
+                return {}
 
     async def set_many(self, items: dict[str, Any], ttl: int | None = None) -> bool:
         """Set multiple values in cache.
@@ -485,22 +488,22 @@ class CacheManager:
                 "user:3": user3
             }, ttl=300)
         """
-        cache = get_cache()
-        ttl = ttl or self.config.ttl
+        async with get_cache() as cache:
+            ttl = ttl or self.config.ttl
 
-        try:
-            # Use pipeline for efficiency
-            pipe = cache.pipeline()
-            for key, value in items.items():
-                cache_key = self._make_key(self._hash_key(key))
-                serialized = self.config.serialize(value)
-                pipe.set(cache_key, serialized, ex=ttl)
+            try:
+                # Use pipeline for efficiency
+                pipe = cache.pipeline()
+                for key, value in items.items():
+                    cache_key = self._make_key(self._hash_key(key))
+                    serialized = self.config.serialize(value)
+                    pipe.set(cache_key, serialized, ex=ttl)
 
-            await pipe.execute()
-            return True
-        except Exception as e:
-            logger.error(f"Batch set failed: {e}", exc_info=True)
-            return False
+                await pipe.execute()
+                return True
+            except Exception as e:
+                logger.error(f"Batch set failed: {e}", exc_info=True)
+                return False
 
     # ============================================================================
     # Cache Invalidation
@@ -519,23 +522,23 @@ class CacheManager:
                     # Invalidate all user caches
             deleted = await cache.invalidate_pattern("user:*")
         """
-        cache = get_cache()
-        full_pattern = self._make_key(pattern)
+        async with get_cache() as cache:
+            full_pattern = self._make_key(pattern)
 
-        try:
-            # Find matching keys
-            keys = []
-            async for key in cache.scan_iter(match=full_pattern):
-                keys.append(key)
+            try:
+                # Find matching keys
+                keys = []
+                async for key in cache.scan_iter(match=full_pattern):
+                    keys.append(key)
 
-            if keys:
-                await cache.delete(*keys)
-                logger.info(f"Invalidated {len(keys)} keys matching pattern: {pattern}")
+                if keys:
+                    await cache.delete(*keys)
+                    logger.info(f"Invalidated {len(keys)} keys matching pattern: {pattern}")
 
-            return len(keys)
-        except Exception as e:
-            logger.error(f"Pattern invalidation failed for {pattern}: {e}", exc_info=True)
-            return 0
+                return len(keys)
+            except Exception as e:
+                logger.error(f"Pattern invalidation failed for {pattern}: {e}", exc_info=True)
+                return 0
 
 
 # ============================================================================

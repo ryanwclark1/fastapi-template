@@ -9,6 +9,7 @@ This module provides CLI commands for monitoring:
 
 import sys
 from datetime import UTC, datetime
+from typing import Any, cast
 
 import click
 
@@ -26,14 +27,14 @@ async def application_status() -> None:
     """Show overall application status and health."""
     header("Application Status")
 
-    from example_service.core.settings import get_app_settings
+    from example_service.core.settings import get_settings
 
-    settings = get_app_settings()
+    settings = get_settings()
 
     click.echo()
     section("Application Info")
-    click.echo(f"  Service:     {settings.app.app_name}")
-    click.echo(f"  Version:     {settings.app.app_version}")
+    click.echo(f"  Service:     {settings.app.service_name}")
+    click.echo(f"  Version:     {settings.app.version}")
     click.echo(f"  Environment: {settings.app.environment}")
     click.echo(f"  Debug:       {settings.app.debug}")
 
@@ -105,9 +106,9 @@ async def _check_database() -> dict:
     try:
         from sqlalchemy import text
 
-        from example_service.infra.database import get_session
+        from example_service.infra.database import get_async_session
 
-        async with get_session() as session:
+        async with get_async_session() as session:
             result = await session.execute(text("SELECT 1"))
             result.scalar_one()
 
@@ -134,7 +135,7 @@ async def _check_redis() -> dict:
 
         client = redis.from_url(redis_settings.get_url())
         info_data = await client.info("server")
-        await client.aclose()
+        await cast("Any", client).aclose()
 
         version = info_data.get("redis_version", "Unknown")
         return {"healthy": True, "configured": True, "info": f"v{version}"}
@@ -188,9 +189,9 @@ async def show_connections() -> None:
     try:
         from sqlalchemy import text
 
-        from example_service.infra.database import get_session
+        from example_service.infra.database import get_async_session
 
-        async with get_session() as session:
+        async with get_async_session() as session:
             result = await session.execute(
                 text("""
                 SELECT
@@ -271,7 +272,7 @@ async def show_queues() -> None:
             for queue_name in queue_names:
                 try:
                     queue = await channel.get_queue(queue_name, ensure=False)
-                    declaration = await queue.declare(passive=True)
+                    declaration = await queue.declare()
 
                     click.echo(
                         f"  {queue_name:<40} {declaration.message_count:<12} {declaration.consumer_count:<12}"
@@ -329,7 +330,7 @@ async def redis_info() -> None:
         click.echo(f"  Keyspace Hits:  {info_stats.get('keyspace_hits', 0):,}")
         click.echo(f"  Keyspace Misses:{info_stats.get('keyspace_misses', 0):,}")
 
-        await client.aclose()
+        await cast("Any", client).aclose()
 
     except Exception as e:
         error(f"Failed to get Redis info: {e}")
@@ -347,9 +348,9 @@ async def show_metrics() -> None:
 
         from example_service.core.models.user import User
         from example_service.features.reminders.models import Reminder
-        from example_service.infra.database import get_session
+        from example_service.infra.database import get_async_session
 
-        async with get_session() as session:
+        async with get_async_session() as session:
             # User metrics
             result = await session.execute(select(func.count()).select_from(User))
             total_users = result.scalar_one()
@@ -479,6 +480,9 @@ def view_logs(lines: int, follow: bool, level: str | None) -> None:
         if level:
             # Pipe through grep for level filtering
             tail_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+            if tail_proc.stdout is None:
+                error("Failed to create tail process")
+                sys.exit(1)
             grep_proc = subprocess.Popen(
                 ["grep", "--line-buffered", level],
                 stdin=tail_proc.stdout,
@@ -488,8 +492,9 @@ def view_logs(lines: int, follow: bool, level: str | None) -> None:
             tail_proc.stdout.close()
 
             try:
-                for line in grep_proc.stdout:
-                    click.echo(line, nl=False)
+                if grep_proc.stdout is not None:
+                    for line in grep_proc.stdout:
+                        click.echo(line, nl=False)
             except KeyboardInterrupt:
                 pass
             finally:
@@ -532,7 +537,7 @@ async def show_workers() -> None:
 
             try:
                 queue = await channel.get_queue(queue_name, ensure=False)
-                declaration = await queue.declare(passive=True)
+                declaration = await queue.declare()
 
                 section("Task Queue Status")
                 click.echo(f"  Queue:           {queue_name}")

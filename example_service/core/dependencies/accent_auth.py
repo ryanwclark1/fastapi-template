@@ -11,7 +11,7 @@ This module provides FastAPI dependencies for:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import Depends, Header, HTTPException, Request, status
 
@@ -25,6 +25,8 @@ from example_service.infra.cache.redis import get_cache
 from example_service.infra.logging.context import set_log_context
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from example_service.infra.cache.redis import RedisCache
 
 logger = logging.getLogger(__name__)
@@ -36,7 +38,7 @@ async def get_current_user(
     request: Request,
     x_auth_token: Annotated[str | None, Header(alias="X-Auth-Token")] = None,
     accent_tenant: Annotated[str | None, Header(alias="Accent-Tenant")] = None,
-    cache: Annotated[RedisCache, Depends(get_cache)] = None,
+    cache: Annotated[RedisCache | None, Depends(get_cache)] = None,
 ) -> AuthUser:
     """Get currently authenticated user from Accent-Auth.
 
@@ -80,25 +82,26 @@ async def get_current_user(
     cache_key = ":".join(cache_key_parts)
 
     # Check cache first
-    try:
-        cached = await cache.get(cache_key)
-        if cached:
-            logger.debug("Token validation cache hit")
-            auth_user = AuthUser(**cached)
+    if cache is not None:
+        try:
+            cached = await cache.get(cache_key)
+            if cached:
+                logger.debug("Token validation cache hit")
+                auth_user = AuthUser(**cached)
 
-            # Add user context to logs
-            set_log_context(
-                user_id=auth_user.user_id,
-                tenant_id=auth_user.metadata.get("tenant_uuid"),
-            )
+                # Add user context to logs
+                set_log_context(
+                    user_id=auth_user.user_id,
+                    tenant_id=auth_user.metadata.get("tenant_uuid"),
+                )
 
-            # Store in request state
-            request.state.user = auth_user
-            request.state.tenant_uuid = auth_user.metadata.get("tenant_uuid")
+                # Store in request state
+                request.state.user = auth_user
+                request.state.tenant_uuid = auth_user.metadata.get("tenant_uuid")
 
-            return auth_user
-    except Exception as e:
-        logger.warning("Cache lookup failed, proceeding to validation", extra={"error": str(e)})
+                return auth_user
+        except Exception as e:
+            logger.warning("Cache lookup failed, proceeding to validation", extra={"error": str(e)})
 
     # Validate with Accent-Auth
     try:
@@ -109,14 +112,15 @@ async def get_current_user(
         auth_user = client.to_auth_user(token_info)
 
         # Cache the result
-        try:
-            await cache.set(
-                cache_key,
-                auth_user.model_dump(),
-                ttl=auth_settings.token_cache_ttl,
-            )
-        except Exception as e:
-            logger.warning("Failed to cache token validation", extra={"error": str(e)})
+        if cache is not None:
+            try:
+                await cache.set(
+                    cache_key,
+                    auth_user.model_dump(),
+                    ttl=auth_settings.token_cache_ttl,
+                )
+            except Exception as e:
+                logger.warning("Failed to cache token validation", extra={"error": str(e)})
 
         # Add user context to logs
         set_log_context(
@@ -152,7 +156,7 @@ async def get_current_user_optional(
     request: Request,
     x_auth_token: Annotated[str | None, Header(alias="X-Auth-Token")] = None,
     accent_tenant: Annotated[str | None, Header(alias="Accent-Tenant")] = None,
-    cache: Annotated[RedisCache, Depends(get_cache)] = None,
+    cache: Annotated[RedisCache | None, Depends(get_cache)] = None,
 ) -> AuthUser | None:
     """Get currently authenticated user (optional).
 
@@ -187,7 +191,7 @@ async def get_current_user_optional(
         return None
 
 
-def require_acl(required_acl: str):
+def require_acl(required_acl: str) -> Callable[[AuthUser], Awaitable[AuthUser]]:
     """Dependency factory to require specific ACL permission.
 
     Uses Accent-Auth ACL format with dot-notation:
@@ -232,7 +236,7 @@ def require_acl(required_acl: str):
     return acl_checker
 
 
-def require_any_acl(*required_acls: str):
+def require_any_acl(*required_acls: str) -> Callable[[AuthUser], Awaitable[AuthUser]]:
     """Dependency factory to require any of the specified ACLs.
 
     Args:
@@ -277,7 +281,7 @@ def require_any_acl(*required_acls: str):
     return acl_checker
 
 
-def require_all_acls(*required_acls: str):
+def require_all_acls(*required_acls: str) -> Callable[[AuthUser], Awaitable[AuthUser]]:
     """Dependency factory to require all of the specified ACLs.
 
     Args:
@@ -335,11 +339,18 @@ def get_tenant_uuid() -> str | None:
                 raise HTTPException(400, "Tenant context required")
             return {"tenant_uuid": tenant_uuid}
     """
-    from fastapi import Request
 
     # Try to get from request state (set by get_current_user)
     try:
-        request = Request(scope={"type": "http"}, receive=None)
+        from starlette.requests import Request as StarletteRequest
+
+        async def dummy_receive() -> dict[str, Any]:
+            return {"type": "http.request", "body": b""}
+
+        request = StarletteRequest(
+            scope={"type": "http", "method": "GET", "path": "/"},
+            receive=dummy_receive,
+        )
         return getattr(request.state, "tenant_uuid", None)
     except Exception:
         return None

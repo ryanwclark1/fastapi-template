@@ -26,6 +26,7 @@ from example_service.app.middleware.base import HeaderContextMiddleware, generat
 from example_service.infra.logging.context import set_log_context
 
 if TYPE_CHECKING:
+    from starlette.requests import Request
     from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 logger = logging.getLogger(__name__)
@@ -201,7 +202,7 @@ class CorrelationIDMiddleware(HeaderContextMiddleware):
             raise
 
 
-def get_correlation_id_from_request(request) -> str | None:
+def get_correlation_id_from_request(request: Request) -> str | None:
     """Helper function to extract correlation ID from request.
 
     Args:

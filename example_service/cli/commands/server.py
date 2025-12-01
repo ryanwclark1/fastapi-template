@@ -55,15 +55,15 @@ def dev(
 
     # Get settings for defaults
     settings = get_app_settings()
-    host = host or settings.app.host
-    port = port or settings.app.port
+    host = host or settings.app.host  # type: ignore[attr-defined]
+    port = port or settings.app.port  # type: ignore[attr-defined]
 
     if reload and workers > 1:
         warning("--reload is incompatible with --workers > 1. Setting workers to 1.")
         workers = 1
 
     info(f"Server will run at: http://{host}:{port}")
-    info(f"Environment: {settings.app.environment}")
+    info(f"Environment: {settings.app.environment}")  # type: ignore[attr-defined]
     info(f"Auto-reload: {'enabled' if reload else 'disabled'}")
 
     try:
@@ -127,11 +127,11 @@ def prod(
 
     # Get settings for defaults
     settings = get_app_settings()
-    host = host or settings.app.host
-    port = port or settings.app.port
+    host = host or settings.app.host  # type: ignore[attr-defined]
+    port = port or settings.app.port  # type: ignore[attr-defined]
 
     info(f"Server will run at: http://{host}:{port}")
-    info(f"Environment: {settings.app.environment}")
+    info(f"Environment: {settings.app.environment}")  # type: ignore[attr-defined]
     info(f"Workers: {workers}")
     info(f"Access log: {'enabled' if access_log else 'disabled'}")
 

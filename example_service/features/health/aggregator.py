@@ -422,8 +422,9 @@ class HealthAggregator:
                 # but handle it just in case
                 logger.exception("Unexpected error in health check", exc_info=result)
                 continue
-            name, check_result = result
-            checks[name] = check_result
+            if isinstance(result, tuple) and len(result) == 2:
+                name, check_result = result
+                checks[name] = check_result
 
         return checks
 
@@ -603,7 +604,7 @@ class HealthAggregator:
                 else:
                     continue  # Skip entries without this provider
             else:
-                item["checks"] = {name: status.value for name, status in entry.checks.items()}
+                item["checks"] = {name: status.value for name, status in entry.checks.items()}  # type: ignore[assignment]
 
             result.append(item)
 
@@ -642,7 +643,7 @@ class HealthAggregator:
 
         # Per-provider stats
         provider_stats: dict[str, dict[str, Any]] = {}
-        all_providers = set()
+        all_providers: set[str] = set()
         for entry in entries:
             all_providers.update(entry.checks.keys())
 

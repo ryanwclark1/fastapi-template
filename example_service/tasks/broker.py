@@ -37,16 +37,16 @@ else:
 try:
     from taskiq_aio_pika import AioPikaBroker
 except ImportError:
-    AioPikaBroker = None
+    AioPikaBroker = None  # type: ignore[misc,assignment]
 
 # Import taskiq-faststream for scheduled message publishing
 try:
     from taskiq.schedule_sources import LabelScheduleSource
     from taskiq_faststream import BrokerWrapper, StreamScheduler
 except ImportError:
-    BrokerWrapper = None
-    StreamScheduler = None
-    LabelScheduleSource = None
+    BrokerWrapper = None  # type: ignore[misc,assignment]
+    StreamScheduler = None  # type: ignore[misc,assignment]
+    LabelScheduleSource = None  # type: ignore[misc,assignment]
 
 from example_service.core.settings import (
     get_db_settings,
@@ -73,7 +73,7 @@ setup_logging()
 broker: AioPikaBrokerType | None = None
 
 
-def _create_result_backend():
+def _create_result_backend() -> Any:
     """Create the appropriate result backend based on settings.
 
     Returns:
@@ -88,7 +88,7 @@ def _create_result_backend():
             extra={"retention_hours": task_settings.tracking_retention_hours},
         )
         return PostgresAsyncResultBackend(
-            dsn=db_settings.async_url,
+            dsn=db_settings.get_sqlalchemy_url(),
             keep_results=True,
             result_ttl_seconds=task_settings.tracking_retention_seconds,
         )

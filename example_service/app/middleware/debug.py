@@ -60,9 +60,9 @@ from example_service.infra.logging.context import set_log_context
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-    from starlette.applications import Starlette
     from starlette.requests import Request
     from starlette.responses import Response
+    from starlette.types import ASGIApp
 
 logger = logging.getLogger(__name__)
 
@@ -101,8 +101,7 @@ class DebugMiddleware(BaseHTTPMiddleware):
 
     def __init__(
         self,
-        app: Starlette,
-        *,
+        app: ASGIApp,
         enabled: bool = True,
         log_requests: bool = True,
         log_responses: bool = True,

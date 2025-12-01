@@ -1,7 +1,7 @@
 """Utilities for running async operations in CLI commands."""
 
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Coroutine
 from functools import wraps
 from typing import Any, TypeVar
 
@@ -53,7 +53,7 @@ def async_command(func: Callable[..., Awaitable[Any]]) -> Callable[..., Any]:
     return wrapper
 
 
-def coro[T](f: Callable[..., Awaitable[T]]) -> Callable[..., T]:
+def coro[T](f: Callable[..., Coroutine[Any, Any, T]]) -> Callable[..., T]:
     """
     Decorator that makes an async function synchronous for Click.
 

@@ -33,7 +33,6 @@ Example:
 
 from __future__ import annotations
 
-import asyncio
 import functools
 import logging
 import time
@@ -41,7 +40,7 @@ from contextlib import asynccontextmanager, contextmanager
 from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Callable, Iterator
+    from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -54,7 +53,7 @@ def log_operation(
     log_args: bool = False,
     include_timing: bool = True,
     error_level: int = logging.ERROR,
-) -> Callable[[Callable[P, R]], Callable[P, R]]:
+) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
     """Generic operation logging decorator.
 
     Logs operation entry, exit (with duration), and errors. Uses lazy evaluation
@@ -76,10 +75,9 @@ def log_operation(
             ...
     """
 
-    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+    def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
         logger = logging.getLogger(func.__module__)
         func_name = func.__name__
-        is_async = asyncio.iscoroutinefunction(func)
 
         @functools.wraps(func)
         async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
@@ -122,43 +120,7 @@ def log_operation(
                     logger.log(error_level, f"{operation_type}.{func_name} failed", extra=extra)
                 raise
 
-        @functools.wraps(func)
-        def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-            should_log = logger.isEnabledFor(level)
-            should_log_errors = logger.isEnabledFor(error_level)
-
-            if not should_log and not should_log_errors:
-                return func(*args, **kwargs)
-
-            extra: dict[str, Any] = {
-                "operation": operation_type,
-                "function": func_name,
-            }
-
-            start_time = time.perf_counter() if include_timing else 0
-
-            try:
-                result = func(*args, **kwargs)
-
-                if should_log:
-                    if include_timing:
-                        extra["duration_ms"] = round((time.perf_counter() - start_time) * 1000, 2)
-                    extra["success"] = True
-                    logger.log(level, f"{operation_type}.{func_name}", extra=extra)
-
-                return result
-
-            except Exception as exc:
-                if should_log_errors:
-                    if include_timing:
-                        extra["duration_ms"] = round((time.perf_counter() - start_time) * 1000, 2)
-                    extra["success"] = False
-                    extra["error_type"] = type(exc).__name__
-                    extra["error"] = str(exc)
-                    logger.log(error_level, f"{operation_type}.{func_name} failed", extra=extra)
-                raise
-
-        return async_wrapper if is_async else sync_wrapper  # type: ignore[return-value]
+        return async_wrapper
 
     return decorator
 
@@ -167,7 +129,7 @@ def log_db_operation(
     operation: str,
     *,
     level: int = logging.DEBUG,
-) -> Callable[[Callable[P, R]], Callable[P, R]]:
+) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
     """Decorator for database repository operations.
 
     Specialized for repository methods with automatic entity detection.
@@ -193,7 +155,7 @@ def log_service_op(
     operation: str,
     *,
     level: int = logging.INFO,
-) -> Callable[[Callable[P, R]], Callable[P, R]]:
+) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
     """Decorator for service layer operations.
 
     Logs at INFO level by default since service operations represent
@@ -215,7 +177,7 @@ def log_endpoint(
     operation: str,
     *,
     level: int = logging.DEBUG,
-) -> Callable[[Callable[P, R]], Callable[P, R]]:
+) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
     """Decorator for API endpoint handlers.
 
     Use sparingly - request logging middleware handles most cases.

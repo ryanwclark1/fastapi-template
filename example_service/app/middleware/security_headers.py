@@ -79,7 +79,7 @@ class SecurityHeadersMiddleware:
 
     def __init__(
         self,
-        app: ASGIApp,
+        app: ASGIApp | None = None,
         enable_hsts: bool | None = None,
         hsts_max_age: int = 31536000,
         hsts_include_subdomains: bool = True,
@@ -101,7 +101,7 @@ class SecurityHeadersMiddleware:
         """Initialize security headers middleware.
 
         Args:
-            app: The ASGI application.
+            app: The ASGI application. Can be None for factory functions.
             enable_hsts: Whether to enable Strict-Transport-Security header.
                 If None, auto-enabled in production (default: True for backward compat).
             hsts_max_age: Max age for HSTS in seconds (default: 1 year).
@@ -162,6 +162,11 @@ class SecurityHeadersMiddleware:
 
         # Server header handling
         self.server_header = server_header
+
+        # Validate app is provided (except for factory functions)
+        if app is None:
+            # This is allowed for factory functions that will set app later
+            pass
 
         # Log initialization with environment info
         logger.info(
@@ -439,6 +444,10 @@ class SecurityHeadersMiddleware:
             receive: ASGI receive channel.
             send: ASGI send channel.
         """
+        # Validate app is set
+        if self.app is None:
+            raise RuntimeError("SecurityHeadersMiddleware.app must be set before use")
+
         # Only process HTTP requests
         if scope["type"] != "http":
             await self.app(scope, receive, send)
@@ -472,6 +481,8 @@ class SecurityHeadersMiddleware:
                         del headers["server"]
                 elif self.server_header is not False:
                     # String = set custom Server header
+                    # Type narrowing: at this point server_header must be str
+                    assert isinstance(self.server_header, str), "server_header must be str here"
                     headers["server"] = self.server_header
                 # False = keep default Server header (do nothing)
 

@@ -30,8 +30,8 @@ def _format_bytes(size_bytes: int) -> str:
     """
     for unit in ["B", "KB", "MB", "GB", "TB"]:
         if size_bytes < 1024.0:
-            return f"{size_bytes:.2f} {unit}"
-        size_bytes /= 1024.0
+            return f"{int(size_bytes)} {unit}"
+        size_bytes = int(size_bytes / 1024.0)
     return f"{size_bytes:.2f} PB"
 
 
@@ -698,7 +698,7 @@ async def delete(
         from example_service.infra.storage.s3 import S3Client
 
         # Get list of files to delete
-        delete_tasks = []
+        delete_tasks: list[str | tuple[str, int]] = []
 
         if keys:
             # Specific files
@@ -729,7 +729,7 @@ async def delete(
             return
 
         # Calculate total size
-        total_size = sum(size for _, size in delete_tasks) if prefix else 0
+        total_size = sum(item[1] for item in delete_tasks if isinstance(item, tuple))
 
         click.echo(f"\n{'=' * 80}")
         if dry_run:

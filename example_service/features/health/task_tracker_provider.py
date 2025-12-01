@@ -193,7 +193,7 @@ class TaskTrackerHealthProvider:
             }
 
             # Check for high latency
-            if latency_ms > self._config.latency_threshold_ms:
+            if latency_ms > self._config.degraded_threshold_ms:
                 return HealthCheckResult(
                     status=HealthStatus.DEGRADED,
                     message=f"High latency: {latency_ms:.2f}ms",

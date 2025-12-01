@@ -65,7 +65,8 @@ def setup_tracing() -> None:
             # Automatically detect host, process, container, k8s attributes
             from opentelemetry.sdk.resources import get_aggregated_resources
 
-            resource = get_aggregated_resources([Resource(attributes=resource_attrs)])
+            detected_resource = get_aggregated_resources([])
+            resource = detected_resource.merge(Resource(attributes=resource_attrs))
         else:
             resource = Resource(attributes=resource_attrs)
 

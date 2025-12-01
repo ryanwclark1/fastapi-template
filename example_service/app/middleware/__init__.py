@@ -36,7 +36,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from example_service.app.middleware.base import HeaderContextMiddleware
-from example_service.app.middleware.constants import EXEMPT_PATHS
 from example_service.app.middleware.correlation_id import CorrelationIDMiddleware
 from example_service.app.middleware.debug import DebugMiddleware
 from example_service.app.middleware.i18n import I18nMiddleware, create_i18n_middleware
@@ -218,6 +217,7 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
     # 1. Debug Middleware (optional, first to capture all requests)
     # Adds comprehensive debugging with trace IDs and request logging
     if app_settings.enable_debug_middleware:
+        # DebugMiddleware extends BaseHTTPMiddleware which is compatible with FastAPI
         app.add_middleware(
             DebugMiddleware,
             enabled=True,
@@ -307,28 +307,14 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
 
     # 7. Rate Limiting Middleware (optional, requires Redis)
     # Must be early in the chain for fast rejection before expensive processing
+    # Note: Rate limiter middleware requires async context, so it's disabled here.
+    # Rate limiting should be done via dependencies in routes instead.
+    # See example_service.core.dependencies.ratelimit for per-route rate limiting.
     if app_settings.enable_rate_limiting:
-        try:
-            from example_service.infra.cache import get_cache
-            from example_service.infra.ratelimit import RateLimiter
-
-            redis = get_cache()
-            limiter = RateLimiter(redis)
-
-            app.add_middleware(
-                RateLimitMiddleware,
-                limiter=limiter,
-                default_limit=app_settings.rate_limit_per_minute,
-                default_window=app_settings.rate_limit_window_seconds,
-                exempt_paths=EXEMPT_PATHS,
-            )
-            logger.info(
-                f"RateLimitMiddleware enabled: {app_settings.rate_limit_per_minute}/min "
-                f"(window: {app_settings.rate_limit_window_seconds}s)"
-            )
-        except Exception as e:
-            logger.error(f"Failed to enable rate limiting: {e}", exc_info=True)
-            logger.warning("Continuing without rate limiting")
+        logger.warning(
+            "Rate limiting middleware is disabled. Use per-route dependencies instead. "
+            "See example_service.core.dependencies.ratelimit"
+        )
 
     # 8. Request Logging Middleware (debug only)
     # Logs detailed request/response information with PII masking

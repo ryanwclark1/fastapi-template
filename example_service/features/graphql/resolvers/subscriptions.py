@@ -95,8 +95,8 @@ async def _subscribe_to_channel(
 
     finally:
         await pubsub.unsubscribe(channel)
-        await pubsub.aclose()
-        await redis.aclose()
+        await pubsub.close()
+        await redis.close()
         logger.info(f"Unsubscribed from channel: {channel}")
 
 

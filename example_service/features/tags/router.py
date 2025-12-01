@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, cast
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
@@ -70,24 +70,23 @@ async def list_tags(
     result = await session.execute(stmt)
     tags = result.scalars().all()
 
+    # Build counts once if requested
+    counts: dict[UUID, int] = {}
     if include_counts:
-        # Get counts in a separate query
         count_stmt = select(
             reminder_tags.c.tag_id,
             func.count(reminder_tags.c.reminder_id).label("count"),
         ).group_by(reminder_tags.c.tag_id)
         count_result = await session.execute(count_stmt)
-        counts = {row.tag_id: row.count for row in count_result}
+        counts = {row.tag_id: cast("int", row.count) for row in count_result}
 
-        tag_responses = [
-            TagWithCountResponse(
-                **TagResponse.model_validate(tag).model_dump(),
-                reminder_count=counts.get(tag.id, 0),
-            )
-            for tag in tags
-        ]
-    else:
-        tag_responses = [TagResponse.model_validate(tag) for tag in tags]
+    tag_responses = [
+        TagWithCountResponse(
+            **TagResponse.model_validate(tag).model_dump(),
+            reminder_count=counts.get(tag.id, 0),
+        )
+        for tag in tags
+    ]
 
     return TagListResponse(tags=tag_responses, total=len(tag_responses))
 

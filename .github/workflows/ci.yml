@@ -62,7 +62,7 @@ jobs:
         run: uv sync --frozen --group dev
 
       - name: Run MyPy
-        run: uv run mypy example_service --ignore-missing-imports
+        run: uv run mypy
 
   unit-tests:
     name: Unit Tests

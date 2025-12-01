@@ -94,9 +94,9 @@ async def export_data(
 
         from sqlalchemy import inspect, select, text
 
-        from example_service.infra.database import get_session
+        from example_service.infra.database import get_async_session
 
-        async with get_session() as session:
+        async with get_async_session() as session:
             # Build query
             stmt = select(Model)
 
@@ -276,12 +276,12 @@ async def import_data(
             return
 
         # Import data
-        from example_service.infra.database import get_session
+        from example_service.infra.database import get_async_session
 
         imported = 0
         errors_count = 0
 
-        async with get_session() as session:
+        async with get_async_session() as session:
             for i, row in enumerate(data_rows):
                 try:
                     # Remove id field if present (let DB generate it)
@@ -320,13 +320,12 @@ async def database_stats() -> None:
     try:
         from sqlalchemy import text
 
-        from example_service.core.settings import get_app_settings
-        from example_service.infra.database import get_session
+        from example_service.core.settings import get_db_settings
+        from example_service.infra.database import get_async_session
 
-        settings = get_app_settings()
-        db_settings = settings.database
+        db_settings = get_db_settings()
 
-        async with get_session() as session:
+        async with get_async_session() as session:
             # Database info
             result = await session.execute(text("SELECT version()"))
             version = result.scalar_one()
@@ -340,7 +339,7 @@ async def database_stats() -> None:
             db_size = result.scalar_one()
 
             section("Database Info")
-            click.echo(f"  Host:     {db_settings.db_host}:{db_settings.db_port}")
+            click.echo(f"  Host:     {db_settings.host}:{db_settings.port}")
             click.echo(f"  Database: {db_name}")
             click.echo(f"  Size:     {db_size}")
             click.echo(f"  Version:  {version.split(',')[0] if version else 'N/A'}")
@@ -408,9 +407,10 @@ async def database_stats() -> None:
             conn_stats = result.fetchone()
 
             section("Connection Statistics")
-            click.echo(f"  Total:    {conn_stats.total}")
-            click.echo(f"  Active:   {conn_stats.active}")
-            click.echo(f"  Idle:     {conn_stats.idle}")
+            if conn_stats is not None:
+                click.echo(f"  Total:    {conn_stats.total}")
+                click.echo(f"  Active:   {conn_stats.active}")
+                click.echo(f"  Idle:     {conn_stats.idle}")
 
     except Exception as e:
         error(f"Failed to get database stats: {e}")
@@ -426,9 +426,9 @@ async def list_tables() -> None:
     try:
         from sqlalchemy import text
 
-        from example_service.infra.database import get_session
+        from example_service.infra.database import get_async_session
 
-        async with get_session() as session:
+        async with get_async_session() as session:
             # Get tables
             result = await session.execute(
                 text("""
@@ -492,9 +492,9 @@ async def count_records(table: str | None) -> None:
     try:
         from sqlalchemy import text
 
-        from example_service.infra.database import get_session
+        from example_service.infra.database import get_async_session
 
-        async with get_session() as session:
+        async with get_async_session() as session:
             if table:
                 # Count specific table
                 result = await session.execute(
@@ -562,9 +562,9 @@ async def truncate_table(table: str, cascade: bool) -> None:
     try:
         from sqlalchemy import text
 
-        from example_service.infra.database import get_session
+        from example_service.infra.database import get_async_session
 
-        async with get_session() as session:
+        async with get_async_session() as session:
             cascade_str = " CASCADE" if cascade else ""
             await session.execute(text(f"TRUNCATE TABLE {table}{cascade_str}"))  # noqa: S608
             await session.commit()

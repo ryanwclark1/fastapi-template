@@ -266,7 +266,7 @@ class LoggingSettings(BaseSettings):
     # Computed / helper fields
     # ──────────────────────────────────────────────────────────────
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def effective_file_path(self) -> Path | None:
         """Return the file path only when file logging is enabled.
@@ -279,7 +279,7 @@ class LoggingSettings(BaseSettings):
             return None
         return self.file_path
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def level_int(self) -> int:
         """Get numeric log level for use with logging module."""
@@ -287,19 +287,19 @@ class LoggingSettings(BaseSettings):
 
         return getattr(logging, self.level.upper(), logging.INFO)
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def effective_console_level(self) -> LogLevel:
         """Get effective console handler level (falls back to root level)."""
         return self.console_level or self.level
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def effective_file_level(self) -> LogLevel:
         """Get effective file handler level (falls back to root level)."""
         return self.file_level or self.level
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def console_level_int(self) -> int:
         """Get numeric console log level."""
@@ -307,7 +307,7 @@ class LoggingSettings(BaseSettings):
 
         return getattr(logging, self.effective_console_level.upper(), logging.INFO)
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def file_level_int(self) -> int:
         """Get numeric file log level."""
@@ -323,7 +323,7 @@ class LoggingSettings(BaseSettings):
             return v.upper()
         return v
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def effective_sampling_rates(self) -> dict[str, float]:
         """Build complete sampling rates dict merging defaults with custom.
@@ -400,8 +400,13 @@ class LoggingSettings(BaseSettings):
 
     @classmethod
     def settings_customise_sources(
-        cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings
-    ):
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: Any,
+        env_settings: Any,
+        dotenv_settings: Any,
+        file_secret_settings: Any,
+    ) -> tuple[Any, ...]:
         """Customize settings source precedence: init > yaml > env > dotenv > secrets."""
         return (
             init_settings,

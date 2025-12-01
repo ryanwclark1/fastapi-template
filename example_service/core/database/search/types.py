@@ -12,8 +12,13 @@ TSVECTOR columns in Python.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 from sqlalchemy.dialects.postgresql import TSVECTOR as PG_TSVECTOR
-from sqlalchemy.types import TypeDecorator
+from sqlalchemy.types import TypeDecorator, TypeEngine
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Dialect
 
 
 class TSVECTOR(TypeDecorator):
@@ -42,7 +47,7 @@ class TSVECTOR(TypeDecorator):
     impl = PG_TSVECTOR
     cache_ok = True
 
-    def load_dialect_impl(self, dialect):
+    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         """Load dialect-specific implementation.
 
         For PostgreSQL, use native TSVECTOR.

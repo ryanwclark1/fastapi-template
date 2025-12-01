@@ -375,12 +375,13 @@ def _ordinal(n: int) -> str:
 
 
 # Common recurrence presets for convenience
-DAILY = "FREQ=DAILY"
+# Note: These shadow the imported constants but are string RRULE presets
+DAILY = "FREQ=DAILY"  # type: ignore[misc,assignment]
 WEEKDAYS = "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"
-WEEKLY = "FREQ=WEEKLY"
+WEEKLY = "FREQ=WEEKLY"  # type: ignore[misc,assignment]
 BIWEEKLY = "FREQ=WEEKLY;INTERVAL=2"
-MONTHLY = "FREQ=MONTHLY"
-YEARLY = "FREQ=YEARLY"
+MONTHLY = "FREQ=MONTHLY"  # type: ignore[misc,assignment]
+YEARLY = "FREQ=YEARLY"  # type: ignore[misc,assignment]
 
 
 __all__ = [

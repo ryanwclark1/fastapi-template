@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import sys
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -57,7 +57,7 @@ class DiagnoseFormatter(logging.Formatter):
         self,
         fmt: str | None = None,
         datefmt: str | None = None,
-        style: str = "%",
+        style: Literal["%", "{", "$"] = "%",
         diagnose: bool = False,
         max_variable_length: int = 100,
         exclude_vars: set[str] | None = None,
@@ -89,7 +89,11 @@ class DiagnoseFormatter(logging.Formatter):
             "session",
         }
 
-    def formatException(self, ei: tuple[type, BaseException, TracebackType | None]) -> str:
+    def formatException(
+        self,
+        ei: tuple[type[BaseException], BaseException, TracebackType | None]
+        | tuple[None, None, None],
+    ) -> str:
         """Format exception with optional variable diagnosis.
 
         Args:
@@ -103,6 +107,8 @@ class DiagnoseFormatter(logging.Formatter):
             return super().formatException(ei)
 
         # Enhanced exception formatting with variable values
+        if ei == (None, None, None):
+            return super().formatException(ei)
         exc_type, exc_value, exc_tb = ei
 
         if exc_tb is None:
@@ -112,7 +118,7 @@ class DiagnoseFormatter(logging.Formatter):
         lines = ["Traceback (most recent call last):"]
 
         # Walk the traceback
-        tb = exc_tb
+        tb: TracebackType | None = exc_tb
         while tb is not None:
             frame = tb.tb_frame
             lineno = tb.tb_lineno
@@ -156,10 +162,11 @@ class DiagnoseFormatter(logging.Formatter):
                         except Exception:
                             lines.append(f"      {var_name} = <error getting repr>")
 
-            tb = tb.tb_next
+        tb = tb.tb_next if tb is not None else None
 
         # Add exception type and message
-        lines.append(f"{exc_type.__name__}: {exc_value}")
+        if exc_type is not None and exc_value is not None:
+            lines.append(f"{exc_type.__name__}: {exc_value}")
 
         return "\n".join(lines)
 

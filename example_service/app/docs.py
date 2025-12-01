@@ -254,7 +254,7 @@ def _patch_asyncapi_template() -> None:
 </html>
 """
 
-    asyncapi_site.get_asyncapi_html = custom_asyncapi_html  # type: ignore[assignment]
+    asyncapi_site.get_asyncapi_html = custom_asyncapi_html
     _ASYNCAPI_PATCHED = True
 
     logger.debug("Patched FastStream AsyncAPI template for CSP-safe assets")
@@ -262,8 +262,11 @@ def _patch_asyncapi_template() -> None:
 
 def _resolve_static_directory() -> str:
     static_dir = resources.files("example_service") / "static" / "docs"
-    if not static_dir.exists():
-        raise RuntimeError("Documentation assets are missing. Reinstall the application.")
+    # Check if directory exists by trying to iterate it
+    try:
+        next(static_dir.iterdir(), None)
+    except (OSError, FileNotFoundError) as e:
+        raise RuntimeError("Documentation assets are missing. Reinstall the application.") from e
     return str(static_dir)
 
 

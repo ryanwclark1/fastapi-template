@@ -7,10 +7,12 @@ Allows fine-grained control over lazy evaluation, exception info, stack depth, e
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from collections.abc import Mapping, MutableMapping
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from types import TracebackType
 
 
 class OptLoggerAdapter(logging.LoggerAdapter):
@@ -107,14 +109,19 @@ class OptLoggerAdapter(logging.LoggerAdapter):
             logger.opt(record=add_user_id).info("User action")
         """
         # Create new adapter with same logger but modified options
-        new_adapter = OptLoggerAdapter(self.logger, self.extra.copy())
+        extra_copy: dict[str, Any] = {}
+        if self.extra is not None:
+            extra_copy = dict(self.extra)
+        new_adapter = OptLoggerAdapter(self.logger, extra_copy)
         new_adapter._lazy = lazy
         new_adapter._include_exception = exception
         new_adapter._depth = depth
         new_adapter._record_patcher = record
         return new_adapter
 
-    def process(self, msg: Any, kwargs: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
+    def process(
+        self, msg: object, kwargs: MutableMapping[str, object]
+    ) -> tuple[object, MutableMapping[str, object]]:
         """Process log message and kwargs with configured options.
 
         Args:
@@ -133,10 +140,10 @@ class OptLoggerAdapter(logging.LoggerAdapter):
 
         # Handle lazy args
         if self._lazy and "args" in kwargs:
-            args = kwargs.get("args", ())
-            if args:
+            raw_args = kwargs.get("args")
+            if isinstance(raw_args, tuple):
                 evaluated_args = []
-                for arg in args:
+                for arg in raw_args:
                     if callable(arg):
                         try:
                             evaluated_args.append(arg())
@@ -155,22 +162,33 @@ class OptLoggerAdapter(logging.LoggerAdapter):
             kwargs.setdefault("stacklevel", 1 + self._depth)
 
         # Merge extra context
+        extra_dict: dict[str, Any] = {}
+        if self.extra is not None:
+            extra_dict = dict(self.extra)
         if "extra" in kwargs:
-            kwargs["extra"] = {**self.extra, **kwargs["extra"]}
+            extra_val = kwargs["extra"]
+            if isinstance(extra_val, Mapping):
+                kwargs["extra"] = {**extra_dict, **extra_val}
+            else:
+                kwargs["extra"] = extra_dict
         else:
-            kwargs["extra"] = self.extra.copy()
+            kwargs["extra"] = extra_dict
 
         return msg, kwargs
 
     def _log(
         self,
         level: int,
-        msg: Any,
-        args: tuple[Any, ...],
-        exc_info: Any = None,
-        extra: dict[str, Any] | None = None,
+        msg: object,
+        args: tuple[object, ...] | Mapping[str, object],
+        *,
+        exc_info: bool
+        | BaseException
+        | tuple[type[BaseException], BaseException, TracebackType | None]
+        | tuple[None, None, None]
+        | None = None,
+        extra: Mapping[str, object] | None = None,
         stack_info: bool = False,
-        stacklevel: int = 1,
         **kwargs: Any,
     ) -> None:
         """Low-level logging method with record patching support.
@@ -178,29 +196,33 @@ class OptLoggerAdapter(logging.LoggerAdapter):
         Overrides logging.Logger._log to support record patching.
         """
         # Process message and kwargs
-        msg, log_kwargs = self.process(
-            msg,
-            {
-                "exc_info": exc_info,
-                "extra": extra,
-                "stack_info": stack_info,
-                "stacklevel": stacklevel,
-                **kwargs,
-            },
-        )
+        extra_kwargs: dict[str, object] = cast("dict[str, object]", kwargs)
+        stacklevel_value = extra_kwargs.pop("stacklevel", 1)
+        log_kwargs_input: dict[str, object] = {
+            "exc_info": exc_info,
+            "extra": extra,
+            "stack_info": stack_info,
+            "stacklevel": stacklevel_value,
+            **extra_kwargs,
+        }
+        msg, log_kwargs = self.process(msg, log_kwargs_input)
 
         # Extract processed values
-        exc_info = log_kwargs.pop("exc_info", None)
-        extra = log_kwargs.pop("extra", None)
-        stack_info = log_kwargs.pop("stack_info", False)
-        stacklevel = log_kwargs.pop("stacklevel", 1)
+        exc_info_obj = log_kwargs.pop("exc_info", None)
+        exc_info = cast(
+            "bool | BaseException | tuple[type[BaseException], BaseException, TracebackType | None] | tuple[None, None, None] | None",
+            exc_info_obj,
+        )
+        extra_mapping = cast("Mapping[str, object] | None", log_kwargs.pop("extra", None))
+        stack_info = bool(log_kwargs.pop("stack_info", False))
+        stacklevel = cast("int", log_kwargs.pop("stacklevel", 1))
 
         # Call parent _log
         if hasattr(self.logger, "_log"):
             # Create kwargs dict for _log
             _log_kwargs = {
                 "exc_info": exc_info,
-                "extra": extra,
+                "extra": extra_mapping,
                 "stack_info": stack_info,
                 "stacklevel": stacklevel + 1,  # +1 for this wrapper
             }
@@ -211,16 +233,16 @@ class OptLoggerAdapter(logging.LoggerAdapter):
                 original_make_record = self.logger.makeRecord
 
                 def patched_make_record(*args: Any, **kwargs: Any) -> logging.LogRecord:
-                    record = original_make_record(*args, **kwargs)
+                    record = cast("logging.LogRecord", original_make_record(*args, **kwargs))
                     if self._record_patcher:
                         self._record_patcher(record)
                     return record
 
-                self.logger.makeRecord = patched_make_record  # type: ignore
+                self.logger.makeRecord = patched_make_record
                 try:
                     self.logger._log(level, msg, args, **_log_kwargs)
                 finally:
-                    self.logger.makeRecord = original_make_record  # type: ignore
+                    self.logger.makeRecord = original_make_record
             else:
                 self.logger._log(level, msg, args, **_log_kwargs)
 

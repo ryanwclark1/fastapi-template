@@ -45,6 +45,9 @@ if TYPE_CHECKING:
 
     from fastapi import FastAPI
 
+    from example_service.core.settings.rabbit import RabbitSettings
+    from example_service.core.settings.redis import RedisSettings
+
 logger = logging.getLogger(__name__)
 
 
@@ -67,7 +70,7 @@ def _load_scheduler_module() -> ModuleType | None:
 
 
 async def _initialize_taskiq_and_scheduler(
-    rabbit_settings: object, redis_settings: object
+    rabbit_settings: RabbitSettings, redis_settings: RedisSettings
 ) -> tuple[ModuleType | None, ModuleType | None]:
     """Initialize Taskiq broker and APScheduler for background tasks.
 
@@ -372,9 +375,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Initialize Taskiq broker for background tasks (independent of FastStream)
     # Taskiq uses its own RabbitMQ connection via taskiq-aio-pika
-    initialization = _initialize_taskiq_and_scheduler(rabbit_settings, redis_settings)
-    if inspect.isawaitable(initialization):
-        initialization = await initialization
+    initialization_result = _initialize_taskiq_and_scheduler(rabbit_settings, redis_settings)
+    if inspect.isawaitable(initialization_result):
+        initialization = await initialization_result
+    else:
+        initialization = initialization_result
     if initialization is None:
         initialization = (None, None)
     taskiq_module, scheduler_module = initialization

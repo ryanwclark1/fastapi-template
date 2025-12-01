@@ -22,7 +22,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Literal
 
-from sqlalchemy import Select, and_, func, or_
+from sqlalchemy import Select, and_, false, func, or_
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -206,7 +206,7 @@ class CollectionFilter(StatementFilter):
         """Apply collection filter to statement."""
         if not self.values:
             # Empty collection - return statement that matches nothing
-            return statement.where(False) if not self.invert else statement
+            return statement.where(false()) if not self.invert else statement
 
         if self.invert:
             return statement.where(self.field.notin_(self.values))

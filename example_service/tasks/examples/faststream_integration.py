@@ -231,53 +231,59 @@ if faststream_router is not None and rabbit_settings.is_configured:
             logger.exception(f"Failed to handle data processing event: {e}")
             raise
 
-    @faststream_broker.subscriber(RabbitQueue(USER_ACTIONS_QUEUE, durable=True, auto_delete=False))
-    async def handle_user_action_event(event: UserActionEvent) -> None:
-        """Handle user action events by triggering Taskiq tasks.
+    if faststream_broker is None:
+        logger.warning("Faststream broker not configured; user action subscriber disabled")
+    else:
 
-        This demonstrates:
-        1. Event validation
-        2. Task kicking with retry logic
-        3. Event chaining (trigger notification after completion)
-
-        Args:
-            event: User action event
-        """
-        logger.info(
-            f"Received user action: {event.action} for user {event.user_id}",
-            extra={
-                "user_id": event.user_id,
-                "action": event.action,
-            },
+        @faststream_broker.subscriber(
+            RabbitQueue(USER_ACTIONS_QUEUE, durable=True, auto_delete=False)
         )
+        async def handle_user_action_event(event: UserActionEvent) -> None:
+            """Handle user action events by triggering Taskiq tasks.
 
-        try:
-            # Kick the action handling task
-            task = await handle_user_action_task.kiq(
-                user_id=event.user_id,
-                action=event.action,
-                payload=event.payload,
-            )
+            This demonstrates:
+            1. Event validation
+            2. Task kicking with retry logic
+            3. Event chaining (trigger notification after completion)
 
+            Args:
+                event: User action event
+            """
             logger.info(
-                f"Action task kicked: {task.task_id}",
-                extra={"user_id": event.user_id, "task_id": task.task_id},
+                f"Received user action: {event.action} for user {event.user_id}",
+                extra={
+                    "user_id": event.user_id,
+                    "action": event.action,
+                },
             )
 
-            # Wait for task to complete (optional - depends on use case)
-            # result = await task.wait_result(timeout=30)
+            try:
+                # Kick the action handling task
+                task = await handle_user_action_task.kiq(
+                    user_id=event.user_id,
+                    action=event.action,
+                    payload=event.payload,
+                )
 
-            # Event chaining: Send notification about completion
-            # This could also be done by the task itself
-            # await send_completion_notification_task.kiq(
-            #     user_id=event.user_id,
-            #     task_type=event.action,
-            #     result=result,
-            # )
+                logger.info(
+                    f"Action task kicked: {task.task_id}",
+                    extra={"user_id": event.user_id, "task_id": task.task_id},
+                )
 
-        except Exception as e:
-            logger.exception(f"Failed to handle user action event: {e}")
-            raise
+                # Wait for task to complete (optional - depends on use case)
+                # result = await task.wait_result(timeout=30)
+
+                # Event chaining: Send notification about completion
+                # This could also be done by the task itself
+                # await send_completion_notification_task.kiq(
+                #     user_id=event.user_id,
+                #     task_type=event.action,
+                #     result=result,
+                # )
+
+            except Exception as e:
+                logger.exception(f"Failed to handle user action event: {e}")
+                raise
 
 
 # Example: Publishing events that trigger these handlers

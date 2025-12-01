@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -89,7 +89,7 @@ class RateLimitMiddleware:
             raise ValueError("limiter is required when rate limiting is enabled")
 
     @staticmethod
-    def __validate_middleware__(*args, **kwargs) -> None:
+    def __validate_middleware__(*args: Any, **kwargs: Any) -> None:
         """Eager validation when middleware is registered."""
         enabled = kwargs.get("enabled", True)
         limiter = kwargs.get("limiter")
@@ -148,6 +148,10 @@ class RateLimitMiddleware:
         if not self.enabled or self._is_exempt(path):
             await self.app(scope, receive, send)
             return
+
+        # Validate limiter is set (should be checked in __init__, but type narrowing)
+        if self.limiter is None:
+            raise RuntimeError("RateLimitMiddleware.limiter must be set when enabled=True")
 
         # Construct Request object to use key_func
         # This is lightweight - only parses what we need

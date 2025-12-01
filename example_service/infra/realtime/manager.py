@@ -581,7 +581,7 @@ async def start_connection_manager() -> ConnectionManager:
         try:
             from redis.asyncio import ConnectionPool, Redis
 
-            pool = ConnectionPool.from_url(
+            pool: ConnectionPool = ConnectionPool.from_url(
                 redis_settings.url,
                 **redis_settings.connection_pool_kwargs(),
             )

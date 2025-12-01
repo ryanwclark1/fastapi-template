@@ -152,19 +152,19 @@ class TaskSettings(BaseSettings):
     # Computed fields
     # ──────────────────────────────────────────────────────────────
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def is_postgres_backend(self) -> bool:
         """Check if using PostgreSQL backend."""
         return self.result_backend == "postgres"
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def is_redis_backend(self) -> bool:
         """Check if using Redis backend."""
         return self.result_backend == "redis"
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def tracking_retention_seconds(self) -> int:
         """Get retention period in seconds."""

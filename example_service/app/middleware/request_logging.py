@@ -28,7 +28,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from example_service.infra.logging.context import set_log_context
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Awaitable, Callable
 
     from fastapi import Request, Response
     from starlette.types import ASGIApp
@@ -46,8 +46,11 @@ SECURITY_PATTERNS = {
     "command_injection": re.compile(r"(;|\||&|\$\(|`)", re.IGNORECASE),
 }
 
+_tracking: Any
 try:
     from example_service.tasks import tracking as _task_tracking
+
+    _tracking = _task_tracking
 except Exception:  # pragma: no cover - optional dependency
 
     class _TrackingStub:
@@ -59,9 +62,9 @@ except Exception:  # pragma: no cover - optional dependency
         def track_slow_request(**_: Any) -> None:
             return
 
-    tracking = _TrackingStub()
-else:  # pragma: no cover - exercised in integration tests
-    tracking = _task_tracking
+    _tracking = _TrackingStub()
+
+tracking: Any = _tracking
 
 
 class PIIMasker:
@@ -275,7 +278,7 @@ class PIIMasker:
         if depth > max_depth:
             return {"_truncated": "max_depth_exceeded"}
 
-        masked = {}
+        masked: dict[str, Any] = {}
 
         for key, value in data.items():
             key_lower = key.lower()
@@ -541,10 +544,13 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             elif "application/x-www-form-urlencoded" in content_type:
                 # Parse form data
                 form_str = body_bytes.decode("utf-8")
-                form_data = dict(
-                    param.split("=", 1) if "=" in param else (param, "")
-                    for param in form_str.split("&")
-                )
+                form_data: dict[str, str] = {}
+                for param in form_str.split("&"):
+                    if "=" in param:
+                        key, value = param.split("=", 1)
+                        form_data[key] = value
+                    else:
+                        form_data[param] = ""
                 return body_bytes, self.masker.mask_dict(form_data)
         except Exception as e:
             logger.debug(f"Failed to parse request body: {e}")
@@ -552,7 +558,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         return body_bytes, None
 
     async def dispatch(
-        self, request: Request, call_next: Callable[[Request], Response]
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
         """Log request and response with PII masking.
 
@@ -565,7 +571,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         """
         # Skip detailed logging for exempt paths
         if self._is_exempt(request.url.path):
-            return await call_next(request)
+            response = await call_next(request)
+            return response
 
         start_time = time.time()
         request_id = getattr(request.state, "request_id", None)
@@ -642,7 +649,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                     log_data["body_size"] = len(body_bytes)
 
                 # Store body for route handler to read
-                async def receive():
+                async def receive() -> dict[str, Any]:
                     return {"type": "http.request", "body": body_bytes}
 
                 request._receive = receive

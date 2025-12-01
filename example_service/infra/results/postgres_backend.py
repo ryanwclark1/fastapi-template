@@ -20,7 +20,12 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from taskiq import AsyncResultBackend
 from taskiq.compat import model_dump, model_validate
 from taskiq.depends.progress_tracker import TaskProgress
@@ -94,7 +99,7 @@ class PostgresAsyncResultBackend(AsyncResultBackend[_ReturnType]):
         self._max_overflow = max_overflow
         self._pool_pre_ping = pool_pre_ping
 
-        self._engine = None
+        self._engine: AsyncEngine | None = None
         self._session_factory: async_sessionmaker[AsyncSession] | None = None
 
     async def startup(self) -> None:

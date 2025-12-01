@@ -9,18 +9,21 @@ from __future__ import annotations
 import functools
 import logging
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 F = TypeVar("F", bound=Callable[..., Any])
 
 
 def catch(
-    exception: type[BaseException] | tuple[type[BaseException], ...] = Exception,
+    exception: type[Exception] | tuple[type[Exception], ...] = Exception,
     *,
     level: str = "ERROR",
     reraise: bool = False,
     onerror: Callable[[Exception], None] | None = None,
-    exclude: type[BaseException] | tuple[type[BaseException], ...] | None = None,
+    exclude: type[Exception] | tuple[type[Exception], ...] | None = None,
     default: Any = None,
     message: str = "An exception occurred",
     logger: logging.Logger | None = None,
@@ -99,7 +102,7 @@ def catch(
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
                 return func(*args, **kwargs)
-            except BaseException as exc:
+            except Exception as exc:
                 # Check if this exception should be excluded
                 if exclude and isinstance(exc, exclude):
                     raise
@@ -172,12 +175,12 @@ class CatchContext:
 
     def __init__(
         self,
-        exception: type[BaseException] | tuple[type[BaseException], ...] = Exception,
+        exception: type[Exception] | tuple[type[Exception], ...] = Exception,
         *,
         level: str = "ERROR",
         reraise: bool = False,
         onerror: Callable[[Exception], None] | None = None,
-        exclude: type[BaseException] | tuple[type[BaseException], ...] | None = None,
+        exclude: type[Exception] | tuple[type[Exception], ...] | None = None,
         message: str = "An exception occurred in context",
         logger: logging.Logger | None = None,
     ) -> None:
@@ -206,9 +209,9 @@ class CatchContext:
 
     def __exit__(
         self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: Any,
+        exc_type: type[Exception] | None,
+        exc_val: Exception | None,
+        exc_tb: TracebackType | None,
     ) -> bool:
         """Exit context manager and handle exceptions.
 
@@ -228,11 +231,19 @@ class CatchContext:
         if not issubclass(exc_type, self.exception):
             return False
 
+        if exc_val is None:
+            return False
+
         # Log the exception
         log_method = getattr(self.logger, self.level.lower(), self.logger.error)
+        exc_info_tuple: tuple[type[Exception], Exception, TracebackType | None] = (
+            exc_type,
+            exc_val,
+            exc_tb,
+        )
         log_method(
             f"{self.message}: {exc_type.__name__}: {exc_val}",
-            exc_info=(exc_type, exc_val, exc_tb),
+            exc_info=exc_info_tuple,
             extra={
                 "exception_type": exc_type.__name__,
                 "exception_message": str(exc_val),
@@ -255,12 +266,12 @@ class CatchContext:
 
 # Convenience function to create catch context
 def catch_context(
-    exception: type[BaseException] | tuple[type[BaseException], ...] = Exception,
+    exception: type[Exception] | tuple[type[Exception], ...] = Exception,
     *,
     level: str = "ERROR",
     reraise: bool = False,
     onerror: Callable[[Exception], None] | None = None,
-    exclude: type[BaseException] | tuple[type[BaseException], ...] | None = None,
+    exclude: type[Exception] | tuple[type[Exception], ...] | None = None,
     message: str = "An exception occurred in context",
     logger: logging.Logger | None = None,
 ) -> CatchContext:

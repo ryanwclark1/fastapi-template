@@ -13,6 +13,9 @@ from example_service.infra.ratelimit.limiter import RateLimiter, check_rate_limi
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from fastapi.params import Depends as DependsParam
+    from redis.asyncio import Redis
+
 logger = logging.getLogger(__name__)
 
 
@@ -30,15 +33,16 @@ async def get_rate_limiter() -> RateLimiter:
             await check_rate_limit(limiter, "endpoint:get_data", limit=10, window=60)
             return {"data": "value"}
     """
-    redis = get_cache()
-    return RateLimiter(redis)
+    async with get_cache() as cache:
+        redis_client: Redis = cache.get_client()
+        return RateLimiter(redis_client)
 
 
 def rate_limit(
     limit: int,
     window: int = 60,
     key_func: Callable[[Request], str] | None = None,
-) -> Callable:
+) -> DependsParam:
     """Decorator for applying rate limits to specific endpoints.
 
     This dependency can be used to apply custom rate limits to individual
@@ -105,10 +109,11 @@ def rate_limit(
         # Store metadata in request state for access in route handler
         request.state.rate_limit = metadata
 
-    return Depends(_rate_limit_dependency)
+    dependency: DependsParam = Depends(_rate_limit_dependency)
+    return dependency
 
 
-def per_user_rate_limit(limit: int, window: int = 60) -> Callable:
+def per_user_rate_limit(limit: int, window: int = 60) -> DependsParam:
     """Rate limit decorator for authenticated endpoints (per user).
 
     This applies rate limits per authenticated user instead of per IP.
@@ -151,7 +156,7 @@ def per_user_rate_limit(limit: int, window: int = 60) -> Callable:
     return rate_limit(limit=limit, window=window, key_func=user_key_func)
 
 
-def per_api_key_rate_limit(limit: int, window: int = 60) -> Callable:
+def per_api_key_rate_limit(limit: int, window: int = 60) -> DependsParam:
     """Rate limit decorator for API key authenticated endpoints.
 
     This applies rate limits per API key instead of per IP.

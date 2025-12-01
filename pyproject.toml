@@ -38,6 +38,7 @@ dependencies = [
     "strawberry-graphql[fastapi]>=0.235.0",
     # Recurrence rules (iCalendar RRULE)
     "python-dateutil>=2.9.0",
+    "pwdlib[argon2]>=0.3.0",
 ]
 
 [project.optional-dependencies]
@@ -63,6 +64,9 @@ dev = [
     "ruff>=0.7.0",
     "mypy>=1.13.0",
     "pre-commit>=4.0.0",
+    "types-pyyaml>=6.0.12.20250915",
+    "types-python-dateutil>=2.9.0.20251115",
+    "types-redis>=4.6.0.20241004",
 ]
 tests = ["httpx>=0.28.1"]
 
@@ -252,6 +256,7 @@ known-first-party = ["example_service"]
 
 [tool.mypy]
 python_version = "3.13"
+files = ["example_service", "tests", "alembic"]
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -263,10 +268,12 @@ warn_unused_ignores = true
 warn_no_return = true
 strict_equality = true
 plugins = ["pydantic.mypy"]
+exclude = ["^alembic/env\\.py$"]
 
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
+ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = "alembic.versions.*"
@@ -276,6 +283,21 @@ ignore_errors = true
 # SQLAlchemy models rely on runtime imports for annotation evaluation
 module = "example_service.*.models"
 ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["alembic.*", "alembic.env"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = [
+    "botocore.*",
+    "cryptography.*",
+    "dateutil.*",
+    "netifaces",
+    "yaml",
+    "IPython",
+]
+ignore_missing_imports = true
 
 [tool.alembic]
 script_location = "alembic"

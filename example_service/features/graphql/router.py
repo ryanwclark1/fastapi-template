@@ -10,7 +10,7 @@ Provides:
 from __future__ import annotations
 
 import logging
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +24,9 @@ from example_service.features.graphql.context import GraphQLContext
 from example_service.features.graphql.dataloaders import create_dataloaders
 from example_service.features.graphql.playground import register_playground_routes
 from example_service.features.graphql.schema import schema
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -73,25 +76,26 @@ def create_graphql_router() -> APIRouter:
     settings = get_graphql_settings()
 
     # Build subscription protocols list if subscriptions are enabled
-    subscription_protocols = []
+    subscription_protocols: Sequence[str] | None = None
     if settings.subscriptions_enabled:
-        subscription_protocols = [
-            "graphql-transport-ws",  # Modern protocol (recommended)
-            "graphql-ws",  # Legacy protocol (for older clients)
-        ]
+        subscription_protocols = (
+            "graphql-transport-ws",
+            "graphql-ws",
+        )
 
     graphql_ide_setting = settings.get_graphql_ide()
     use_local_playground = graphql_ide_setting == "playground"
-    if use_local_playground:
-        graphql_ide_setting = False
+    selected_ide: Literal["graphiql", "apollo-sandbox", "pathfinder"] | None = None
+    if graphql_ide_setting in ("graphiql", "apollo-sandbox", "pathfinder"):
+        selected_ide = cast(
+            "Literal['graphiql', 'apollo-sandbox', 'pathfinder']", graphql_ide_setting
+        )
 
     graphql_app = GraphQLRouter(
         schema,
-        context_getter=get_graphql_context,
-        subscription_protocols=subscription_protocols if subscription_protocols else None,
-        # Use settings to determine GraphQL IDE (playground)
-        # get_graphql_ide() returns False if disabled, otherwise the IDE type
-        graphql_ide=graphql_ide_setting,
+        context_getter=cast("Any", get_graphql_context),
+        subscription_protocols=subscription_protocols or (),
+        graphql_ide=selected_ide,
     )
 
     router = APIRouter()

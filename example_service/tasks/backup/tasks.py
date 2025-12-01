@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from example_service.core.settings import get_backup_settings, get_db_settings
 from example_service.tasks.broker import broker
@@ -288,7 +288,7 @@ if broker is not None:
         """
         backup_settings = get_backup_settings()
 
-        result = {
+        result: dict[str, Any] = {
             "local_backups": [],
             "s3_backups": [],
         }

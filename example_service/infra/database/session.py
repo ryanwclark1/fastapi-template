@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from opentelemetry import trace
 from sqlalchemy import event, text
@@ -73,7 +73,9 @@ async def _ensure_event_outbox_table() -> None:
 
     async with engine.begin() as conn:
         await conn.run_sync(
-            lambda sync_conn: EventOutbox.__table__.create(bind=sync_conn, checkfirst=True)
+            lambda sync_conn: cast("Any", EventOutbox.__table__).create(
+                bind=sync_conn, checkfirst=True
+            )
         )
 
     _outbox_table_initialized = True
@@ -86,7 +88,7 @@ async def _ensure_event_outbox_table() -> None:
 
 # Track connection pool events for active connections metric
 @event.listens_for(engine.sync_engine.pool, "connect")
-def _receive_connect(dbapi_conn, connection_record):
+def _receive_connect(dbapi_conn: Any, connection_record: Any) -> None:
     """Increment active connections when a new connection is established."""
     _ = dbapi_conn, connection_record
     database_connections_active.inc()
@@ -94,7 +96,7 @@ def _receive_connect(dbapi_conn, connection_record):
 
 
 @event.listens_for(engine.sync_engine.pool, "close")
-def _receive_close(dbapi_conn, connection_record):
+def _receive_close(dbapi_conn: Any, connection_record: Any) -> None:
     """Decrement active connections when a connection is closed."""
     _ = dbapi_conn, connection_record
     database_connections_active.dec()
@@ -103,14 +105,18 @@ def _receive_close(dbapi_conn, connection_record):
 
 # Track query execution duration with trace correlation
 @event.listens_for(engine.sync_engine, "before_cursor_execute")
-def _before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+def _before_cursor_execute(
+    conn: Any, cursor: Any, statement: str, parameters: Any, context: Any, executemany: Any
+) -> None:
     """Record query start time before execution."""
     _ = conn, cursor, statement, parameters, executemany
     context._query_start_time = time.perf_counter()
 
 
 @event.listens_for(engine.sync_engine, "after_cursor_execute")
-def _after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+def _after_cursor_execute(
+    conn: Any, cursor: Any, statement: str, parameters: Any, context: Any, executemany: Any
+) -> None:
     """Record query duration and link to current trace via exemplar."""
     _ = conn, cursor, parameters, executemany
     # Calculate duration

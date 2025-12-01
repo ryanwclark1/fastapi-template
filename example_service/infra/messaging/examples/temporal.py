@@ -23,10 +23,13 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import UTC, datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 
 from example_service.core.settings import get_rabbit_settings
+from example_service.infra.cache import get_cache
 from example_service.infra.messaging.broker import broker
 
 logger = logging.getLogger(__name__)
@@ -70,7 +73,6 @@ async def scheduled_health_check() -> None:
 
     try:
         # Perform health checks
-        from example_service.infra.cache import redis_client
         from example_service.infra.database import engine
 
         checks = {}
@@ -78,7 +80,7 @@ async def scheduled_health_check() -> None:
         # Database health check
         try:
             async with engine.connect() as conn:
-                await conn.execute("SELECT 1")
+                await conn.execute(text("SELECT 1"))
             checks["database"] = True
         except Exception as e:
             logger.error(f"Database health check failed: {e}")
@@ -86,8 +88,8 @@ async def scheduled_health_check() -> None:
 
         # Cache health check
         try:
-            if redis_client:
-                await redis_client.ping()
+            async with get_cache() as cache:
+                await cache.client.ping()
             checks["cache"] = True
         except Exception as e:
             logger.error(f"Cache health check failed: {e}")
@@ -95,10 +97,7 @@ async def scheduled_health_check() -> None:
 
         # RabbitMQ health check
         try:
-            if broker and broker.started:
-                checks["messaging"] = True
-            else:
-                checks["messaging"] = False
+            checks["messaging"] = bool(broker and getattr(broker, "started", False))
         except Exception:
             checks["messaging"] = False
 
@@ -129,7 +128,7 @@ async def scheduled_health_check() -> None:
 async def schedule_periodic_task(
     task_name: str,
     interval_seconds: int = 60,
-    **task_data,
+    **task_data: Any,
 ) -> None:
     """Schedule a periodic task to run at regular intervals.
 

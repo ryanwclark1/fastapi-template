@@ -113,14 +113,14 @@ class CursorCodec:
 
         Handles special types like datetime and UUID.
         """
-        result = {}
+        result: dict[str, Any] = {}
         for key, value in values.items():
             if isinstance(value, datetime):
                 result[key] = value.isoformat()
             elif isinstance(value, UUID):
                 result[key] = str(value)
             elif value is None:
-                result[key] = None
+                result[key] = ""  # Convert None to empty string for cursor encoding
             else:
                 result[key] = value
         return result

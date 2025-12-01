@@ -12,14 +12,17 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Column, Index, String, event, select
+from sqlalchemy import Column, Index, String, event, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import declarative_mixin, declared_attr
 
 from example_service.core.middleware.tenant import get_tenant_context
 
 if TYPE_CHECKING:
-    from sqlalchemy.sql import Select
+    from collections.abc import Mapping, Sequence
+
+    from sqlalchemy.engine import Result
+    from sqlalchemy.sql import Executable
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +63,8 @@ class TenantMixin:
             comment="Tenant identifier for data isolation",
         )
 
-    @declared_attr
-    def __table_args__(cls) -> tuple:
+    @declared_attr  # type: ignore[arg-type]
+    def __table_args__(cls) -> tuple[Any, ...]:
         """Add composite index on tenant_id and primary key.
 
         Returns:
@@ -71,7 +74,10 @@ class TenantMixin:
         existing_args = getattr(cls, "__table_args__", None)
 
         # Build new index
-        index_name = f"ix_{cls.__tablename__}_tenant_id_id"
+        tablename = getattr(cls, "__tablename__", None)
+        if tablename is None:
+            return existing_args or ()
+        index_name = f"ix_{tablename}_tenant_id_id"
         new_index = Index(index_name, "tenant_id", "id")
 
         # Combine with existing args
@@ -96,7 +102,7 @@ class TenantAwareSession(AsyncSession):
             posts = await session.execute(select(Post))
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize tenant-aware session."""
         super().__init__(*args, **kwargs)
         self._tenant_id: str | None = None
@@ -106,7 +112,17 @@ class TenantAwareSession(AsyncSession):
         if context:
             self._tenant_id = context.tenant_id
 
-    def execute(self, statement: Select, *args, **kwargs):
+    async def execute(
+        self,
+        statement: Executable,
+        params: Sequence[Mapping[str, Any]] | Mapping[str, Any] | None = None,
+        *,
+        execution_options: Mapping[str, Any] | None = None,
+        bind_arguments: dict[str, Any] | None = None,
+        _parent_execute_state: Any | None = None,
+        _add_event: Any | None = None,
+        **kwargs: Any,
+    ) -> Result[Any]:
         """Execute statement with automatic tenant filtering.
 
         Args:
@@ -119,9 +135,27 @@ class TenantAwareSession(AsyncSession):
         """
         # Add tenant filter if applicable
         statement = self._add_tenant_filter(statement)
-        return super().execute(statement, *args, **kwargs)
+        if execution_options is None:
+            return await super().execute(
+                statement,
+                params=params,
+                bind_arguments=bind_arguments,
+                _parent_execute_state=_parent_execute_state,
+                _add_event=_add_event,
+                **kwargs,
+            )
 
-    def _add_tenant_filter(self, statement: Select) -> Select:
+        return await super().execute(
+            statement,
+            params=params,
+            execution_options=execution_options,
+            bind_arguments=bind_arguments,
+            _parent_execute_state=_parent_execute_state,
+            _add_event=_add_event,
+            **kwargs,
+        )
+
+    def _add_tenant_filter(self, statement: Any) -> Any:
         """Add tenant filter to SELECT statement.
 
         Args:
@@ -130,25 +164,23 @@ class TenantAwareSession(AsyncSession):
         Returns:
             Modified statement with tenant filter
         """
-        if not self._tenant_id:
+        if not self._tenant_id or not hasattr(statement, "column_descriptions"):
             return statement
 
         # Check if statement queries a tenant-aware model
-        if hasattr(statement, "column_descriptions"):
-            for desc in statement.column_descriptions:
-                entity = desc.get("entity")
-                if entity and hasattr(entity, "tenant_id"):
-                    # Add tenant filter
-                    statement = statement.where(entity.tenant_id == self._tenant_id)
-                    logger.debug(
-                        "Added tenant filter to query",
-                        extra={"tenant_id": self._tenant_id, "entity": entity.__name__},
-                    )
+        for desc in statement.column_descriptions:
+            entity = desc.get("entity")
+            if entity and hasattr(entity, "tenant_id"):
+                statement = statement.where(entity.tenant_id == self._tenant_id)
+                logger.debug(
+                    "Added tenant filter to query",
+                    extra={"tenant_id": self._tenant_id, "entity": entity.__name__},
+                )
 
         return statement
 
 
-def set_tenant_on_insert(mapper, connection, target):  # noqa: ARG001
+def set_tenant_on_insert(mapper: Any, connection: Any, target: Any) -> None:  # noqa: ARG001
     """SQLAlchemy event listener to set tenant_id on insert.
 
     This event listener automatically sets the tenant_id column
@@ -177,7 +209,7 @@ def set_tenant_on_insert(mapper, connection, target):  # noqa: ARG001
             )
 
 
-def validate_tenant_on_update(mapper, connection, target):  # noqa: ARG001
+def validate_tenant_on_update(mapper: Any, connection: Any, target: Any) -> None:  # noqa: ARG001
     """SQLAlchemy event listener to prevent tenant_id changes.
 
     This event listener prevents accidental tenant_id modifications
@@ -219,7 +251,11 @@ def register_tenant_events(base_class: type) -> None:
         # After defining all models
         register_tenant_events(Base)
     """
-    for mapper in base_class.registry.mappers:
+    registry = getattr(base_class, "registry", None)
+    if registry is None:
+        return
+    mappers = getattr(registry, "mappers", [])
+    for mapper in mappers:
         model_class = mapper.class_
 
         # Check if model has tenant_id column
@@ -252,9 +288,7 @@ async def create_tenant_schema(tenant_id: str, session: AsyncSession) -> None:
 
     # Check if schema exists
     result = await session.execute(
-        select(1).select_from(
-            "information_schema.schemata WHERE schema_name = :schema_name",
-        ),
+        text("SELECT 1 FROM information_schema.schemata WHERE schema_name = :schema_name"),
         {"schema_name": schema_name},
     )
 
@@ -263,7 +297,7 @@ async def create_tenant_schema(tenant_id: str, session: AsyncSession) -> None:
         return
 
     # Create schema
-    await session.execute(f"CREATE SCHEMA {schema_name}")
+    await session.execute(text(f"CREATE SCHEMA {schema_name}"))
     await session.commit()
 
     logger.info(f"Created tenant schema: {schema_name}")
@@ -280,7 +314,7 @@ async def drop_tenant_schema(tenant_id: str, session: AsyncSession) -> None:
     """
     schema_name = f"tenant_{tenant_id.replace('-', '_')}"
 
-    await session.execute(f"DROP SCHEMA IF EXISTS {schema_name} CASCADE")
+    await session.execute(text(f"DROP SCHEMA IF EXISTS {schema_name} CASCADE"))
     await session.commit()
 
     logger.warning(f"Dropped tenant schema: {schema_name}")

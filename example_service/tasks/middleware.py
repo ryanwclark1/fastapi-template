@@ -87,7 +87,7 @@ class TrackingMiddleware(TaskiqMiddleware):
                     task_id=task_id,
                     task_name=task_name,
                     worker_id=None,  # Could add worker identification later
-                    task_args=message.args if message.args else None,
+                    task_args=tuple(message.args) if message.args else None,
                     task_kwargs=message.kwargs if message.kwargs else None,
                     labels=message.labels if message.labels else None,
                 )
@@ -131,7 +131,9 @@ class TrackingMiddleware(TaskiqMiddleware):
         if result.is_err:
             status = "failure"
             return_value = None
-            error = result.error
+            error_raw = result.error
+            # Convert BaseException to Exception if needed
+            error: Exception | None = error_raw if isinstance(error_raw, Exception) else Exception(str(error_raw)) if error_raw else None
         else:
             status = "success"
             return_value = result.return_value
