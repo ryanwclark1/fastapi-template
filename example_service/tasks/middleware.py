@@ -133,7 +133,13 @@ class TrackingMiddleware(TaskiqMiddleware):
             return_value = None
             error_raw = result.error
             # Convert BaseException to Exception if needed
-            error: Exception | None = error_raw if isinstance(error_raw, Exception) else Exception(str(error_raw)) if error_raw else None
+            error: Exception | None = (
+                error_raw
+                if isinstance(error_raw, Exception)
+                else Exception(str(error_raw))
+                if error_raw
+                else None
+            )
         else:
             status = "success"
             return_value = result.return_value

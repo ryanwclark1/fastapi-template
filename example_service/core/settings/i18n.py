@@ -140,9 +140,7 @@ class I18nSettings(BaseSettings):
 
     @field_validator("default_locale")
     @classmethod
-    def validate_default_locale_in_supported(
-        cls, v: str, info: ValidationInfo
-    ) -> str:
+    def validate_default_locale_in_supported(cls, v: str, info: ValidationInfo) -> str:
         """Validate that default locale is in supported locales.
 
         Note: This validator runs before supported_locales is validated,

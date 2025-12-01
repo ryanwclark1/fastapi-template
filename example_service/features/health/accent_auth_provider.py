@@ -9,18 +9,15 @@ from __future__ import annotations
 
 import logging
 
+from example_service.core.schemas.common import HealthStatus
 from example_service.core.settings import get_auth_settings
-from example_service.features.health.base import (  # type: ignore[import-untyped]
-    ComponentHealth,
-    ComponentStatus,
-    HealthProvider,
-)
+from example_service.features.health.providers import HealthCheckResult
 from example_service.infra.auth.accent_auth import get_accent_auth_client
 
 logger = logging.getLogger(__name__)
 
 
-class AccentAuthHealthProvider(HealthProvider):
+class AccentAuthHealthProvider:
     """Health check provider for Accent-Auth service.
 
     Monitors the availability of the Accent-Auth service by performing
@@ -47,17 +44,21 @@ class AccentAuthHealthProvider(HealthProvider):
 
     def __init__(self) -> None:
         """Initialize Accent-Auth health provider."""
-        super().__init__()
         self._settings = get_auth_settings()
 
-    async def check_health(self) -> ComponentHealth:
+    @property
+    def name(self) -> str:
+        """Return provider name."""
+        return "accent-auth"
+
+    async def check_health(self) -> HealthCheckResult:
         """Check Accent-Auth service health.
 
         Returns:
-            ComponentHealth with status:
-            - healthy: Service is responding
-            - unhealthy: Service is not responding
-            - degraded: Service is slow but responding
+            HealthCheckResult with status:
+            - HEALTHY: Service is responding
+            - UNHEALTHY: Service is not responding
+            - DEGRADED: Service is slow but responding
 
         Note:
             This does NOT prevent the application from starting or operating.
@@ -65,10 +66,10 @@ class AccentAuthHealthProvider(HealthProvider):
             service is unavailable.
         """
         if not self._settings.service_url:
-            return ComponentHealth(
-                name="accent-auth",
-                status=ComponentStatus.UNHEALTHY,
-                details={"error": "AUTH_SERVICE_URL not configured"},
+            return HealthCheckResult(
+                status=HealthStatus.UNHEALTHY,
+                message="AUTH_SERVICE_URL not configured",
+                metadata={"error": "AUTH_SERVICE_URL not configured"},
             )
 
         client = get_accent_auth_client()
@@ -84,7 +85,11 @@ class AccentAuthHealthProvider(HealthProvider):
 
                 start = time.perf_counter()
                 if client._client is None:
-                    return False
+                    return HealthCheckResult(
+                        status=HealthStatus.UNHEALTHY,
+                        message="Accent-Auth client not initialized",
+                        metadata={"error": "Client not initialized"},
+                    )
                 response = await client._client.head(
                     f"{client.base_url}/api/auth/0.1/token/check",
                     headers={"X-Auth-Token": "health-check"},  # Invalid token is OK
@@ -95,25 +100,24 @@ class AccentAuthHealthProvider(HealthProvider):
                 # Any response (including 401) means the service is reachable
                 if response.status_code in (200, 401, 404):
                     # Determine status based on latency
-                    if latency_ms < 100:
-                        status = ComponentStatus.HEALTHY
-                    else:
-                        status = ComponentStatus.DEGRADED
+                    status = HealthStatus.HEALTHY if latency_ms < 100 else HealthStatus.DEGRADED
 
-                    return ComponentHealth(
-                        name="accent-auth",
+                    return HealthCheckResult(
                         status=status,
-                        details={
+                        message="Accent-Auth service responding",
+                        latency_ms=latency_ms,
+                        metadata={
                             "url": str(self._settings.service_url),
                             "latency_ms": round(latency_ms, 2),
                             "status_code": response.status_code,
                         },
                     )
                 else:
-                    return ComponentHealth(
-                        name="accent-auth",
-                        status=ComponentStatus.UNHEALTHY,
-                        details={
+                    return HealthCheckResult(
+                        status=HealthStatus.UNHEALTHY,
+                        message="Unexpected status code from Accent-Auth",
+                        latency_ms=latency_ms,
+                        metadata={
                             "url": str(self._settings.service_url),
                             "status_code": response.status_code,
                             "error": "Unexpected status code",
@@ -125,10 +129,10 @@ class AccentAuthHealthProvider(HealthProvider):
                 "Accent-Auth connection failed",
                 extra={"url": str(self._settings.service_url), "error": str(e)},
             )
-            return ComponentHealth(
-                name="accent-auth",
-                status=ComponentStatus.UNHEALTHY,
-                details={
+            return HealthCheckResult(
+                status=HealthStatus.UNHEALTHY,
+                message="Accent-Auth connection failed",
+                metadata={
                     "url": str(self._settings.service_url),
                     "error": "Connection failed",
                     "details": str(e),
@@ -139,10 +143,10 @@ class AccentAuthHealthProvider(HealthProvider):
                 "Accent-Auth request timeout",
                 extra={"url": str(self._settings.service_url), "error": str(e)},
             )
-            return ComponentHealth(
-                name="accent-auth",
-                status=ComponentStatus.UNHEALTHY,
-                details={
+            return HealthCheckResult(
+                status=HealthStatus.UNHEALTHY,
+                message="Accent-Auth request timeout",
+                metadata={
                     "url": str(self._settings.service_url),
                     "error": "Request timeout",
                     "timeout": self._settings.request_timeout,
@@ -153,10 +157,10 @@ class AccentAuthHealthProvider(HealthProvider):
                 "Accent-Auth health check failed",
                 extra={"url": str(self._settings.service_url), "error": str(e)},
             )
-            return ComponentHealth(
-                name="accent-auth",
-                status=ComponentStatus.UNHEALTHY,
-                details={
+            return HealthCheckResult(
+                status=HealthStatus.UNHEALTHY,
+                message="Accent-Auth health check failed",
+                metadata={
                     "url": str(self._settings.service_url),
                     "error": str(e),
                 },

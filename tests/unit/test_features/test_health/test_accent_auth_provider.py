@@ -4,10 +4,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from example_service.core.schemas.common import HealthStatus
 from example_service.features.health.accent_auth_provider import (
     AccentAuthHealthProvider,
 )
-from example_service.features.health.base import ComponentStatus
 
 
 @pytest.mark.asyncio
@@ -40,10 +40,10 @@ class TestAccentAuthHealthProvider:
             # Check health
             health = await provider.check_health()
 
-            assert health.name == "accent-auth"
-            assert health.status == ComponentStatus.HEALTHY
-            assert "latency_ms" in health.details
-            assert health.details["status_code"] == 401
+            assert provider.name == "accent-auth"
+            assert health.status == HealthStatus.HEALTHY
+            assert "latency_ms" in health.metadata
+            assert health.metadata["status_code"] == 401
 
     async def test_degraded_status_slow_response(self):
         """Test degraded status when service responds slowly."""
@@ -69,9 +69,9 @@ class TestAccentAuthHealthProvider:
             with patch("time.perf_counter", side_effect=[0.0, 0.15]):  # 150ms
                 health = await provider.check_health()
 
-            assert health.name == "accent-auth"
+            assert provider.name == "accent-auth"
             # 150ms should be degraded (> 100ms)
-            assert health.status in (ComponentStatus.HEALTHY, ComponentStatus.DEGRADED)
+            assert health.status in (HealthStatus.HEALTHY, HealthStatus.DEGRADED)
 
     async def test_unhealthy_status_connection_error(self):
         """Test unhealthy status when connection fails."""
@@ -95,9 +95,9 @@ class TestAccentAuthHealthProvider:
 
             health = await provider.check_health()
 
-            assert health.name == "accent-auth"
-            assert health.status == ComponentStatus.UNHEALTHY
-            assert "Connection failed" in health.details["error"]
+            assert provider.name == "accent-auth"
+            assert health.status == HealthStatus.UNHEALTHY
+            assert "Connection failed" in health.metadata["error"]
 
     async def test_unhealthy_status_timeout(self):
         """Test unhealthy status when request times out."""
@@ -121,9 +121,9 @@ class TestAccentAuthHealthProvider:
 
             health = await provider.check_health()
 
-            assert health.name == "accent-auth"
-            assert health.status == ComponentStatus.UNHEALTHY
-            assert "timeout" in health.details["error"].lower()
+            assert provider.name == "accent-auth"
+            assert health.status == HealthStatus.UNHEALTHY
+            assert "timeout" in health.metadata["error"].lower()
 
     async def test_unhealthy_status_no_url_configured(self):
         """Test unhealthy status when AUTH_SERVICE_URL not configured."""
@@ -138,9 +138,9 @@ class TestAccentAuthHealthProvider:
             provider = AccentAuthHealthProvider()
             health = await provider.check_health()
 
-            assert health.name == "accent-auth"
-            assert health.status == ComponentStatus.UNHEALTHY
-            assert "not configured" in health.details["error"]
+            assert provider.name == "accent-auth"
+            assert health.status == HealthStatus.UNHEALTHY
+            assert "not configured" in health.metadata["error"]
 
     async def test_unexpected_status_code(self):
         """Test handling of unexpected status codes."""
@@ -164,6 +164,6 @@ class TestAccentAuthHealthProvider:
 
             health = await provider.check_health()
 
-            assert health.name == "accent-auth"
-            assert health.status == ComponentStatus.UNHEALTHY
-            assert health.details["status_code"] == 500
+            assert provider.name == "accent-auth"
+            assert health.status == HealthStatus.UNHEALTHY
+            assert health.metadata["status_code"] == 500

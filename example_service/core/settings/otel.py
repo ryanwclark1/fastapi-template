@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+from pathlib import Path  # noqa: TC003
+from typing import Any, Literal
 
 from pydantic import AliasChoices, AnyUrl, Field, computed_field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .yaml_sources import create_otel_yaml_source
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class OtelSettings(BaseSettings):
@@ -409,3 +407,7 @@ class OtelSettings(BaseSettings):
             dotenv_settings,
             file_secret_settings,
         )
+
+
+# Rebuild model to resolve forward references (Path type)
+OtelSettings.model_rebuild()

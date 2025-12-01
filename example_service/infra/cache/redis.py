@@ -279,9 +279,7 @@ class RedisCache:
             raise RuntimeError("Redis client not connected. Call connect() first.")
         return self._client.pipeline()
 
-    def scan_iter(
-        self, match: str | None = None, count: int | None = None
-    ) -> Any:
+    def scan_iter(self, match: str | None = None, count: int | None = None) -> Any:
         """Iterate over keys matching a pattern."""
         if self._client is None:
             raise RuntimeError("Redis client not connected. Call connect() first.")

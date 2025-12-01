@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+from pathlib import Path  # noqa: TC003
+from typing import Any, Literal
 from urllib.parse import quote, urlparse
 
 from pydantic import Field, SecretStr, computed_field, field_validator, model_validator
@@ -10,9 +11,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ._sanitizers import sanitize_inline_numeric
 from .yaml_sources import create_redis_yaml_source
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class RedisSettings(BaseSettings):
@@ -433,3 +431,7 @@ class RedisSettings(BaseSettings):
             dotenv_settings,
             file_secret_settings,
         )
+
+
+# Rebuild model to resolve forward references (Path type)
+RedisSettings.model_rebuild()
