@@ -78,9 +78,7 @@ class ConsulService:
 
         # Determine service name
         self._service_name = (
-            service_name
-            or self._settings.service_name
-            or self._app_settings.service_name
+            service_name or self._settings.service_name or self._app_settings.service_name
         )
 
         # Generate unique service ID

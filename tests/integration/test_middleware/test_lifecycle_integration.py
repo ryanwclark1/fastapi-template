@@ -78,9 +78,7 @@ class TestFullLifecycleIntegration:
         Returns:
             Async HTTP client.
         """
-        async with AsyncClient(
-            transport=ASGITransport(app=full_app), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=full_app), base_url="http://test") as ac:
             yield ac
 
     @patch("example_service.app.middleware.request_logging.logger")
@@ -108,9 +106,7 @@ class TestFullLifecycleIntegration:
         # Find request log
         call_args = mock_logger.log.call_args_list
         request_logs = [
-            call
-            for call in call_args
-            if len(call[0]) > 1 and call[0][1] == "HTTP Request"
+            call for call in call_args if len(call[0]) > 1 and call[0][1] == "HTTP Request"
         ]
 
         assert len(request_logs) > 0, "Expected at least one HTTP Request log"
@@ -124,9 +120,7 @@ class TestFullLifecycleIntegration:
             assert body.get("username") == "testuser", "Username should NOT be masked"
             # Email should be partially masked (domain preserved)
             if "email" in body:
-                assert "@example.com" in body.get("email", ""), (
-                    "Email domain should be preserved"
-                )
+                assert "@example.com" in body.get("email", ""), "Email domain should be preserved"
 
         # Verify Authorization header is masked
         if "headers" in log_extra:
@@ -177,9 +171,7 @@ class TestFullLifecycleIntegration:
 
         call_args = mock_logger.log.call_args_list
         request_logs = [
-            call
-            for call in call_args
-            if len(call[0]) > 1 and call[0][1] == "HTTP Request"
+            call for call in call_args if len(call[0]) > 1 and call[0][1] == "HTTP Request"
         ]
 
         assert len(request_logs) > 0, "Expected at least one HTTP Request log"
@@ -211,21 +203,15 @@ class TestFullLifecycleIntegration:
             await asyncio.sleep(0.01)  # Small delay to increase overlap chance
             return {"request_id": request_id}
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # Generate unique IDs for each request
             ids = [str(uuid.uuid4()) for _ in range(5)]
-            tasks = [
-                client.get("/test", headers={"X-Request-ID": req_id}) for req_id in ids
-            ]
+            tasks = [client.get("/test", headers={"X-Request-ID": req_id}) for req_id in ids]
             responses = await asyncio.gather(*tasks)
 
         # Each response should have its correct request_id
         for i, response in enumerate(responses):
-            assert response.json()["request_id"] == ids[i], (
-                f"Response {i} has wrong request_id"
-            )
+            assert response.json()["request_id"] == ids[i], f"Response {i} has wrong request_id"
 
         # All captured IDs should be unique (no cross-contamination)
         assert len(set(captured_ids)) == 5, "Request IDs should not leak between requests"
@@ -253,9 +239,7 @@ class TestFullLifecycleIntegration:
 
         call_args = mock_logger.log.call_args_list
         request_logs = [
-            call
-            for call in call_args
-            if len(call[0]) > 1 and call[0][1] == "HTTP Request"
+            call for call in call_args if len(call[0]) > 1 and call[0][1] == "HTTP Request"
         ]
 
         if request_logs and "body" in request_logs[0][1]["extra"]:
@@ -271,9 +255,7 @@ class TestFullLifecycleIntegration:
                     )
                 profile = user.get("profile", {})
                 if profile:
-                    assert profile.get("password") == "********", (
-                        "Nested password should be masked"
-                    )
+                    assert profile.get("password") == "********", "Nested password should be masked"
 
     async def test_all_middleware_headers_present(self, client: AsyncClient):
         """Test that all expected middleware headers are present in response.
@@ -311,16 +293,12 @@ class TestFullLifecycleIntegration:
 
         # Find request log
         request_logs = [
-            call
-            for call in call_args
-            if len(call[0]) > 1 and call[0][1] == "HTTP Request"
+            call for call in call_args if len(call[0]) > 1 and call[0][1] == "HTTP Request"
         ]
 
         # Find response log
         response_logs = [
-            call
-            for call in call_args
-            if len(call[0]) > 1 and call[0][1] == "HTTP Response"
+            call for call in call_args if len(call[0]) > 1 and call[0][1] == "HTTP Response"
         ]
 
         assert len(request_logs) > 0, "Expected HTTP Request log"
@@ -348,9 +326,7 @@ class TestFullLifecycleIntegration:
         async def error_endpoint():
             raise HTTPException(status_code=500, detail="Test error")
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/error")
 
         assert response.status_code == 500

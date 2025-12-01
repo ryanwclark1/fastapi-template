@@ -1,4 +1,5 @@
 """Unit tests for RequestSizeLimitMiddleware."""
+
 from __future__ import annotations
 
 import json
@@ -96,15 +97,19 @@ class TestRequestSizeLimitMiddleware:
         from starlette.types import Receive, Scope, Send
 
         async def mock_app(scope: Scope, receive: Receive, send: Send):
-            await send({
-                "type": "http.response.start",
-                "status": 200,
-                "headers": [[b"content-type", b"application/json"]],
-            })
-            await send({
-                "type": "http.response.body",
-                "body": b'{"status":"ok"}',
-            })
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 200,
+                    "headers": [[b"content-type", b"application/json"]],
+                }
+            )
+            await send(
+                {
+                    "type": "http.response.body",
+                    "body": b'{"status":"ok"}',
+                }
+            )
 
         middleware = RequestSizeLimitMiddleware(mock_app, max_size=1024)
 
@@ -219,15 +224,19 @@ class TestRequestSizeLimitMiddleware:
         from starlette.types import Receive, Scope, Send
 
         async def mock_app(scope: Scope, receive: Receive, send: Send):
-            await send({
-                "type": "http.response.start",
-                "status": 200,
-                "headers": [[b"content-type", b"application/json"]],
-            })
-            await send({
-                "type": "http.response.body",
-                "body": b'{"status":"ok"}',
-            })
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 200,
+                    "headers": [[b"content-type", b"application/json"]],
+                }
+            )
+            await send(
+                {
+                    "type": "http.response.body",
+                    "body": b'{"status":"ok"}',
+                }
+            )
 
         middleware = RequestSizeLimitMiddleware(mock_app, max_size=1024)
 
@@ -260,9 +269,7 @@ class TestRequestSizeLimitMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
             assert response.status_code == 200
 
@@ -286,15 +293,19 @@ class TestRequestSizeLimitMiddleware:
         from starlette.types import Receive, Scope, Send
 
         async def mock_app(scope: Scope, receive: Receive, send: Send):
-            await send({
-                "type": "http.response.start",
-                "status": 200,
-                "headers": [[b"content-type", b"application/json"]],
-            })
-            await send({
-                "type": "http.response.body",
-                "body": b'{"status":"ok"}',
-            })
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 200,
+                    "headers": [[b"content-type", b"application/json"]],
+                }
+            )
+            await send(
+                {
+                    "type": "http.response.body",
+                    "body": b'{"status":"ok"}',
+                }
+            )
 
         middleware = RequestSizeLimitMiddleware(mock_app, max_size=1024)
 
@@ -330,9 +341,7 @@ class TestRequestSizeLimitMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # Warm up
             await client.post("/upload", json={"test": "data"})
 

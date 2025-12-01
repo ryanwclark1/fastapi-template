@@ -55,7 +55,10 @@ service_discovery_errors_total = Counter(
     "Total errors during service discovery operations. "
     "Categorized by operation and error type for debugging. "
     "Usage: Increment when any Consul operation fails with an exception.",
-    ["operation", "error_type"],  # operation: register/deregister/ttl_pass, error_type: timeout/connection/http_error
+    [
+        "operation",
+        "error_type",
+    ],  # operation: register/deregister/ttl_pass, error_type: timeout/connection/http_error
     registry=REGISTRY,
 )
 

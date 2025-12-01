@@ -245,10 +245,12 @@ class TestAccentAuthACL:
 
     def test_negation_acl(self):
         """Test negation ACLs (!)."""
-        acl = AccentAuthACL([
-            "confd.users.*",
-            "!confd.users.delete",
-        ])
+        acl = AccentAuthACL(
+            [
+                "confd.users.*",
+                "!confd.users.delete",
+            ]
+        )
 
         # Positive ACLs grant access
         assert acl.has_permission("confd.users.read") is True
@@ -259,11 +261,13 @@ class TestAccentAuthACL:
 
     def test_negation_with_wildcard(self):
         """Test negation with wildcards."""
-        acl = AccentAuthACL([
-            "confd.#",
-            "!confd.users.delete",
-            "!confd.tenants.*",
-        ])
+        acl = AccentAuthACL(
+            [
+                "confd.#",
+                "!confd.users.delete",
+                "!confd.tenants.*",
+            ]
+        )
 
         # Broad access
         assert acl.has_permission("confd.users.read") is True
@@ -278,13 +282,15 @@ class TestAccentAuthACL:
 
     def test_complex_acl_patterns(self):
         """Test complex ACL patterns."""
-        acl = AccentAuthACL([
-            "confd.users.read",
-            "confd.users.me.#",  # Full access to own user
-            "webhookd.subscriptions.*",
-            "calld.calls.my_session.*",  # Access to own session calls
-            "!admin.*",  # No admin access
-        ])
+        acl = AccentAuthACL(
+            [
+                "confd.users.read",
+                "confd.users.me.#",  # Full access to own user
+                "webhookd.subscriptions.*",
+                "calld.calls.my_session.*",  # Access to own session calls
+                "!admin.*",  # No admin access
+            ]
+        )
 
         assert acl.has_permission("confd.users.read") is True
         assert acl.has_permission("confd.users.me.update") is True

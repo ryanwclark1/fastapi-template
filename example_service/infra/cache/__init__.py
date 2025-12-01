@@ -1,4 +1,5 @@
 """Cache infrastructure using Redis."""
+
 from __future__ import annotations
 
 from example_service.infra.cache.decorators import (

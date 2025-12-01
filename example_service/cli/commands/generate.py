@@ -1,4 +1,5 @@
 """Code generation and scaffolding commands."""
+
 from __future__ import annotations
 
 import re
@@ -673,7 +674,9 @@ def resource(
         if crud:
             click.echo("4. Import CRUD functions in example_service/core/crud/__init__.py")
         if model:
-            click.echo(f"5. Create database migration: example-service db revision -m 'add {ctx['table_name']}'")
+            click.echo(
+                f"5. Create database migration: example-service db revision -m 'add {ctx['table_name']}'"
+            )
         if tests:
             click.echo(f"6. Run tests: pytest tests/test_api/test_{ctx['model_plural']}.py")
 

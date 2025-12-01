@@ -1,4 +1,5 @@
 """Prometheus metrics for monitoring with exemplar support."""
+
 from __future__ import annotations
 
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
@@ -28,21 +29,21 @@ DEFAULT_LATENCY_BUCKETS = (
 MIDDLEWARE_LATENCY_BUCKETS = (
     0.001,  # 1ms
     0.005,  # 5ms
-    0.01,   # 10ms
+    0.01,  # 10ms
     0.025,  # 25ms
-    0.05,   # 50ms
-    0.1,    # 100ms
-    0.25,   # 250ms
-    0.5,    # 500ms
-    1.0,    # 1s
+    0.05,  # 50ms
+    0.1,  # 100ms
+    0.25,  # 250ms
+    0.5,  # 500ms
+    1.0,  # 1s
 )
 
 # Request size buckets (1KB to 10MB)
 REQUEST_SIZE_BUCKETS = (
-    1024,      # 1KB
-    10240,     # 10KB
-    102400,    # 100KB
-    1048576,   # 1MB
+    1024,  # 1KB
+    10240,  # 10KB
+    102400,  # 100KB
+    1048576,  # 1MB
     10485760,  # 10MB
 )
 

@@ -1,4 +1,5 @@
 """Unit tests for the domain event system."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -51,9 +52,7 @@ class TestDomainEvent:
             name: str
 
         causing_event = TestEvent(name="cause")
-        causing_event = causing_event.model_copy(
-            update={"correlation_id": "corr-123"}
-        )
+        causing_event = causing_event.model_copy(update={"correlation_id": "corr-123"})
 
         caused_event = TestEvent(name="effect")
         caused_event = caused_event.with_causation(causing_event)

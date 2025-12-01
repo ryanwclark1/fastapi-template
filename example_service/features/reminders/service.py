@@ -1,4 +1,5 @@
 """Service layer for reminder-specific business logic."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -85,9 +86,7 @@ class ReminderService(BaseService):
             )
         else:
             # DEBUG level - expected "not found" case
-            self._lazy.debug(
-                lambda: f"service.mark_completed({reminder_id}) -> not found"
-            )
+            self._lazy.debug(lambda: f"service.mark_completed({reminder_id}) -> not found")
         return result
 
     async def mark_notification_sent(self, reminder_id: UUID) -> Reminder | None:
@@ -98,12 +97,13 @@ class ReminderService(BaseService):
             # INFO level - notification lifecycle event
             self.logger.info(
                 "Notification sent for reminder",
-                extra={"reminder_id": str(reminder_id), "operation": "service.mark_notification_sent"},
+                extra={
+                    "reminder_id": str(reminder_id),
+                    "operation": "service.mark_notification_sent",
+                },
             )
         else:
-            self._lazy.debug(
-                lambda: f"service.mark_notification_sent({reminder_id}) -> not found"
-            )
+            self._lazy.debug(lambda: f"service.mark_notification_sent({reminder_id}) -> not found")
         return result
 
 

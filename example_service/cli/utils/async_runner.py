@@ -35,9 +35,7 @@ def run_async[T](coro: Awaitable[T]) -> T:
         pass
 
 
-def async_command(
-    func: Callable[..., Awaitable[Any]]
-) -> Callable[..., Any]:
+def async_command(func: Callable[..., Awaitable[Any]]) -> Callable[..., Any]:
     """
     Decorator to convert an async function into a Click command.
 

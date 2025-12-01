@@ -62,10 +62,7 @@ class TestCorrelationIDMiddleware:
         """Test that existing correlation ID from upstream is preserved."""
         correlation_id = "test-correlation-123"
 
-        response = client.get(
-            "/test",
-            headers={"X-Correlation-ID": correlation_id}
-        )
+        response = client.get("/test", headers={"X-Correlation-ID": correlation_id})
 
         assert response.status_code == 200
         data = response.json()
@@ -85,10 +82,7 @@ class TestCorrelationIDMiddleware:
         """Test that upstream correlation ID is returned in response headers."""
         correlation_id = "upstream-correlation-456"
 
-        response = client.get(
-            "/test",
-            headers={"X-Correlation-ID": correlation_id}
-        )
+        response = client.get("/test", headers={"X-Correlation-ID": correlation_id})
 
         assert response.status_code == 200
         assert response.headers["x-correlation-id"] == correlation_id
@@ -108,10 +102,7 @@ class TestCorrelationIDMiddleware:
         """Test the helper function for extracting correlation ID."""
         correlation_id = "helper-test-789"
 
-        response = client.get(
-            "/test-helper",
-            headers={"X-Correlation-ID": correlation_id}
-        )
+        response = client.get("/test-helper", headers={"X-Correlation-ID": correlation_id})
 
         assert response.status_code == 200
         data = response.json()
@@ -142,10 +133,7 @@ class TestCorrelationIDMiddleware:
         ]
 
         for header_name in variations:
-            response = client.get(
-                "/test",
-                headers={header_name: correlation_id}
-            )
+            response = client.get("/test", headers={header_name: correlation_id})
 
             assert response.status_code == 200
             data = response.json()
@@ -156,10 +144,7 @@ class TestCorrelationIDMiddleware:
         # Make multiple requests without providing correlation ID
         responses = [client.get("/test") for _ in range(5)]
 
-        correlation_ids = [
-            response.json()["correlation_id"]
-            for response in responses
-        ]
+        correlation_ids = [response.json()["correlation_id"] for response in responses]
 
         # All correlation IDs should be unique
         assert len(set(correlation_ids)) == 5
@@ -181,10 +166,7 @@ class TestCorrelationIDMiddleware:
         client = TestClient(app)
         correlation_id = "custom-header-test"
 
-        response = client.get(
-            "/test",
-            headers={custom_header: correlation_id}
-        )
+        response = client.get("/test", headers={custom_header: correlation_id})
 
         assert response.status_code == 200
         data = response.json()
@@ -220,10 +202,7 @@ class TestCorrelationIDMiddleware:
         correlation_id = "error-test-123"
 
         # Test with invalid endpoint (404)
-        response = client.get(
-            "/nonexistent",
-            headers={"X-Correlation-ID": correlation_id}
-        )
+        response = client.get("/nonexistent", headers={"X-Correlation-ID": correlation_id})
 
         assert response.status_code == 404
         # Correlation ID should still be in response headers
@@ -244,7 +223,7 @@ class TestCorrelationIDMiddleware:
             return {
                 "service": "A",
                 "correlation_id": correlation_id,
-                "message": "Pass this correlation_id to Service B"
+                "message": "Pass this correlation_id to Service B",
             }
 
         @app.get("/service-b")
@@ -255,23 +234,19 @@ class TestCorrelationIDMiddleware:
             return {
                 "service": "B",
                 "correlation_id": correlation_id,
-                "message": "Received correlation_id from Service A"
+                "message": "Received correlation_id from Service A",
             }
 
         client = TestClient(app)
         correlation_id = "transaction-12345"
 
         # Client calls Service A
-        response_a = client.get(
-            "/service-a",
-            headers={"X-Correlation-ID": correlation_id}
-        )
+        response_a = client.get("/service-a", headers={"X-Correlation-ID": correlation_id})
         data_a = response_a.json()
 
         # Service A calls Service B with same correlation ID
         response_b = client.get(
-            "/service-b",
-            headers={"X-Correlation-ID": data_a["correlation_id"]}
+            "/service-b", headers={"X-Correlation-ID": data_a["correlation_id"]}
         )
         data_b = response_b.json()
 
@@ -285,8 +260,7 @@ class TestCorrelationIDMiddleware:
 
         # Make concurrent requests with different correlation IDs
         responses = [
-            client.get("/test", headers={"X-Correlation-ID": cid})
-            for cid in correlation_ids
+            client.get("/test", headers={"X-Correlation-ID": cid}) for cid in correlation_ids
         ]
 
         # Verify each response has the correct correlation ID
@@ -308,10 +282,7 @@ class TestCorrelationIDMiddleware:
         ]
 
         for correlation_id in test_formats:
-            response = client.get(
-                "/test",
-                headers={"X-Correlation-ID": correlation_id}
-            )
+            response = client.get("/test", headers={"X-Correlation-ID": correlation_id})
 
             assert response.status_code == 200
             data = response.json()
@@ -319,10 +290,7 @@ class TestCorrelationIDMiddleware:
 
     def test_empty_correlation_id_header(self, client):
         """Test handling of empty correlation ID header."""
-        response = client.get(
-            "/test",
-            headers={"X-Correlation-ID": ""}
-        )
+        response = client.get("/test", headers={"X-Correlation-ID": ""})
 
         assert response.status_code == 200
         # Empty string should be treated as missing, new ID generated
@@ -375,7 +343,7 @@ class TestCorrelationIDIntegration:
             headers={
                 "X-Correlation-ID": correlation_id,
                 "X-Request-ID": request_id,
-            }
+            },
         )
 
         assert response.status_code == 200
@@ -401,10 +369,7 @@ class TestCorrelationIDIntegration:
         client = TestClient(app, raise_server_exceptions=False)
         correlation_id = "error-correlation-789"
 
-        response = client.get(
-            "/error",
-            headers={"X-Correlation-ID": correlation_id}
-        )
+        response = client.get("/error", headers={"X-Correlation-ID": correlation_id})
 
         # Error should occur but correlation ID should still be in headers
         assert response.status_code == 500

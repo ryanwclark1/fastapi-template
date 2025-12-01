@@ -1,4 +1,5 @@
 """Request size limit middleware."""
+
 from __future__ import annotations
 
 import json
@@ -42,17 +43,23 @@ class RequestSizeLimitMiddleware:
                     content_length = int(header_value.decode())
                     if content_length > self.max_size:
                         # Send 413 error response
-                        await send({
-                            "type": "http.response.start",
-                            "status": 413,
-                            "headers": [[b"content-type", b"application/json"]],
-                        })
-                        await send({
-                            "type": "http.response.body",
-                            "body": json.dumps({
-                                "detail": f"Request size {content_length} exceeds maximum {self.max_size} bytes"
-                            }).encode(),
-                        })
+                        await send(
+                            {
+                                "type": "http.response.start",
+                                "status": 413,
+                                "headers": [[b"content-type", b"application/json"]],
+                            }
+                        )
+                        await send(
+                            {
+                                "type": "http.response.body",
+                                "body": json.dumps(
+                                    {
+                                        "detail": f"Request size {content_length} exceeds maximum {self.max_size} bytes"
+                                    }
+                                ).encode(),
+                            }
+                        )
                         return
                 except (ValueError, UnicodeDecodeError):
                     # Invalid content-length header, pass through

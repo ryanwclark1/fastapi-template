@@ -304,9 +304,7 @@ class CircuitBreaker:
         """
         return self._state == CircuitState.HALF_OPEN
 
-    async def call(
-        self, func: Callable[P, Awaitable[T]], *args: P.args, **kwargs: P.kwargs
-    ) -> T:
+    async def call(self, func: Callable[P, Awaitable[T]], *args: P.args, **kwargs: P.kwargs) -> T:
         """Execute function with circuit breaker protection.
 
         This method wraps the provided async function with circuit breaker logic.
@@ -354,9 +352,7 @@ class CircuitBreaker:
             if self.is_half_open:
                 if self._half_open_calls >= self.half_open_max_calls:
                     self.total_rejections += 1
-                    msg = (
-                        f"Circuit breaker '{self.name}' half-open call limit reached"
-                    )
+                    msg = f"Circuit breaker '{self.name}' half-open call limit reached"
                     logger.warning(
                         msg,
                         extra={
@@ -556,9 +552,7 @@ class CircuitBreaker:
             },
         )
 
-    def protected(
-        self, func: Callable[P, Awaitable[T]]
-    ) -> Callable[P, Awaitable[T]]:
+    def protected(self, func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
         """Decorator to protect async function with circuit breaker.
 
         This decorator wraps an async function with circuit breaker protection.

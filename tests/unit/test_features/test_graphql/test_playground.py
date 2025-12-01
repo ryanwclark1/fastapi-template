@@ -1,4 +1,5 @@
 """Tests for the local GraphQL Playground assets."""
+
 from __future__ import annotations
 
 import html

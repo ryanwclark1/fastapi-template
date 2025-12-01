@@ -188,7 +188,11 @@ class BaseRepository[T]:
         if instance is None:
             self._logger.info(
                 "Entity not found",
-                extra={"entity": self.model.__name__, "id": str(id), "operation": "db.get_or_raise"},
+                extra={
+                    "entity": self.model.__name__,
+                    "id": str(id),
+                    "operation": "db.get_or_raise",
+                },
             )
             raise NotFoundError(self.model.__name__, {"id": id})
         return instance
@@ -323,9 +327,7 @@ class BaseRepository[T]:
         await session.refresh(instance)
 
         entity_id = getattr(instance, "id", None)
-        self._lazy.debug(
-            lambda: f"db.create: {self.model.__name__}(id={entity_id})"
-        )
+        self._lazy.debug(lambda: f"db.create: {self.model.__name__}(id={entity_id})")
         return instance
 
     async def create_many(self, session: AsyncSession, instances: Iterable[T]) -> Sequence[T]:

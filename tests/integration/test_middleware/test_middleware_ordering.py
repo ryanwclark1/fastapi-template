@@ -1,4 +1,5 @@
 """Integration tests for middleware execution order."""
+
 from __future__ import annotations
 
 from unittest.mock import patch
@@ -46,9 +47,7 @@ class TestMiddlewareOrdering:
         if mock_logger.log.called:
             call_args = mock_logger.log.call_args_list
             request_logs = [
-                call
-                for call in call_args
-                if len(call[0]) > 1 and call[0][1] == "HTTP Request"
+                call for call in call_args if len(call[0]) > 1 and call[0][1] == "HTTP Request"
             ]
             if request_logs:
                 log_extra = request_logs[0][1]["extra"]
@@ -80,9 +79,7 @@ class TestMiddlewareOrdering:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # Send large payload
             response = await client.post("/upload", json={"data": "x" * 1000})
 
@@ -113,9 +110,7 @@ class TestMiddlewareOrdering:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         # Both custom and security headers should be present
@@ -147,9 +142,7 @@ class TestMiddlewareOrdering:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         # Timing should include middleware delay
@@ -193,9 +186,7 @@ class TestMiddlewareOrdering:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await client.get("/test")
 
         # Verify execution order:
@@ -235,9 +226,7 @@ class TestMiddlewareOrdering:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await client.get("/test")
 
         # Context should have been captured
@@ -266,9 +255,7 @@ class TestMiddlewareOrdering:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # Large request
             response = await client.post("/upload", json={"data": "x" * 1000})
 
@@ -311,9 +298,7 @@ class TestMiddlewareOrdering:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await client.get("/test")
 
         # Verify execution order (outer to inner):
@@ -347,9 +332,7 @@ class TestMiddlewareOrdering:
                     if message["type"] == "http.response.start":
                         header_order.append(self.header_name)
                         headers = list(message.get("headers", []))
-                        headers.append(
-                            (self.header_name.encode(), b"value")
-                        )
+                        headers.append((self.header_name.encode(), b"value"))
                         message["headers"] = headers
                     await send(message)
 
@@ -366,9 +349,7 @@ class TestMiddlewareOrdering:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         # All headers should be present
@@ -409,9 +390,7 @@ class TestMiddlewareOrdering:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             with pytest.raises(ValueError):
                 await client.get("/error")
 
@@ -449,9 +428,7 @@ class TestMiddlewareOrdering:
         from httpx import ASGITransport
 
         custom_id = str(uuid.uuid4())
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await client.get("/test", headers={"X-Request-ID": custom_id})
 
         # Context should have been set during request
@@ -482,9 +459,7 @@ class TestMiddlewareOrdering:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         # All middleware should work together

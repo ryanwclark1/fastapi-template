@@ -1,4 +1,5 @@
 """Unit tests for cursor-based pagination."""
+
 from __future__ import annotations
 
 import base64
@@ -98,6 +99,7 @@ class TestCursorCodec:
 
     def test_create_cursor_from_row(self):
         """CursorCodec should create cursor from database row."""
+
         # Mock a row-like object
         class MockRow:
             id = "row-123"

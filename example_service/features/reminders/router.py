@@ -1,4 +1,5 @@
 """API router for the reminders feature."""
+
 from __future__ import annotations
 
 import logging
@@ -322,9 +323,7 @@ async def fulltext_search_reminders(
         # Add rank column for relevance score
         # Note: WebSearchFilter doesn't have with_rank_column, so we add it manually
         ts_query = func.websearch_to_tsquery("english", q)
-        stmt = stmt.add_columns(
-            func.ts_rank(Reminder.search_vector, ts_query).label("search_rank")
-        )
+        stmt = stmt.add_columns(func.ts_rank(Reminder.search_vector, ts_query).label("search_rank"))
     else:
         # Plain text search with optional prefix matching
         search_filter = FullTextSearchFilter(
@@ -420,9 +419,7 @@ async def get_reminder(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> ReminderResponse:
     """Get a single reminder by ID."""
-    result = await session.execute(
-        select(Reminder).where(Reminder.id == reminder_id)
-    )
+    result = await session.execute(select(Reminder).where(Reminder.id == reminder_id))
     reminder = result.scalar_one_or_none()
 
     if reminder is None:
@@ -522,9 +519,7 @@ async def update_reminder(
     publisher: Annotated[EventPublisherDep, Depends()],
 ) -> ReminderResponse:
     """Update an existing reminder."""
-    result = await session.execute(
-        select(Reminder).where(Reminder.id == reminder_id)
-    )
+    result = await session.execute(select(Reminder).where(Reminder.id == reminder_id))
     reminder = result.scalar_one_or_none()
 
     if reminder is None:
@@ -561,7 +556,10 @@ async def update_reminder(
             changes["recurrence_rule"] = payload.recurrence_rule
             reminder.recurrence_rule = payload.recurrence_rule
 
-    if payload.recurrence_end_at is not None and reminder.recurrence_end_at != payload.recurrence_end_at:
+    if (
+        payload.recurrence_end_at is not None
+        and reminder.recurrence_end_at != payload.recurrence_end_at
+    ):
         changes["recurrence_end_at"] = (
             payload.recurrence_end_at.isoformat() if payload.recurrence_end_at else None
         )
@@ -595,9 +593,7 @@ async def complete_reminder(
     publisher: Annotated[EventPublisherDep, Depends()],
 ) -> ReminderResponse:
     """Mark a reminder as completed."""
-    result = await session.execute(
-        select(Reminder).where(Reminder.id == reminder_id)
-    )
+    result = await session.execute(select(Reminder).where(Reminder.id == reminder_id))
     reminder = result.scalar_one_or_none()
 
     if reminder is None:
@@ -635,9 +631,7 @@ async def delete_reminder(
     publisher: Annotated[EventPublisherDep, Depends()],
 ) -> None:
     """Delete a reminder permanently."""
-    result = await session.execute(
-        select(Reminder).where(Reminder.id == reminder_id)
-    )
+    result = await session.execute(select(Reminder).where(Reminder.id == reminder_id))
     reminder = result.scalar_one_or_none()
 
     if reminder is None:
@@ -647,9 +641,7 @@ async def delete_reminder(
     track_user_action("delete", is_authenticated=False)
 
     # Publish domain event before deletion
-    await publisher.publish(
-        ReminderDeletedEvent(reminder_id=str(reminder_id))
-    )
+    await publisher.publish(ReminderDeletedEvent(reminder_id=str(reminder_id)))
 
     await session.delete(reminder)
     await session.commit()
@@ -703,9 +695,7 @@ async def get_occurrences(
     Returns:
         List of occurrence dates with modification status
     """
-    result = await session.execute(
-        select(Reminder).where(Reminder.id == reminder_id)
-    )
+    result = await session.execute(select(Reminder).where(Reminder.id == reminder_id))
     reminder = result.scalar_one_or_none()
 
     if reminder is None:
@@ -808,9 +798,7 @@ async def break_out_occurrence(
     Returns:
         The new independent reminder
     """
-    result = await session.execute(
-        select(Reminder).where(Reminder.id == reminder_id)
-    )
+    result = await session.execute(select(Reminder).where(Reminder.id == reminder_id))
     reminder = result.scalar_one_or_none()
 
     if reminder is None:
@@ -899,9 +887,7 @@ async def get_next_reminder_occurrence(
     Returns:
         The next occurrence, or null if no more occurrences
     """
-    result = await session.execute(
-        select(Reminder).where(Reminder.id == reminder_id)
-    )
+    result = await session.execute(select(Reminder).where(Reminder.id == reminder_id))
     reminder = result.scalar_one_or_none()
 
     if reminder is None:

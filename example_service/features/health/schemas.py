@@ -264,12 +264,8 @@ class HealthHistoryEntry(BaseModel):
     timestamp: str = Field(description="When the check was performed (ISO format)")
     status: str = Field(description="Overall health status at that time")
     duration_ms: float = Field(description="How long the check took")
-    checks: dict[str, str] | None = Field(
-        default=None, description="Individual provider statuses"
-    )
-    provider_status: str | None = Field(
-        default=None, description="Status for filtered provider"
-    )
+    checks: dict[str, str] | None = Field(default=None, description="Individual provider statuses")
+    provider_status: str | None = Field(default=None, description="Status for filtered provider")
 
     model_config = ConfigDict(
         json_schema_extra={

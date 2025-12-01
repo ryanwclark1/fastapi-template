@@ -1,4 +1,5 @@
 """Unit tests for recurrence rule handling."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -177,9 +178,7 @@ class TestGenerateOccurrences:
         start = datetime(2025, 1, 1, 9, 0, 0)
         after = datetime(2025, 1, 5, 0, 0, 0)
 
-        occurrences = list(
-            generate_occurrences(DAILY, start, after=after, count=3)
-        )
+        occurrences = list(generate_occurrences(DAILY, start, after=after, count=3))
 
         assert len(occurrences) == 3
         assert all(dt > after for dt in occurrences)
@@ -189,9 +188,7 @@ class TestGenerateOccurrences:
         start = datetime(2025, 1, 1, 9, 0, 0)
         before = datetime(2025, 1, 5, 0, 0, 0)
 
-        occurrences = list(
-            generate_occurrences(DAILY, start, before=before, count=100)
-        )
+        occurrences = list(generate_occurrences(DAILY, start, before=before, count=100))
 
         assert len(occurrences) == 4  # Jan 1, 2, 3, 4
         assert all(dt < before for dt in occurrences)
@@ -208,9 +205,7 @@ class TestGenerateOccurrences:
     def test_exclude_start(self):
         """include_start=False should skip the start date."""
         start = datetime(2025, 1, 1, 9, 0, 0)
-        occurrences = list(
-            generate_occurrences(DAILY, start, count=3, include_start=False)
-        )
+        occurrences = list(generate_occurrences(DAILY, start, count=3, include_start=False))
 
         assert len(occurrences) == 3
         assert occurrences[0] == start + timedelta(days=1)

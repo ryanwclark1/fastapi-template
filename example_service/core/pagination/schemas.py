@@ -38,12 +38,8 @@ class PageInfo(BaseModel):
         total_count: Total number of items (optional, can be expensive)
     """
 
-    has_previous_page: bool = Field(
-        description="Whether previous items exist"
-    )
-    has_next_page: bool = Field(
-        description="Whether more items exist"
-    )
+    has_previous_page: bool = Field(description="Whether previous items exist")
+    has_next_page: bool = Field(description="Whether more items exist")
     start_cursor: str | None = Field(
         default=None,
         description="Cursor of the first item",

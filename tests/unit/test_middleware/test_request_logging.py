@@ -1,4 +1,5 @@
 """Unit tests for RequestLoggingMiddleware."""
+
 from __future__ import annotations
 
 import logging
@@ -55,9 +56,7 @@ class TestRequestLoggingMiddleware:
         """
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
             yield ac
 
     @patch("example_service.app.middleware.request_logging.logger")
@@ -120,9 +119,7 @@ class TestRequestLoggingMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         # Request should have request_id
@@ -159,9 +156,7 @@ class TestRequestLoggingMiddleware:
             # Or should log minimal info
             call_args = mock_logger.log.call_args_list
             # Exempt paths should either not log or log very minimally
-            assert len(call_args) == 0 or all(
-                "HTTP Request" not in str(call) for call in call_args
-            )
+            assert len(call_args) == 0 or all("HTTP Request" not in str(call) for call in call_args)
 
     @patch("example_service.app.middleware.request_logging.logger")
     async def test_logs_request_body(self, mock_logger: MagicMock, client: AsyncClient):
@@ -267,9 +262,7 @@ class TestRequestLoggingMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             with pytest.raises(ValueError):
                 await client.get("/error")
 
@@ -282,9 +275,7 @@ class TestRequestLoggingMiddleware:
             assert "failed" in log_message.lower() or "error" in log_message.lower()
 
     @patch("example_service.app.middleware.request_logging.set_log_context")
-    async def test_sets_logging_context(
-        self, mock_set_context: MagicMock, client: AsyncClient
-    ):
+    async def test_sets_logging_context(self, mock_set_context: MagicMock, client: AsyncClient):
         """Test that middleware sets logging context with request details."""
         await client.get("/test")
 
@@ -397,9 +388,7 @@ class TestRequestLoggingMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await client.get("/slow")
 
         # Find response log with duration
@@ -428,9 +417,7 @@ class TestRequestLoggingMiddleware:
 
     @patch("example_service.app.middleware.request_logging.logger")
     @patch("example_service.app.middleware.request_logging.tracking")
-    async def test_tracks_slow_requests(
-        self, mock_tracking: MagicMock, mock_logger: MagicMock
-    ):
+    async def test_tracks_slow_requests(self, mock_tracking: MagicMock, mock_logger: MagicMock):
         """Test that slow requests are tracked."""
         import asyncio
 
@@ -476,9 +463,7 @@ class TestRequestLoggingMiddleware:
 
             # Should not log detailed request for exempt path
             call_args = mock_logger.log.call_args_list
-            assert len(call_args) == 0 or all(
-                "HTTP Request" not in str(call) for call in call_args
-            )
+            assert len(call_args) == 0 or all("HTTP Request" not in str(call) for call in call_args)
 
     @patch("example_service.app.middleware.request_logging.logger")
     async def test_handles_form_data(self, mock_logger: MagicMock):
@@ -495,9 +480,7 @@ class TestRequestLoggingMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await client.post(
                 "/form",
                 data={"username": "testuser", "password": "secret"},
@@ -638,9 +621,7 @@ class TestEnhancedFeatures:
             assert log_extra["client_ip"] == "203.0.113.42"
 
     @patch("example_service.app.middleware.request_logging.logger")
-    async def test_user_agent_logging(
-        self, mock_logger: MagicMock, enhanced_client: AsyncClient
-    ):
+    async def test_user_agent_logging(self, mock_logger: MagicMock, enhanced_client: AsyncClient):
         """Test that user agent is logged."""
         user_agent = "Mozilla/5.0 (Test Browser)"
         await enhanced_client.get("/test", headers={"User-Agent": user_agent})
@@ -655,9 +636,7 @@ class TestEnhancedFeatures:
             assert log_extra["user_agent"] == user_agent
 
     @patch("example_service.app.middleware.request_logging.logger")
-    async def test_request_size_logging(
-        self, mock_logger: MagicMock, enhanced_client: AsyncClient
-    ):
+    async def test_request_size_logging(self, mock_logger: MagicMock, enhanced_client: AsyncClient):
         """Test that request size is logged."""
         payload = {"data": "test"}
         await enhanced_client.post("/upload", json=payload)
@@ -696,9 +675,7 @@ class TestEnhancedFeatures:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await client.get("/test")
 
         # Find request log (context should be available at request time)
@@ -713,9 +690,7 @@ class TestEnhancedFeatures:
         # This is expected behavior - context is logged when available
 
     @patch("example_service.app.middleware.request_logging.logger")
-    async def test_event_type_fields(
-        self, mock_logger: MagicMock, enhanced_client: AsyncClient
-    ):
+    async def test_event_type_fields(self, mock_logger: MagicMock, enhanced_client: AsyncClient):
         """Test that event_type field is present in logs."""
         await enhanced_client.get("/test")
 
@@ -738,9 +713,7 @@ class TestEnhancedFeatures:
             assert log_extra["event_type"] == "request_complete"
 
     @patch("example_service.app.middleware.request_logging.logger")
-    async def test_duration_ms_field(
-        self, mock_logger: MagicMock, enhanced_client: AsyncClient
-    ):
+    async def test_duration_ms_field(self, mock_logger: MagicMock, enhanced_client: AsyncClient):
         """Test that duration is logged in both seconds and milliseconds."""
         await enhanced_client.get("/test")
 
@@ -804,7 +777,8 @@ class TestEnhancedFeatures:
 
         # Check for security warning
         warning_calls = [
-            call for call in mock_logger.warning.call_args_list
+            call
+            for call in mock_logger.warning.call_args_list
             if "security event" in str(call).lower()
         ]
 
@@ -824,7 +798,8 @@ class TestEnhancedFeatures:
 
         # Check for security warning
         warning_calls = [
-            call for call in mock_logger.warning.call_args_list
+            call
+            for call in mock_logger.warning.call_args_list
             if "security event" in str(call).lower()
         ]
 
@@ -843,7 +818,8 @@ class TestEnhancedFeatures:
 
         # Check for security warning
         warning_calls = [
-            call for call in mock_logger.warning.call_args_list
+            call
+            for call in mock_logger.warning.call_args_list
             if "security event" in str(call).lower()
         ]
 
@@ -868,14 +844,13 @@ class TestEnhancedFeatures:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await client.get("/test?search=admin' OR '1'='1")
 
         # Should not log security warnings
         warning_calls = [
-            call for call in mock_logger.warning.call_args_list
+            call
+            for call in mock_logger.warning.call_args_list
             if "security event" in str(call).lower()
         ]
         assert len(warning_calls) == 0
@@ -897,9 +872,7 @@ class TestEnhancedFeatures:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             with pytest.raises(ValueError):
                 await client.get(
                     "/error",
@@ -941,16 +914,15 @@ class TestEnhancedFeatures:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # Test 200 - should use INFO level
             await client.get("/success")
             info_calls = mock_logger.log.call_args_list
             # Last call should be response log with INFO level
             if info_calls:
                 response_logs = [
-                    call for call in info_calls
+                    call
+                    for call in info_calls
                     if len(call[0]) > 1 and call[0][1] == "HTTP Response"
                 ]
                 if response_logs:
@@ -978,14 +950,10 @@ class TestEnhancedFeatures:
     ):
         """Test handling of various IP address formats."""
         # Test IPv6
-        await enhanced_client.get(
-            "/test", headers={"X-Forwarded-For": "2001:db8::1"}
-        )
+        await enhanced_client.get("/test", headers={"X-Forwarded-For": "2001:db8::1"})
 
         # Test with port
-        await enhanced_client.get(
-            "/test", headers={"X-Forwarded-For": "203.0.113.1:8080"}
-        )
+        await enhanced_client.get("/test", headers={"X-Forwarded-For": "203.0.113.1:8080"})
 
         # Should handle all formats without errors
         call_args = mock_logger.log.call_args_list

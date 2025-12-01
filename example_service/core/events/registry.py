@@ -62,9 +62,7 @@ class EventRegistry:
     @overload
     def register(self, event_class: None = None) -> Any: ...
 
-    def register(
-        self, event_class: type[T] | None = None
-    ) -> type[T] | Any:
+    def register(self, event_class: type[T] | None = None) -> type[T] | Any:
         """Register an event class in the registry.
 
         Can be used as a decorator or direct method call.

@@ -1,4 +1,5 @@
 """Tests for FastAPI application lifespan management."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -29,7 +30,9 @@ class DummySettings:
 
 
 @pytest.mark.asyncio
-async def test_lifespan_runs_with_all_dependencies_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_lifespan_runs_with_all_dependencies_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Minimal lifespan should complete without hitting external resources."""
 
     dummy = DummySettings()
@@ -79,7 +82,9 @@ async def test_lifespan_initializes_database_and_cache(monkeypatch: pytest.Monke
     monkeypatch.setattr("example_service.app.lifespan.close_database", lambda: record("db_close"))
     monkeypatch.setattr("example_service.app.lifespan.start_cache", lambda: record("cache_start"))
     monkeypatch.setattr("example_service.app.lifespan.stop_cache", lambda: record("cache_stop"))
-    monkeypatch.setattr("example_service.app.lifespan.start_tracker", lambda: record("tracker_start"))
+    monkeypatch.setattr(
+        "example_service.app.lifespan.start_tracker", lambda: record("tracker_start")
+    )
     monkeypatch.setattr("example_service.app.lifespan.stop_tracker", lambda: record("tracker_stop"))
     monkeypatch.setattr(
         "example_service.app.lifespan._initialize_taskiq_and_scheduler",
@@ -152,7 +157,9 @@ async def test_lifespan_warns_when_database_optional(monkeypatch: pytest.MonkeyP
     async def close_db() -> None:
         warnings.append("close")
 
-    monkeypatch.setattr("example_service.app.lifespan.logger.warning", lambda msg, *_, **__: warnings.append(msg))
+    monkeypatch.setattr(
+        "example_service.app.lifespan.logger.warning", lambda msg, *_, **__: warnings.append(msg)
+    )
     monkeypatch.setattr("example_service.app.lifespan.init_database", failing_init)
     monkeypatch.setattr("example_service.app.lifespan.close_database", close_db)
     _patch_common_dependencies(monkeypatch)

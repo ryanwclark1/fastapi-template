@@ -301,9 +301,7 @@ def require_all_acls(*required_acls: str):
     async def acl_checker(user: Annotated[AuthUser, Depends(get_current_user)]) -> AuthUser:
         acl = AccentAuthACL(user.permissions)
 
-        missing_acls = [
-            required for required in required_acls if not acl.has_permission(required)
-        ]
+        missing_acls = [required for required in required_acls if not acl.has_permission(required)]
 
         if missing_acls:
             logger.warning(

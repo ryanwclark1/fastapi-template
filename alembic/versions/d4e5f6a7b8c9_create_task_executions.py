@@ -70,8 +70,12 @@ def upgrade() -> None:
     op.create_index("ix_task_executions_task_name", "task_executions", ["task_name"], unique=False)
     op.create_index("ix_task_executions_status", "task_executions", ["status"], unique=False)
     op.create_index("ix_task_executions_worker_id", "task_executions", ["worker_id"], unique=False)
-    op.create_index("ix_task_executions_created_at", "task_executions", ["created_at"], unique=False)
-    op.create_index("ix_task_executions_error_type", "task_executions", ["error_type"], unique=False)
+    op.create_index(
+        "ix_task_executions_created_at", "task_executions", ["created_at"], unique=False
+    )
+    op.create_index(
+        "ix_task_executions_error_type", "task_executions", ["error_type"], unique=False
+    )
 
     # Composite indexes for common query patterns
     op.create_index(

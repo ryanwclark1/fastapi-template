@@ -33,6 +33,7 @@ Example:
     # Extract timestamp from UUID v7
     created_at = uuid_to_timestamp(id1)
 """
+
 from __future__ import annotations
 
 import base64

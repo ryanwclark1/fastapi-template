@@ -5,6 +5,7 @@ Revises: b2c3d4e5f6a7
 Create Date: 2025-11-25 14:00:00.000000
 
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -15,8 +16,8 @@ from sqlalchemy.dialects.postgresql import TSVECTOR
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'c3d4e5f6a7b8'
-down_revision: str | None = 'b2c3d4e5f6a7'
+revision: str = "c3d4e5f6a7b8"
+down_revision: str | None = "b2c3d4e5f6a7"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -24,18 +25,15 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     """Add full-text search capability to reminders table."""
     # Add search_vector column
-    op.add_column(
-        'reminders',
-        sa.Column('search_vector', TSVECTOR(), nullable=True)
-    )
+    op.add_column("reminders", sa.Column("search_vector", TSVECTOR(), nullable=True))
 
     # Create GIN index for fast full-text search
     op.create_index(
-        'ix_reminders_search_vector',
-        'reminders',
-        ['search_vector'],
+        "ix_reminders_search_vector",
+        "reminders",
+        ["search_vector"],
         unique=False,
-        postgresql_using='gin'
+        postgresql_using="gin",
     )
 
     # Create trigger function to auto-update search vector
@@ -75,7 +73,7 @@ def downgrade() -> None:
     op.execute("DROP FUNCTION IF EXISTS reminders_search_vector_update()")
 
     # Drop index
-    op.drop_index('ix_reminders_search_vector', table_name='reminders')
+    op.drop_index("ix_reminders_search_vector", table_name="reminders")
 
     # Drop column
-    op.drop_column('reminders', 'search_vector')
+    op.drop_column("reminders", "search_vector")

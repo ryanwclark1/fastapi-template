@@ -144,9 +144,7 @@ class ReminderRepository(BaseRepository[Reminder]):
         result = await session.execute(stmt)
         items = result.scalars().all()
 
-        self._lazy.debug(
-            lambda: f"db.find_pending_notifications: {len(items)} pending as of {now}"
-        )
+        self._lazy.debug(lambda: f"db.find_pending_notifications: {len(items)} pending as of {now}")
         return items
 
     async def search_reminders(
@@ -226,18 +224,14 @@ class ReminderRepository(BaseRepository[Reminder]):
         """
         reminder = await self.get(session, reminder_id)
         if reminder is None:
-            self._lazy.debug(
-                lambda: f"db.mark_completed({reminder_id}) -> not found"
-            )
+            self._lazy.debug(lambda: f"db.mark_completed({reminder_id}) -> not found")
             return None
 
         reminder.is_completed = True
         await session.flush()
         await session.refresh(reminder)
 
-        self._lazy.debug(
-            lambda: f"db.mark_completed({reminder_id}) -> success"
-        )
+        self._lazy.debug(lambda: f"db.mark_completed({reminder_id}) -> success")
         return reminder
 
     async def mark_notification_sent(
@@ -256,18 +250,14 @@ class ReminderRepository(BaseRepository[Reminder]):
         """
         reminder = await self.get(session, reminder_id)
         if reminder is None:
-            self._lazy.debug(
-                lambda: f"db.mark_notification_sent({reminder_id}) -> not found"
-            )
+            self._lazy.debug(lambda: f"db.mark_notification_sent({reminder_id}) -> not found")
             return None
 
         reminder.notification_sent = True
         await session.flush()
         await session.refresh(reminder)
 
-        self._lazy.debug(
-            lambda: f"db.mark_notification_sent({reminder_id}) -> success"
-        )
+        self._lazy.debug(lambda: f"db.mark_notification_sent({reminder_id}) -> success")
         return reminder
 
 

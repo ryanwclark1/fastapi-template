@@ -299,9 +299,7 @@ class IntegrationTestHelper:
             AssertionError: If any expected header is missing
         """
         for header in expected_headers:
-            assert (
-                header.lower() in response.headers
-            ), f"Missing expected header: {header}"
+            assert header.lower() in response.headers, f"Missing expected header: {header}"
 
     @staticmethod
     def assert_security_headers(response: Any) -> None:

@@ -93,9 +93,7 @@ def _color_distance(c1: tuple[int, int, int], c2: tuple[int, int, int]) -> float
     return ((c1[0] - c2[0]) ** 2 + (c1[1] - c2[1]) ** 2 + (c1[2] - c2[2]) ** 2) ** 0.5
 
 
-def _nearest_color_index(
-    rgb: tuple[int, int, int], palette: list[tuple[int, int, int]]
-) -> int:
+def _nearest_color_index(rgb: tuple[int, int, int], palette: list[tuple[int, int, int]]) -> int:
     """Find the index of the nearest color in the palette.
 
     Args:

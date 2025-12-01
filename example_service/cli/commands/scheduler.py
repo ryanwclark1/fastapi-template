@@ -56,6 +56,7 @@ async def list_jobs(output_format: str) -> None:
 
         if output_format == "json":
             import json
+
             click.echo(json.dumps(jobs, indent=2))
             return
 
@@ -67,9 +68,7 @@ async def list_jobs(output_format: str) -> None:
         name_width = max(len(j["name"]) for j in jobs) + 2
 
         click.echo()
-        click.echo(
-            f"{'ID':<{id_width}} {'Name':<{name_width}} {'Next Run':<25} {'Trigger':<30}"
-        )
+        click.echo(f"{'ID':<{id_width}} {'Name':<{name_width}} {'Next Run':<25} {'Trigger':<30}")
         click.echo("-" * (id_width + name_width + 55))
 
         for job in jobs:
@@ -164,6 +163,7 @@ async def run_job(job_id: str, wait: bool) -> None:
         try:
             # Initialize broker if needed for Taskiq tasks
             from example_service.tasks.broker import broker
+
             if broker is not None:
                 await broker.startup()
 
@@ -325,7 +325,13 @@ async def show_jobs_by_category(category: str | None) -> None:
     header("Scheduled Jobs Detail")
 
     job_categories = {
-        "cleanup": ["cleanup_sessions", "temp_cleanup", "backup_cleanup", "export_cleanup", "data_cleanup"],
+        "cleanup": [
+            "cleanup_sessions",
+            "temp_cleanup",
+            "backup_cleanup",
+            "export_cleanup",
+            "data_cleanup",
+        ],
         "backup": ["database_backup"],
         "metrics": ["hourly_metrics"],
         "sync": ["sync_external"],

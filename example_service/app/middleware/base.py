@@ -91,9 +91,7 @@ class HeaderContextMiddleware(ABC):
         """
         ...
 
-    def on_value_extracted(
-        self, scope: Scope, value: str, was_generated: bool
-    ) -> None:
+    def on_value_extracted(self, scope: Scope, value: str, was_generated: bool) -> None:
         """Hook called after the value is determined.
 
         Override to add custom logging or processing.

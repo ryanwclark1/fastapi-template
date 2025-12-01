@@ -16,12 +16,8 @@ class PageInfoType:
     Mirrors example_service.core.pagination.schemas.PageInfo.
     """
 
-    has_previous_page: bool = strawberry.field(
-        description="Whether previous items exist"
-    )
-    has_next_page: bool = strawberry.field(
-        description="Whether more items exist"
-    )
+    has_previous_page: bool = strawberry.field(description="Whether previous items exist")
+    has_next_page: bool = strawberry.field(description="Whether more items exist")
     start_cursor: str | None = strawberry.field(
         default=None,
         description="Cursor of the first item",

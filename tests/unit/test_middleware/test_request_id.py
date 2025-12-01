@@ -1,4 +1,5 @@
 """Unit tests for RequestIDMiddleware."""
+
 from __future__ import annotations
 
 import uuid
@@ -42,9 +43,7 @@ class TestRequestIDMiddleware:
         """
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
             yield ac
 
     async def test_generates_request_id_when_not_provided(self, client: AsyncClient):
@@ -101,9 +100,7 @@ class TestRequestIDMiddleware:
         mock_clear_context.assert_called_once()
 
     @patch("example_service.app.middleware.base.clear_log_context")
-    async def test_clears_context_on_error(
-        self, mock_clear_context: MagicMock
-    ):
+    async def test_clears_context_on_error(self, mock_clear_context: MagicMock):
         """Test that middleware clears context even when handler raises exception."""
         app = FastAPI()
         app.add_middleware(RequestIDMiddleware)
@@ -114,9 +111,7 @@ class TestRequestIDMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             with pytest.raises(ValueError):
                 await client.get("/error")
 
@@ -139,9 +134,7 @@ class TestRequestIDMiddleware:
         from httpx import ASGITransport
 
         custom_id = str(uuid.uuid4())
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test", headers={"X-Request-ID": custom_id})
 
         assert response.status_code == 200
@@ -174,15 +167,19 @@ class TestRequestIDMiddleware:
 
         # Mock ASGI app
         async def mock_app(scope: Scope, receive: Receive, send: Send):
-            await send({
-                "type": "http.response.start",
-                "status": 200,
-                "headers": [[b"content-type", b"application/json"]],
-            })
-            await send({
-                "type": "http.response.body",
-                "body": b'{"status":"ok"}',
-            })
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 200,
+                    "headers": [[b"content-type", b"application/json"]],
+                }
+            )
+            await send(
+                {
+                    "type": "http.response.body",
+                    "body": b'{"status":"ok"}',
+                }
+            )
 
         middleware = RequestIDMiddleware(mock_app)
 
@@ -239,9 +236,7 @@ class TestRequestIDMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # Warm up
             await client.get("/test")
 

@@ -49,66 +49,77 @@ if TYPE_CHECKING:
 def _get_app_settings() -> AppSettings:
     """Lazy import to avoid circular dependencies."""
     from .app import AppSettings
+
     return AppSettings()
 
 
 def _get_db_settings() -> PostgresSettings:
     """Lazy import to avoid circular dependencies."""
     from .postgres import PostgresSettings
+
     return PostgresSettings()
 
 
 def _get_redis_settings() -> RedisSettings:
     """Lazy import to avoid circular dependencies."""
     from .redis import RedisSettings
+
     return RedisSettings()
 
 
 def _get_rabbit_settings() -> RabbitSettings:
     """Lazy import to avoid circular dependencies."""
     from .rabbit import RabbitSettings
+
     return RabbitSettings()
 
 
 def _get_logging_settings() -> LoggingSettings:
     """Lazy import to avoid circular dependencies."""
     from .logs import LoggingSettings
+
     return LoggingSettings()
 
 
 def _get_otel_settings() -> OtelSettings:
     """Lazy import to avoid circular dependencies."""
     from .otel import OtelSettings
+
     return OtelSettings()
 
 
 def _get_auth_settings() -> AuthSettings:
     """Lazy import to avoid circular dependencies."""
     from .auth import AuthSettings
+
     return AuthSettings()
 
 
 def _get_backup_settings() -> BackupSettings:
     """Lazy import to avoid circular dependencies."""
     from .backup import BackupSettings
+
     return BackupSettings()
 
 
 def _get_consul_settings() -> ConsulSettings:
     """Lazy import to avoid circular dependencies."""
     from .consul import ConsulSettings
+
     return ConsulSettings()
 
 
 def _get_storage_settings() -> StorageSettings:
     """Lazy import to avoid circular dependencies."""
     from .storage import StorageSettings
+
     return StorageSettings()
 
 
 def _get_task_settings() -> TaskSettings:
     """Lazy import to avoid circular dependencies."""
     from .tasks import TaskSettings
+
     return TaskSettings()
 
 

@@ -24,11 +24,17 @@ class WebhookBase(BaseModel):
     name: str = Field(..., max_length=200, description="Human-readable webhook name")
     description: str | None = Field(None, description="Webhook description")
     url: HttpUrl = Field(..., description="Target URL for webhook delivery")
-    event_types: list[str] = Field(..., min_length=1, description="List of event types to subscribe to")
+    event_types: list[str] = Field(
+        ..., min_length=1, description="List of event types to subscribe to"
+    )
     is_active: bool = Field(default=True, description="Whether webhook is active")
     max_retries: int = Field(default=5, ge=0, le=10, description="Maximum delivery retry attempts")
-    timeout_seconds: int = Field(default=30, ge=1, le=300, description="HTTP request timeout in seconds")
-    custom_headers: dict[str, str] | None = Field(None, description="Additional HTTP headers to include in requests")
+    timeout_seconds: int = Field(
+        default=30, ge=1, le=300, description="HTTP request timeout in seconds"
+    )
+    custom_headers: dict[str, str] | None = Field(
+        None, description="Additional HTTP headers to include in requests"
+    )
 
     @field_validator("event_types")
     @classmethod
@@ -71,11 +77,19 @@ class WebhookUpdate(BaseModel):
     name: str | None = Field(None, max_length=200, description="Human-readable webhook name")
     description: str | None = Field(None, description="Webhook description")
     url: HttpUrl | None = Field(None, description="Target URL for webhook delivery")
-    event_types: list[str] | None = Field(None, min_length=1, description="List of event types to subscribe to")
+    event_types: list[str] | None = Field(
+        None, min_length=1, description="List of event types to subscribe to"
+    )
     is_active: bool | None = Field(None, description="Whether webhook is active")
-    max_retries: int | None = Field(None, ge=0, le=10, description="Maximum delivery retry attempts")
-    timeout_seconds: int | None = Field(None, ge=1, le=300, description="HTTP request timeout in seconds")
-    custom_headers: dict[str, str] | None = Field(None, description="Additional HTTP headers to include in requests")
+    max_retries: int | None = Field(
+        None, ge=0, le=10, description="Maximum delivery retry attempts"
+    )
+    timeout_seconds: int | None = Field(
+        None, ge=1, le=300, description="HTTP request timeout in seconds"
+    )
+    custom_headers: dict[str, str] | None = Field(
+        None, description="Additional HTTP headers to include in requests"
+    )
 
     @field_validator("event_types")
     @classmethod

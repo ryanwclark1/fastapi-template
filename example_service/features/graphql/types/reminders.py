@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING, Annotated
 import strawberry
 
 if TYPE_CHECKING:
-
     from datetime import datetime
 
     from example_service.features.graphql.types.base import PageInfoType

@@ -108,7 +108,9 @@ class TestDatabasePoolHealthProviderInitialization:
 
     def test_degraded_threshold_not_less_than_unhealthy(self, mock_engine):
         """Test initialization fails when degraded >= unhealthy threshold."""
-        with pytest.raises(ValueError, match="degraded_threshold.*must be less than.*unhealthy_threshold"):
+        with pytest.raises(
+            ValueError, match="degraded_threshold.*must be less than.*unhealthy_threshold"
+        ):
             DatabasePoolHealthProvider(
                 engine=mock_engine,
                 degraded_threshold=0.9,
@@ -117,7 +119,9 @@ class TestDatabasePoolHealthProviderInitialization:
 
     def test_degraded_threshold_equal_to_unhealthy(self, mock_engine):
         """Test initialization fails when thresholds are equal."""
-        with pytest.raises(ValueError, match="degraded_threshold.*must be less than.*unhealthy_threshold"):
+        with pytest.raises(
+            ValueError, match="degraded_threshold.*must be less than.*unhealthy_threshold"
+        ):
             DatabasePoolHealthProvider(
                 engine=mock_engine,
                 degraded_threshold=0.8,
@@ -358,7 +362,9 @@ class TestDatabasePoolHealthProviderEdgeCases:
         type(unsupported_pool).__name__ = "CustomPool"
 
         # Make methods raise AttributeError
-        unsupported_pool.size.side_effect = AttributeError("'CustomPool' object has no attribute 'size'")
+        unsupported_pool.size.side_effect = AttributeError(
+            "'CustomPool' object has no attribute 'size'"
+        )
 
         mock_engine.pool = unsupported_pool
 

@@ -16,9 +16,7 @@ class DuplicateExpireTimeSelectedError(ResultBackendError, TaskIQRedisError):
 class ExpireTimeMustBeMoreThanZeroError(ResultBackendError, TaskIQRedisError):
     """Error if two lifetimes are less or equal zero."""
 
-    __template__ = (
-        "You must select one expire time param and it must be more than zero."
-    )
+    __template__ = "You must select one expire time param and it must be more than zero."
 
 
 class ResultIsMissingError(TaskIQRedisError, ResultGetError):

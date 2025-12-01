@@ -31,11 +31,21 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Type aliases for annotated arguments with descriptions
-FirstArg = Annotated[int, strawberry.argument(description="Number of items to return (forward pagination)")]
-AfterArg = Annotated[str | None, strawberry.argument(description="Cursor to start after (forward pagination)")]
-LastArg = Annotated[int | None, strawberry.argument(description="Number of items to return (backward pagination)")]
-BeforeArg = Annotated[str | None, strawberry.argument(description="Cursor to start before (backward pagination)")]
-IncludeCompletedArg = Annotated[bool, strawberry.argument(description="Include completed reminders")]
+FirstArg = Annotated[
+    int, strawberry.argument(description="Number of items to return (forward pagination)")
+]
+AfterArg = Annotated[
+    str | None, strawberry.argument(description="Cursor to start after (forward pagination)")
+]
+LastArg = Annotated[
+    int | None, strawberry.argument(description="Number of items to return (backward pagination)")
+]
+BeforeArg = Annotated[
+    str | None, strawberry.argument(description="Cursor to start before (backward pagination)")
+]
+IncludeCompletedArg = Annotated[
+    bool, strawberry.argument(description="Include completed reminders")
+]
 
 
 @strawberry.type(description="Root query type")

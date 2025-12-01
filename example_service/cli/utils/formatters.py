@@ -32,4 +32,4 @@ def section(title: str) -> None:
     """Print a section divider."""
     click.secho(f"\n{'=' * 60}", fg="white", dim=True)
     click.secho(title, fg="white", bold=True)
-    click.secho('=' * 60, fg="white", dim=True)
+    click.secho("=" * 60, fg="white", dim=True)

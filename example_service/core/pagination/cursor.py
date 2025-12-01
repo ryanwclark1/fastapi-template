@@ -33,9 +33,7 @@ class CursorData(BaseModel):
         direction: Pagination direction (forward = after, backward = before)
     """
 
-    values: dict[str, Any] = Field(
-        description="Sort field values for seeking"
-    )
+    values: dict[str, Any] = Field(description="Sort field values for seeking")
     direction: Literal["forward", "backward"] = Field(
         default="forward",
         description="Pagination direction",

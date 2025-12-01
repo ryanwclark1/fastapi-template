@@ -1,4 +1,5 @@
 """Tests for RateLimitMiddleware behavior."""
+
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
@@ -14,7 +15,13 @@ from example_service.app.middleware.rate_limit import RateLimitMiddleware
 class StubLimiter:
     """Async limiter stub with configurable responses."""
 
-    def __init__(self, *, allowed: bool = True, metadata: dict[str, Any] | None = None, error: Exception | None = None):
+    def __init__(
+        self,
+        *,
+        allowed: bool = True,
+        metadata: dict[str, Any] | None = None,
+        error: Exception | None = None,
+    ):
         self.allowed = allowed
         self.metadata = metadata or {"limit": 5, "remaining": 4, "reset": 30, "retry_after": 10}
         self.error = error

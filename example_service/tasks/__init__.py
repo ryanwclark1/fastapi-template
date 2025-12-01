@@ -15,6 +15,7 @@ Task modules:
 Run the worker to execute tasks:
     taskiq worker example_service.tasks.broker:broker
 """
+
 from __future__ import annotations
 
 # Re-export task modules for convenient access
@@ -26,6 +27,7 @@ except Exception:  # pragma: no cover - broker optional in some environments
 
     def get_broker():  # type: ignore[override]
         return None
+
 
 try:
     from example_service.tasks.scheduler import (
@@ -57,6 +59,7 @@ except Exception:  # pragma: no cover - scheduler optional without broker
 
     async def stop_scheduler() -> None:
         return None
+
 
 from example_service.tasks.tracking import (
     TaskExecutionTracker,

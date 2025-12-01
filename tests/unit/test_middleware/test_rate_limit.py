@@ -1,4 +1,5 @@
 """Unit tests for RateLimitMiddleware."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -132,9 +133,7 @@ class TestRateLimitMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/health")
 
         assert response.status_code == 200
@@ -158,9 +157,7 @@ class TestRateLimitMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/custom/exempt")
 
         assert response.status_code == 200
@@ -207,9 +204,7 @@ class TestRateLimitMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await client.get("/test", headers={"X-User-ID": "user123"})
 
         call_args = mock_limiter.check_limit.call_args
@@ -236,9 +231,7 @@ class TestRateLimitMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await client.get("/test", headers={"X-Forwarded-For": "192.168.1.1, 10.0.0.1"})
 
         # Should use first IP in X-Forwarded-For chain
@@ -261,9 +254,7 @@ class TestRateLimitMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         assert response.status_code == 200
@@ -299,9 +290,7 @@ class TestRateLimitMiddleware:
             {"limit": 10, "remaining": 0, "reset": 1234567890, "retry_after": 60},
         )
 
-        with patch(
-            "example_service.app.middleware.rate_limit.logger"
-        ) as mock_logger:
+        with patch("example_service.app.middleware.rate_limit.logger") as mock_logger:
             await client.get("/test")
 
             # Should log warning about rate limit
@@ -355,9 +344,7 @@ class TestRateLimitMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # GET request
             response = await client.get("/test")
             assert response.status_code == 200
@@ -392,9 +379,7 @@ class TestRateLimitMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # Make 10 concurrent requests
             tasks = [client.get("/test") for _ in range(10)]
             responses = await asyncio.gather(*tasks)
@@ -442,9 +427,7 @@ class TestRateLimitMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # Both should be exempt (prefix matching)
             await client.get("/health/live")
             await client.get("/health/ready")

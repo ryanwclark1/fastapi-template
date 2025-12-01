@@ -83,9 +83,7 @@ class OutboxProcessor:
         self._broker = broker
 
         if self._broker is None:
-            logger.warning(
-                "RabbitMQ broker not configured, outbox processor disabled"
-            )
+            logger.warning("RabbitMQ broker not configured, outbox processor disabled")
             return
 
         self._running = True
@@ -255,9 +253,7 @@ class OutboxProcessor:
         repo = OutboxRepository()
 
         async with get_async_session() as session:
-            events = await repo.fetch_pending(
-                session, batch_size=1, max_retries=self.max_retries
-            )
+            events = await repo.fetch_pending(session, batch_size=1, max_retries=self.max_retries)
 
             if not events:
                 return False

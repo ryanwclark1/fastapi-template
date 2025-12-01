@@ -167,9 +167,7 @@ class TestCircuitBreakerStateTransitions:
         assert breaker.state == CircuitState.OPEN
         assert breaker.total_failures == breaker.failure_threshold
 
-    async def test_open_to_half_open_after_timeout(
-        self, breaker: CircuitBreaker
-    ) -> None:
+    async def test_open_to_half_open_after_timeout(self, breaker: CircuitBreaker) -> None:
         """Test circuit transitions to half-open after recovery timeout."""
         # Force circuit to open
         breaker._state = CircuitState.OPEN
@@ -250,7 +248,8 @@ class TestCircuitBreakerCallProtection:
         assert breaker._failure_count == 1
 
     async def test_call_resets_failure_count_on_success(
-        self, breaker: CircuitBreaker,
+        self,
+        breaker: CircuitBreaker,
         fast_failing_func: Callable[[], None],
         successful_func: Callable[[], str],
     ) -> None:
@@ -266,9 +265,7 @@ class TestCircuitBreakerCallProtection:
         await breaker.call(successful_func)
         assert breaker._failure_count == 0
 
-    async def test_call_with_unexpected_exception(
-        self, breaker: CircuitBreaker
-    ) -> None:
+    async def test_call_with_unexpected_exception(self, breaker: CircuitBreaker) -> None:
         """Test unexpected exceptions don't affect circuit state."""
 
         async def unexpected_error_func() -> None:
@@ -311,9 +308,7 @@ class TestCircuitBreakerDecoratorPattern:
 
         assert breaker.total_failures == 1
 
-    async def test_protected_decorator_preserves_metadata(
-        self, breaker: CircuitBreaker
-    ) -> None:
+    async def test_protected_decorator_preserves_metadata(self, breaker: CircuitBreaker) -> None:
         """Test @breaker.protected preserves function metadata."""
 
         @breaker.protected
@@ -354,9 +349,7 @@ class TestCircuitBreakerContextManager:
 
         assert breaker.total_failures == 1
 
-    async def test_context_manager_raises_when_open(
-        self, breaker: CircuitBreaker
-    ) -> None:
+    async def test_context_manager_raises_when_open(self, breaker: CircuitBreaker) -> None:
         """Test context manager raises CircuitOpenError when circuit is open."""
         # Force circuit to open
         breaker._state = CircuitState.OPEN
@@ -366,9 +359,7 @@ class TestCircuitBreakerContextManager:
             async with breaker:
                 pass  # Should not reach here
 
-    async def test_context_manager_half_open_call_limit(
-        self, breaker: CircuitBreaker
-    ) -> None:
+    async def test_context_manager_half_open_call_limit(self, breaker: CircuitBreaker) -> None:
         """Test context manager respects half-open call limit."""
         # Set to half-open with calls at limit
         breaker._state = CircuitState.HALF_OPEN
@@ -416,9 +407,7 @@ class TestCircuitBreakerMetrics:
         assert metrics["failure_rate"] == pytest.approx(1 / 3)
         assert metrics["last_failure_time"] is not None
 
-    async def test_get_metrics_failure_rate_calculation(
-        self, breaker: CircuitBreaker
-    ) -> None:
+    async def test_get_metrics_failure_rate_calculation(self, breaker: CircuitBreaker) -> None:
         """Test failure rate is calculated correctly."""
         breaker.total_successes = 7
         breaker.total_failures = 3
@@ -426,9 +415,7 @@ class TestCircuitBreakerMetrics:
         metrics = breaker.get_metrics()
         assert metrics["failure_rate"] == pytest.approx(0.3)
 
-    async def test_get_stats_backward_compatibility(
-        self, breaker: CircuitBreaker
-    ) -> None:
+    async def test_get_stats_backward_compatibility(self, breaker: CircuitBreaker) -> None:
         """Test get_stats method for backward compatibility."""
         stats = breaker.get_stats()
 
@@ -505,9 +492,7 @@ class TestCircuitBreakerConcurrency:
 class TestCircuitBreakerHalfOpenState:
     """Test circuit breaker half-open state behavior."""
 
-    async def test_half_open_limits_concurrent_calls(
-        self, breaker: CircuitBreaker
-    ) -> None:
+    async def test_half_open_limits_concurrent_calls(self, breaker: CircuitBreaker) -> None:
         """Test half-open state limits concurrent calls."""
         breaker._state = CircuitState.HALF_OPEN
         breaker._half_open_calls = 0
@@ -546,9 +531,7 @@ class TestCircuitBreakerEdgeCases:
     async def test_recovery_timeout_edge_case(self, breaker: CircuitBreaker) -> None:
         """Test recovery timeout at exact boundary."""
         breaker._state = CircuitState.OPEN
-        breaker._last_failure_time = datetime.now(UTC) - timedelta(
-            seconds=breaker.recovery_timeout
-        )
+        breaker._last_failure_time = datetime.now(UTC) - timedelta(seconds=breaker.recovery_timeout)
 
         async with breaker._lock:
             await breaker._check_state()
@@ -556,16 +539,12 @@ class TestCircuitBreakerEdgeCases:
         # Should transition exactly at timeout boundary
         assert breaker.state == CircuitState.HALF_OPEN
 
-    async def test_zero_failure_rate_with_no_calls(
-        self, breaker: CircuitBreaker
-    ) -> None:
+    async def test_zero_failure_rate_with_no_calls(self, breaker: CircuitBreaker) -> None:
         """Test failure rate is 0 when no calls have been made."""
         metrics = breaker.get_metrics()
         assert metrics["failure_rate"] == 0.0
 
-    async def test_exception_in_decorator_propagates(
-        self, breaker: CircuitBreaker
-    ) -> None:
+    async def test_exception_in_decorator_propagates(self, breaker: CircuitBreaker) -> None:
         """Test exceptions in decorated functions propagate correctly."""
 
         @breaker.protected

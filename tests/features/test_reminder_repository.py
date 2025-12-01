@@ -1,4 +1,5 @@
 """Integration-style tests for the reminder repository queries."""
+
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
@@ -20,7 +21,9 @@ async def session() -> AsyncIterator[AsyncSession]:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     tables = [Reminder.__table__, Tag.__table__, reminder_tags]
     async with engine.begin() as conn:
-        await conn.run_sync(lambda sync_conn: Reminder.metadata.create_all(sync_conn, tables=tables))
+        await conn.run_sync(
+            lambda sync_conn: Reminder.metadata.create_all(sync_conn, tables=tables)
+        )
 
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with factory() as session:

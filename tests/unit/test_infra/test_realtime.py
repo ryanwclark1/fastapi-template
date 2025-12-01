@@ -1,4 +1,5 @@
 """Unit tests for WebSocket realtime infrastructure."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -170,9 +171,7 @@ class TestConnectionManager:
         )
 
         assert result is True
-        mock_ws.send_json.assert_called_once_with(
-            {"type": "test", "data": "hello"}
-        )
+        mock_ws.send_json.assert_called_once_with({"type": "test", "data": "hello"})
 
     @pytest.mark.asyncio
     async def test_send_to_nonexistent_connection(self, manager):

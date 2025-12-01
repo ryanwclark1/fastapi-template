@@ -88,6 +88,7 @@ async def export_data(
         # Import the model
         module_path, class_name = table_models[table].rsplit(":", 1)
         import importlib
+
         module = importlib.import_module(module_path)
         Model = getattr(module, class_name)
 
@@ -239,6 +240,7 @@ async def import_data(
         # Import the model
         module_path, class_name = table_models[table].rsplit(":", 1)
         import importlib
+
         module = importlib.import_module(module_path)
         Model = getattr(module, class_name)
 
@@ -332,7 +334,9 @@ async def database_stats() -> None:
             result = await session.execute(text("SELECT current_database()"))
             db_name = result.scalar_one()
 
-            result = await session.execute(text("SELECT pg_size_pretty(pg_database_size(current_database()))"))
+            result = await session.execute(
+                text("SELECT pg_size_pretty(pg_database_size(current_database()))")
+            )
             db_size = result.scalar_one()
 
             section("Database Info")
@@ -342,7 +346,8 @@ async def database_stats() -> None:
             click.echo(f"  Version:  {version.split(',')[0] if version else 'N/A'}")
 
             # Table statistics
-            result = await session.execute(text("""
+            result = await session.execute(
+                text("""
                 SELECT
                     schemaname,
                     relname as table_name,
@@ -350,7 +355,8 @@ async def database_stats() -> None:
                     pg_size_pretty(pg_total_relation_size(relid)) as total_size
                 FROM pg_stat_user_tables
                 ORDER BY n_live_tup DESC
-            """))
+            """)
+            )
             tables = result.fetchall()
 
             section("Table Statistics")
@@ -358,12 +364,15 @@ async def database_stats() -> None:
                 click.echo(f"  {'Table':<30} {'Rows':<12} {'Size':<15}")
                 click.echo("  " + "-" * 57)
                 for table in tables:
-                    click.echo(f"  {table.table_name:<30} {table.row_count:<12} {table.total_size:<15}")
+                    click.echo(
+                        f"  {table.table_name:<30} {table.row_count:<12} {table.total_size:<15}"
+                    )
             else:
                 info("No tables found")
 
             # Index statistics
-            result = await session.execute(text("""
+            result = await session.execute(
+                text("""
                 SELECT
                     indexrelname as index_name,
                     relname as table_name,
@@ -372,7 +381,8 @@ async def database_stats() -> None:
                 FROM pg_stat_user_indexes
                 ORDER BY idx_scan DESC
                 LIMIT 10
-            """))
+            """)
+            )
             indexes = result.fetchall()
 
             section("Top Indexes (by usage)")
@@ -385,14 +395,16 @@ async def database_stats() -> None:
                 info("No indexes found")
 
             # Connection info
-            result = await session.execute(text("""
+            result = await session.execute(
+                text("""
                 SELECT
                     count(*) as total,
                     count(*) FILTER (WHERE state = 'active') as active,
                     count(*) FILTER (WHERE state = 'idle') as idle
                 FROM pg_stat_activity
                 WHERE datname = current_database()
-            """))
+            """)
+            )
             conn_stats = result.fetchone()
 
             section("Connection Statistics")
@@ -418,12 +430,14 @@ async def list_tables() -> None:
 
         async with get_session() as session:
             # Get tables
-            result = await session.execute(text("""
+            result = await session.execute(
+                text("""
                 SELECT table_name
                 FROM information_schema.tables
                 WHERE table_schema = 'public'
                 ORDER BY table_name
-            """))
+            """)
+            )
             tables = result.fetchall()
 
             if not tables:
@@ -435,7 +449,8 @@ async def list_tables() -> None:
                 section(f"Table: {table_name}")
 
                 # Get columns
-                result = await session.execute(text("""
+                result = await session.execute(
+                    text("""
                     SELECT
                         column_name,
                         data_type,
@@ -444,7 +459,9 @@ async def list_tables() -> None:
                     FROM information_schema.columns
                     WHERE table_name = :table_name
                     ORDER BY ordinal_position
-                """), {"table_name": table_name})
+                """),
+                    {"table_name": table_name},
+                )
                 columns = result.fetchall()
 
                 click.echo(f"  {'Column':<25} {'Type':<20} {'Nullable':<10} {'Default'}")
@@ -452,7 +469,9 @@ async def list_tables() -> None:
                 for col in columns:
                     nullable = "Yes" if col.is_nullable == "YES" else "No"
                     default = col.column_default[:30] if col.column_default else "-"
-                    click.echo(f"  {col.column_name:<25} {col.data_type:<20} {nullable:<10} {default}")
+                    click.echo(
+                        f"  {col.column_name:<25} {col.data_type:<20} {nullable:<10} {default}"
+                    )
 
                 click.echo()
 
@@ -487,12 +506,14 @@ async def count_records(table: str | None) -> None:
                 # Count all tables
                 header("Record Counts")
 
-                result = await session.execute(text("""
+                result = await session.execute(
+                    text("""
                     SELECT table_name
                     FROM information_schema.tables
                     WHERE table_schema = 'public'
                     ORDER BY table_name
-                """))
+                """)
+                )
                 tables = result.fetchall()
 
                 total = 0

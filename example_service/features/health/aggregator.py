@@ -209,9 +209,7 @@ class HealthAggregator:
             self._settings = settings
         else:
             self._cache_ttl = (
-                cache_ttl_seconds
-                if cache_ttl_seconds is not None
-                else DEFAULT_CACHE_TTL_SECONDS
+                cache_ttl_seconds if cache_ttl_seconds is not None else DEFAULT_CACHE_TTL_SECONDS
             )
             self._check_timeout = (
                 check_timeout_seconds
@@ -340,7 +338,9 @@ class HealthAggregator:
         if not self._providers:
             return {}
 
-        async def check_provider(name: str, provider: HealthProvider) -> tuple[str, HealthCheckResult]:
+        async def check_provider(
+            name: str, provider: HealthProvider
+        ) -> tuple[str, HealthCheckResult]:
             """Run a single provider check with error handling and metrics tracking."""
             from example_service.features.health.providers import (
                 record_health_check_result,
@@ -373,9 +373,7 @@ class HealthAggregator:
                 logger.exception("Health check failed for provider", extra={"provider": name})
 
                 # Record error metric
-                health_check_errors_total.labels(
-                    provider=name, error_type=type(e).__name__
-                ).inc()
+                health_check_errors_total.labels(provider=name, error_type=type(e).__name__).inc()
 
                 # Update legacy metrics for failed check
                 dependency_type = PROVIDER_TYPE_MAPPING.get(name, "api")
@@ -395,10 +393,7 @@ class HealthAggregator:
                 return name, result
 
         # Create tasks for all providers
-        tasks = [
-            check_provider(name, provider)
-            for name, provider in self._providers.items()
-        ]
+        tasks = [check_provider(name, provider) for name, provider in self._providers.items()]
 
         # Run all checks concurrently with overall timeout
         try:
@@ -657,9 +652,15 @@ class HealthAggregator:
                 continue
 
             p_total = len(provider_entries)
-            p_healthy = sum(1 for e in provider_entries if e.checks[provider_name] == HealthStatus.HEALTHY)
-            p_degraded = sum(1 for e in provider_entries if e.checks[provider_name] == HealthStatus.DEGRADED)
-            p_unhealthy = sum(1 for e in provider_entries if e.checks[provider_name] == HealthStatus.UNHEALTHY)
+            p_healthy = sum(
+                1 for e in provider_entries if e.checks[provider_name] == HealthStatus.HEALTHY
+            )
+            p_degraded = sum(
+                1 for e in provider_entries if e.checks[provider_name] == HealthStatus.DEGRADED
+            )
+            p_unhealthy = sum(
+                1 for e in provider_entries if e.checks[provider_name] == HealthStatus.UNHEALTHY
+            )
 
             provider_stats[provider_name] = {
                 "total_checks": p_total,
@@ -691,9 +692,7 @@ class HealthAggregator:
     # Status Determination
     # =========================================================================
 
-    def _determine_overall_status(
-        self, checks: dict[str, HealthCheckResult]
-    ) -> HealthStatus:
+    def _determine_overall_status(self, checks: dict[str, HealthCheckResult]) -> HealthStatus:
         """Determine overall status from individual check results.
 
         Args:

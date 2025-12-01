@@ -149,13 +149,7 @@ class EventOutbox(Base, UUIDv7PKMixin, TimestampMixin):
     def __repr__(self) -> str:
         """Human-readable representation."""
         status = "processed" if self.is_processed else f"pending (retries={self.retry_count})"
-        return (
-            f"EventOutbox("
-            f"id={self.id}, "
-            f"event_type={self.event_type!r}, "
-            f"status={status}"
-            f")"
-        )
+        return f"EventOutbox(id={self.id}, event_type={self.event_type!r}, status={status})"
 
 
 __all__ = ["EventOutbox"]

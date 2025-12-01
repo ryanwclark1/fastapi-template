@@ -120,9 +120,7 @@ class FullTextSearchFilter(StatementFilter):
         ts_query = self._build_tsquery()
 
         # Apply match filter
-        statement = statement.where(
-            self.search_column.op("@@")(ts_query)
-        )
+        statement = statement.where(self.search_column.op("@@")(ts_query))
 
         # Apply ranking if enabled
         if self.rank_order:
@@ -241,9 +239,7 @@ class WebSearchFilter(StatementFilter):
         ts_query = func.websearch_to_tsquery(self.config, self.query)
 
         # Apply match filter
-        statement = statement.where(
-            self.search_column.op("@@")(ts_query)
-        )
+        statement = statement.where(self.search_column.op("@@")(ts_query))
 
         # Apply ranking
         if self.rank_order:

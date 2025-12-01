@@ -161,9 +161,7 @@ class RecurrenceRule:
 
         weekdays = None
         if "BYDAY" in parts:
-            weekdays = [
-                Weekday(day.strip()) for day in parts["BYDAY"].split(",")
-            ]
+            weekdays = [Weekday(day.strip()) for day in parts["BYDAY"].split(",")]
 
         month_day = int(parts["BYMONTHDAY"]) if "BYMONTHDAY" in parts else None
         month = int(parts["BYMONTH"]) if "BYMONTH" in parts else None
@@ -345,8 +343,19 @@ def describe_rrule(rrule_string: str) -> str:
     # Add month info
     if rule.month is not None:
         month_names = [
-            "", "January", "February", "March", "April", "May", "June",
-            "July", "August", "September", "October", "November", "December"
+            "",
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December",
         ]
         parts.append(f"in {month_names[rule.month]}")
 

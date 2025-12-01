@@ -15,6 +15,7 @@ Example:
     # Get safely quoted reference
     ref = safe_table_reference("users", schema="public")  # '"public"."users"'
 """
+
 from __future__ import annotations
 
 import re

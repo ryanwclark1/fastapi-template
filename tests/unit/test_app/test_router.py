@@ -1,4 +1,5 @@
 """Tests for router setup logic."""
+
 from __future__ import annotations
 
 import sys
@@ -63,10 +64,13 @@ def settings() -> SimpleNamespace:
 def _prepare_base(monkeypatch: pytest.MonkeyPatch, settings: SimpleNamespace) -> None:
     """Patch module-level dependencies with simple sentinels."""
     monkeypatch.setattr(router_module, "get_app_settings", lambda: settings)
-    monkeypatch.setattr(router_module, "get_websocket_settings", lambda: SimpleNamespace(enabled=False))
     monkeypatch.setattr(
-        router_module, "get_graphql_settings",
-        lambda: SimpleNamespace(enabled=False, path="/graphql", playground_enabled=True)
+        router_module, "get_websocket_settings", lambda: SimpleNamespace(enabled=False)
+    )
+    monkeypatch.setattr(
+        router_module,
+        "get_graphql_settings",
+        lambda: SimpleNamespace(enabled=False, path="/graphql", playground_enabled=True),
     )
     monkeypatch.setattr(router_module, "metrics_router", object())
     monkeypatch.setattr(router_module, "reminders_router", object())
@@ -78,7 +82,9 @@ def _prepare_base(monkeypatch: pytest.MonkeyPatch, settings: SimpleNamespace) ->
     monkeypatch.setattr(router_module, "admin_router", object())
 
 
-def test_setup_routers_without_rabbit(monkeypatch: pytest.MonkeyPatch, settings: SimpleNamespace) -> None:
+def test_setup_routers_without_rabbit(
+    monkeypatch: pytest.MonkeyPatch, settings: SimpleNamespace
+) -> None:
     """Core routers should be included even when messaging router is missing."""
     _prepare_base(monkeypatch, settings)
     monkeypatch.setattr(router_module, "get_rabbit_router", lambda: None)
@@ -99,7 +105,9 @@ def test_setup_routers_without_rabbit(monkeypatch: pytest.MonkeyPatch, settings:
     ]
 
 
-def test_setup_routers_includes_rabbit_router(monkeypatch: pytest.MonkeyPatch, settings: SimpleNamespace) -> None:
+def test_setup_routers_includes_rabbit_router(
+    monkeypatch: pytest.MonkeyPatch, settings: SimpleNamespace
+) -> None:
     """Messaging router should be included when available."""
     _prepare_base(monkeypatch, settings)
     rabbit_router = object()

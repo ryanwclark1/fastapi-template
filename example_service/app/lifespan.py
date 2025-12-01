@@ -1,4 +1,5 @@
 """Application lifespan management."""
+
 from __future__ import annotations
 
 import inspect
@@ -289,9 +290,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     tracker_started = False
     if task_settings.tracking_enabled:
         # Check if the required backend is configured
-        can_start_tracker = (
-            (task_settings.is_redis_backend and redis_settings.is_configured) or
-            (task_settings.is_postgres_backend and db_settings.is_configured)
+        can_start_tracker = (task_settings.is_redis_backend and redis_settings.is_configured) or (
+            task_settings.is_postgres_backend and db_settings.is_configured
         )
         if can_start_tracker:
             try:
@@ -404,9 +404,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Shutdown
     # Note: Settings are still available from startup phase (cached and frozen)
-    logger.info(
-        "Application shutting down", extra={"service": app_settings.service_name}
-    )
+    logger.info("Application shutting down", extra={"service": app_settings.service_name})
 
     # Stop Consul service discovery first (deregister before dependencies close)
     if consul_settings.is_configured:

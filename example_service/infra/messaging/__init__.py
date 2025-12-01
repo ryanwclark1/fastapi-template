@@ -13,6 +13,7 @@ OpenTelemetry Tracing:
     Use add_message_span_attributes/add_message_span_event to add
     custom span data within handlers.
 """
+
 from __future__ import annotations
 
 from example_service.infra.messaging.broker import broker, get_broker

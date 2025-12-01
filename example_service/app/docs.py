@@ -1,4 +1,5 @@
 """Custom documentation pages with CSP-friendly assets."""
+
 from __future__ import annotations
 
 import html

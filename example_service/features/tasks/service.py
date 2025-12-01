@@ -56,6 +56,7 @@ class TrackerNotAvailableError(TaskServiceError):
 
     pass
 
+
 if TYPE_CHECKING:
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -174,7 +175,11 @@ class TaskManagementService:
                     "Failed to count task history; falling back to page size",
                     extra={"error": str(e)},
                 )
-                total = len(tasks) + params.offset if len(tasks) == params.limit else len(tasks) + params.offset
+                total = (
+                    len(tasks) + params.offset
+                    if len(tasks) == params.limit
+                    else len(tasks) + params.offset
+                )
 
             return responses, total
         except Exception as e:
@@ -661,6 +666,7 @@ def get_task_service(
         if scheduler is None:
             try:
                 from example_service.tasks.scheduler import scheduler as app_scheduler
+
                 scheduler = app_scheduler
                 globals()["scheduler"] = app_scheduler
             except ImportError:

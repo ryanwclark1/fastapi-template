@@ -53,7 +53,9 @@ def show(output_format: str, show_secrets: bool) -> None:
                 "port": settings.database.db_port,
                 "name": settings.database.db_name,
                 "user": settings.database.db_user,
-                "password": "***" if not show_secrets else settings.database.db_password.get_secret_value(),
+                "password": "***"
+                if not show_secrets
+                else settings.database.db_password.get_secret_value(),
                 "pool_size": settings.database.db_pool_size,
                 "max_overflow": settings.database.db_max_overflow,
             },
@@ -70,7 +72,9 @@ def show(output_format: str, show_secrets: bool) -> None:
                 "max_consumers": settings.messaging.rabbit_max_consumers,
             },
             "auth": {
-                "secret_key": "***" if not show_secrets else settings.auth.secret_key.get_secret_value(),
+                "secret_key": "***"
+                if not show_secrets
+                else settings.auth.secret_key.get_secret_value(),
                 "algorithm": settings.auth.algorithm,
                 "access_token_expire_minutes": settings.auth.access_token_expire_minutes,
             },
@@ -131,7 +135,9 @@ def validate() -> None:
         # Check database configuration
         click.echo("\n🗄️  Database Configuration:")
         try:
-            info(f"  Database URL: {settings.database.db_host}:{settings.database.db_port}/{settings.database.db_name}")
+            info(
+                f"  Database URL: {settings.database.db_host}:{settings.database.db_port}/{settings.database.db_name}"
+            )
             success("  ✓ Database settings valid")
         except Exception as e:
             error(f"  ✗ Database configuration error: {e}")
@@ -457,6 +463,7 @@ def generate_env_with_defaults(output: str, overwrite: bool) -> None:
     except Exception as e:
         error(f"Failed to generate environment file: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 
@@ -664,17 +671,23 @@ def check_env() -> None:
     # Check secret key length
     secret_key = os.environ.get("AUTH_SECRET_KEY", "")
     if secret_key and len(secret_key) < 32:
-        click.echo(f"  {click.style('WARN', fg='yellow')} AUTH_SECRET_KEY is short ({len(secret_key)} chars, recommend 32+)")
+        click.echo(
+            f"  {click.style('WARN', fg='yellow')} AUTH_SECRET_KEY is short ({len(secret_key)} chars, recommend 32+)"
+        )
         warnings_list.append("AUTH_SECRET_KEY_LENGTH")
     elif secret_key:
-        click.echo(f"  {click.style('OK', fg='green')} AUTH_SECRET_KEY length OK ({len(secret_key)} chars)")
+        click.echo(
+            f"  {click.style('OK', fg='green')} AUTH_SECRET_KEY length OK ({len(secret_key)} chars)"
+        )
 
     # Check environment value
     env = os.environ.get("APP_ENVIRONMENT", "development")
     if env == "production":
         debug = os.environ.get("APP_DEBUG", "false").lower()
         if debug == "true":
-            click.echo(f"  {click.style('WARN', fg='yellow')} APP_DEBUG=true in production environment")
+            click.echo(
+                f"  {click.style('WARN', fg='yellow')} APP_DEBUG=true in production environment"
+            )
             warnings_list.append("DEBUG_IN_PROD")
         else:
             click.echo(f"  {click.style('OK', fg='green')} Debug disabled in production")
@@ -742,7 +755,9 @@ def show_sources() -> None:
                         line = line.strip()
                         if line and not line.startswith("#") and "=" in line:
                             key = line.split("=")[0]
-                            if any(s in key.upper() for s in ["PASSWORD", "SECRET", "TOKEN", "KEY"]):
+                            if any(
+                                s in key.upper() for s in ["PASSWORD", "SECRET", "TOKEN", "KEY"]
+                            ):
                                 click.echo(f"    {key}=***")
                             else:
                                 click.echo(f"    {line[:60]}{'...' if len(line) > 60 else ''}")
@@ -789,19 +804,26 @@ def show_diff(output_format: str) -> None:
     for key, default in sorted(defaults.items()):
         current = os.environ.get(key, default)
         if current != default:
-            differences.append({
-                "key": key,
-                "default": default,
-                "current": current,
-            })
+            differences.append(
+                {
+                    "key": key,
+                    "default": default,
+                    "current": current,
+                }
+            )
         else:
             same.append(key)
 
     if output_format == "json":
-        click.echo(json.dumps({
-            "differences": differences,
-            "same": same,
-        }, indent=2))
+        click.echo(
+            json.dumps(
+                {
+                    "differences": differences,
+                    "same": same,
+                },
+                indent=2,
+            )
+        )
         return
 
     if differences:

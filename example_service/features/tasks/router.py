@@ -71,14 +71,24 @@ TaskServiceDep = Annotated[TaskManagementService, Depends(get_service)]
 async def search_tasks(
     service: TaskServiceDep,
     task_name: Annotated[str | None, Query(description="Filter by exact task name")] = None,
-    task_name_like: Annotated[str | None, Query(description="Filter by task name (contains)")] = None,
+    task_name_like: Annotated[
+        str | None, Query(description="Filter by task name (contains)")
+    ] = None,
     status: Annotated[TaskStatus | None, Query(description="Filter by status")] = None,
     worker_id: Annotated[str | None, Query(description="Filter by worker ID")] = None,
     error_type: Annotated[str | None, Query(description="Filter by error type")] = None,
-    created_after: Annotated[datetime | None, Query(description="Tasks created after this time")] = None,
-    created_before: Annotated[datetime | None, Query(description="Tasks created before this time")] = None,
-    min_duration_ms: Annotated[int | None, Query(ge=0, description="Minimum duration in ms")] = None,
-    max_duration_ms: Annotated[int | None, Query(ge=0, description="Maximum duration in ms")] = None,
+    created_after: Annotated[
+        datetime | None, Query(description="Tasks created after this time")
+    ] = None,
+    created_before: Annotated[
+        datetime | None, Query(description="Tasks created before this time")
+    ] = None,
+    min_duration_ms: Annotated[
+        int | None, Query(ge=0, description="Minimum duration in ms")
+    ] = None,
+    max_duration_ms: Annotated[
+        int | None, Query(ge=0, description="Maximum duration in ms")
+    ] = None,
     order_by: Annotated[
         Literal["created_at", "duration_ms", "task_name", "status"],
         Query(description="Field to order by"),

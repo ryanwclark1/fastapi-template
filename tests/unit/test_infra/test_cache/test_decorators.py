@@ -746,9 +746,7 @@ class TestCacheIntegration:
         key2 = mock_cache.get.call_args_list[1][0][0]
         assert key1 == key2
 
-    async def test_invalidate_pattern_clears_related_caches(
-        self, mock_cache: AsyncMock
-    ) -> None:
+    async def test_invalidate_pattern_clears_related_caches(self, mock_cache: AsyncMock) -> None:
         """Test pattern invalidation clears all related cache entries."""
         mock_redis = mock_cache._client
 
@@ -768,9 +766,7 @@ class TestCacheIntegration:
         assert count == 3
         mock_redis.delete.assert_called_once()
 
-    async def test_conditional_caching_with_empty_results(
-        self, mock_cache: AsyncMock
-    ) -> None:
+    async def test_conditional_caching_with_empty_results(self, mock_cache: AsyncMock) -> None:
         """Test conditional caching does not cache empty results."""
         call_count = 0
 

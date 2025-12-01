@@ -209,9 +209,7 @@ class PostgresTaskTracker(BaseTaskTracker):
         if error is not None:
             error_type = type(error).__name__
             error_message = str(error)
-            error_tb = "".join(
-                traceback.format_exception(type(error), error, error.__traceback__)
-            )
+            error_tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
 
         try:
             async with self._get_session() as session, session.begin():
@@ -264,17 +262,19 @@ class PostgresTaskTracker(BaseTaskTracker):
                 for execution in executions:
                     running_for_ms = 0
                     if execution.started_at:
-                        running_for_ms = int(
-                            (now - execution.started_at).total_seconds() * 1000
-                        )
+                        running_for_ms = int((now - execution.started_at).total_seconds() * 1000)
 
-                    tasks.append({
-                        "task_id": execution.task_id,
-                        "task_name": execution.task_name,
-                        "started_at": execution.started_at.isoformat() if execution.started_at else "",
-                        "running_for_ms": running_for_ms,
-                        "worker_id": execution.worker_id,
-                    })
+                    tasks.append(
+                        {
+                            "task_id": execution.task_id,
+                            "task_name": execution.task_name,
+                            "started_at": execution.started_at.isoformat()
+                            if execution.started_at
+                            else "",
+                            "running_for_ms": running_for_ms,
+                            "worker_id": execution.worker_id,
+                        }
+                    )
 
                 return tasks
         except Exception as e:
@@ -435,8 +435,12 @@ class PostgresTaskTracker(BaseTaskTracker):
                     "task_id": execution.task_id,
                     "task_name": execution.task_name,
                     "status": execution.status,
-                    "started_at": execution.started_at.isoformat() if execution.started_at else None,
-                    "finished_at": execution.finished_at.isoformat() if execution.finished_at else None,
+                    "started_at": execution.started_at.isoformat()
+                    if execution.started_at
+                    else None,
+                    "finished_at": execution.finished_at.isoformat()
+                    if execution.finished_at
+                    else None,
                     "duration_ms": execution.duration_ms,
                     "return_value": execution.return_value,
                     "error_message": execution.error_message,
@@ -509,14 +513,11 @@ class PostgresTaskTracker(BaseTaskTracker):
                 by_task_name = {row[0]: row[1] for row in result.all()}
 
                 # Average duration (successful tasks only)
-                stmt = (
-                    select(func.avg(TaskExecution.duration_ms))
-                    .where(
-                        and_(
-                            TaskExecution.status == "success",
-                            TaskExecution.duration_ms.isnot(None),
-                            TaskExecution.created_at >= cutoff,
-                        )
+                stmt = select(func.avg(TaskExecution.duration_ms)).where(
+                    and_(
+                        TaskExecution.status == "success",
+                        TaskExecution.duration_ms.isnot(None),
+                        TaskExecution.created_at >= cutoff,
                     )
                 )
                 result = await session.execute(stmt)
@@ -552,9 +553,7 @@ class PostgresTaskTracker(BaseTaskTracker):
             async with self._get_session() as session:
                 async with session.begin():
                     # Check current status
-                    stmt = select(TaskExecution.status).where(
-                        TaskExecution.task_id == task_id
-                    )
+                    stmt = select(TaskExecution.status).where(TaskExecution.task_id == task_id)
                     result = await session.execute(stmt)
                     current_status = result.scalar_one_or_none()
 

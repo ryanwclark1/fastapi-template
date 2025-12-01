@@ -26,6 +26,7 @@ Example Usage:
     settings = get_settings()
     configure_middleware(app, settings)
 """
+
 from __future__ import annotations
 
 import logging

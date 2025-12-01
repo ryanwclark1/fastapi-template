@@ -36,7 +36,10 @@ async def e2e_stack(monkeypatch):
 
     test_broker = TestRabbitBroker(broker_module.router.broker)
 
-    async with test_broker, AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with (
+        test_broker,
+        AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client,
+    ):
         yield {
             "client": client,
             "broker": broker_module.router.broker,

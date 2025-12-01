@@ -1,4 +1,5 @@
 """Tests for database session helpers."""
+
 from __future__ import annotations
 
 import pytest
@@ -19,9 +20,7 @@ async def test_ensure_event_outbox_table_creates_table(monkeypatch):
 
     async with temp_engine.connect() as conn:
         result = await conn.execute(
-            text(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='event_outbox'"
-            )
+            text("SELECT name FROM sqlite_master WHERE type='table' AND name='event_outbox'")
         )
         assert result.scalar_one() == "event_outbox"
 

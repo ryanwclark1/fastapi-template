@@ -1,4 +1,5 @@
 """Integration tests for middleware chain behavior."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -58,9 +59,7 @@ class TestMiddlewareChain:
         """
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=full_app), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=full_app), base_url="http://test") as ac:
             yield ac
 
     async def test_request_id_propagates_through_chain(self, client: AsyncClient):
@@ -107,9 +106,7 @@ class TestMiddlewareChain:
         assert "exceeds maximum" in response.json()["detail"]
 
     @patch("example_service.app.middleware.request_logging.logger")
-    async def test_logging_includes_request_id(
-        self, mock_logger: MagicMock, client: AsyncClient
-    ):
+    async def test_logging_includes_request_id(self, mock_logger: MagicMock, client: AsyncClient):
         """Test that request logging includes request_id from context."""
         import uuid
 
@@ -122,9 +119,7 @@ class TestMiddlewareChain:
         # Check that logs contain request_id
         if call_args:
             request_logs = [
-                call
-                for call in call_args
-                if len(call[0]) > 1 and call[0][1] == "HTTP Request"
+                call for call in call_args if len(call[0]) > 1 and call[0][1] == "HTTP Request"
             ]
             if request_logs:
                 log_extra = request_logs[0][1]["extra"]
@@ -172,9 +167,7 @@ class TestMiddlewareChain:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             with pytest.raises(ValueError):
                 await client.get("/error")
 
@@ -206,9 +199,7 @@ class TestMiddlewareChain:
         if mock_logger.log.called:
             call_args = mock_logger.log.call_args_list
             request_logs = [
-                call
-                for call in call_args
-                if len(call[0]) > 1 and call[0][1] == "HTTP Request"
+                call for call in call_args if len(call[0]) > 1 and call[0][1] == "HTTP Request"
             ]
             if request_logs and "body" in request_logs[0][1]["extra"]:
                 logged_body = request_logs[0][1]["extra"]["body"]
@@ -235,16 +226,12 @@ class TestMiddlewareChain:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # Generate unique IDs for each request
             ids = [str(uuid.uuid4()) for _ in range(5)]
 
             # Make concurrent requests with different IDs
-            tasks = [
-                client.get("/test", headers={"X-Request-ID": req_id}) for req_id in ids
-            ]
+            tasks = [client.get("/test", headers={"X-Request-ID": req_id}) for req_id in ids]
             responses = await asyncio.gather(*tasks)
 
         # Each response should have its correct request_id
@@ -326,17 +313,13 @@ class TestMiddlewareChain:
         if mock_logger.log.called:
             call_args = mock_logger.log.call_args_list
             request_logs = [
-                call
-                for call in call_args
-                if len(call[0]) > 1 and call[0][1] == "HTTP Request"
+                call for call in call_args if len(call[0]) > 1 and call[0][1] == "HTTP Request"
             ]
             if request_logs and "headers" in request_logs[0][1]["extra"]:
                 logged_headers = request_logs[0][1]["extra"]["headers"]
                 if isinstance(logged_headers, dict):
                     # Custom headers should be present (case-insensitive)
-                    assert any(
-                        k.lower() == "x-custom-header" for k in logged_headers
-                    )
+                    assert any(k.lower() == "x-custom-header" for k in logged_headers)
 
     async def test_performance_of_full_middleware_stack(self):
         """Test that full middleware stack has acceptable performance."""
@@ -357,9 +340,7 @@ class TestMiddlewareChain:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # Warm up
             await client.get("/test")
 
@@ -371,9 +352,9 @@ class TestMiddlewareChain:
 
             # Even with full middleware stack, should be reasonably fast
             # Allow more time due to multiple middleware
-            assert (
-                elapsed < 3.0
-            ), f"100 requests with full stack took {elapsed:.3f}s, performance issue"
+            assert elapsed < 3.0, (
+                f"100 requests with full stack took {elapsed:.3f}s, performance issue"
+            )
 
     async def test_request_state_accessible_in_endpoint(self, client: AsyncClient):
         """Test that request state from middleware is accessible in endpoints."""
@@ -413,9 +394,7 @@ class TestMiddlewareChain:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # JSON response
             response = await client.get("/json")
             assert response.status_code == 200

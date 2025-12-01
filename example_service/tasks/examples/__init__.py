@@ -9,6 +9,7 @@ with different integrations:
 
 Note: APScheduler scheduling has been moved to tasks/scheduler.py (production code).
 """
+
 from .fastapi_integration import router as tasks_router
 
 __all__ = ["tasks_router"]

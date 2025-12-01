@@ -1,4 +1,5 @@
 """Tests for the reminders service layer."""
+
 from __future__ import annotations
 
 import pytest
@@ -18,7 +19,9 @@ async def session() -> AsyncSession:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     tables = [Reminder.__table__, Tag.__table__, reminder_tags]
     async with engine.begin() as conn:
-        await conn.run_sync(lambda sync_conn: Reminder.metadata.create_all(sync_conn, tables=tables))
+        await conn.run_sync(
+            lambda sync_conn: Reminder.metadata.create_all(sync_conn, tables=tables)
+        )
 
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with session_factory() as session:

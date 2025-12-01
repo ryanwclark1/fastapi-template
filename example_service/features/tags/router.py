@@ -1,4 +1,5 @@
 """API router for the tags feature."""
+
 from __future__ import annotations
 
 import logging
@@ -71,13 +72,10 @@ async def list_tags(
 
     if include_counts:
         # Get counts in a separate query
-        count_stmt = (
-            select(
-                reminder_tags.c.tag_id,
-                func.count(reminder_tags.c.reminder_id).label("count"),
-            )
-            .group_by(reminder_tags.c.tag_id)
-        )
+        count_stmt = select(
+            reminder_tags.c.tag_id,
+            func.count(reminder_tags.c.reminder_id).label("count"),
+        ).group_by(reminder_tags.c.tag_id)
         count_result = await session.execute(count_stmt)
         counts = {row.tag_id: row.count for row in count_result}
 
@@ -114,9 +112,7 @@ async def get_tag(
 
     # Get reminder count
     count_stmt = (
-        select(func.count())
-        .select_from(reminder_tags)
-        .where(reminder_tags.c.tag_id == tag_id)
+        select(func.count()).select_from(reminder_tags).where(reminder_tags.c.tag_id == tag_id)
     )
     count_result = await session.execute(count_stmt)
     count = count_result.scalar() or 0
@@ -140,9 +136,7 @@ async def create_tag(
 ) -> TagResponse:
     """Create a new tag."""
     # Check for existing tag with same name
-    existing = await session.execute(
-        select(Tag).where(Tag.name == payload.name)
-    )
+    existing = await session.execute(select(Tag).where(Tag.name == payload.name))
     if existing.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -188,9 +182,7 @@ async def update_tag(
 
     # Check for name conflict if changing name
     if payload.name is not None and payload.name != tag.name:
-        existing = await session.execute(
-            select(Tag).where(Tag.name == payload.name)
-        )
+        existing = await session.execute(select(Tag).where(Tag.name == payload.name))
         if existing.scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -261,11 +253,7 @@ async def get_tag_reminders(
         raise NotFoundError("Tag", {"id": tag_id})
 
     # Query reminders with this tag
-    stmt = (
-        select(Reminder)
-        .join(reminder_tags)
-        .where(reminder_tags.c.tag_id == tag_id)
-    )
+    stmt = select(Reminder).join(reminder_tags).where(reminder_tags.c.tag_id == tag_id)
 
     if not include_completed:
         stmt = stmt.where(Reminder.is_completed == False)  # noqa: E712
@@ -299,9 +287,7 @@ async def get_reminder_tags(
 ) -> list[TagResponse]:
     """Get all tags for a specific reminder."""
     result = await session.execute(
-        select(Reminder)
-        .options(selectinload(Reminder.tags))
-        .where(Reminder.id == reminder_id)
+        select(Reminder).options(selectinload(Reminder.tags)).where(Reminder.id == reminder_id)
     )
     reminder = result.scalar_one_or_none()
 
@@ -325,9 +311,7 @@ async def set_reminder_tags(
 ) -> list[TagResponse]:
     """Set (replace) all tags for a reminder."""
     result = await session.execute(
-        select(Reminder)
-        .options(selectinload(Reminder.tags))
-        .where(Reminder.id == reminder_id)
+        select(Reminder).options(selectinload(Reminder.tags)).where(Reminder.id == reminder_id)
     )
     reminder = result.scalar_one_or_none()
 
@@ -336,9 +320,7 @@ async def set_reminder_tags(
 
     # Fetch the specified tags
     if payload.tag_ids:
-        tags_result = await session.execute(
-            select(Tag).where(Tag.id.in_(payload.tag_ids))
-        )
+        tags_result = await session.execute(select(Tag).where(Tag.id.in_(payload.tag_ids)))
         tags = list(tags_result.scalars().all())
 
         # Verify all tags were found
@@ -379,9 +361,7 @@ async def add_reminder_tags(
 ) -> list[TagResponse]:
     """Add tags to a reminder."""
     result = await session.execute(
-        select(Reminder)
-        .options(selectinload(Reminder.tags))
-        .where(Reminder.id == reminder_id)
+        select(Reminder).options(selectinload(Reminder.tags)).where(Reminder.id == reminder_id)
     )
     reminder = result.scalar_one_or_none()
 
@@ -389,9 +369,7 @@ async def add_reminder_tags(
         raise NotFoundError("Reminder", {"id": reminder_id})
 
     # Fetch the specified tags
-    tags_result = await session.execute(
-        select(Tag).where(Tag.id.in_(payload.tag_ids))
-    )
+    tags_result = await session.execute(select(Tag).where(Tag.id.in_(payload.tag_ids)))
     new_tags = list(tags_result.scalars().all())
 
     # Verify all tags were found
@@ -426,9 +404,7 @@ async def remove_reminder_tags(
 ) -> list[TagResponse]:
     """Remove tags from a reminder."""
     result = await session.execute(
-        select(Reminder)
-        .options(selectinload(Reminder.tags))
-        .where(Reminder.id == reminder_id)
+        select(Reminder).options(selectinload(Reminder.tags)).where(Reminder.id == reminder_id)
     )
     reminder = result.scalar_one_or_none()
 

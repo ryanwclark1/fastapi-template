@@ -156,7 +156,11 @@ async def _check_rabbitmq() -> dict:
         connection = await aio_pika.connect_robust(rabbit_settings.get_url())
         await connection.close()
 
-        return {"healthy": True, "configured": True, "info": f"{rabbit_settings.host}:{rabbit_settings.port}"}
+        return {
+            "healthy": True,
+            "configured": True,
+            "info": f"{rabbit_settings.host}:{rabbit_settings.port}",
+        }
     except Exception as e:
         return {"healthy": False, "configured": True, "error": str(e)}
 
@@ -187,7 +191,8 @@ async def show_connections() -> None:
         from example_service.infra.database import get_session
 
         async with get_session() as session:
-            result = await session.execute(text("""
+            result = await session.execute(
+                text("""
                 SELECT
                     pid,
                     usename as username,
@@ -199,7 +204,8 @@ async def show_connections() -> None:
                 FROM pg_stat_activity
                 WHERE datname = current_database()
                 ORDER BY query_start DESC NULLS LAST
-            """))
+            """)
+            )
             connections = result.fetchall()
 
             click.echo()
@@ -207,13 +213,21 @@ async def show_connections() -> None:
             click.echo("  " + "-" * 80)
 
             for conn in connections:
-                state_color = "green" if conn.state == "active" else "yellow" if conn.state == "idle" else "red"
+                state_color = (
+                    "green"
+                    if conn.state == "active"
+                    else "yellow"
+                    if conn.state == "idle"
+                    else "red"
+                )
                 state_str = click.style(conn.state or "N/A", fg=state_color)
 
                 client = str(conn.client_addr) if conn.client_addr else "local"
                 query = (conn.query_preview or "")[:40]
 
-                click.echo(f"  {conn.pid:<8} {(conn.username or 'N/A'):<15} {state_str:<21} {client:<18} {query}")
+                click.echo(
+                    f"  {conn.pid:<8} {(conn.username or 'N/A'):<15} {state_str:<21} {client:<18} {query}"
+                )
 
             click.echo()
             success(f"Total: {len(connections)} connections")
@@ -360,9 +374,11 @@ async def show_metrics() -> None:
             completed_reminders = result.scalar_one()
 
             result = await session.execute(
-                select(func.count()).select_from(Reminder).where(
+                select(func.count())
+                .select_from(Reminder)
+                .where(
                     Reminder.is_completed == False,  # noqa: E712
-                    Reminder.remind_at <= datetime.now(UTC)
+                    Reminder.remind_at <= datetime.now(UTC),
                 )
             )
             overdue_reminders = result.scalar_one()
@@ -374,9 +390,11 @@ async def show_metrics() -> None:
             click.echo(f"  Overdue:        {overdue_reminders}")
 
             # Database metrics
-            result = await session.execute(text("""
+            result = await session.execute(
+                text("""
                 SELECT pg_size_pretty(pg_database_size(current_database()))
-            """))
+            """)
+            )
             db_size = result.scalar_one()
 
             section("Database Metrics")
@@ -423,7 +441,9 @@ def view_logs(lines: int, follow: bool, level: str | None) -> None:
 
     # Check common log locations
     log_paths = [
-        Path(log_settings.log_file) if hasattr(log_settings, "log_file") and log_settings.log_file else None,
+        Path(log_settings.log_file)
+        if hasattr(log_settings, "log_file") and log_settings.log_file
+        else None,
         Path("/var/log/example-service/app.log"),
         Path("logs/app.log"),
         Path("app.log"),

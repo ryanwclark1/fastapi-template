@@ -1,4 +1,5 @@
 """Common schemas and validators."""
+
 from __future__ import annotations
 
 from enum import Enum
@@ -26,11 +27,7 @@ class HealthStatus(str, Enum):
 class MessageResponse(BaseModel):
     """Simple message response."""
 
-    message: str = Field(
-        min_length=1,
-        max_length=1000,
-        description="Response message"
-    )
+    message: str = Field(min_length=1, max_length=1000, description="Response message")
     success: bool = Field(default=True, description="Operation success status")
 
     model_config = ConfigDict(

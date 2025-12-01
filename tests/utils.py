@@ -198,21 +198,29 @@ def assert_audit_trail(
         # Note: SQLite stores timestamps without timezone info, PostgreSQL preserves it
         # We only verify the datetime exists and is valid
         if created_at:
-            assert model.created_at == created_at, f"Expected created_at={created_at}, got {model.created_at}"
+            assert model.created_at == created_at, (
+                f"Expected created_at={created_at}, got {model.created_at}"
+            )
 
     if hasattr(model, "updated_at"):
         assert model.updated_at is not None, "updated_at should be set"
         # Note: SQLite stores timestamps without timezone info, PostgreSQL preserves it
         # We only verify the datetime exists and is valid
         if updated_at:
-            assert model.updated_at == updated_at, f"Expected updated_at={updated_at}, got {model.updated_at}"
+            assert model.updated_at == updated_at, (
+                f"Expected updated_at={updated_at}, got {model.updated_at}"
+            )
 
     # Check audit user fields if model has them
     if hasattr(model, "created_by") and created_by is not None:
-        assert model.created_by == created_by, f"Expected created_by={created_by}, got {model.created_by}"
+        assert model.created_by == created_by, (
+            f"Expected created_by={created_by}, got {model.created_by}"
+        )
 
     if hasattr(model, "updated_by") and updated_by is not None:
-        assert model.updated_by == updated_by, f"Expected updated_by={updated_by}, got {model.updated_by}"
+        assert model.updated_by == updated_by, (
+            f"Expected updated_by={updated_by}, got {model.updated_by}"
+        )
 
 
 def assert_soft_deleted(
@@ -246,7 +254,9 @@ def assert_soft_deleted(
         assert model.is_deleted, "is_deleted property should return True"
 
         if hasattr(model, "deleted_by") and deleted_by is not None:
-            assert model.deleted_by == deleted_by, f"Expected deleted_by={deleted_by}, got {model.deleted_by}"
+            assert model.deleted_by == deleted_by, (
+                f"Expected deleted_by={deleted_by}, got {model.deleted_by}"
+            )
     else:
         assert model.deleted_at is None, "deleted_at should be None for non-deleted record"
         assert not model.is_deleted, "is_deleted property should return False"

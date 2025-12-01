@@ -102,9 +102,7 @@ class TestTaskManagementServiceInit:
         service = TaskManagementService()
 
         # Tracker property will try to get global tracker
-        with patch(
-            "example_service.features.tasks.service.get_tracker"
-        ) as mock_get_tracker:
+        with patch("example_service.features.tasks.service.get_tracker") as mock_get_tracker:
             mock_get_tracker.return_value = MockTracker()
             _ = service.tracker
 
@@ -230,9 +228,7 @@ class TestSearchTasks:
         """Should return empty results when no tracker."""
         service = TaskManagementService(tracker=None)
 
-        with patch(
-            "example_service.features.tasks.service.get_tracker"
-        ) as mock_get_tracker:
+        with patch("example_service.features.tasks.service.get_tracker") as mock_get_tracker:
             mock_get_tracker.return_value = None
 
             params = TaskSearchParams()
@@ -547,9 +543,7 @@ class TestGetTaskService:
             def raise_import_error(*args, **kwargs):
                 raise ImportError("No module")
 
-            with patch(
-                "example_service.features.tasks.service.get_task_service"
-            ) as mock_factory:
+            with patch("example_service.features.tasks.service.get_task_service") as mock_factory:
                 mock_factory.return_value = TaskManagementService()
                 service = mock_factory()
 

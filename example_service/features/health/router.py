@@ -217,7 +217,10 @@ async def protection_status(aggregator: HealthAggregatorDep) -> ProtectionHealth
         # Overall status is worst of all protections
         if rate_limiter_result.status == HealthStatus.UNHEALTHY:
             overall_status = HealthStatus.UNHEALTHY
-        elif rate_limiter_result.status == HealthStatus.DEGRADED and overall_status != HealthStatus.UNHEALTHY:
+        elif (
+            rate_limiter_result.status == HealthStatus.DEGRADED
+            and overall_status != HealthStatus.UNHEALTHY
+        ):
             overall_status = HealthStatus.DEGRADED
     else:
         # Rate limiter not configured

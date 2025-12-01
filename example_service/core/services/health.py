@@ -294,8 +294,7 @@ class HealthService(BaseService):
             "service": self._app_settings.service_name,
             "version": "0.1.0",
             "checks": {
-                name: check.status == HealthStatus.HEALTHY
-                for name, check in result.checks.items()
+                name: check.status == HealthStatus.HEALTHY for name, check in result.checks.items()
             },
         }
 

@@ -1,4 +1,5 @@
 """Business metrics and KPIs for monitoring application health and usage."""
+
 from __future__ import annotations
 
 from prometheus_client import Counter, Gauge, Histogram

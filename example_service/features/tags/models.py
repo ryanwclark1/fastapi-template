@@ -1,4 +1,5 @@
 """SQLAlchemy models for the tags feature."""
+
 from __future__ import annotations
 
 from uuid import UUID, uuid4
@@ -38,9 +39,7 @@ class Tag(TimestampedBase):
     """
 
     __tablename__ = "tags"
-    __table_args__ = (
-        UniqueConstraint("name", name="uq_tags_name"),
-    )
+    __table_args__ = (UniqueConstraint("name", name="uq_tags_name"),)
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(

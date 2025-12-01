@@ -100,6 +100,7 @@ class WebhookClient:
         try:
             # Prepare payload
             import json
+
             payload_str = json.dumps(payload, separators=(",", ":"))
 
             # Generate timestamp and signature

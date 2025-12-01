@@ -20,6 +20,7 @@ This is useful for:
 Run the scheduler:
     taskiq scheduler example_service.tasks.broker:stream_scheduler
 """
+
 from __future__ import annotations
 
 import logging

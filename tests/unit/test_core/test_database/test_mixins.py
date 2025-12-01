@@ -7,6 +7,7 @@ This module tests the enhanced database layer including:
 - Combined mixin functionality
 - Multiple primary key strategies (Integer, UUID v4, UUID v7)
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -56,9 +57,7 @@ class AuditedDocument(Base, IntegerPKMixin, TimestampMixin, AuditColumnsMixin):
     content: Mapped[str] = mapped_column(String(1000))
 
 
-class SoftDeletablePost(
-    Base, IntegerPKMixin, TimestampMixin, AuditColumnsMixin, SoftDeleteMixin
-):
+class SoftDeletablePost(Base, IntegerPKMixin, TimestampMixin, AuditColumnsMixin, SoftDeleteMixin):
     """Test model with full audit trail including soft delete."""
 
     __tablename__ = "soft_deletable_posts"
@@ -161,7 +160,9 @@ async def test_timestamp_created_at_is_set_automatically(session: AsyncSession):
 
     assert user.created_at is not None
     # Note: SQLite doesn't preserve timezone info, so we check without timezone
-    created_naive = user.created_at.replace(tzinfo=None) if user.created_at.tzinfo else user.created_at
+    created_naive = (
+        user.created_at.replace(tzinfo=None) if user.created_at.tzinfo else user.created_at
+    )
     assert before <= created_naive <= after, "created_at should be between test bounds"
 
 
@@ -238,9 +239,7 @@ async def test_timestamp_created_at_is_immutable(session: AsyncSession):
         await session.commit()
         await session.refresh(user)
 
-        assert (
-            user.created_at == original_created_at
-        ), f"created_at changed on update {i + 1}"
+        assert user.created_at == original_created_at, f"created_at changed on update {i + 1}"
 
 
 # ============================================================================
@@ -354,9 +353,7 @@ async def test_audit_supports_multiple_updates_by_different_users(session: Async
         await session.refresh(doc)
 
         assert doc.updated_by == user, f"updated_by should reflect user {i + 1}"
-        assert (
-            doc.created_by == "user1@example.com"
-        ), "created_by should remain unchanged"
+        assert doc.created_by == "user1@example.com", "created_by should remain unchanged"
 
 
 # ============================================================================
@@ -452,9 +449,7 @@ async def test_soft_delete_queries_must_explicitly_filter(session: AsyncSession)
     assert len(all_posts) == 2, "Should include both active and deleted records"
 
     # Query only active posts (exclude soft-deleted)
-    stmt_active = select(SoftDeletablePost).where(
-        SoftDeletablePost.deleted_at.is_(None)
-    )
+    stmt_active = select(SoftDeletablePost).where(SoftDeletablePost.deleted_at.is_(None))
     result_active = await session.execute(stmt_active)
     active_posts = result_active.scalars().all()
 
@@ -816,9 +811,7 @@ async def test_timestamp_precision_across_updates(session: AsyncSession):
 
     # All timestamps should be unique or at least non-decreasing
     for i in range(len(timestamps) - 1):
-        assert (
-            timestamps[i] <= timestamps[i + 1]
-        ), f"Timestamp {i} should not be later than {i+1}"
+        assert timestamps[i] <= timestamps[i + 1], f"Timestamp {i} should not be later than {i + 1}"
 
 
 @pytest.mark.asyncio

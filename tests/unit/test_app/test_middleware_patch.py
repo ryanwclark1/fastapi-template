@@ -1,4 +1,5 @@
 """Tests for the FastAPI middleware ordering patch."""
+
 from __future__ import annotations
 
 import pytest

@@ -1,4 +1,5 @@
 """Tests for MetricsMiddleware instrumentation."""
+
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
@@ -79,7 +80,9 @@ async def client(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[AsyncClient]
     async def get_item(item_id: int):
         return {"item_id": item_id}
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as async_client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as async_client:
         async_client._duration_metric = duration_metric  # type: ignore[attr-defined]
         async_client._total_metric = total_metric  # type: ignore[attr-defined]
         async_client._in_progress_metric = in_progress_metric  # type: ignore[attr-defined]
@@ -87,7 +90,9 @@ async def client(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[AsyncClient]
 
 
 @pytest.mark.asyncio
-async def test_metrics_record_without_trace(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_metrics_record_without_trace(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(
         "example_service.app.middleware.metrics.trace.get_current_span",
         lambda: DummySpan(DummySpanContext(valid=False)),

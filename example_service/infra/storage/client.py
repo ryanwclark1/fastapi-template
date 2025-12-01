@@ -137,7 +137,10 @@ class StorageClient:
         if self._client is None:
             # Create boto3 config with adaptive retry and connection pooling
             boto_config = Config(
-                retries={"max_attempts": self.settings.max_retries, "mode": self.settings.retry_mode},
+                retries={
+                    "max_attempts": self.settings.max_retries,
+                    "mode": self.settings.retry_mode,
+                },
                 connect_timeout=self.settings.timeout,
                 read_timeout=self.settings.timeout,
                 max_pool_connections=self.settings.max_pool_connections,
@@ -370,9 +373,7 @@ class StorageClient:
                 ExpiresIn=expires_in,
             )
 
-            logger.debug(
-                f"Generated presigned download URL for {key} (expires in {expires_in}s)"
-            )
+            logger.debug(f"Generated presigned download URL for {key} (expires in {expires_in}s)")
             return url
 
         except ClientError as e:
@@ -443,7 +444,9 @@ class StorageClient:
             logger.exception("Failed to generate presigned upload", extra={"error": str(e)})
             raise map_boto_error(e, operation="presigned_upload", key=key) from e
         except Exception as e:
-            logger.exception("Unexpected error generating presigned upload", extra={"error": str(e)})
+            logger.exception(
+                "Unexpected error generating presigned upload", extra={"error": str(e)}
+            )
             raise StorageError(
                 f"Failed to generate presigned upload for {key}: {e}",
                 code="STORAGE_PRESIGNED_UPLOAD_ERROR",
@@ -468,7 +471,9 @@ class StorageClient:
             return True
         except ClientError as e:
             # NoSuchKey means file doesn't exist - return False
-            error_code = e.response.get("Error", {}).get("Code", "") if hasattr(e, "response") else ""
+            error_code = (
+                e.response.get("Error", {}).get("Code", "") if hasattr(e, "response") else ""
+            )
             if error_code in {"NoSuchKey", "404", "NotFound"}:
                 return False
             # Other errors should be raised
@@ -513,7 +518,9 @@ class StorageClient:
             }
 
         except ClientError as e:
-            error_code = e.response.get("Error", {}).get("Code", "") if hasattr(e, "response") else ""
+            error_code = (
+                e.response.get("Error", {}).get("Code", "") if hasattr(e, "response") else ""
+            )
             if error_code in {"NoSuchKey", "404", "NotFound"}:
                 return None
             logger.exception("Failed to get file info from storage", extra={"error": str(e)})
@@ -554,7 +561,9 @@ class StorageClient:
         """
         semaphore = asyncio.Semaphore(max_concurrency)
 
-        async def upload_one(key: str, file_obj: BinaryIO | bytes, content_type: str) -> dict[str, Any]:
+        async def upload_one(
+            key: str, file_obj: BinaryIO | bytes, content_type: str
+        ) -> dict[str, Any]:
             """Upload a single file with semaphore control."""
             async with semaphore:
                 try:
@@ -611,12 +620,14 @@ class StorageClient:
                 key = files[i][0]
                 error_msg = str(result)
                 logger.error(f"Unexpected error uploading {key}: {error_msg}")
-                processed_results.append({
-                    "key": key,
-                    "success": False,
-                    "url": None,
-                    "error": error_msg,
-                })
+                processed_results.append(
+                    {
+                        "key": key,
+                        "success": False,
+                        "url": None,
+                        "error": error_msg,
+                    }
+                )
             else:
                 processed_results.append(result)
 
@@ -708,12 +719,14 @@ class StorageClient:
                 key = keys[i]
                 error_msg = str(result)
                 logger.error(f"Unexpected error downloading {key}: {error_msg}")
-                processed_results.append({
-                    "key": key,
-                    "success": False,
-                    "data": None,
-                    "error": error_msg,
-                })
+                processed_results.append(
+                    {
+                        "key": key,
+                        "success": False,
+                        "data": None,
+                        "error": error_msg,
+                    }
+                )
             else:
                 processed_results.append(result)
 
@@ -1036,12 +1049,14 @@ class StorageClient:
                     if pattern and not fnmatch.fnmatch(key, pattern):
                         continue
 
-                    files.append({
-                        "key": key,
-                        "size": obj["Size"],
-                        "last_modified": obj["LastModified"],
-                        "etag": obj.get("ETag", "").strip('"'),
-                    })
+                    files.append(
+                        {
+                            "key": key,
+                            "size": obj["Size"],
+                            "last_modified": obj["LastModified"],
+                            "etag": obj.get("ETag", "").strip('"'),
+                        }
+                    )
 
             logger.info(
                 f"Listed {len(files)} files",

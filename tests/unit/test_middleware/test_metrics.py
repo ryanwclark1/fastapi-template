@@ -1,4 +1,5 @@
 """Unit tests for MetricsMiddleware."""
+
 from __future__ import annotations
 
 import contextlib
@@ -46,9 +47,7 @@ class TestMetricsMiddleware:
         """
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
             yield ac
 
     @patch("example_service.app.middleware.metrics.http_requests_in_progress")
@@ -63,9 +62,7 @@ class TestMetricsMiddleware:
         assert mock_in_progress.labels.return_value.dec.called
 
     @patch("example_service.app.middleware.metrics.http_requests_total")
-    async def test_tracks_total_requests(
-        self, mock_requests_total: MagicMock, client: AsyncClient
-    ):
+    async def test_tracks_total_requests(self, mock_requests_total: MagicMock, client: AsyncClient):
         """Test that total requests counter is incremented."""
         await client.get("/test")
 
@@ -77,9 +74,7 @@ class TestMetricsMiddleware:
         assert "status" in call_kwargs
 
     @patch("example_service.app.middleware.metrics.http_request_duration_seconds")
-    async def test_tracks_request_duration(
-        self, mock_duration: MagicMock, client: AsyncClient
-    ):
+    async def test_tracks_request_duration(self, mock_duration: MagicMock, client: AsyncClient):
         """Test that request duration is tracked."""
         await client.get("/test")
 
@@ -112,9 +107,7 @@ class TestMetricsMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             with pytest.raises(ValueError):
                 await client.get("/error")
 
@@ -122,9 +115,7 @@ class TestMetricsMiddleware:
         assert mock_in_progress.labels.return_value.dec.called
 
     @patch("example_service.app.middleware.metrics.http_requests_total")
-    async def test_records_error_status_code(
-        self, mock_requests_total: MagicMock
-    ):
+    async def test_records_error_status_code(self, mock_requests_total: MagicMock):
         """Test that error status codes are properly recorded."""
         app = FastAPI()
         app.add_middleware(MetricsMiddleware)
@@ -135,9 +126,7 @@ class TestMetricsMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             with pytest.raises(ValueError):
                 await client.get("/error")
 
@@ -158,7 +147,9 @@ class TestMetricsMiddleware:
         mock_span.get_span_context.return_value.trace_id = 123456789
         mock_trace.get_current_span.return_value = mock_span
 
-        with patch("example_service.app.middleware.metrics.http_request_duration_seconds") as mock_duration:
+        with patch(
+            "example_service.app.middleware.metrics.http_request_duration_seconds"
+        ) as mock_duration:
             await client.get("/test")
 
             # Should observe with exemplar containing trace_id
@@ -167,16 +158,16 @@ class TestMetricsMiddleware:
             assert "trace_id" in call_kwargs["exemplar"]
 
     @patch("example_service.app.middleware.metrics.trace")
-    async def test_metrics_without_trace(
-        self, mock_trace: MagicMock, client: AsyncClient
-    ):
+    async def test_metrics_without_trace(self, mock_trace: MagicMock, client: AsyncClient):
         """Test that metrics work without active trace."""
         # Mock trace span with invalid context
         mock_span = MagicMock()
         mock_span.get_span_context.return_value.is_valid = False
         mock_trace.get_current_span.return_value = mock_span
 
-        with patch("example_service.app.middleware.metrics.http_request_duration_seconds") as mock_duration:
+        with patch(
+            "example_service.app.middleware.metrics.http_request_duration_seconds"
+        ) as mock_duration:
             await client.get("/test")
 
             # Should observe without exemplar
@@ -209,10 +200,7 @@ class TestMetricsMiddleware:
             # Should use template "/users/{user_id}" not actual paths
             # This prevents high cardinality metrics
             if mock_total.labels.called:
-                endpoints = [
-                    call[1].get("endpoint")
-                    for call in mock_total.labels.call_args_list
-                ]
+                endpoints = [call[1].get("endpoint") for call in mock_total.labels.call_args_list]
                 # Should use path template, not actual ID
                 # Note: Exact behavior depends on when route is resolved
                 assert any("/users" in str(ep) for ep in endpoints)
@@ -247,10 +235,7 @@ class TestMetricsMiddleware:
             # Should record metrics for each method
             assert mock_total.labels.call_count >= 3
 
-            methods = [
-                call[1].get("method")
-                for call in mock_total.labels.call_args_list
-            ]
+            methods = [call[1].get("method") for call in mock_total.labels.call_args_list]
             assert "GET" in methods
             assert "POST" in methods
             assert "PUT" in methods
@@ -269,7 +254,9 @@ class TestMetricsMiddleware:
 
         from httpx import ASGITransport
 
-        with patch("example_service.app.middleware.metrics.http_requests_in_progress") as mock_in_progress:
+        with patch(
+            "example_service.app.middleware.metrics.http_requests_in_progress"
+        ) as mock_in_progress:
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://test"
             ) as client:
@@ -308,10 +295,7 @@ class TestMetricsMiddleware:
                     await client.get("/not-found")
 
             # Should record different status codes
-            status_codes = [
-                call[1].get("status")
-                for call in mock_total.labels.call_args_list
-            ]
+            status_codes = [call[1].get("status") for call in mock_total.labels.call_args_list]
             assert 200 in status_codes or "200" in status_codes
 
     async def test_timing_header_accuracy(self):
@@ -328,9 +312,7 @@ class TestMetricsMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/slow")
 
         process_time = float(response.headers["x-process-time"])
@@ -353,9 +335,7 @@ class TestMetricsMiddleware:
             assert isinstance(call_kwargs["endpoint"], str)
 
     @patch("example_service.app.middleware.metrics.http_request_duration_seconds")
-    async def test_duration_histogram_buckets(
-        self, mock_duration: MagicMock, client: AsyncClient
-    ):
+    async def test_duration_histogram_buckets(self, mock_duration: MagicMock, client: AsyncClient):
         """Test that duration is recorded as histogram observation."""
         await client.get("/test")
 
@@ -385,7 +365,9 @@ class TestMetricsMiddleware:
             mock_span.get_span_context.return_value.trace_id = 0x123456789ABCDEF0123456789ABCDEF0
             mock_trace.get_current_span.return_value = mock_span
 
-            with patch("example_service.app.middleware.metrics.http_request_duration_seconds") as mock_duration:
+            with patch(
+                "example_service.app.middleware.metrics.http_request_duration_seconds"
+            ) as mock_duration:
                 async with AsyncClient(
                     transport=ASGITransport(app=app), base_url="http://test"
                 ) as client:
@@ -405,15 +387,19 @@ class TestMetricsMiddleware:
         from starlette.types import Receive, Scope, Send
 
         async def mock_app(scope: Scope, receive: Receive, send: Send):
-            await send({
-                "type": "http.response.start",
-                "status": 200,
-                "headers": [[b"content-type", b"application/json"]],
-            })
-            await send({
-                "type": "http.response.body",
-                "body": b'{"status":"ok"}',
-            })
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 200,
+                    "headers": [[b"content-type", b"application/json"]],
+                }
+            )
+            await send(
+                {
+                    "type": "http.response.body",
+                    "body": b'{"status":"ok"}',
+                }
+            )
 
         middleware = MetricsMiddleware(mock_app)
 
@@ -447,9 +433,7 @@ class TestMetricsMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # Warm up
             await client.get("/test")
 

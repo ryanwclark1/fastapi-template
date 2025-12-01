@@ -249,18 +249,14 @@ class TestNPlusOneDetectionMiddleware:
         assert middleware.slow_query_threshold == 0.1
         assert middleware.enable_detailed_logging is True
 
-    def test_initialization_default_exclude_patterns(
-        self, app: FastAPI
-    ) -> None:
+    def test_initialization_default_exclude_patterns(self, app: FastAPI) -> None:
         """Test middleware initialization with default exclude patterns."""
         middleware = NPlusOneDetectionMiddleware(app)
 
         assert middleware.exclude_patterns == []
         assert middleware.exclude_regexes == []
 
-    def test_initialization_custom_exclude_patterns(
-        self, app: FastAPI
-    ) -> None:
+    def test_initialization_custom_exclude_patterns(self, app: FastAPI) -> None:
         """Test middleware initialization with custom exclude patterns."""
         middleware = NPlusOneDetectionMiddleware(
             app, exclude_patterns=[r"pg_catalog", r"information_schema"]
@@ -287,17 +283,13 @@ class TestNPlusOneDetectionMiddleware:
         assert "X-Request-Time" in response.headers
 
     @pytest.mark.asyncio
-    async def test_record_query_basic(
-        self, middleware: NPlusOneDetectionMiddleware
-    ) -> None:
+    async def test_record_query_basic(self, middleware: NPlusOneDetectionMiddleware) -> None:
         """Test basic query recording."""
         mock_request = Mock(spec=Request)
         mock_request.state.query_patterns = {}
         mock_request.state.query_count = 0
 
-        middleware.record_query(
-            mock_request, "SELECT * FROM users WHERE id = 1", 0.005
-        )
+        middleware.record_query(mock_request, "SELECT * FROM users WHERE id = 1", 0.005)
 
         assert mock_request.state.query_count == 1
         assert len(mock_request.state.query_patterns) == 1
@@ -313,9 +305,7 @@ class TestNPlusOneDetectionMiddleware:
 
         # Record similar queries with different parameters
         for i in range(10):
-            middleware.record_query(
-                mock_request, f"SELECT * FROM users WHERE id = {i}", 0.005
-            )
+            middleware.record_query(mock_request, f"SELECT * FROM users WHERE id = {i}", 0.005)
 
         # Should normalize to same pattern
         assert mock_request.state.query_count == 10
@@ -325,21 +315,15 @@ class TestNPlusOneDetectionMiddleware:
         assert patterns[0].count == 10
 
     @pytest.mark.asyncio
-    async def test_record_query_excluded_pattern(
-        self, app: FastAPI
-    ) -> None:
+    async def test_record_query_excluded_pattern(self, app: FastAPI) -> None:
         """Test query recording skips excluded patterns."""
-        middleware = NPlusOneDetectionMiddleware(
-            app, exclude_patterns=[r"pg_catalog"]
-        )
+        middleware = NPlusOneDetectionMiddleware(app, exclude_patterns=[r"pg_catalog"])
 
         mock_request = Mock(spec=Request)
         mock_request.state.query_patterns = {}
         mock_request.state.query_count = 0
 
-        middleware.record_query(
-            mock_request, "SELECT * FROM pg_catalog.pg_tables", 0.005
-        )
+        middleware.record_query(mock_request, "SELECT * FROM pg_catalog.pg_tables", 0.005)
 
         # Should be excluded
         assert mock_request.state.query_count == 0
@@ -355,26 +339,20 @@ class TestNPlusOneDetectionMiddleware:
         mock_request.state.query_count = 0
 
         with caplog.at_level("WARNING"):
-            middleware.record_query(
-                mock_request, "SELECT * FROM users WHERE id = 1", 0.5
-            )
+            middleware.record_query(mock_request, "SELECT * FROM users WHERE id = 1", 0.5)
 
         # Slow query should be logged (threshold is 0.1s)
         assert "Slow Query Detected" in caplog.text
 
     @pytest.mark.asyncio
-    async def test_record_query_no_state(
-        self, middleware: NPlusOneDetectionMiddleware
-    ) -> None:
+    async def test_record_query_no_state(self, middleware: NPlusOneDetectionMiddleware) -> None:
         """Test query recording when request state is not initialized."""
         mock_request = Mock(spec=Request)
         # Create a proper state object that doesn't have query_patterns
-        mock_request.state = type('State', (), {})()
+        mock_request.state = type("State", (), {})()
 
         # Should not raise exception - just return early
-        middleware.record_query(
-            mock_request, "SELECT * FROM users WHERE id = 1", 0.005
-        )
+        middleware.record_query(mock_request, "SELECT * FROM users WHERE id = 1", 0.005)
 
         # Verify nothing was recorded
         assert not hasattr(mock_request.state, "query_patterns")
@@ -393,9 +371,7 @@ class TestNPlusOneDetectionMiddleware:
 
         # Simulate N+1 pattern
         for i in range(15):
-            middleware.record_query(
-                mock_request, f"SELECT * FROM users WHERE id = {i}", 0.005
-            )
+            middleware.record_query(mock_request, f"SELECT * FROM users WHERE id = {i}", 0.005)
 
         mock_response = Mock(spec=Response)
         mock_response.headers = {}
@@ -441,9 +417,7 @@ class TestNPlusOneDetectionMiddleware:
             pattern.add_execution(0.005)
 
         with caplog.at_level("WARNING"):
-            await middleware._log_n_plus_one_patterns(
-                mock_request, [pattern], 0.1, 15
-            )
+            await middleware._log_n_plus_one_patterns(mock_request, [pattern], 0.1, 15)
 
         assert "N+1 Query Pattern Detected" in caplog.text
         assert "Recommendation" in caplog.text
@@ -459,9 +433,7 @@ class TestNPlusOneDetectionMiddleware:
         mock_request.method = "GET"
 
         with caplog.at_level("WARNING"):
-            await middleware._log_request_summary(
-                mock_request, 0.1, 15, 1
-            )
+            await middleware._log_request_summary(mock_request, 0.1, 15, 1)
 
         assert "Request Summary" in caplog.text
         assert "15 queries" in caplog.text
@@ -476,9 +448,7 @@ class TestNPlusOneDetectionMiddleware:
         mock_request.method = "GET"
 
         with caplog.at_level("INFO"):
-            await middleware._log_request_summary(
-                mock_request, 0.1, 5, 0
-            )
+            await middleware._log_request_summary(mock_request, 0.1, 5, 0)
 
         assert "Request Summary" in caplog.text
 
@@ -492,15 +462,11 @@ class TestSetupNPlusOneMonitoring:
     )
     def test_setup_monitoring_without_sqlalchemy(self) -> None:
         """Test setup when SQLAlchemy is not available."""
-        with patch(
-            "example_service.app.middleware.n_plus_one_detection.event", None
-        ):
+        with patch("example_service.app.middleware.n_plus_one_detection.event", None):
             mock_engine = Mock()
             mock_middleware = Mock(spec=NPlusOneDetectionMiddleware)
 
-            set_request_context = setup_n_plus_one_monitoring(
-                mock_engine, mock_middleware
-            )
+            set_request_context = setup_n_plus_one_monitoring(mock_engine, mock_middleware)
 
             # Should return a no-op function
             assert callable(set_request_context)
@@ -513,9 +479,7 @@ class TestSetupNPlusOneMonitoring:
         mock_middleware = Mock(spec=NPlusOneDetectionMiddleware)
 
         with patch("example_service.app.middleware.n_plus_one_detection.event"):
-            set_request_context = setup_n_plus_one_monitoring(
-                mock_engine, mock_middleware
-            )
+            set_request_context = setup_n_plus_one_monitoring(mock_engine, mock_middleware)
 
             mock_request = Mock()
             set_request_context(mock_request)

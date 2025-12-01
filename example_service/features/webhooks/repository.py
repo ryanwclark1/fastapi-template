@@ -218,9 +218,7 @@ class WebhookDeliveryRepository(BaseRepository[WebhookDelivery]):
         result = await session.execute(stmt)
         items = result.scalars().all()
 
-        self._lazy.debug(
-            lambda: f"db.find_by_status: status={status!r} -> {len(items)} items"
-        )
+        self._lazy.debug(lambda: f"db.find_by_status: status={status!r} -> {len(items)} items")
         return items
 
     async def find_retries_due(
@@ -294,9 +292,7 @@ class WebhookDeliveryRepository(BaseRepository[WebhookDelivery]):
         """
         delivery = await self.get(session, delivery_id)
         if delivery is None:
-            self._lazy.debug(
-                lambda: f"db.update_status({delivery_id}) -> not found"
-            )
+            self._lazy.debug(lambda: f"db.update_status({delivery_id}) -> not found")
             return None
 
         delivery.status = status

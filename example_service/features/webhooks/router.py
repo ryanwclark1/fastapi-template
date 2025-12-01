@@ -284,6 +284,7 @@ async def test_webhook(
     )
 
     from example_service.features.webhooks.repository import get_webhook_delivery_repository
+
     delivery_repo = get_webhook_delivery_repository()
     created_delivery = await delivery_repo.create(session, delivery)
     await session.commit()

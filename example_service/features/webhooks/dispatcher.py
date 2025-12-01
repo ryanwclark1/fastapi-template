@@ -169,7 +169,7 @@ async def process_pending_deliveries(
             # Check if we should retry
             if delivery.attempt_count + 1 < delivery.max_attempts:
                 # Calculate exponential backoff
-                retry_delay_seconds = min(2 ** delivery.attempt_count * 60, 3600)  # Max 1 hour
+                retry_delay_seconds = min(2**delivery.attempt_count * 60, 3600)  # Max 1 hour
                 next_retry_at = datetime.now(UTC) + timedelta(seconds=retry_delay_seconds)
 
                 await delivery_repo.update_status(
@@ -206,9 +206,7 @@ async def process_pending_deliveries(
             },
         )
     else:
-        lazy_logger.debug(
-            lambda: "dispatcher.process_pending_deliveries: no deliveries to process"
-        )
+        lazy_logger.debug(lambda: "dispatcher.process_pending_deliveries: no deliveries to process")
 
     return processed_count
 

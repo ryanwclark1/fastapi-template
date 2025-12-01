@@ -1,4 +1,5 @@
 """Serve the local GraphQL Playground assets and HTML shell."""
+
 from __future__ import annotations
 
 import html

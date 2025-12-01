@@ -158,9 +158,7 @@ class I18nSettings(BaseSettings):
         if "supported_locales" in info.data:
             supported = info.data["supported_locales"]
             if supported and v not in supported:
-                raise ValueError(
-                    f"Default locale '{v}' must be in supported_locales: {supported}"
-                )
+                raise ValueError(f"Default locale '{v}' must be in supported_locales: {supported}")
         return v
 
     @property

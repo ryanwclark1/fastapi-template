@@ -146,8 +146,6 @@ async def update_delivery_status(
     )
 
 
-
-
 async def find_deliveries_for_retry() -> list[dict[str, Any]]:
     """Find webhook deliveries that are due for retry.
 
@@ -289,9 +287,7 @@ if broker is not None:
 
                 else:
                     # Non-2xx response or error: Schedule retry
-                    raise WebhookDeliveryError(
-                        result.error_message or f"HTTP {result.status_code}"
-                    )
+                    raise WebhookDeliveryError(result.error_message or f"HTTP {result.status_code}")
 
             except Exception as e:
                 # Step 5: Handle delivery failure
@@ -309,9 +305,7 @@ if broker is not None:
                 # Calculate next retry time
                 if new_attempt_count < delivery["max_attempts"]:
                     backoff_seconds = calculate_backoff(new_attempt_count - 1)
-                    next_retry_at = datetime.now(UTC) + timedelta(
-                        seconds=backoff_seconds
-                    )
+                    next_retry_at = datetime.now(UTC) + timedelta(seconds=backoff_seconds)
 
                     await update_delivery_status(
                         delivery_id,
@@ -366,9 +360,7 @@ if broker is not None:
                 "Webhook delivery task failed",
                 extra={"delivery_id": delivery_id, "error": str(e)},
             )
-            raise WebhookDeliveryError(
-                f"Failed to deliver webhook {delivery_id}: {e}"
-            ) from e
+            raise WebhookDeliveryError(f"Failed to deliver webhook {delivery_id}: {e}") from e
 
     @broker.task()
     async def process_webhook_retries() -> dict[str, Any]:

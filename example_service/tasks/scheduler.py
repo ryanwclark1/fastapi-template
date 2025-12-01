@@ -10,6 +10,7 @@ Run the Taskiq worker to execute scheduled tasks:
 Architecture:
     APScheduler (in-process) → Taskiq kiq() → RabbitMQ → Taskiq Worker
 """
+
 from __future__ import annotations
 
 import logging
@@ -54,7 +55,11 @@ if broker is not None:
             # In lieu of a concrete session model, return a structured no-op result
             deleted_count = 0
             logger.info("Cleanup completed", extra={"deleted_count": deleted_count})
-            return {"status": "success", "deleted_count": deleted_count, "checked_at": datetime.now(UTC).isoformat()}
+            return {
+                "status": "success",
+                "deleted_count": deleted_count,
+                "checked_at": datetime.now(UTC).isoformat(),
+            }
         except Exception:
             logger.exception("Failed to cleanup sessions")
             raise
@@ -91,7 +96,11 @@ if broker is not None:
             synced_count = 0
             sync_started_at = datetime.now(UTC).isoformat()
             logger.info("External sync completed", extra={"synced_count": synced_count})
-            return {"status": "success", "synced_count": synced_count, "sync_started_at": sync_started_at}
+            return {
+                "status": "success",
+                "synced_count": synced_count,
+                "sync_started_at": sync_started_at,
+            }
         except Exception:
             logger.exception("Failed to sync external data")
             raise
@@ -108,7 +117,11 @@ if broker is not None:
             sent_count = 0
             digest_generated_at = datetime.now(UTC).isoformat()
             logger.info("Daily digest processed", extra={"sent_count": sent_count})
-            return {"status": "success", "sent_count": sent_count, "generated_at": digest_generated_at}
+            return {
+                "status": "success",
+                "sent_count": sent_count,
+                "generated_at": digest_generated_at,
+            }
         except Exception:
             logger.exception("Failed to send daily digest")
             raise
@@ -418,9 +431,7 @@ def get_job_status() -> list[dict]:
             {
                 "id": job.id,
                 "name": job.name,
-                "next_run_time": job.next_run_time.isoformat()
-                if job.next_run_time
-                else None,
+                "next_run_time": job.next_run_time.isoformat() if job.next_run_time else None,
                 "trigger": str(job.trigger),
             }
         )

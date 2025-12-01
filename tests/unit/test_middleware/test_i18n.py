@@ -325,9 +325,7 @@ def test_locale_priority_query_over_cookie(app: FastAPI, client: TestClient):
 # Translation Provider Tests
 
 
-def test_translations_loaded(
-    app: FastAPI, client: TestClient, translation_provider
-):
+def test_translations_loaded(app: FastAPI, client: TestClient, translation_provider):
     """Test that translations are loaded via provider."""
     app.add_middleware(
         I18nMiddleware,
@@ -652,9 +650,7 @@ def test_locale_persistence_across_requests(app: FastAPI):
         assert response2.json()["locale"] == "es"
 
 
-def test_real_world_scenario(
-    app: FastAPI, client: TestClient, translation_provider
-):
+def test_real_world_scenario(app: FastAPI, client: TestClient, translation_provider):
     """Test real-world scenario with multiple features."""
     app.add_middleware(
         I18nMiddleware,

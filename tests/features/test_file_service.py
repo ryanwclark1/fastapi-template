@@ -26,6 +26,8 @@ if os.getenv("RUN_POSTGRES_TESTS") != "1":  # pragma: no cover - default skip
         "Set RUN_POSTGRES_TESTS=1 to run Postgres-backed file service tests",
         allow_module_level=True,
     )
+
+
 @pytest.fixture(autouse=True)
 def disable_webhook_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
     """Prevent webhook dispatcher from running during unit tests."""

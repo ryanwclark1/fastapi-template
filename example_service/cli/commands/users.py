@@ -18,11 +18,13 @@ def hash_password(password: str) -> str:
     """Hash a password using bcrypt or fallback."""
     try:
         from passlib.context import CryptContext
+
         pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
         return pwd_context.hash(password)
     except ImportError:
         # Fallback to hashlib if passlib not available
         import hashlib
+
         warning("passlib not installed, using basic hash (not recommended for production)")
         return hashlib.sha256(password.encode()).hexdigest()
 
@@ -31,10 +33,12 @@ def verify_password(plain: str, hashed: str) -> bool:
     """Verify a password against its hash."""
     try:
         from passlib.context import CryptContext
+
         pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
         return pwd_context.verify(plain, hashed)
     except ImportError:
         import hashlib
+
         return hashlib.sha256(plain.encode()).hexdigest() == hashed
 
 
@@ -98,6 +102,7 @@ async def list_users(active_only: bool, superusers: bool, limit: int, output_for
 
             if output_format == "json":
                 import json
+
                 data = [
                     {
                         "id": u.id,
@@ -119,7 +124,11 @@ async def list_users(active_only: bool, superusers: bool, limit: int, output_for
             click.echo("-" * 85)
 
             for user in users_list:
-                active = click.style("Yes", fg="green") if user.is_active else click.style("No", fg="red")
+                active = (
+                    click.style("Yes", fg="green")
+                    if user.is_active
+                    else click.style("No", fg="red")
+                )
                 superuser = click.style("Yes", fg="cyan") if user.is_superuser else "No"
 
                 click.echo(
@@ -162,9 +171,7 @@ async def create_user(email: str, username: str, full_name: str | None, password
         async with get_session() as session:
             # Check if user exists
             existing = await session.execute(
-                select(User).where(
-                    (User.email == email) | (User.username == username)
-                )
+                select(User).where((User.email == email) | (User.username == username))
             )
             if existing.scalar_one_or_none():
                 error("A user with this email or username already exists")
@@ -219,9 +226,7 @@ async def create_superuser(email: str, username: str, full_name: str | None, pas
         async with get_session() as session:
             # Check if user exists
             existing = await session.execute(
-                select(User).where(
-                    (User.email == email) | (User.username == username)
-                )
+                select(User).where((User.email == email) | (User.username == username))
             )
             if existing.scalar_one_or_none():
                 error("A user with this email or username already exists")
@@ -546,11 +551,19 @@ async def show_user(identifier: str) -> None:
             click.echo(f"  Full Name:  {user.full_name or 'N/A'}")
 
             # Status
-            status = click.style("Active", fg="green") if user.is_active else click.style("Inactive", fg="red")
+            status = (
+                click.style("Active", fg="green")
+                if user.is_active
+                else click.style("Inactive", fg="red")
+            )
             click.echo(f"  Status:     {status}")
 
             # Role
-            role = click.style("Superuser", fg="cyan", bold=True) if user.is_superuser else "Regular User"
+            role = (
+                click.style("Superuser", fg="cyan", bold=True)
+                if user.is_superuser
+                else "Regular User"
+            )
             click.echo(f"  Role:       {role}")
 
             # Timestamps

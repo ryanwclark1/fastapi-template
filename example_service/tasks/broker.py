@@ -116,14 +116,18 @@ def _can_create_broker() -> bool:
 
     # For Redis backend, we need Redis configured
     if task_settings.is_redis_backend and not redis_settings.is_configured:
-        logger.warning("Redis not configured but TASK_RESULT_BACKEND=redis - background tasks disabled")
+        logger.warning(
+            "Redis not configured but TASK_RESULT_BACKEND=redis - background tasks disabled"
+        )
         return False
 
     # For Postgres backend, we need database configured
     if task_settings.is_postgres_backend:
         db_settings = get_db_settings()
         if not db_settings.is_configured:
-            logger.warning("PostgreSQL not configured but TASK_RESULT_BACKEND=postgres - background tasks disabled")
+            logger.warning(
+                "PostgreSQL not configured but TASK_RESULT_BACKEND=postgres - background tasks disabled"
+            )
             return False
 
     return True

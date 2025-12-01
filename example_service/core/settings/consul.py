@@ -189,7 +189,10 @@ class ConsulSettings(BaseSettings):
     @model_validator(mode="after")
     def _validate_ttl_settings(self) -> ConsulSettings:
         """Ensure TTL heartbeat interval is less than TTL duration."""
-        if self.health_check_mode == HealthCheckMode.TTL and self.ttl_heartbeat_interval >= self.ttl_seconds:
+        if (
+            self.health_check_mode == HealthCheckMode.TTL
+            and self.ttl_heartbeat_interval >= self.ttl_seconds
+        ):
             raise ValueError(
                 f"ttl_heartbeat_interval ({self.ttl_heartbeat_interval}s) must be "
                 f"less than ttl_seconds ({self.ttl_seconds}s) to avoid flapping"
@@ -199,7 +202,9 @@ class ConsulSettings(BaseSettings):
     @model_validator(mode="after")
     def _validate_http_settings(self) -> ConsulSettings:
         """Ensure HTTP check path starts with /."""
-        if self.health_check_mode == HealthCheckMode.HTTP and not self.http_check_path.startswith("/"):
+        if self.health_check_mode == HealthCheckMode.HTTP and not self.http_check_path.startswith(
+            "/"
+        ):
             raise ValueError("http_check_path must start with '/'")
         return self
 

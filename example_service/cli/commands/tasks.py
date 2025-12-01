@@ -174,7 +174,9 @@ async def run_task(task_name: str, arg: tuple, wait: bool, timeout: int) -> None
                         click.echo(f"  Result: {result.return_value}")
                 except TimeoutError:
                     warning(f"Timeout waiting for result after {timeout}s")
-                    info(f"Task may still be running. Check with: example-service tasks status {task_handle.task_id}")
+                    info(
+                        f"Task may still be running. Check with: example-service tasks status {task_handle.task_id}"
+                    )
 
         finally:
             await broker.shutdown()
@@ -272,10 +274,12 @@ async def task_result(task_id: str, output_format: str) -> None:
             # Format output
             if output_format == "json":
                 import json
+
                 click.echo(json.dumps(result.return_value, indent=2, default=str))
             elif output_format == "yaml":
                 try:
                     import yaml
+
                     click.echo(yaml.dump(result.return_value, default_flow_style=False))
                 except ImportError:
                     error("PyYAML is not installed. Use --format json instead.")
@@ -318,7 +322,8 @@ def start_worker(concurrency: int, queue: str | None) -> None:
         "taskiq",
         "worker",
         "example_service.tasks.broker:broker",
-        "-w", str(concurrency),
+        "-w",
+        str(concurrency),
     ]
 
     if queue:

@@ -76,7 +76,9 @@ def info_cmd() -> None:
         click.echo(f"Use SSL: {settings.use_ssl}")
 
         # Upload configuration
-        click.echo(f"\nMax File Size: {settings.max_file_size_mb} MB ({_format_bytes(settings.max_file_size_bytes)})")
+        click.echo(
+            f"\nMax File Size: {settings.max_file_size_mb} MB ({_format_bytes(settings.max_file_size_bytes)})"
+        )
         click.echo(f"Presigned URL Expiry: {settings.presigned_url_expiry_seconds}s")
         click.echo(f"Upload Prefix: {settings.upload_prefix}")
 
@@ -161,9 +163,7 @@ async def list_files(prefix: str, limit: int) -> None:
 
             click.echo(f"\n{'=' * 100}")
             click.secho(
-                f"Storage Objects (showing {len(objects)} of max {limit})",
-                fg="cyan",
-                bold=True
+                f"Storage Objects (showing {len(objects)} of max {limit})", fg="cyan", bold=True
             )
             click.echo(f"{'=' * 100}")
 
@@ -187,11 +187,7 @@ async def list_files(prefix: str, limit: int) -> None:
                 else:
                     modified_str = str(modified)
 
-                click.echo(
-                    f"{display_key:<50} "
-                    f"{_format_bytes(size):<12} "
-                    f"{modified_str:<25}"
-                )
+                click.echo(f"{display_key:<50} {_format_bytes(size):<12} {modified_str:<25}")
                 total_size += size
 
             click.echo("-" * 100)
@@ -258,7 +254,9 @@ async def check() -> None:
 
             if not backup_settings.is_s3_configured:
                 warning("   S3 backup settings not configured")
-                info("   Configure BACKUP_S3_BUCKET, BACKUP_S3_ACCESS_KEY, and BACKUP_S3_SECRET_KEY")
+                info(
+                    "   Configure BACKUP_S3_BUCKET, BACKUP_S3_ACCESS_KEY, and BACKUP_S3_SECRET_KEY"
+                )
                 click.echo("\n" + "=" * 60)
                 return
 
@@ -298,7 +296,7 @@ async def check() -> None:
                     local_path=tmp_path,
                     s3_key=test_key,
                     content_type="text/plain",
-                    metadata={"purpose": "healthcheck"}
+                    metadata={"purpose": "healthcheck"},
                 )
                 success("   Write permission: OK")
 
@@ -551,7 +549,9 @@ async def download(
                 file_key = obj["Key"]
                 # Apply pattern filter if specified
                 if pattern:
-                    if fnmatch.fnmatch(file_key, pattern) or fnmatch.fnmatch(Path(file_key).name, pattern):
+                    if fnmatch.fnmatch(file_key, pattern) or fnmatch.fnmatch(
+                        Path(file_key).name, pattern
+                    ):
                         download_tasks.append(file_key)
                 else:
                     download_tasks.append(file_key)
@@ -717,7 +717,9 @@ async def delete(
                 file_key = obj["Key"]
                 # Apply pattern filter if specified
                 if pattern:
-                    if fnmatch.fnmatch(file_key, pattern) or fnmatch.fnmatch(Path(file_key).name, pattern):
+                    if fnmatch.fnmatch(file_key, pattern) or fnmatch.fnmatch(
+                        Path(file_key).name, pattern
+                    ):
                         delete_tasks.append((file_key, obj["Size"]))
                 else:
                     delete_tasks.append((file_key, obj["Size"]))
@@ -731,7 +733,9 @@ async def delete(
 
         click.echo(f"\n{'=' * 80}")
         if dry_run:
-            click.secho(f"DRY RUN: Would delete {len(delete_tasks)} file(s)", fg="yellow", bold=True)
+            click.secho(
+                f"DRY RUN: Would delete {len(delete_tasks)} file(s)", fg="yellow", bold=True
+            )
         else:
             click.secho(f"DELETING {len(delete_tasks)} file(s)", fg="red", bold=True)
         click.echo(f"{'=' * 80}\n")

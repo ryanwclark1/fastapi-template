@@ -267,9 +267,7 @@ class FileRepository(BaseRepository[File]):
         await session.flush()
         await session.refresh(file)
 
-        self._lazy.debug(
-            lambda: f"db.update_status({file_id}, {status.value}) -> success"
-        )
+        self._lazy.debug(lambda: f"db.update_status({file_id}, {status.value}) -> success")
         return file
 
     async def soft_delete(

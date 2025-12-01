@@ -3,6 +3,7 @@
 Custom exceptions for database operations that provide better
 error messages and typing than raw SQLAlchemy exceptions.
 """
+
 from __future__ import annotations
 
 from typing import Any

@@ -285,8 +285,9 @@ class ConnectionManager:
 
         # Add to local tracking
         conn_info.channels.add(channel)
-        is_first_subscriber = channel not in self._channel_connections or \
-                              not self._channel_connections[channel]
+        is_first_subscriber = (
+            channel not in self._channel_connections or not self._channel_connections[channel]
+        )
         self._channel_connections[channel].add(connection_id)
 
         # Subscribe to Redis PubSub if this is the first local subscriber
@@ -404,7 +405,9 @@ class ConnectionManager:
         """
         count = 0
         for conn_info in list(self._connections.values()):
-            if conn_info.user_id == user_id and await self.send_to_connection(conn_info.connection_id, message):
+            if conn_info.user_id == user_id and await self.send_to_connection(
+                conn_info.connection_id, message
+            ):
                 count += 1
         return count
 
@@ -415,11 +418,7 @@ class ConnectionManager:
     def get_channel_connections(self, channel: str) -> list[ConnectionInfo]:
         """Get all connections subscribed to a channel."""
         connection_ids = self._channel_connections.get(channel, set())
-        return [
-            self._connections[cid]
-            for cid in connection_ids
-            if cid in self._connections
-        ]
+        return [self._connections[cid] for cid in connection_ids if cid in self._connections]
 
     @property
     def connection_count(self) -> int:
@@ -479,7 +478,7 @@ class ConnectionManager:
 
                     # Remove prefix to get logical channel name
                     if channel.startswith(self._channel_prefix):
-                        channel = channel[len(self._channel_prefix):]
+                        channel = channel[len(self._channel_prefix) :]
 
                     data = message["data"]
                     if isinstance(data, bytes):
@@ -559,7 +558,9 @@ def get_connection_manager() -> ConnectionManager:
         RuntimeError: If manager not initialized
     """
     if _manager is None:
-        raise RuntimeError("Connection manager not initialized. Call start_connection_manager() first.")
+        raise RuntimeError(
+            "Connection manager not initialized. Call start_connection_manager() first."
+        )
     return _manager
 
 

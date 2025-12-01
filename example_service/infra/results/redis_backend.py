@@ -33,6 +33,7 @@ from example_service.infra.results.exceptions import (
 
 if TYPE_CHECKING:
     from redis.asyncio.connection import Connection
+
     type _Redis = Redis[bytes]  # type: ignore
     type _BlockingConnectionPool = BlockingConnectionPool[Connection]  # type: ignore
 else:

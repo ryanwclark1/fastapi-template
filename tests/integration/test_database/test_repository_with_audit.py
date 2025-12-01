@@ -53,9 +53,7 @@ class SoftDeletablePost(Base, IntegerPKMixin, TimestampMixin, SoftDeleteMixin):
     body: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
 
-class FullAuditPost(
-    Base, IntegerPKMixin, TimestampMixin, AuditColumnsMixin, SoftDeleteMixin
-):
+class FullAuditPost(Base, IntegerPKMixin, TimestampMixin, AuditColumnsMixin, SoftDeleteMixin):
     """Test model with complete audit trail and soft delete."""
 
     __tablename__ = "full_audit_posts"
@@ -200,9 +198,7 @@ async def test_complete_audit_trail_through_lifecycle(
 
 
 @pytest.mark.asyncio
-async def test_soft_delete_via_update(
-    session: AsyncSession, current_user: str
-) -> None:
+async def test_soft_delete_via_update(session: AsyncSession, current_user: str) -> None:
     """Test soft delete by setting deleted_at and deleted_by."""
     repo = BaseRepository(SoftDeletablePost)
 
@@ -339,9 +335,7 @@ async def test_list_includes_all_with_soft_delete_included(session: AsyncSession
 
 
 @pytest.mark.asyncio
-async def test_recovering_soft_deleted_record(
-    session: AsyncSession, current_user: str
-) -> None:
+async def test_recovering_soft_deleted_record(session: AsyncSession, current_user: str) -> None:
     """Test recovering a soft-deleted record by clearing deleted_at."""
     repo = BaseRepository(SoftDeletablePost)
 
@@ -481,9 +475,7 @@ async def test_pagination_counts_exclude_soft_deleted(session: AsyncSession) -> 
 
 
 @pytest.mark.asyncio
-async def test_bulk_create_with_audit_fields(
-    session: AsyncSession, current_user: str
-) -> None:
+async def test_bulk_create_with_audit_fields(session: AsyncSession, current_user: str) -> None:
     """Test bulk_create preserves audit fields.
 
     Note: bulk_create uses SQLAlchemy Core which bypasses ORM defaults,
@@ -517,15 +509,11 @@ async def test_bulk_create_with_audit_fields(
 
 
 @pytest.mark.asyncio
-async def test_create_many_with_audit_tracking(
-    session: AsyncSession, current_user: str
-) -> None:
+async def test_create_many_with_audit_tracking(session: AsyncSession, current_user: str) -> None:
     """Test create_many preserves audit tracking and returns instances."""
     repo = BaseRepository(AuditedDocument)
 
-    docs = [
-        AuditedDocument(title=f"Doc {i}", created_by=current_user) for i in range(10)
-    ]
+    docs = [AuditedDocument(title=f"Doc {i}", created_by=current_user) for i in range(10)]
 
     created = await repo.create_many(session, docs)
     await session.commit()
@@ -561,9 +549,7 @@ async def test_delete_many_for_soft_delete(session: AsyncSession) -> None:
 
 
 @pytest.mark.asyncio
-async def test_upsert_with_audit_tracking(
-    session: AsyncSession, current_user: str
-) -> None:
+async def test_upsert_with_audit_tracking(session: AsyncSession, current_user: str) -> None:
     """Test upsert_many preserves and updates audit tracking."""
     repo = BaseRepository(AuditedDocument)
 
@@ -580,9 +566,7 @@ async def test_upsert_with_audit_tracking(
             created_by=current_user,
             updated_by="updater@example.com",
         ),
-        AuditedDocument(
-            title="Unique Doc 2", content="New", created_by="new.user@example.com"
-        ),
+        AuditedDocument(title="Unique Doc 2", content="New", created_by="new.user@example.com"),
     ]
 
     # Note: upsert requires PostgreSQL-specific syntax, but we can test the pattern

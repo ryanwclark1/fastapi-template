@@ -1,4 +1,5 @@
 """End-to-end integration tests executed against the Docker image."""
+
 from __future__ import annotations
 
 import shutil
@@ -10,7 +11,9 @@ from pathlib import Path
 import httpx
 import pytest
 
-pytest.importorskip("testcontainers.core.container", reason="testcontainers is required for container smoke tests")
+pytest.importorskip(
+    "testcontainers.core.container", reason="testcontainers is required for container smoke tests"
+)
 from testcontainers.core.container import DockerContainer
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]

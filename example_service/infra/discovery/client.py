@@ -134,9 +134,9 @@ class ConsulClient:
                 )
 
                 duration = time.perf_counter() - start_time
-                service_discovery_operation_duration_seconds.labels(
-                    operation="register"
-                ).observe(duration)
+                service_discovery_operation_duration_seconds.labels(operation="register").observe(
+                    duration
+                )
 
                 if response.status_code == 200:
                     span.set_attribute("consul.success", True)
@@ -170,9 +170,9 @@ class ConsulClient:
 
             except httpx.TimeoutException as e:
                 duration = time.perf_counter() - start_time
-                service_discovery_operation_duration_seconds.labels(
-                    operation="register"
-                ).observe(duration)
+                service_discovery_operation_duration_seconds.labels(operation="register").observe(
+                    duration
+                )
                 span.set_attribute("consul.success", False)
                 span.record_exception(e)
                 service_discovery_registrations_total.labels(status="failure").inc()
@@ -187,9 +187,9 @@ class ConsulClient:
 
             except httpx.HTTPError as e:
                 duration = time.perf_counter() - start_time
-                service_discovery_operation_duration_seconds.labels(
-                    operation="register"
-                ).observe(duration)
+                service_discovery_operation_duration_seconds.labels(operation="register").observe(
+                    duration
+                )
                 span.set_attribute("consul.success", False)
                 span.record_exception(e)
                 service_discovery_registrations_total.labels(status="failure").inc()
@@ -222,9 +222,9 @@ class ConsulClient:
                 )
 
                 duration = time.perf_counter() - start_time
-                service_discovery_operation_duration_seconds.labels(
-                    operation="deregister"
-                ).observe(duration)
+                service_discovery_operation_duration_seconds.labels(operation="deregister").observe(
+                    duration
+                )
 
                 if response.status_code == 200:
                     span.set_attribute("consul.success", True)
@@ -252,9 +252,9 @@ class ConsulClient:
 
             except httpx.TimeoutException as e:
                 duration = time.perf_counter() - start_time
-                service_discovery_operation_duration_seconds.labels(
-                    operation="deregister"
-                ).observe(duration)
+                service_discovery_operation_duration_seconds.labels(operation="deregister").observe(
+                    duration
+                )
                 span.set_attribute("consul.success", False)
                 span.record_exception(e)
                 service_discovery_deregistrations_total.labels(status="failure").inc()
@@ -269,9 +269,9 @@ class ConsulClient:
 
             except httpx.HTTPError as e:
                 duration = time.perf_counter() - start_time
-                service_discovery_operation_duration_seconds.labels(
-                    operation="deregister"
-                ).observe(duration)
+                service_discovery_operation_duration_seconds.labels(operation="deregister").observe(
+                    duration
+                )
                 span.set_attribute("consul.success", False)
                 span.record_exception(e)
                 service_discovery_deregistrations_total.labels(status="failure").inc()
@@ -284,9 +284,7 @@ class ConsulClient:
                 )
                 return False
 
-    async def _ttl_update(
-        self, check_id: str, status: str, note: str | None = None
-    ) -> bool:
+    async def _ttl_update(self, check_id: str, status: str, note: str | None = None) -> bool:
         """Send TTL check update to Consul.
 
         Args:
@@ -312,18 +310,16 @@ class ConsulClient:
                 response = await self._client.put(url, params=params)
 
                 duration = time.perf_counter() - start_time
-                service_discovery_operation_duration_seconds.labels(
-                    operation=operation
-                ).observe(duration)
+                service_discovery_operation_duration_seconds.labels(operation=operation).observe(
+                    duration
+                )
 
                 if response.status_code == 200:
                     span.set_attribute("consul.success", True)
                     service_discovery_ttl_passes_total.labels(
                         status="success", check_status=status
                     ).inc()
-                    logger.debug(
-                        "TTL %s sent to Consul", status, extra={"check_id": check_id}
-                    )
+                    logger.debug("TTL %s sent to Consul", status, extra={"check_id": check_id})
                     return True
                 else:
                     span.set_attribute("consul.success", False)
@@ -346,9 +342,9 @@ class ConsulClient:
 
             except httpx.TimeoutException as e:
                 duration = time.perf_counter() - start_time
-                service_discovery_operation_duration_seconds.labels(
-                    operation=operation
-                ).observe(duration)
+                service_discovery_operation_duration_seconds.labels(operation=operation).observe(
+                    duration
+                )
                 span.set_attribute("consul.success", False)
                 span.record_exception(e)
                 service_discovery_ttl_passes_total.labels(
@@ -366,9 +362,9 @@ class ConsulClient:
 
             except httpx.HTTPError as e:
                 duration = time.perf_counter() - start_time
-                service_discovery_operation_duration_seconds.labels(
-                    operation=operation
-                ).observe(duration)
+                service_discovery_operation_duration_seconds.labels(operation=operation).observe(
+                    duration
+                )
                 span.set_attribute("consul.success", False)
                 span.record_exception(e)
                 service_discovery_ttl_passes_total.labels(

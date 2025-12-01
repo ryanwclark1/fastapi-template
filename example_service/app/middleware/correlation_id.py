@@ -90,9 +90,7 @@ class CorrelationIDMiddleware(HeaderContextMiddleware):
         """
         return generate_uuid()
 
-    def on_value_extracted(
-        self, scope: Scope, value: str, was_generated: bool
-    ) -> None:
+    def on_value_extracted(self, scope: Scope, value: str, was_generated: bool) -> None:
         """Log correlation ID source for debugging distributed traces.
 
         Args:

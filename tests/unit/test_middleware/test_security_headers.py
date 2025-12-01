@@ -1,4 +1,5 @@
 """Unit tests for SecurityHeadersMiddleware."""
+
 from __future__ import annotations
 
 import pytest
@@ -43,9 +44,7 @@ class TestSecurityHeadersMiddleware:
         """
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
             yield ac
 
     async def test_hsts_header_present(self, client: AsyncClient):
@@ -68,9 +67,7 @@ class TestSecurityHeadersMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         assert "strict-transport-security" not in response.headers
@@ -86,17 +83,13 @@ class TestSecurityHeadersMiddleware:
         assert "frame-ancestors" in csp
         assert (
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net"
-            " https://unpkg.com"
-            in csp
+            " https://unpkg.com" in csp
         )
         assert (
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://fonts.googleapis.com"
             in csp
         )
-        assert (
-            "font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com"
-            in csp
-        )
+        assert "font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com" in csp
         # Default now includes ws/wss for WebSocket support
         assert "connect-src 'self'" in csp
         assert "worker-src 'self' blob:" in csp
@@ -168,9 +161,7 @@ class TestSecurityHeadersMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         # X-Powered-By should be removed by security middleware
@@ -191,9 +182,7 @@ class TestSecurityHeadersMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         csp = response.headers["content-security-policy"]
@@ -211,9 +200,7 @@ class TestSecurityHeadersMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         assert response.headers["x-frame-options"] == "SAMEORIGIN"
@@ -233,9 +220,7 @@ class TestSecurityHeadersMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         policy = response.headers["permissions-policy"]
@@ -257,9 +242,7 @@ class TestSecurityHeadersMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         hsts = response.headers["strict-transport-security"]
@@ -280,9 +263,7 @@ class TestSecurityHeadersMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         hsts = response.headers["strict-transport-security"]
@@ -303,9 +284,7 @@ class TestSecurityHeadersMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         hsts = response.headers["strict-transport-security"]
@@ -327,9 +306,7 @@ class TestSecurityHeadersMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         # Disabled headers should not be present
@@ -393,9 +370,7 @@ class TestSecurityHeadersMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         assert response.headers["referrer-policy"] == "no-referrer"
@@ -481,9 +456,7 @@ class TestSecurityHeadersMiddleware:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # Warm up
             await client.get("/test")
 
@@ -511,9 +484,7 @@ class TestEnvironmentAwareFeatures:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         csp = response.headers["content-security-policy"]
@@ -533,9 +504,7 @@ class TestEnvironmentAwareFeatures:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         csp = response.headers["content-security-policy"]
@@ -547,9 +516,7 @@ class TestEnvironmentAwareFeatures:
     async def test_production_auto_enables_hsts(self):
         """Test that HSTS is auto-enabled in production."""
         app = FastAPI()
-        app.add_middleware(
-            SecurityHeadersMiddleware, environment="production", enable_hsts=None
-        )
+        app.add_middleware(SecurityHeadersMiddleware, environment="production", enable_hsts=None)
 
         @app.get("/test")
         async def test_endpoint():
@@ -557,9 +524,7 @@ class TestEnvironmentAwareFeatures:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         assert "strict-transport-security" in response.headers
@@ -575,9 +540,7 @@ class TestEnvironmentAwareFeatures:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         csp = response.headers["content-security-policy"]
@@ -599,9 +562,7 @@ class TestServerHeaderHandling:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         assert "server" not in response.headers
@@ -617,9 +578,7 @@ class TestServerHeaderHandling:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await client.get("/test")
 
         # Server header should be present (uvicorn default)
@@ -637,9 +596,7 @@ class TestServerHeaderHandling:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         assert response.headers.get("server") == "CustomServer/1.0"
@@ -659,9 +616,7 @@ class TestEnhancedPermissionsPolicy:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         policy = response.headers["permissions-policy"]
@@ -700,9 +655,7 @@ class TestEnhancedPermissionsPolicy:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         policy = response.headers["permissions-policy"]
@@ -727,9 +680,7 @@ class TestCSPEnhancements:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         csp = response.headers["content-security-policy"]
@@ -749,9 +700,7 @@ class TestCSPEnhancements:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         csp = response.headers["content-security-policy"]
@@ -835,9 +784,7 @@ class TestGetSecurityHeadersHelper:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/error")
 
         assert response.status_code == 500
@@ -861,9 +808,7 @@ class TestBackwardCompatibility:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         # All headers should be present by default
@@ -891,9 +836,7 @@ class TestBackwardCompatibility:
 
         from httpx import ASGITransport
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         assert "max-age=7776000" in response.headers["strict-transport-security"]

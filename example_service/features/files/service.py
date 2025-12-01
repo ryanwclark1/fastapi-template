@@ -340,9 +340,7 @@ class FileService(BaseService):
         file = await self._repository.get_or_raise(self._session, file_id)
 
         if file.status != FileStatus.PENDING:
-            raise ValueError(
-                f"File {file_id} is not pending upload (status: {file.status.value})"
-            )
+            raise ValueError(f"File {file_id} is not pending upload (status: {file.status.value})")
 
         # Verify file exists in storage
         file_info = await self._storage.get_file_info(file.storage_key)
@@ -447,14 +445,14 @@ class FileService(BaseService):
         file = await self._repository.get_or_raise(self._session, file_id)
 
         if file.status != FileStatus.READY:
-            raise ValueError(f"File {file_id} is not ready for download (status: {file.status.value})")
+            raise ValueError(
+                f"File {file_id} is not ready for download (status: {file.status.value})"
+            )
 
         # Generate presigned download URL
         download_url = await self._storage.get_presigned_url(file.storage_key)
 
-        self._lazy.debug(
-            lambda: f"service.get_download_url({file_id}) -> generated presigned URL"
-        )
+        self._lazy.debug(lambda: f"service.get_download_url({file_id}) -> generated presigned URL")
 
         return {
             "download_url": download_url,
@@ -573,20 +571,24 @@ class FileService(BaseService):
                     owner_id=owner_id,
                     is_public=is_public,
                 )
-                results.append({
-                    "filename": filename,
-                    "file_id": created_file.id,
-                    "success": True,
-                    "error": None,
-                })
+                results.append(
+                    {
+                        "filename": filename,
+                        "file_id": created_file.id,
+                        "success": True,
+                        "error": None,
+                    }
+                )
                 successful += 1
             except (InvalidFileError, StorageClientError) as e:
-                results.append({
-                    "filename": filename,
-                    "file_id": None,
-                    "success": False,
-                    "error": str(e),
-                })
+                results.append(
+                    {
+                        "filename": filename,
+                        "file_id": None,
+                        "success": False,
+                        "error": str(e),
+                    }
+                )
                 failed += 1
 
         self.logger.info(
@@ -623,53 +625,61 @@ class FileService(BaseService):
             try:
                 file = await self._repository.get(self._session, file_id)
                 if file is None:
-                    items.append({
+                    items.append(
+                        {
+                            "file_id": file_id,
+                            "download_url": None,
+                            "filename": None,
+                            "content_type": None,
+                            "size_bytes": None,
+                            "success": False,
+                            "error": "File not found",
+                        }
+                    )
+                    failed += 1
+                    continue
+
+                if file.status != FileStatus.READY:
+                    items.append(
+                        {
+                            "file_id": file_id,
+                            "download_url": None,
+                            "filename": file.original_filename,
+                            "content_type": file.content_type,
+                            "size_bytes": file.size_bytes,
+                            "success": False,
+                            "error": f"File not ready (status: {file.status.value})",
+                        }
+                    )
+                    failed += 1
+                    continue
+
+                download_url = await self._storage.get_presigned_url(file.storage_key)
+                items.append(
+                    {
+                        "file_id": file_id,
+                        "download_url": download_url,
+                        "filename": file.original_filename,
+                        "content_type": file.content_type,
+                        "size_bytes": file.size_bytes,
+                        "success": True,
+                        "error": None,
+                    }
+                )
+                successful += 1
+
+            except Exception as e:
+                items.append(
+                    {
                         "file_id": file_id,
                         "download_url": None,
                         "filename": None,
                         "content_type": None,
                         "size_bytes": None,
                         "success": False,
-                        "error": "File not found",
-                    })
-                    failed += 1
-                    continue
-
-                if file.status != FileStatus.READY:
-                    items.append({
-                        "file_id": file_id,
-                        "download_url": None,
-                        "filename": file.original_filename,
-                        "content_type": file.content_type,
-                        "size_bytes": file.size_bytes,
-                        "success": False,
-                        "error": f"File not ready (status: {file.status.value})",
-                    })
-                    failed += 1
-                    continue
-
-                download_url = await self._storage.get_presigned_url(file.storage_key)
-                items.append({
-                    "file_id": file_id,
-                    "download_url": download_url,
-                    "filename": file.original_filename,
-                    "content_type": file.content_type,
-                    "size_bytes": file.size_bytes,
-                    "success": True,
-                    "error": None,
-                })
-                successful += 1
-
-            except Exception as e:
-                items.append({
-                    "file_id": file_id,
-                    "download_url": None,
-                    "filename": None,
-                    "content_type": None,
-                    "size_bytes": None,
-                    "success": False,
-                    "error": str(e),
-                })
+                        "error": str(e),
+                    }
+                )
                 failed += 1
 
         self.logger.info(
@@ -714,50 +724,58 @@ class FileService(BaseService):
             try:
                 file = await self._repository.get(self._session, file_id)
                 if file is None:
-                    items.append({
-                        "file_id": file_id,
-                        "filename": None,
-                        "would_delete": None if dry_run else None,
-                        "deleted": None if not dry_run else None,
-                        "success": False,
-                        "error": "File not found",
-                    })
+                    items.append(
+                        {
+                            "file_id": file_id,
+                            "filename": None,
+                            "would_delete": None if dry_run else None,
+                            "deleted": None if not dry_run else None,
+                            "success": False,
+                            "error": "File not found",
+                        }
+                    )
                     failed += 1
                     continue
 
                 if dry_run:
                     # Dry run - just preview
-                    items.append({
-                        "file_id": file_id,
-                        "filename": file.original_filename,
-                        "would_delete": True,
-                        "deleted": None,
-                        "success": True,
-                        "error": None,
-                    })
+                    items.append(
+                        {
+                            "file_id": file_id,
+                            "filename": file.original_filename,
+                            "would_delete": True,
+                            "deleted": None,
+                            "success": True,
+                            "error": None,
+                        }
+                    )
                     successful += 1
                 else:
                     # Actual deletion
                     await self.delete_file(file_id, hard_delete=hard_delete)
-                    items.append({
-                        "file_id": file_id,
-                        "filename": file.original_filename,
-                        "would_delete": None,
-                        "deleted": True,
-                        "success": True,
-                        "error": None,
-                    })
+                    items.append(
+                        {
+                            "file_id": file_id,
+                            "filename": file.original_filename,
+                            "would_delete": None,
+                            "deleted": True,
+                            "success": True,
+                            "error": None,
+                        }
+                    )
                     successful += 1
 
             except Exception as e:
-                items.append({
-                    "file_id": file_id,
-                    "filename": None,
-                    "would_delete": None if dry_run else None,
-                    "deleted": None if not dry_run else None,
-                    "success": False,
-                    "error": str(e),
-                })
+                items.append(
+                    {
+                        "file_id": file_id,
+                        "filename": None,
+                        "would_delete": None if dry_run else None,
+                        "deleted": None if not dry_run else None,
+                        "success": False,
+                        "error": str(e),
+                    }
+                )
                 failed += 1
 
         self.logger.info(

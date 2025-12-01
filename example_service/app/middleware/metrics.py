@@ -1,4 +1,5 @@
 """Metrics middleware for HTTP request instrumentation with trace correlation."""
+
 from __future__ import annotations
 
 import re
@@ -39,9 +40,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
     previously in TimingMiddleware, eliminating duplicate timing measurements.
     """
 
-    async def dispatch(
-        self, request: Request, call_next: Callable
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Process request and collect metrics.
 
         Args:
@@ -90,27 +89,25 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             # Record metrics with exemplar linking
             # Exemplars enable click-through from Prometheus/Grafana to Tempo
             if trace_id:
-                http_request_duration_seconds.labels(
-                    method=method, endpoint=endpoint
-                ).observe(duration, exemplar={"trace_id": trace_id})
+                http_request_duration_seconds.labels(method=method, endpoint=endpoint).observe(
+                    duration, exemplar={"trace_id": trace_id}
+                )
 
                 http_requests_total.labels(
                     method=method, endpoint=endpoint, status=status_code
                 ).inc(exemplar={"trace_id": trace_id})
             else:
                 # Fallback without exemplar if tracing unavailable
-                http_request_duration_seconds.labels(
-                    method=method, endpoint=endpoint
-                ).observe(duration)
+                http_request_duration_seconds.labels(method=method, endpoint=endpoint).observe(
+                    duration
+                )
 
                 http_requests_total.labels(
                     method=method, endpoint=endpoint, status=status_code
                 ).inc()
 
             # Decrement in-progress gauge
-            http_requests_in_progress.labels(
-                method=method, endpoint=endpoint
-            ).dec()
+            http_requests_in_progress.labels(method=method, endpoint=endpoint).dec()
 
 
 def _patch_fastapi_middleware_ordering() -> None:

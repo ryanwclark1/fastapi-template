@@ -7,6 +7,7 @@ RabbitRouter for automatic AsyncAPI documentation.
 AsyncAPI Documentation:
     All handlers defined here will appear in the AsyncAPI docs at /asyncapi
 """
+
 from __future__ import annotations
 
 import logging
@@ -140,9 +141,7 @@ if router is not None:
     # Demonstrates message bus communication with a simple echo pattern.
     # Messages sent to echo-service queue are logged and republished.
 
-    @router.subscriber(
-        RabbitQueue(ECHO_SERVICE_QUEUE, durable=True, auto_delete=False)
-    )
+    @router.subscriber(RabbitQueue(ECHO_SERVICE_QUEUE, durable=True, auto_delete=False))
     @router.publisher(ECHO_RESPONSE_QUEUE)
     async def handle_echo_request(message: dict) -> dict:
         """Echo service - receives message, logs it, returns with timestamp.
@@ -177,9 +176,7 @@ if router is not None:
 
         return echo_response
 
-    @router.subscriber(
-        RabbitQueue(ECHO_RESPONSE_QUEUE, durable=True, auto_delete=False)
-    )
+    @router.subscriber(RabbitQueue(ECHO_RESPONSE_QUEUE, durable=True, auto_delete=False))
     async def handle_echo_response(message: dict) -> None:
         """Log echo responses - completes the round-trip demonstration.
 

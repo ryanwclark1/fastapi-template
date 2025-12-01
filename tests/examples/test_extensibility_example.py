@@ -48,6 +48,7 @@ if TYPE_CHECKING:
 # Example: Adding a New Feature (Product Management)
 # ============================================================================
 
+
 # Step 1: Define your model (would normally be in example_service/features/products/models.py)
 class Product(
     Base,

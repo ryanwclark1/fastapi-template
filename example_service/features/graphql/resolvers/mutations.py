@@ -62,10 +62,12 @@ async def _publish_reminder_event(
         redis = Redis.from_url(str(redis_settings.url))
         try:
             channel = "graphql:reminders"
-            payload = json.dumps({
-                "event_type": event_type,
-                **reminder_data,
-            })
+            payload = json.dumps(
+                {
+                    "event_type": event_type,
+                    **reminder_data,
+                }
+            )
             await redis.publish(channel, payload)
             logger.debug(f"Published {event_type} event to {channel}")
         finally:

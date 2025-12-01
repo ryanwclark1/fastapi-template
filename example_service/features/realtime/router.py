@@ -167,12 +167,13 @@ async def _handle_messages(
                 conn = manager.get_connection(connection_id)
                 if conn:
                     import time
+
                     conn.last_ping = time.time()
 
             elif msg_type == ClientMessageType.SUBSCRIBE:
                 # Subscribe to channels
                 channels = message.get("channels", [])
-                for channel in channels[:ws_settings.max_channels_per_connection]:
+                for channel in channels[: ws_settings.max_channels_per_connection]:
                     if await manager.subscribe(connection_id, channel):
                         response = SubscribedMessage(channel=channel)
                         await websocket.send_json(response.model_dump())

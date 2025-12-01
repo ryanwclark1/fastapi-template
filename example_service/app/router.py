@@ -1,4 +1,5 @@
 """Router registry and setup."""
+
 from __future__ import annotations
 
 import logging
@@ -55,9 +56,7 @@ def setup_routers(app: FastAPI) -> None:
         try:
             from example_service.features.graphql.router import router as graphql_router
         except Exception as exc:  # pragma: no cover - optional dependency
-            logger.warning(
-                "GraphQL endpoint disabled (strawberry not available): %s", exc
-            )
+            logger.warning("GraphQL endpoint disabled (strawberry not available): %s", exc)
         else:
             app.include_router(graphql_router, prefix=graphql_settings.path, tags=["graphql"])
             playground_status = "enabled" if graphql_settings.playground_enabled else "disabled"

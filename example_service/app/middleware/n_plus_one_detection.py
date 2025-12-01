@@ -438,9 +438,7 @@ class NPlusOneDetectionMiddleware(BaseHTTPMiddleware):
             response.headers["X-Query-Count"] = str(total_queries)
             response.headers["X-Request-Time"] = f"{request_time:.3f}"
             if n_plus_one_patterns:
-                response.headers["X-N-Plus-One-Detected"] = str(
-                    len(n_plus_one_patterns)
-                )
+                response.headers["X-N-Plus-One-Detected"] = str(len(n_plus_one_patterns))
 
     async def _log_n_plus_one_patterns(
         self,
@@ -559,9 +557,7 @@ class NPlusOneDetectionMiddleware(BaseHTTPMiddleware):
             if query_patterns[normalized_query] is not None:
                 query_patterns[normalized_query].add_execution(execution_time)
         else:
-            query_patterns[normalized_query] = QueryPattern(
-                normalized_query, execution_time
-            )
+            query_patterns[normalized_query] = QueryPattern(normalized_query, execution_time)
 
         # Log slow queries if enabled
         if self.log_slow_queries and execution_time > self.slow_query_threshold:
@@ -631,9 +627,7 @@ def setup_n_plus_one_monitoring(
         return lambda _request: None
 
     # Context variable to track current request
-    current_request: ContextVar[Any | None] = ContextVar(
-        "current_request", default=None
-    )
+    current_request: ContextVar[Any | None] = ContextVar("current_request", default=None)
 
     @event.listens_for(engine.sync_engine, "before_cursor_execute")
     def receive_before_cursor_execute(

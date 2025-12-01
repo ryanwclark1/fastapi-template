@@ -65,10 +65,7 @@ class OutboxRepository(BaseRepository[EventOutbox]):
                 EventOutbox.processed_at.is_(None),
                 EventOutbox.retry_count < max_retries,
             )
-            .where(
-                (EventOutbox.next_retry_at.is_(None))
-                | (EventOutbox.next_retry_at <= now)
-            )
+            .where((EventOutbox.next_retry_at.is_(None)) | (EventOutbox.next_retry_at <= now))
             .order_by(EventOutbox.created_at.asc())
             .limit(batch_size)
             # Use FOR UPDATE SKIP LOCKED for concurrent processors
@@ -189,9 +186,7 @@ class OutboxRepository(BaseRepository[EventOutbox]):
         from sqlalchemy import func
 
         stmt = (
-            select(func.count())
-            .select_from(EventOutbox)
-            .where(EventOutbox.processed_at.is_(None))
+            select(func.count()).select_from(EventOutbox).where(EventOutbox.processed_at.is_(None))
         )
         result = await session.execute(stmt)
         return result.scalar_one()

@@ -176,9 +176,7 @@ class SecurityHeadersMiddleware:
         )
 
     @staticmethod
-    def _determine_production_mode(
-        is_production: bool | None, environment: str | None
-    ) -> bool:
+    def _determine_production_mode(is_production: bool | None, environment: str | None) -> bool:
         """Determine if running in production mode.
 
         Args:
@@ -259,12 +257,8 @@ class SecurityHeadersMiddleware:
         return {
             "default-src": "'self'",
             # Allow Swagger docs (jsDelivr) + AsyncAPI docs (unpkg) to load bundled assets
-            "script-src": (
-                f"'self' 'unsafe-inline' 'unsafe-eval' {swagger_cdn} {unpkg_cdn}"
-            ),
-            "style-src": (
-                f"'self' 'unsafe-inline' {swagger_cdn} {unpkg_cdn} {google_fonts_css}"
-            ),
+            "script-src": (f"'self' 'unsafe-inline' 'unsafe-eval' {swagger_cdn} {unpkg_cdn}"),
+            "style-src": (f"'self' 'unsafe-inline' {swagger_cdn} {unpkg_cdn} {google_fonts_css}"),
             "img-src": "'self' data: https:",
             "font-src": f"'self' data: {swagger_cdn} {google_fonts_assets}",
             "connect-src": f"'self' {swagger_cdn}",

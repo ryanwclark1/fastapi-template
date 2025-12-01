@@ -204,7 +204,9 @@ class OtelSettings(BaseSettings):
     def validate_tls_or_insecure(self) -> OtelSettings:
         """Validate that tls_enabled and insecure are mutually exclusive."""
         if self.tls_enabled and self.insecure:
-            raise ValueError("Cannot use both tls_enabled=True and insecure=True - they are mutually exclusive")
+            raise ValueError(
+                "Cannot use both tls_enabled=True and insecure=True - they are mutually exclusive"
+            )
         return self
 
     @computed_field
@@ -238,7 +240,10 @@ class OtelSettings(BaseSettings):
         # Add compression if enabled
         if self.compression != "none":
             from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import Compression
-            kwargs["compression"] = Compression.Gzip if self.compression == "gzip" else Compression.NoCompression
+
+            kwargs["compression"] = (
+                Compression.Gzip if self.compression == "gzip" else Compression.NoCompression
+            )
 
         # Add authentication headers if provided
         if self.headers:
@@ -289,6 +294,7 @@ class OtelSettings(BaseSettings):
         # Add environment attribute from app settings
         try:
             from example_service.core.settings import get_app_settings
+
             app = get_app_settings()
             attrs["deployment.environment"] = app.environment
             attrs["service.namespace"] = app.service_name
@@ -369,6 +375,7 @@ class OtelSettings(BaseSettings):
 
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).warning(
                 f"Failed to build TLS credentials: {e}. Falling back to insecure connection."
             )

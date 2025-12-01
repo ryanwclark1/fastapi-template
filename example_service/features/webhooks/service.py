@@ -67,24 +67,16 @@ class WebhookService(BaseService):
 
         # Block private/internal IP ranges
         if ip.is_private:
-            raise ValueError(
-                f"Webhook URL cannot point to private IP address: {hostname}"
-            )
+            raise ValueError(f"Webhook URL cannot point to private IP address: {hostname}")
 
         if ip.is_loopback:
-            raise ValueError(
-                f"Webhook URL cannot point to loopback address: {hostname}"
-            )
+            raise ValueError(f"Webhook URL cannot point to loopback address: {hostname}")
 
         if ip.is_reserved:
-            raise ValueError(
-                f"Webhook URL cannot point to reserved IP address: {hostname}"
-            )
+            raise ValueError(f"Webhook URL cannot point to reserved IP address: {hostname}")
 
         if ip.is_link_local:
-            raise ValueError(
-                f"Webhook URL cannot point to link-local address: {hostname}"
-            )
+            raise ValueError(f"Webhook URL cannot point to link-local address: {hostname}")
 
     def generate_secret(self) -> str:
         """Generate a secure HMAC secret.
@@ -203,9 +195,7 @@ class WebhookService(BaseService):
         """
         webhook = await self._webhook_repo.get(self._session, webhook_id)
         if webhook is None:
-            self._lazy.debug(
-                lambda: f"service.update_webhook({webhook_id}) -> not found"
-            )
+            self._lazy.debug(lambda: f"service.update_webhook({webhook_id}) -> not found")
             return None
 
         # Validate URL if provided
@@ -250,9 +240,7 @@ class WebhookService(BaseService):
         """
         webhook = await self._webhook_repo.get(self._session, webhook_id)
         if webhook is None:
-            self._lazy.debug(
-                lambda: f"service.delete_webhook({webhook_id}) -> not found"
-            )
+            self._lazy.debug(lambda: f"service.delete_webhook({webhook_id}) -> not found")
             return False
 
         await self._webhook_repo.delete(self._session, webhook)
@@ -275,9 +263,7 @@ class WebhookService(BaseService):
         """
         webhook = await self._webhook_repo.get(self._session, webhook_id)
         if webhook is None:
-            self._lazy.debug(
-                lambda: f"service.regenerate_secret({webhook_id}) -> not found"
-            )
+            self._lazy.debug(lambda: f"service.regenerate_secret({webhook_id}) -> not found")
             return None
 
         # Generate new secret
@@ -349,9 +335,7 @@ class WebhookService(BaseService):
         """
         delivery = await self._delivery_repo.get(self._session, delivery_id)
         if delivery is None:
-            self._lazy.debug(
-                lambda: f"service.retry_delivery({delivery_id}) -> not found"
-            )
+            self._lazy.debug(lambda: f"service.retry_delivery({delivery_id}) -> not found")
             return None
 
         # Reset status to allow retry

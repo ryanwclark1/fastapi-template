@@ -120,9 +120,7 @@ class DomainEvent(BaseModel):
             return
         # Ensure event_type is defined
         if not hasattr(cls, "event_type") or cls.event_type == "domain.event":
-            raise TypeError(
-                f"{cls.__name__} must define 'event_type' class variable"
-            )
+            raise TypeError(f"{cls.__name__} must define 'event_type' class variable")
 
     @classmethod
     def get_event_type(cls) -> str:

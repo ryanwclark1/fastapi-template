@@ -43,9 +43,7 @@ class AuthSettings(BaseSettings):
     token_header: str = Field(
         default="Authorization", description="HTTP header containing the token"
     )
-    token_scheme: str = Field(
-        default="Bearer", description="Token authentication scheme"
-    )
+    token_scheme: str = Field(default="Bearer", description="Token authentication scheme")
 
     # Service-to-service authentication
     service_token: SecretStr | None = Field(
@@ -59,17 +57,11 @@ class AuthSettings(BaseSettings):
     request_timeout: float = Field(
         default=5.0, ge=0.1, le=30.0, description="Auth request timeout in seconds"
     )
-    max_retries: int = Field(
-        default=3, ge=0, le=5, description="Maximum retry attempts"
-    )
+    max_retries: int = Field(default=3, ge=0, le=5, description="Maximum retry attempts")
 
     # Optional features
-    enable_permission_caching: bool = Field(
-        default=True, description="Cache user ACL permissions"
-    )
-    enable_acl_caching: bool = Field(
-        default=True, description="Cache ACL validation results"
-    )
+    enable_permission_caching: bool = Field(default=True, description="Cache user ACL permissions")
+    enable_acl_caching: bool = Field(default=True, description="Cache ACL validation results")
 
     model_config = SettingsConfigDict(
         env_prefix="AUTH_",
