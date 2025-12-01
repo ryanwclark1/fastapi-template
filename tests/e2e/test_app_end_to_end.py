@@ -36,13 +36,12 @@ async def e2e_stack(monkeypatch):
 
     test_broker = TestRabbitBroker(broker_module.router.broker)
 
-    async with test_broker:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            yield {
-                "client": client,
-                "broker": broker_module.router.broker,
-                "handlers": handlers_module,
-            }
+    async with test_broker, AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        yield {
+            "client": client,
+            "broker": broker_module.router.broker,
+            "handlers": handlers_module,
+        }
 
     # Restore original settings/modules for the rest of the suite
     if original_rabbit_enabled is None:

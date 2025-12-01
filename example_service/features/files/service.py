@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, BinaryIO
@@ -33,7 +34,6 @@ if TYPE_CHECKING:
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from example_service.core.settings.storage import StorageSettings
 
 
 class FileService(BaseService):
@@ -463,10 +463,9 @@ class FileService(BaseService):
 
             # Delete thumbnails from storage
             for thumbnail in file.thumbnails:
-                try:
+                with contextlib.suppress(StorageClientError):
+                    # Continue even if thumbnail deletion fails
                     await self._storage.delete_file(thumbnail.storage_key)
-                except StorageClientError:
-                    pass  # Continue even if thumbnail deletion fails
 
             # Delete from database
             await self._repository.delete(self._session, file)

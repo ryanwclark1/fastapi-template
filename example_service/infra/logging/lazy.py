@@ -104,10 +104,7 @@ class LazyLoggerAdapter(logging.LoggerAdapter):
             msg = msg()
 
         # Evaluate any lazy args
-        if args:
-            evaluated_args = tuple(arg() if callable(arg) else arg for arg in args)
-        else:
-            evaluated_args = args
+        evaluated_args = tuple(arg() if callable(arg) else arg for arg in args) if args else args
 
         # Call parent with evaluated values
         super().log(level, msg, *evaluated_args, **kwargs)

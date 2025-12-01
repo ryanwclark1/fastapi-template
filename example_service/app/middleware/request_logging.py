@@ -2,6 +2,15 @@
 
 This middleware is responsible for logging only. Metrics collection is handled
 by MetricsMiddleware to avoid duplication.
+
+Key Features:
+- Structured request/response logging with correlation IDs
+- PII masking with configurable patterns
+- Request/response body logging with sensitive data redaction
+- Client IP detection through proxy headers (X-Forwarded-For, X-Real-IP)
+- Enhanced context enrichment (user agent, user/tenant context, request size)
+- Security event detection (optional)
+- Performance metrics tracking
 """
 
 from __future__ import annotations
@@ -22,6 +31,14 @@ from example_service.infra.logging.context import set_log_context
 
 logger = logging.getLogger(__name__)
 SLOW_REQUEST_THRESHOLD = 5.0
+
+# Security event detection patterns
+SECURITY_PATTERNS = {
+    "sql_injection": re.compile(r"(\bunion\b.*\bselect\b|\bor\b.*=.*|\bdrop\b.*\btable\b)", re.IGNORECASE),
+    "xss": re.compile(r"(<script|javascript:|onerror=|onload=)", re.IGNORECASE),
+    "path_traversal": re.compile(r"(\.\./|\.\.\\|%2e%2e)", re.IGNORECASE),
+    "command_injection": re.compile(r"(;|\||&|\$\(|`)", re.IGNORECASE),
+}
 
 try:
     from example_service.tasks import tracking as _task_tracking
@@ -297,13 +314,16 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         log_response_body: Whether to log response bodies
         max_body_size: Maximum body size to log (bytes)
         exempt_paths: Paths to exclude from logging
+        detect_security_events: Whether to detect and log security events
+        sensitive_fields: Additional sensitive field names for redaction
 
     Example:
             app.add_middleware(
             RequestLoggingMiddleware,
             log_request_body=True,
             log_response_body=True,
-            max_body_size=10000
+            max_body_size=10000,
+            detect_security_events=True
         )
     """
 
@@ -316,6 +336,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         max_body_size: int = 10000,  # 10KB
         exempt_paths: list[str] | None = None,
         log_level: int = logging.INFO,
+        detect_security_events: bool = False,  # Optional security detection
+        sensitive_fields: list[str] | None = None,  # Additional sensitive fields
     ) -> None:
         """Initialize request logging middleware.
 
@@ -327,6 +349,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             max_body_size: Maximum body size to log in bytes
             exempt_paths: Paths to exclude from detailed logging
             log_level: Logging level for request logs
+            detect_security_events: Enable security event detection
+            sensitive_fields: Additional sensitive field names for masking
         """
         super().__init__(app)
         self.masker = masker or PIIMasker()
@@ -334,6 +358,12 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         self.log_response_body = log_response_body
         self.max_body_size = max_body_size
         self.log_level = log_level
+        self.detect_security_events = detect_security_events
+
+        # Add custom sensitive fields to masker
+        if sensitive_fields:
+            self.masker.sensitive_fields = self.masker.sensitive_fields | set(sensitive_fields)
+
         self.exempt_paths = exempt_paths or [
             "/health",
             "/health/",
@@ -356,6 +386,108 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             True if path is exempt
         """
         return any(path.startswith(exempt) for exempt in self.exempt_paths)
+
+    def _get_client_ip(self, request: Request) -> str:
+        """Extract client IP address from request with proxy header support.
+
+        Checks proxy headers in order of preference:
+        1. X-Forwarded-For (can contain multiple IPs, takes first)
+        2. X-Real-IP
+        3. X-Client-IP
+        4. request.client.host (fallback)
+
+        Args:
+            request: FastAPI request
+
+        Returns:
+            Client IP address or "unknown"
+        """
+        # Check for common proxy headers
+        for header in ["x-forwarded-for", "x-real-ip", "x-client-ip"]:
+            ip = request.headers.get(header)
+            if ip:
+                # X-Forwarded-For can contain multiple IPs, take the first (client)
+                return ip.split(",")[0].strip()
+
+        # Fall back to client host
+        if request.client:
+            return request.client.host
+
+        return "unknown"
+
+    def _get_user_context(self, request: Request) -> dict[str, Any]:
+        """Extract user and tenant context from request state.
+
+        Args:
+            request: FastAPI request
+
+        Returns:
+            Dictionary with user_id and tenant_id if available
+        """
+        context = {}
+
+        # Get user context if available
+        if hasattr(request.state, "user") and request.state.user:
+            user = request.state.user
+            if hasattr(user, "id"):
+                context["user_id"] = str(user.id)
+            elif hasattr(user, "user_id"):
+                context["user_id"] = str(user.user_id)
+            elif hasattr(user, "sub"):
+                context["user_id"] = str(user.sub)
+
+        # Get tenant context if available
+        if hasattr(request.state, "tenant_id"):
+            context["tenant_id"] = str(request.state.tenant_id)
+        elif hasattr(request.state, "tenant") and request.state.tenant:
+            tenant = request.state.tenant
+            if hasattr(tenant, "id"):
+                context["tenant_id"] = str(tenant.id)
+            elif hasattr(tenant, "tenant_id"):
+                context["tenant_id"] = str(tenant.tenant_id)
+
+        return context
+
+    def _detect_security_event(
+        self, request: Request, path: str, query_params: dict[str, Any], body_data: dict[str, Any] | None
+    ) -> list[str]:
+        """Detect potential security threats in request.
+
+        Args:
+            request: FastAPI request
+            path: Request path
+            query_params: Query parameters
+            body_data: Parsed body data
+
+        Returns:
+            List of detected security event types
+        """
+        if not self.detect_security_events:
+            return []
+
+        detected_events = []
+
+        # Check path for suspicious patterns
+        for event_type, pattern in SECURITY_PATTERNS.items():
+            if pattern.search(path):
+                detected_events.append(event_type)
+
+        # Check query parameters
+        query_string = str(query_params)
+        for event_type, pattern in SECURITY_PATTERNS.items():
+            if pattern.search(query_string):
+                if event_type not in detected_events:
+                    detected_events.append(event_type)
+
+        # Check body data
+        if body_data:
+            body_string = json.dumps(body_data)
+            for event_type, pattern in SECURITY_PATTERNS.items():
+                if pattern.search(body_string):
+                    if event_type not in detected_events:
+                        detected_events.append(event_type)
+
+        return detected_events
 
     def _should_log_body(self, content_type: str | None, body_size: int) -> bool:
         """Determine if body should be logged.
@@ -434,25 +566,48 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             request.state.request_id = request_id
             request.scope.setdefault("state", {})["request_id"] = request_id
 
+        # Get enhanced client IP (with proxy support)
+        client_ip = self._get_client_ip(request)
+
         # Add logging-specific context fields
         # Note: request_id is already set by RequestIDMiddleware
         # We only add HTTP-specific fields here for logging purposes
         set_log_context(
             method=request.method,
             path=request.url.path,
-            client_ip=request.client.host if request.client else None,
+            client_ip=client_ip,
         )
 
-        # Log request details
+        # Get user agent
+        user_agent = request.headers.get("user-agent", "")
+
+        # Get request size
+        request_size = 0
+        content_length_header = request.headers.get("content-length")
+        if content_length_header:
+            try:
+                request_size = int(content_length_header)
+            except (ValueError, TypeError):
+                pass
+
+        # Get user and tenant context
+        user_context = self._get_user_context(request)
+
+        # Log request details with enhanced context
         log_data: dict[str, Any] = {
             "event": "request",
+            "event_type": "request_start",
             "request_id": request_id,
             "method": request.method,
             "path": request.url.path,
             "query_params": dict(request.query_params),
-            "client_ip": request.client.host if request.client else None,
-            "user_agent": request.headers.get("user-agent"),
+            "client_ip": client_ip,
+            "user_agent": user_agent,
+            "request_size": request_size,
         }
+
+        # Add user/tenant context if available
+        log_data.update(user_context)
 
         # Mask sensitive headers
         headers = dict(request.headers)
@@ -466,7 +621,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
         log_data["headers"] = masked_headers
 
-        # Log request body if enabled
+        # Log request body if enabled and detect security events
+        parsed_body = None
         if self.log_request_body:
             content_type = request.headers.get("content-type")
             content_length = int(request.headers.get("content-length", 0))
@@ -484,6 +640,26 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
                 request._receive = receive
 
+        # Detect security events if enabled
+        security_events = self._detect_security_event(
+            request, request.url.path, dict(request.query_params), parsed_body
+        )
+        if security_events:
+            log_data["security_events"] = security_events
+            # Log security events at WARNING level separately
+            logger.warning(
+                "Potential security event detected",
+                extra={
+                    "event": "security_event",
+                    "event_type": "security_alert",
+                    "request_id": request_id,
+                    "path": request.url.path,
+                    "client_ip": client_ip,
+                    "security_events": security_events,
+                    **user_context,
+                },
+            )
+
         logger.log(self.log_level, "HTTP Request", extra=log_data)
 
         # Process request
@@ -492,17 +668,24 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         except Exception as e:
             duration = time.time() - start_time
 
+            error_log_data = {
+                "event": "request_error",
+                "event_type": "request_error",
+                "request_id": request_id,
+                "method": request.method,
+                "path": request.url.path,
+                "duration": round(duration, 3),
+                "duration_ms": round(duration * 1000, 2),
+                "client_ip": client_ip,
+                "user_agent": user_agent,
+                "exception": str(e),
+                "exception_type": type(e).__name__,
+            }
+            error_log_data.update(user_context)
+
             logger.error(
                 "Request failed",
-                extra={
-                    "event": "request_error",
-                    "request_id": request_id,
-                    "method": request.method,
-                    "path": request.url.path,
-                    "duration": duration,
-                    "exception": str(e),
-                    "exception_type": type(e).__name__,
-                },
+                extra=error_log_data,
                 exc_info=True,
             )
 
@@ -520,22 +703,42 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         # Note: Duration metrics are tracked separately by MetricsMiddleware
         duration = time.time() - start_time
 
-        # Log response
+        # Log response with enhanced context
         response_log: dict[str, Any] = {
             "event": "response",
+            "event_type": "request_complete",
             "request_id": request_id,
             "method": request.method,
             "path": request.url.path,
             "status_code": response.status_code,
             "duration": round(duration, 3),
+            "duration_ms": round(duration * 1000, 2),
+            "client_ip": client_ip,
+            "user_agent": user_agent,
+            "request_size": request_size,
         }
 
-        # Add response size if available
-        if hasattr(response, "headers") and "content-length" in response.headers:
-            response_size = int(response.headers["content-length"])
-            response_log["response_size"] = response_size
+        # Add user/tenant context
+        response_log.update(user_context)
 
-        logger.log(self.log_level, "HTTP Response", extra=response_log)
+        # Add response size if available
+        response_size = 0
+        if hasattr(response, "headers") and "content-length" in response.headers:
+            try:
+                response_size = int(response.headers["content-length"])
+                response_log["response_size"] = response_size
+            except (ValueError, TypeError):
+                pass
+
+        # Determine log level based on status code
+        if response.status_code >= 500:
+            response_log_level = logging.ERROR
+        elif response.status_code >= 400:
+            response_log_level = logging.WARNING
+        else:
+            response_log_level = self.log_level
+
+        logger.log(response_log_level, "HTTP Response", extra=response_log)
 
         if hasattr(tracking, "track_api_call"):
             tracking.track_api_call(

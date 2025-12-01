@@ -302,7 +302,7 @@ class TestRateLimitMiddleware:
         with patch(
             "example_service.app.middleware.rate_limit.logger"
         ) as mock_logger:
-            response = await client.get("/test")
+            await client.get("/test")
 
             # Should log warning about rate limit
             assert mock_logger.warning.called

@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import logging
-from abc import ABC
 
 from example_service.infra.logging import get_lazy_logger
 
 
-class BaseService(ABC):
+class BaseService:
     """Base class for all service classes.
 
     Provides common functionality like logging and error handling

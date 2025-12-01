@@ -131,7 +131,6 @@ def validate() -> None:
         # Check database configuration
         click.echo("\n🗄️  Database Configuration:")
         try:
-            db_url = settings.database.database_url
             info(f"  Database URL: {settings.database.db_host}:{settings.database.db_port}/{settings.database.db_name}")
             success("  ✓ Database settings valid")
         except Exception as e:
@@ -141,7 +140,6 @@ def validate() -> None:
         # Check cache configuration
         click.echo("\n🔄 Cache Configuration:")
         try:
-            cache_url = settings.cache.redis_url
             info("  Redis URL configured")
             success("  ✓ Cache settings valid")
         except Exception as e:
@@ -151,7 +149,6 @@ def validate() -> None:
         # Check messaging configuration
         click.echo("\n📨 Messaging Configuration:")
         try:
-            rabbit_url = settings.messaging.rabbit_url
             info("  RabbitMQ URL configured")
             success("  ✓ Messaging settings valid")
         except Exception as e:
@@ -262,11 +259,8 @@ def _extract_defaults_from_settings() -> dict[str, tuple[str, str]]:
             elif isinstance(default_val, Path):
                 formatted = str(default_val)
             elif isinstance(default_val, list):
-                if len(default_val) == 0:
-                    formatted = "[]"
-                else:
-                    # Format as JSON array
-                    formatted = json.dumps(default_val)
+                # Format as JSON array or empty brackets
+                formatted = "[]" if len(default_val) == 0 else json.dumps(default_val)
             elif isinstance(default_val, bool):
                 formatted = str(default_val).lower()
             elif default_val is None:
@@ -746,13 +740,12 @@ def show_sources() -> None:
                     lines = f.readlines()[:5]  # First 5 lines
                     for line in lines:
                         line = line.strip()
-                        if line and not line.startswith("#"):
-                            if "=" in line:
-                                key = line.split("=")[0]
-                                if any(s in key.upper() for s in ["PASSWORD", "SECRET", "TOKEN", "KEY"]):
-                                    click.echo(f"    {key}=***")
-                                else:
-                                    click.echo(f"    {line[:60]}{'...' if len(line) > 60 else ''}")
+                        if line and not line.startswith("#") and "=" in line:
+                            key = line.split("=")[0]
+                            if any(s in key.upper() for s in ["PASSWORD", "SECRET", "TOKEN", "KEY"]):
+                                click.echo(f"    {key}=***")
+                            else:
+                                click.echo(f"    {line[:60]}{'...' if len(line) > 60 else ''}")
             except Exception as e:
                 click.echo(f"    (Error reading file: {e})")
 

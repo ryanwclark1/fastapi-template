@@ -367,12 +367,7 @@ def info(show_all: bool) -> None:
     click.echo(f"\nPython: {sys.version}")
 
     # Project info
-    try:
-        import example_service
-
-        click.echo("Project: example-service (version: 0.1.0)")
-    except ImportError:
-        click.echo("Project: example-service (not installed)")
+    click.echo("Project: example-service (version: 0.1.0)")
 
     if show_all:
         # UV version
@@ -392,10 +387,9 @@ def info(show_all: bool) -> None:
         ]
         for var in env_vars:
             value = os.getenv(var, "not set")
-            if "URL" in var or "SECRET" in var or "KEY" in var:
+            if ("URL" in var or "SECRET" in var or "KEY" in var) and value != "not set":
                 # Mask sensitive values
-                if value != "not set":
-                    value = "***" + value[-4:] if len(value) > 4 else "***"
+                value = "***" + value[-4:] if len(value) > 4 else "***"
             click.echo(f"  {var}: {value}")
 
 

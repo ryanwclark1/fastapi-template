@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -82,7 +82,7 @@ class TenantMixin(BaseModel):
     tenant_uuid: str = Field(..., description="Tenant UUID")
 
 
-class APIResponse(BaseModel, Generic[T]):
+class APIResponse[T](BaseModel):
     """Generic API response wrapper.
 
     Wraps response data in a consistent structure with metadata.
@@ -102,7 +102,7 @@ class APIResponse(BaseModel, Generic[T]):
     data: T | None = Field(default=None, description="Response data")
 
 
-class PaginatedResponse(BaseModel, Generic[T]):
+class PaginatedResponse[T](BaseModel):
     """Paginated response wrapper.
 
     Wraps paginated data with pagination metadata.

@@ -8,8 +8,8 @@ pytest.importorskip("dateutil.rrule", reason="Reminder schemas require python-da
 
 from example_service.features.tags.schemas import (
     AddTagsRequest,
-    RemoveTagsRequest,
     ReminderTagsUpdate,
+    RemoveTagsRequest,
     TagCreate,
     TagResponse,
     TagUpdate,

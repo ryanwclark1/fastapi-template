@@ -128,6 +128,12 @@ class AppSettings(BaseSettings):
         default_factory=lambda: ["*"], description="Allowed headers"
     )
 
+    # Trusted Host configuration (production only)
+    allowed_hosts: list[str] = Field(
+        default_factory=lambda: ["*"],
+        description="Allowed host headers for TrustedHostMiddleware (production only)",
+    )
+
     # Middleware configuration
     enable_request_size_limit: bool = Field(
         default=True, description="Enable request size limit middleware"
@@ -146,6 +152,23 @@ class AppSettings(BaseSettings):
     )
     rate_limit_window_seconds: int = Field(
         default=60, ge=1, le=3600, description="Rate limit window in seconds"
+    )
+
+    # Debug middleware configuration (distributed tracing)
+    enable_debug_middleware: bool = Field(
+        default=False, description="Enable debug middleware with distributed tracing"
+    )
+    debug_log_requests: bool = Field(
+        default=True, description="Log request details in debug middleware"
+    )
+    debug_log_responses: bool = Field(
+        default=True, description="Log response details in debug middleware"
+    )
+    debug_log_timing: bool = Field(
+        default=True, description="Log timing information in debug middleware"
+    )
+    debug_header_prefix: str = Field(
+        default="X-", description="Header prefix for trace context (X-, Trace-, etc.)"
     )
 
     # Security settings

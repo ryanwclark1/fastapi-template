@@ -12,25 +12,28 @@ from .yaml_sources import create_auth_yaml_source
 
 
 class AuthSettings(BaseSettings):
-    """External authentication and authorization settings.
+    """Accent-Auth authentication and authorization settings.
 
     Environment variables use AUTH_ prefix.
-    Example: AUTH_SERVICE_URL="http://auth-service:8000"
+    Example: AUTH_SERVICE_URL="http://accent-auth:9497"
     """
 
-    # Auth service endpoints
+    # Accent-Auth service configuration
     service_url: AnyUrl | None = Field(
         default=None,
         alias="AUTH_SERVICE_URL",
-        description="Base URL for authentication service",
+        description="Base URL for Accent-Auth service (e.g., http://accent-auth:9497)",
     )
     health_checks_enabled: bool = Field(
         default=False,
         description="Enable auth service connectivity checks in health endpoints.",
     )
+
+    # Accent-Auth uses /api/auth/0.1/token/{token} for validation
+    # This setting is kept for compatibility but not used with accent-auth
     token_validation_endpoint: str = Field(
-        default="/api/v1/auth/validate",
-        description="Token validation endpoint path",
+        default="/api/auth/0.1/token",
+        description="Token validation endpoint path (accent-auth format)",
     )
 
     # Token settings
@@ -62,10 +65,10 @@ class AuthSettings(BaseSettings):
 
     # Optional features
     enable_permission_caching: bool = Field(
-        default=True, description="Cache user permissions"
+        default=True, description="Cache user ACL permissions"
     )
-    enable_role_caching: bool = Field(
-        default=True, description="Cache user roles"
+    enable_acl_caching: bool = Field(
+        default=True, description="Cache ACL validation results"
     )
 
     model_config = SettingsConfigDict(

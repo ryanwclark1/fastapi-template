@@ -8,7 +8,7 @@ from typing import Any, TypeVar
 T = TypeVar("T")
 
 
-def run_async(coro: Awaitable[T]) -> T:
+def run_async[T](coro: Awaitable[T]) -> T:
     """
     Run an async coroutine in a new event loop.
 
@@ -55,7 +55,7 @@ def async_command(
     return wrapper
 
 
-def coro(f: Callable[..., Awaitable[T]]) -> Callable[..., T]:
+def coro[T](f: Callable[..., Awaitable[T]]) -> Callable[..., T]:
     """
     Decorator that makes an async function synchronous for Click.
 

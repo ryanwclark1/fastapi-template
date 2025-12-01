@@ -15,6 +15,7 @@ The service is designed to NEVER block application startup:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from typing import TYPE_CHECKING
 from uuid import uuid4
@@ -222,10 +223,8 @@ class ConsulService:
             except TimeoutError:
                 logger.warning("Heartbeat task did not stop in time, cancelling")
                 self._heartbeat_task.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await self._heartbeat_task
-                except asyncio.CancelledError:
-                    pass
             except Exception as e:
                 logger.warning("Error stopping heartbeat task", extra={"error": str(e)})
             finally:

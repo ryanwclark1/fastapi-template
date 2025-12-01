@@ -142,7 +142,7 @@ class SamplingFilter(logging.Filter):
                     "sampled": self._sampled_count[logger_name],
                     "dropped": self._dropped_count[logger_name],
                 }
-                for logger_name in self._total_count.keys()
+                for logger_name in self._total_count
             }
 
     def reset_stats(self) -> None:

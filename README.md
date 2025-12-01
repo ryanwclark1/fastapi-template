@@ -17,16 +17,72 @@ This service provides a comprehensive template for building FastAPI microservice
 
 ## Features
 
+### Core Framework
 - **FastAPI** - Modern async web framework
 - **SQLAlchemy 2.0+** - Async ORM with type hints
 - **Pydantic Settings** - Configuration management
+- **GraphQL** - Strawberry GraphQL with subscriptions
+- **WebSocket** - Real-time communication support
+
+### Authentication & Authorization
+- **Accent-Auth Integration** - Native integration with Accent-Auth service
+- **ACL-Based Authorization** - Dot-notation ACLs with wildcards (*, #)
+- **Multi-Tenancy** - Complete tenant isolation via Accent-Tenant header
+- **Token Caching** - Redis-backed token validation caching
+- **Flexible ACL Patterns** - Support for exact, wildcard, and negation ACLs
+- **Session Management** - Full session tracking and validation
+
+### Observability
 - **Structured Logging** - JSON logs with UTC timestamps
-- **Prometheus Metrics** - Observability support
+- **Prometheus Metrics** - OpenTelemetry integration
+- **Distributed Tracing** - Request correlation and tracing
 - **Health Checks** - Liveness, readiness, and health endpoints
+
+### Infrastructure
 - **Database Migrations** - Alembic integration
-- **Testing** - Pytest with async support
+- **Redis Caching** - Distributed caching support
+- **RabbitMQ** - Message queue integration
+- **S3 Storage** - Object storage support
+- **Background Tasks** - Taskiq and APScheduler
+- **Service Discovery** - Consul integration
+
+### Development & Quality
+- **Testing** - Pytest with async support (95%+ coverage)
 - **Code Quality** - Ruff, MyPy, pre-commit hooks
 - **Docker** - Multi-stage builds with uv
+- **CLI Tools** - Comprehensive management commands
+
+### Advanced Middleware (from accent-ai)
+- **Rate Limiting** - Token bucket algorithm with Redis backend
+- **Request Size Limiting** - DoS protection via payload validation
+- **Security Headers** - CSP, HSTS, X-Frame-Options, and more
+- **Request Logging** - Detailed request/response logs with PII masking
+- **Debug Middleware** - Comprehensive debugging with trace context
+- **Correlation ID** - Distributed tracing across microservices
+- **N+1 Detection** - SQL query pattern analysis and alerting
+- **I18n Support** - Multi-language response localization
+- **Metrics Collection** - Prometheus-compatible HTTP metrics
+
+### Real-time Features
+- **WebSocket Manager** - Scalable WebSocket connections with Redis PubSub
+- **GraphQL Subscriptions** - Real-time data updates via GraphQL
+- **Event Bridge** - Cross-service event broadcasting
+- **Outbox Pattern** - Reliable event publishing with transactional guarantees
+
+### Storage & Files
+- **S3 Storage Client** - Upload/download with presigned URLs
+- **File Management** - Metadata tracking and file operations
+- **Multi-provider Support** - AWS S3, MinIO, LocalStack compatible
+
+### Service Integration
+- **Consul Discovery** - Service registration and health checks
+- **Webhook System** - Outgoing webhooks with retry logic
+- **Event Sourcing** - Domain events with outbox pattern
+
+> 📖 **Quick Start**: See [Getting Started Guide](docs/getting-started/getting-started.md) for step-by-step setup
+> 🎯 **Features**: See [Feature Overview](docs/features/accent-ai-features.md) for complete feature documentation
+> 🛡️ **Middleware**: See [Middleware Guide](docs/middleware/middleware-guide.md) for middleware configuration
+> 🔐 **Auth**: See [Accent Auth Integration](docs/integrations/accent-auth-integration.md) for authentication setup
 
 ## Requirements
 
@@ -120,6 +176,27 @@ example_service/
     ├── unit/            # Unit tests
     └── integration/     # Integration tests
 ```
+
+## Documentation
+
+Comprehensive documentation is organized in `docs/` by category:
+
+| Category | Description | Key Documents |
+|----------|-------------|---------------|
+| **Getting Started** | Onboarding & setup | [Getting Started](docs/getting-started/getting-started.md) |
+| **Architecture** | System design | [Architecture Overview](docs/architecture/overview.md), [Final Architecture](docs/architecture/final-architecture.md) |
+| **Features** | Core capabilities | [Feature Overview](docs/features/accent-ai-features.md), [Health Checks](docs/features/health-checks.md) |
+| **Middleware** | Request processing | [Middleware Guide](docs/middleware/middleware-guide.md), [Debug Middleware](docs/middleware/debug-middleware.md) |
+| **Integrations** | External services | [Accent Auth](docs/integrations/accent-auth-integration.md) |
+| **Operations** | Deployment & monitoring | [Kubernetes](docs/operations/kubernetes.md), [Monitoring](docs/operations/monitoring-setup.md) |
+| **Testing** | Quality assurance | [Testing Guide](docs/testing/testing-guide.md) |
+
+See [`docs/README.md`](docs/README.md) for the complete documentation index.
+
+### Additional Resources
+
+- **[Best Practices](docs/development/best-practices.md)** - Comprehensive development patterns and guidelines
+- **[CLI Reference](docs/reference/cli-readme.md)** - Command-line interface documentation
 
 ## API Documentation
 
@@ -284,7 +361,7 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
 
 ## Monitoring
 
-The service exposes Prometheus metrics at `/metrics` (if enabled).
+The service exposes Prometheus metrics at `/metrics` (if enabled). For full setup instructions (Prometheus scrape config, Grafana dashboards, alerting), see [`docs/operations/monitoring-setup.md`](docs/operations/monitoring-setup.md).
 
 Key metrics:
 - `http_requests_total` - Total HTTP requests
@@ -294,9 +371,11 @@ Key metrics:
 
 ## Logging
 
-Logs are output in JSON Lines format for easy parsing by log aggregation systems.
+Logs are output in JSON Lines format for easy parsing by log aggregation systems. Tail the local file at `logs/example-service.log.jsonl` during development, or ship the structured logs to your centralized platform of choice.
 
-Log files are written to `logs/example-service.log.jsonl` with automatic rotation.
+## Security & Hardening
+
+Key runtime safeguards—rate limiting, request-size enforcement, security headers, and PII masking—are configurable through environment variables. Refer to [`docs/operations/security-configuration.md`](docs/operations/security-configuration.md) for recommended production settings and validation steps.
 
 ## Code Quality
 

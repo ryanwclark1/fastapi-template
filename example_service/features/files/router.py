@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -48,7 +49,7 @@ lazy_logger = get_lazy_logger(__name__)
 
 
 def get_file_service(
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> FileService:
     """Dependency for file service."""
     storage_client = get_storage_client()
@@ -68,10 +69,10 @@ def get_file_service(
     description="Upload a file using multipart form data. Best for smaller files.",
 )
 async def upload_file(
-    file: UploadFile = File(...),
+    file: Annotated[UploadFile, File(...)],
+    service: Annotated[FileService, Depends(get_file_service)],
     owner_id: str | None = None,
     is_public: bool = False,
-    service: FileService = Depends(get_file_service),
 ) -> FileRead:
     """Upload a file directly via multipart form data.
 
@@ -119,13 +120,13 @@ async def upload_file(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
-        )
+        ) from e
     except StorageClientError as e:
         logger.error("Storage error during file upload", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Failed to upload file to storage",
-        )
+        ) from e
 
 
 @router.post(
@@ -137,7 +138,7 @@ async def upload_file(
 )
 async def create_presigned_upload(
     request: PresignedUploadRequest,
-    service: FileService = Depends(get_file_service),
+    service: Annotated[FileService, Depends(get_file_service)],
 ) -> PresignedUploadResponse:
     """Create a presigned upload URL for client-side upload.
 
@@ -175,13 +176,13 @@ async def create_presigned_upload(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
-        )
+        ) from e
     except StorageClientError as e:
         logger.error("Storage error during presigned upload creation", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Failed to create presigned upload URL",
-        )
+        ) from e
 
 
 @router.post(
@@ -193,7 +194,7 @@ async def create_presigned_upload(
 async def complete_presigned_upload(
     file_id: UUID,
     completion: FileUploadComplete,
-    service: FileService = Depends(get_file_service),
+    service: Annotated[FileService, Depends(get_file_service)],
 ) -> FileRead:
     """Complete a presigned upload after client uploads to S3.
 
@@ -225,22 +226,22 @@ async def complete_presigned_upload(
 
         return FileRead.model_validate(completed_file)
 
-    except NotFoundError:
+    except NotFoundError as err:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File not found",
-        )
+        ) from err
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
-        )
+        ) from e
     except StorageClientError as e:
         logger.error("Storage error during upload completion", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Upload verification failed - file not found in storage",
-        )
+        ) from e
 
 
 @router.get(
@@ -250,12 +251,12 @@ async def complete_presigned_upload(
     description="List files with optional pagination and owner filter.",
 )
 async def list_files(
+    service: Annotated[FileService, Depends(get_file_service)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    repo: Annotated[FileRepository, Depends(get_file_repository)],
     owner_id: str | None = None,
     limit: int = 50,
     offset: int = 0,
-    service: FileService = Depends(get_file_service),
-    session: AsyncSession = Depends(get_db_session),
-    repo: FileRepository = Depends(get_file_repository),
 ) -> FileList:
     """List files with pagination.
 
@@ -297,7 +298,7 @@ async def list_files(
 )
 async def get_file(
     file_id: UUID,
-    service: FileService = Depends(get_file_service),
+    service: Annotated[FileService, Depends(get_file_service)],
 ) -> FileRead:
     """Get file metadata by ID.
 
@@ -334,7 +335,7 @@ async def get_file(
 )
 async def get_download_url(
     file_id: UUID,
-    service: FileService = Depends(get_file_service),
+    service: Annotated[FileService, Depends(get_file_service)],
 ) -> FileDownloadResponse:
     """Get presigned download URL for a file.
 
@@ -355,16 +356,16 @@ async def get_download_url(
         download_data = await service.get_download_url(file_id)
         return FileDownloadResponse(**download_data)
 
-    except NotFoundError:
+    except NotFoundError as err:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File not found",
-        )
+        ) from err
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
-        )
+        ) from e
 
 
 @router.delete(
@@ -376,8 +377,8 @@ async def get_download_url(
 )
 async def delete_file(
     file_id: UUID,
+    service: Annotated[FileService, Depends(get_file_service)],
     hard_delete: bool = False,
-    service: FileService = Depends(get_file_service),
 ) -> None:
     """Delete a file (soft or hard delete).
 
@@ -403,11 +404,11 @@ async def delete_file(
             },
         )
 
-    except NotFoundError:
+    except NotFoundError as err:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File not found",
-        )
+        ) from err
 
 
 @router.get(
@@ -419,7 +420,7 @@ async def delete_file(
 )
 async def get_processing_status(
     file_id: UUID,
-    service: FileService = Depends(get_file_service),
+    service: Annotated[FileService, Depends(get_file_service)],
 ) -> FileStatusResponse:
     """Get file processing status.
 
@@ -437,11 +438,11 @@ async def get_processing_status(
         status_data = await service.get_processing_status(file_id)
         return FileStatusResponse(**status_data)
 
-    except NotFoundError:
+    except NotFoundError as err:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File not found",
-        )
+        ) from err
 
 
 # Batch Operations
@@ -455,10 +456,10 @@ async def get_processing_status(
     description="Upload multiple files in a single request.",
 )
 async def batch_upload_files(
-    files: list[UploadFile] = File(...),
+    files: Annotated[list[UploadFile], File(...)],
+    service: Annotated[FileService, Depends(get_file_service)],
     owner_id: str | None = None,
     is_public: bool = False,
-    service: FileService = Depends(get_file_service),
 ) -> BatchUploadResponse:
     """Upload multiple files in batch.
 
@@ -496,12 +497,12 @@ async def batch_upload_files(
         if not file.filename:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Filename is required for all files",
+                detail="Filename is required for all files",
             )
         if not file.content_type:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Content type is required for all files",
+                detail="Content type is required for all files",
             )
         file_tuples.append((file.file, file.filename, file.content_type))
 
@@ -519,7 +520,7 @@ async def batch_upload_files(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Failed to upload files to storage",
-        )
+        ) from e
 
 
 @router.post(
@@ -530,7 +531,7 @@ async def batch_upload_files(
 )
 async def batch_download_files(
     request: BatchDownloadRequest,
-    service: FileService = Depends(get_file_service),
+    service: Annotated[FileService, Depends(get_file_service)],
 ) -> BatchDownloadResponse:
     """Get download URLs for multiple files in batch.
 
@@ -556,7 +557,7 @@ async def batch_download_files(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate download URLs",
-        )
+        ) from e
 
 
 @router.post(
@@ -567,7 +568,7 @@ async def batch_download_files(
 )
 async def batch_delete_files(
     request: BatchDeleteRequest,
-    service: FileService = Depends(get_file_service),
+    service: Annotated[FileService, Depends(get_file_service)],
 ) -> BatchDeleteResponse:
     """Delete multiple files in batch with optional dry-run.
 
@@ -598,7 +599,7 @@ async def batch_delete_files(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete files",
-        )
+        ) from e
 
 
 # File Operations
@@ -618,7 +619,7 @@ async def batch_delete_files(
 async def copy_file(
     file_id: UUID,
     request: CopyFileRequest,
-    service: FileService = Depends(get_file_service),
+    service: Annotated[FileService, Depends(get_file_service)],
 ) -> FileRead:
     """Create a copy of a file.
 
@@ -645,22 +646,22 @@ async def copy_file(
 
         return FileRead.model_validate(copied_file)
 
-    except NotFoundError:
+    except NotFoundError as err:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File not found",
-        )
+        ) from err
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
-        )
+        ) from e
     except StorageClientError as e:
         logger.error("Storage error during file copy", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Failed to copy file in storage",
-        )
+        ) from e
 
 
 @router.post(
@@ -673,7 +674,7 @@ async def copy_file(
 async def move_file(
     file_id: UUID,
     request: MoveFileRequest,
-    service: FileService = Depends(get_file_service),
+    service: Annotated[FileService, Depends(get_file_service)],
 ) -> FileRead:
     """Move or rename a file.
 
@@ -699,8 +700,8 @@ async def move_file(
 
         return FileRead.model_validate(moved_file)
 
-    except NotFoundError:
+    except NotFoundError as err:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File not found",
-        )
+        ) from err

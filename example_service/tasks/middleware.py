@@ -87,6 +87,9 @@ class TrackingMiddleware(TaskiqMiddleware):
                     task_id=task_id,
                     task_name=task_name,
                     worker_id=None,  # Could add worker identification later
+                    task_args=message.args if message.args else None,
+                    task_kwargs=message.kwargs if message.kwargs else None,
+                    labels=message.labels if message.labels else None,
                 )
             except Exception as e:
                 # Don't fail the task if tracking fails
@@ -122,10 +125,7 @@ class TrackingMiddleware(TaskiqMiddleware):
 
         # Calculate duration
         start_time = self._start_times.pop(task_id, None)
-        if start_time:
-            duration_ms = int((time.perf_counter() - start_time) * 1000)
-        else:
-            duration_ms = 0
+        duration_ms = int((time.perf_counter() - start_time) * 1000) if start_time else 0
 
         # Determine status and extract error/return value
         if result.is_err:

@@ -253,10 +253,7 @@ async def import_data(
         elif input_format == "json":
             with open(path) as f:
                 content = json.load(f)
-                if isinstance(content, list):
-                    data_rows = content
-                else:
-                    data_rows = [content]
+                data_rows = content if isinstance(content, list) else [content]
 
         elif input_format == "jsonl":
             with open(path) as f:

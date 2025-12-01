@@ -58,7 +58,7 @@ class TestFullLifecycleIntegration:
 
         @app.post("/sensitive")
         async def sensitive_endpoint(request: Request):
-            body = await request.json()
+            await request.json()
             return {"received": True}
 
         @app.get("/slow")

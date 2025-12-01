@@ -12,12 +12,14 @@ from fastapi import FastAPI
 
 from example_service.core.settings import (
     get_app_settings,
+    get_auth_settings,
     get_consul_settings,
     get_db_settings,
     get_logging_settings,
     get_otel_settings,
     get_rabbit_settings,
     get_redis_settings,
+    get_task_settings,
     get_websocket_settings,
 )
 from example_service.infra.cache.redis import start_cache, stop_cache
@@ -27,15 +29,15 @@ from example_service.infra.events.outbox.processor import (
     start_outbox_processor,
     stop_outbox_processor,
 )
+from example_service.infra.logging.config import setup_logging
+from example_service.infra.messaging.broker import start_broker, stop_broker
+from example_service.infra.metrics.prometheus import application_info
 from example_service.infra.realtime import (
     start_connection_manager,
     start_event_bridge,
     stop_connection_manager,
     stop_event_bridge,
 )
-from example_service.infra.logging.config import setup_logging
-from example_service.infra.messaging.broker import start_broker, stop_broker
-from example_service.infra.metrics.prometheus import application_info
 from example_service.infra.tracing.opentelemetry import setup_tracing
 from example_service.tasks.tracking import start_tracker, stop_tracker
 
@@ -125,6 +127,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _ = app  # Reserved for future FastAPI state hooks
     # Load settings (cached after first call)
     app_settings = get_app_settings()
+    auth_settings = get_auth_settings()
     consul_settings = get_consul_settings()
     db_settings = get_db_settings()
     redis_settings = get_redis_settings()
@@ -201,10 +204,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await start_cache()
             logger.info("Redis cache initialized")
 
-            # Initialize task execution tracker (for querying task history via REST API)
-            await start_tracker()
-            logger.info("Task execution tracker initialized")
-
             # Initialize rate limit state tracker for protection observability
             try:
                 from example_service.infra.ratelimit import (
@@ -231,6 +230,26 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 if aggregator:
                     aggregator.add_provider(RateLimiterHealthProvider(rate_limit_tracker))
                     logger.info("Rate limiter health provider registered")
+
+                # Register Accent-Auth health provider (optional, never blocks startup)
+                if auth_settings.health_checks_enabled and auth_settings.service_url:
+                    try:
+                        from example_service.features.health.accent_auth_provider import (
+                            AccentAuthHealthProvider,
+                        )
+
+                        aggregator = get_health_aggregator()
+                        if aggregator:
+                            aggregator.add_provider(AccentAuthHealthProvider())
+                            logger.info(
+                                "Accent-Auth health provider registered",
+                                extra={"auth_url": str(auth_settings.service_url)},
+                            )
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to register Accent-Auth health provider",
+                            extra={"error": str(e)},
+                        )
             except Exception as e:
                 logger.warning(
                     "Failed to initialize rate limit state tracker",
@@ -260,6 +279,56 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                     set_rate_limit_tracker(tracker)
                 except Exception:
                     pass
+
+    # Initialize task execution tracker (for querying task history via REST API)
+    # Supports both Redis and PostgreSQL backends based on TASK_RESULT_BACKEND setting
+    task_settings = get_task_settings()
+    tracker_started = False
+    if task_settings.tracking_enabled:
+        # Check if the required backend is configured
+        can_start_tracker = (
+            (task_settings.is_redis_backend and redis_settings.is_configured) or
+            (task_settings.is_postgres_backend and db_settings.is_configured)
+        )
+        if can_start_tracker:
+            try:
+                await start_tracker()
+                tracker_started = True
+                logger.info(
+                    "Task execution tracker initialized",
+                    extra={"backend": task_settings.result_backend},
+                )
+
+                # Register task tracker health provider
+                try:
+                    from example_service.features.health.service import get_health_aggregator
+                    from example_service.features.health.task_tracker_provider import (
+                        TaskTrackerHealthProvider,
+                    )
+
+                    aggregator = get_health_aggregator()
+                    if aggregator:
+                        aggregator.add_provider(TaskTrackerHealthProvider())
+                        logger.info("Task tracker health provider registered")
+                except Exception as health_err:
+                    logger.warning(
+                        "Failed to register task tracker health provider",
+                        extra={"error": str(health_err)},
+                    )
+            except Exception as e:
+                logger.warning(
+                    "Failed to start task execution tracker",
+                    extra={"error": str(e), "backend": task_settings.result_backend},
+                )
+        else:
+            logger.warning(
+                "Task tracking enabled but required backend not configured",
+                extra={
+                    "backend": task_settings.result_backend,
+                    "redis_configured": redis_settings.is_configured,
+                    "db_configured": db_settings.is_configured,
+                },
+            )
 
     # Initialize RabbitMQ/FastStream broker for event-driven messaging
     if rabbit_settings.is_configured:
@@ -321,6 +390,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "messaging_enabled": rabbit_settings.is_configured,
             "outbox_enabled": db_settings.is_configured and rabbit_settings.is_configured,
             "websocket_enabled": websocket_enabled,
+            "task_tracking_enabled": tracker_started,
+            "task_tracking_backend": task_settings.result_backend if tracker_started else None,
             "host": app_settings.host,
             "port": app_settings.port,
         },
@@ -366,8 +437,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await stop_broker()
         logger.info("RabbitMQ broker closed")
 
-    # Close task execution tracker (before Redis since it depends on Redis)
-    if redis_settings.is_configured:
+    # Close task execution tracker (before Redis since Redis tracker depends on Redis)
+    if tracker_started:
         await stop_tracker()
         logger.info("Task execution tracker closed")
 

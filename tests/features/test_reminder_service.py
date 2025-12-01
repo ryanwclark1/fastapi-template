@@ -7,10 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 pytest.importorskip("dateutil.rrule", reason="Reminder schemas require python-dateutil")
 
 from example_service.features.reminders.models import Reminder
-
-from example_service.features.tags.models import Tag, reminder_tags
 from example_service.features.reminders.schemas import ReminderCreate
 from example_service.features.reminders.service import ReminderService
+from example_service.features.tags.models import Tag, reminder_tags
 
 
 @pytest.fixture

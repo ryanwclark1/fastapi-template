@@ -1,11 +1,9 @@
 """Unit tests for WebSocket realtime infrastructure."""
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 
 # ──────────────────────────────────────────────────────────────
 # Test ConnectionInfo

@@ -8,6 +8,7 @@ import httpx
 
 from example_service.cli.utils import coro, error, info, section, success, warning
 from example_service.core.settings import get_app_settings
+from example_service.core.settings.unified import get_settings
 
 
 @click.command()
@@ -128,7 +129,6 @@ async def health_check() -> None:
     click.echo("\n📨 Message Broker (RabbitMQ):")
     try:
         settings = get_app_settings()
-        rabbit_url = settings.messaging.rabbit_url
 
         # Try to connect using httpx to management API (if available)
         # This is a basic check - in production you'd use pika or similar

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -43,7 +44,7 @@ lazy_logger = get_lazy_logger(__name__)
 )
 async def create_webhook(
     payload: WebhookCreate,
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> WebhookRead:
     """Create a new webhook.
 
@@ -71,7 +72,7 @@ async def create_webhook(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
-        )
+        ) from e
 
 
 @router.get(
@@ -81,10 +82,10 @@ async def create_webhook(
     description="List all webhooks with optional filtering and pagination.",
 )
 async def list_webhooks(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     is_active: bool | None = None,
     limit: int = 50,
     offset: int = 0,
-    session: AsyncSession = Depends(get_db_session),
 ) -> WebhookList:
     """List webhooks with pagination.
 
@@ -121,7 +122,7 @@ async def list_webhooks(
 )
 async def get_webhook(
     webhook_id: UUID,
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> WebhookRead:
     """Get a single webhook by ID.
 
@@ -157,7 +158,7 @@ async def get_webhook(
 async def update_webhook(
     webhook_id: UUID,
     payload: WebhookUpdate,
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> WebhookRead:
     """Update an existing webhook.
 
@@ -191,7 +192,7 @@ async def update_webhook(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
-        )
+        ) from e
 
 
 @router.delete(
@@ -203,7 +204,7 @@ async def update_webhook(
 )
 async def delete_webhook(
     webhook_id: UUID,
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> None:
     """Delete a webhook permanently.
 
@@ -245,7 +246,7 @@ async def delete_webhook(
 async def test_webhook(
     webhook_id: UUID,
     test_request: WebhookTestRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> WebhookTestResponse:
     """Test webhook by sending a test event.
 
@@ -336,7 +337,7 @@ async def test_webhook(
 )
 async def regenerate_secret(
     webhook_id: UUID,
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> SecretRegenerateResponse:
     """Regenerate HMAC secret for a webhook.
 
@@ -376,9 +377,9 @@ async def regenerate_secret(
 )
 async def list_deliveries(
     webhook_id: UUID,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     limit: int = 100,
     offset: int = 0,
-    session: AsyncSession = Depends(get_db_session),
 ) -> WebhookDeliveryList:
     """List delivery history for a webhook.
 
@@ -427,7 +428,7 @@ async def list_deliveries(
 async def retry_delivery(
     webhook_id: UUID,
     delivery_id: UUID,
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> WebhookDeliveryRead:
     """Manually retry a failed delivery.
 

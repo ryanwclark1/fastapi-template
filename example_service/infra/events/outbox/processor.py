@@ -15,6 +15,7 @@ The processor uses:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 from typing import TYPE_CHECKING, Any
@@ -112,13 +113,11 @@ class OutboxProcessor:
             # Wait for task to complete current batch
             try:
                 await asyncio.wait_for(self._task, timeout=30.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("Outbox processor shutdown timed out, cancelling")
                 self._task.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await self._task
-                except asyncio.CancelledError:
-                    pass
             self._task = None
 
         logger.info("Outbox processor stopped")

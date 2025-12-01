@@ -175,7 +175,7 @@ class WebhookClient:
                 error_message=None if success else f"HTTP {response.status_code}",
             )
 
-        except httpx.TimeoutException as e:
+        except httpx.TimeoutException:
             response_time_ms = int((time.time() - start_time) * 1000)
             error_message = f"Request timeout after {webhook.timeout_seconds}s"
 

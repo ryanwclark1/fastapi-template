@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from example_service.core.pagination import Connection, CursorPage, Edge, PageInfo
 from example_service.features.reminders.recurrence import (
     Frequency,
     RecurrenceRule,
@@ -13,6 +15,9 @@ from example_service.features.reminders.recurrence import (
     describe_rrule,
     validate_rrule,
 )
+
+if TYPE_CHECKING:
+    from example_service.features.reminders.models import Reminder
 
 
 class ReminderBase(BaseModel):
@@ -150,9 +155,8 @@ class ReminderResponse(ReminderBase):
     recurrence: RecurrenceInfo | None = None
 
     @classmethod
-    def from_model(cls, reminder: "Reminder") -> "ReminderResponse":
+    def from_model(cls, reminder: Reminder) -> ReminderResponse:
         """Create response from model instance with recurrence info."""
-        from example_service.features.reminders.models import Reminder
 
         recurrence = None
         if reminder.recurrence_rule:
@@ -225,9 +229,6 @@ class ReminderSearchResult(ReminderResponse):
         description="Full-text search relevance score (higher is better)",
     )
 
-
-# Cursor pagination response types
-from example_service.core.pagination import Connection, CursorPage, Edge, PageInfo
 
 # Type aliases for reminder pagination
 ReminderEdge = Edge[ReminderResponse]

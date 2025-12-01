@@ -83,9 +83,8 @@ if broker is not None:
                 stmt = select(Reminder)
 
                 # Apply filters if provided
-                if filters:
-                    if "is_completed" in filters:
-                        stmt = stmt.where(Reminder.is_completed == filters["is_completed"])
+                if filters and "is_completed" in filters:
+                    stmt = stmt.where(Reminder.is_completed == filters["is_completed"])
 
                 result = await session.execute(stmt)
                 db_records = result.scalars().all()
@@ -193,9 +192,8 @@ if broker is not None:
 
                 stmt = select(Reminder)
 
-                if filters:
-                    if "is_completed" in filters:
-                        stmt = stmt.where(Reminder.is_completed == filters["is_completed"])
+                if filters and "is_completed" in filters:
+                    stmt = stmt.where(Reminder.is_completed == filters["is_completed"])
 
                 result = await session.execute(stmt)
                 db_records = result.scalars().all()

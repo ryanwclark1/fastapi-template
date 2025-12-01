@@ -43,6 +43,7 @@ if TYPE_CHECKING:
     from .rabbit import RabbitSettings
     from .redis import RedisSettings
     from .storage import StorageSettings
+    from .tasks import TaskSettings
 
 
 def _get_app_settings() -> AppSettings:
@@ -105,6 +106,12 @@ def _get_storage_settings() -> StorageSettings:
     return StorageSettings()
 
 
+def _get_task_settings() -> TaskSettings:
+    """Lazy import to avoid circular dependencies."""
+    from .tasks import TaskSettings
+    return TaskSettings()
+
+
 class Settings(BaseSettings):
     """Unified settings composing all domain settings.
 
@@ -136,6 +143,7 @@ class Settings(BaseSettings):
     backup: BackupSettings = Field(default_factory=_get_backup_settings)
     consul: ConsulSettings = Field(default_factory=_get_consul_settings)
     storage: StorageSettings = Field(default_factory=_get_storage_settings)
+    task: TaskSettings = Field(default_factory=_get_task_settings)
 
 
 def _rebuild_model() -> None:
@@ -155,6 +163,7 @@ def _rebuild_model() -> None:
     from .rabbit import RabbitSettings
     from .redis import RedisSettings
     from .storage import StorageSettings
+    from .tasks import TaskSettings
 
     Settings.model_rebuild(
         _types_namespace={
@@ -168,6 +177,7 @@ def _rebuild_model() -> None:
             "BackupSettings": BackupSettings,
             "ConsulSettings": ConsulSettings,
             "StorageSettings": StorageSettings,
+            "TaskSettings": TaskSettings,
         }
     )
 

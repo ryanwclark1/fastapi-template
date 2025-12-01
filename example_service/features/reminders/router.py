@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
@@ -26,13 +27,13 @@ from example_service.features.reminders.events import (
     ReminderUpdatedEvent,
 )
 from example_service.features.reminders.models import Reminder
-from example_service.features.reminders.repository import (
-    ReminderRepository,
-    get_reminder_repository,
-)
 from example_service.features.reminders.recurrence import (
     generate_occurrences,
     get_next_occurrence,
+)
+from example_service.features.reminders.repository import (
+    ReminderRepository,
+    get_reminder_repository,
 )
 from example_service.features.reminders.schemas import (
     OccurrenceResponse,
@@ -61,7 +62,7 @@ lazy_logger = get_lazy_logger(__name__)
     description="Return all reminders with smart ordering (pending first, by date).",
 )
 async def list_reminders(
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     include_completed: bool = True,
 ) -> list[ReminderResponse]:
     """List reminders with optional filtering.
@@ -111,8 +112,8 @@ The `cursor` is an opaque string - pass it back unchanged.
 """,
 )
 async def list_reminders_paginated(
-    session: AsyncSession = Depends(get_db_session),
-    repo: ReminderRepository = Depends(get_reminder_repository),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    repo: Annotated[ReminderRepository, Depends(get_reminder_repository)],
     limit: int = 50,
     cursor: str | None = None,
     include_completed: bool = True,
@@ -176,7 +177,7 @@ async def list_reminders_paginated(
     description="Search reminders by title/description with filtering and pagination.",
 )
 async def search_reminders(
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     query: str | None = None,
     before: datetime | None = None,
     after: datetime | None = None,
@@ -268,7 +269,7 @@ Use `mode=web` for Google-like syntax:
 """,
 )
 async def fulltext_search_reminders(
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     q: str = "",
     mode: str = "plain",
     prefix: bool = False,
@@ -376,7 +377,7 @@ async def fulltext_search_reminders(
     description="Return reminders that are past their remind_at date and not completed.",
 )
 async def get_overdue_reminders(
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> list[ReminderResponse]:
     """Get overdue reminders that haven't been completed."""
     now = datetime.now(UTC)
@@ -412,7 +413,7 @@ async def get_overdue_reminders(
 )
 async def get_reminder(
     reminder_id: UUID,
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> ReminderResponse:
     """Get a single reminder by ID."""
     result = await session.execute(
@@ -462,8 +463,8 @@ Supported frequencies: DAILY, WEEKLY, MONTHLY, YEARLY
 )
 async def create_reminder(
     payload: ReminderCreate,
-    session: AsyncSession = Depends(get_db_session),
-    publisher: EventPublisherDep = None,  # type: ignore[assignment]
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    publisher: Annotated[EventPublisherDep, Depends()],
 ) -> ReminderResponse:
     """Create a new reminder with optional recurrence."""
     # Track business metrics
@@ -513,8 +514,8 @@ async def create_reminder(
 async def update_reminder(
     reminder_id: UUID,
     payload: ReminderUpdate,
-    session: AsyncSession = Depends(get_db_session),
-    publisher: EventPublisherDep = None,  # type: ignore[assignment]
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    publisher: Annotated[EventPublisherDep, Depends()],
 ) -> ReminderResponse:
     """Update an existing reminder."""
     result = await session.execute(
@@ -556,12 +557,11 @@ async def update_reminder(
             changes["recurrence_rule"] = payload.recurrence_rule
             reminder.recurrence_rule = payload.recurrence_rule
 
-    if payload.recurrence_end_at is not None:
-        if reminder.recurrence_end_at != payload.recurrence_end_at:
-            changes["recurrence_end_at"] = (
-                payload.recurrence_end_at.isoformat() if payload.recurrence_end_at else None
-            )
-            reminder.recurrence_end_at = payload.recurrence_end_at
+    if payload.recurrence_end_at is not None and reminder.recurrence_end_at != payload.recurrence_end_at:
+        changes["recurrence_end_at"] = (
+            payload.recurrence_end_at.isoformat() if payload.recurrence_end_at else None
+        )
+        reminder.recurrence_end_at = payload.recurrence_end_at
 
     # Publish domain event if there were changes
     if changes:
@@ -587,8 +587,8 @@ async def update_reminder(
 )
 async def complete_reminder(
     reminder_id: UUID,
-    session: AsyncSession = Depends(get_db_session),
-    publisher: EventPublisherDep = None,  # type: ignore[assignment]
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    publisher: Annotated[EventPublisherDep, Depends()],
 ) -> ReminderResponse:
     """Mark a reminder as completed."""
     result = await session.execute(
@@ -627,8 +627,8 @@ async def complete_reminder(
 )
 async def delete_reminder(
     reminder_id: UUID,
-    session: AsyncSession = Depends(get_db_session),
-    publisher: EventPublisherDep = None,  # type: ignore[assignment]
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    publisher: Annotated[EventPublisherDep, Depends()],
 ) -> None:
     """Delete a reminder permanently."""
     result = await session.execute(
@@ -683,7 +683,7 @@ Use query parameters to control the date range and number of occurrences.
 )
 async def get_occurrences(
     reminder_id: UUID,
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     after: datetime | None = None,
     before: datetime | None = None,
     limit: int = 50,
@@ -792,8 +792,8 @@ Common use cases:
 async def break_out_occurrence(
     reminder_id: UUID,
     occurrence_date: datetime,
-    session: AsyncSession = Depends(get_db_session),
-    publisher: EventPublisherDep = None,  # type: ignore[assignment]
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    publisher: Annotated[EventPublisherDep, Depends()],
 ) -> ReminderResponse:
     """Break out a single occurrence from a recurring series.
 
@@ -883,7 +883,7 @@ async def break_out_occurrence(
 )
 async def get_next_reminder_occurrence(
     reminder_id: UUID,
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     after: datetime | None = None,
 ) -> OccurrenceResponse | None:
     """Get the next occurrence for a recurring reminder.

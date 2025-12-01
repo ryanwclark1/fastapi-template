@@ -54,7 +54,7 @@ class WebhookBase(BaseModel):
             "user-agent",
         }
 
-        for header_name in v.keys():
+        for header_name in v:
             if header_name.lower() in reserved_headers:
                 raise ValueError(f"Cannot override reserved header: {header_name}")
 
@@ -103,7 +103,7 @@ class WebhookUpdate(BaseModel):
             "user-agent",
         }
 
-        for header_name in v.keys():
+        for header_name in v:
             if header_name.lower() in reserved_headers:
                 raise ValueError(f"Cannot override reserved header: {header_name}")
 

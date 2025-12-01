@@ -3,8 +3,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-from sqlalchemy import Column, String, select
+from sqlalchemy import Column, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from example_service.core.database.search.filters import (
@@ -12,7 +11,6 @@ from example_service.core.database.search.filters import (
     WebSearchFilter,
 )
 from example_service.core.database.search.types import TSVECTOR
-
 
 # ──────────────────────────────────────────────────────────────
 # Test TSVECTOR Type

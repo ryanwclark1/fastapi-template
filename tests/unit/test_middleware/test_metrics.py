@@ -1,6 +1,7 @@
 """Unit tests for MetricsMiddleware."""
 from __future__ import annotations
 
+import contextlib
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -303,10 +304,8 @@ class TestMetricsMiddleware:
             ) as client:
                 await client.get("/success")
 
-                try:
+                with contextlib.suppress(Exception):
                     await client.get("/not-found")
-                except Exception:
-                    pass
 
             # Should record different status codes
             status_codes = [

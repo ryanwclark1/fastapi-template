@@ -17,6 +17,7 @@ Redis Key Structure:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 from datetime import UTC, datetime
@@ -404,9 +405,8 @@ class TaskExecutionTracker:
 
                 if task_data:
                     # Apply additional filters if both task_name and status specified
-                    if task_name and status:
-                        if task_data.get("status") != status:
-                            continue
+                    if task_name and status and task_data.get("status") != status:
+                        continue
 
                     # Parse return_value back to object
                     return_value = None
@@ -421,10 +421,8 @@ class TaskExecutionTracker:
                     duration_ms = None
                     duration_str = task_data.get("duration_ms", "")
                     if duration_str:
-                        try:
+                        with contextlib.suppress(ValueError):
                             duration_ms = int(duration_str)
-                        except ValueError:
-                            pass
 
                     tasks.append(
                         {
@@ -477,18 +475,14 @@ class TaskExecutionTracker:
             duration_ms = None
             duration_str = task_data.get("duration_ms", "")
             if duration_str:
-                try:
+                with contextlib.suppress(ValueError):
                     duration_ms = int(duration_str)
-                except ValueError:
-                    pass
 
             # Parse retry count
             retry_count = 0
             retry_str = task_data.get("retry_count", "0")
-            try:
+            with contextlib.suppress(ValueError):
                 retry_count = int(retry_str)
-            except ValueError:
-                pass
 
             return {
                 "task_id": task_data.get("task_id", task_id),
@@ -558,10 +552,8 @@ class TaskExecutionTracker:
                     exec_key = f"{self.EXEC_PREFIX}{task_id}"
                     duration_str = await self.client.hget(exec_key, "duration_ms")
                     if duration_str:
-                        try:
+                        with contextlib.suppress(ValueError):
                             durations.append(int(duration_str))
-                        except ValueError:
-                            pass
 
                 if durations:
                     avg_duration_ms = sum(durations) / len(durations)

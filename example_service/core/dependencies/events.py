@@ -48,9 +48,9 @@ def _get_correlation_id(request: Request) -> str | None:
 
 
 async def get_event_publisher(
-    session: Annotated["AsyncSession", Depends(get_db_session)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     request: Request,
-) -> "EventPublisher":
+) -> EventPublisher:
     """FastAPI dependency for event publisher.
 
     Creates an EventPublisher bound to the current database session and

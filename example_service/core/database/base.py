@@ -269,32 +269,36 @@ class SoftDeleteMixin:
     Instead of physically removing records from the database, sets
     a deleted_at timestamp. This allows:
     - Recovery of accidentally deleted data
-    - Audit trails of deletions
+    - Audit trails of deletions (including WHO deleted)
     - Maintaining referential integrity
     - Historical analysis including deleted records
 
     Provides:
         deleted_at: Timestamp of deletion (None if not deleted)
+        deleted_by: User who performed the deletion
         is_deleted: Property to check if record is deleted
 
     Usage:
-            # Soft delete:
+            # Soft delete with audit:
         user.deleted_at = datetime.now(UTC)
+        user.deleted_by = current_user.email
         await session.commit()
 
         # Check if deleted:
         if user.is_deleted:
-            print("User was deleted")
+            print(f"User was deleted by {user.deleted_by}")
 
         # Query non-deleted records:
         stmt = select(User).where(User.deleted_at.is_(None))
 
         # Recover deleted record:
         user.deleted_at = None
+        user.deleted_by = None
         await session.commit()
 
     Note: Queries must explicitly filter out soft-deleted records
     using `.where(Model.deleted_at.is_(None))` or use a query helper.
+    The BaseRepository supports this via include_deleted parameter.
     """
 
     __allow_unmapped__ = True
@@ -304,6 +308,11 @@ class SoftDeleteMixin:
         nullable=True,
         default=None,
         comment="Timestamp of soft deletion",
+    )
+    deleted_by: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="User who performed the soft deletion",
     )
 
     @property

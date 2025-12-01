@@ -2,14 +2,45 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, TypeDecorator
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from example_service.core.database import TimestampedBase
+
+
+class StringArray(TypeDecorator):
+    """Cross-database type for string arrays.
+
+    Uses native ARRAY in PostgreSQL, JSON in SQLite/other databases.
+    """
+
+    impl = Text
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(ARRAY(String(100)))
+        else:
+            return dialect.type_descriptor(Text())
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        if dialect.name == "postgresql":
+            return value
+        return json.dumps(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return []
+        if dialect.name == "postgresql":
+            return value
+        return json.loads(value) if value else []
 
 
 class Webhook(TimestampedBase):
@@ -27,16 +58,16 @@ class Webhook(TimestampedBase):
     url: Mapped[str] = mapped_column(String(2048), nullable=False, comment="Target URL for webhook delivery")
     secret: Mapped[str] = mapped_column(String(255), nullable=False, comment="HMAC secret for signing payloads")
     event_types: Mapped[list[str]] = mapped_column(
-        ARRAY(String(100)),
+        StringArray(),
         nullable=False,
-        server_default="{}",
+        server_default="[]",
         comment="List of event types this webhook subscribes to",
     )
     is_active: Mapped[bool] = mapped_column(Boolean(), default=True, nullable=False, comment="Whether webhook is active")
     max_retries: Mapped[int] = mapped_column(Integer(), default=5, nullable=False, comment="Maximum delivery retry attempts")
     timeout_seconds: Mapped[int] = mapped_column(Integer(), default=30, nullable=False, comment="HTTP request timeout in seconds")
     custom_headers: Mapped[dict | None] = mapped_column(
-        JSONB(),
+        JSONB().with_variant(JSON(), "sqlite"),
         nullable=True,
         comment="Additional HTTP headers to include in requests",
     )
@@ -68,7 +99,7 @@ class WebhookDelivery(TimestampedBase):
     )
     event_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True, comment="Type of event being delivered")
     event_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True, comment="Unique identifier for the event")
-    payload: Mapped[dict] = mapped_column(JSONB(), nullable=False, comment="Event payload data")
+    payload: Mapped[dict] = mapped_column(JSONB().with_variant(JSON(), "sqlite"), nullable=False, comment="Event payload data")
     status: Mapped[str] = mapped_column(
         String(50),
         nullable=False,

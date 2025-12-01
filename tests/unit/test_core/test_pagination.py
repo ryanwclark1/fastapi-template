@@ -14,7 +14,6 @@ from example_service.core.pagination.schemas import (
     PageInfo,
 )
 
-
 # ──────────────────────────────────────────────────────────────
 # Test CursorData and CursorCodec
 # ──────────────────────────────────────────────────────────────

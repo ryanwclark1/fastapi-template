@@ -268,7 +268,7 @@ class TestMiddlewareChain:
 
         from httpx import ASGITransport
 
-        with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
+        with patch("example_service.app.middleware.request_logging.logger"):
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://test"
             ) as client:
@@ -286,9 +286,11 @@ class TestMiddlewareChain:
 
         custom_id = str(uuid.uuid4())
 
-        with patch("example_service.app.middleware.metrics.http_requests_total") as mock_metrics:
-            with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
-                response = await client.get("/test", headers={"X-Request-ID": custom_id})
+        with (
+            patch("example_service.app.middleware.metrics.http_requests_total") as mock_metrics,
+            patch("example_service.app.middleware.request_logging.logger") as mock_logger,
+        ):
+            response = await client.get("/test", headers={"X-Request-ID": custom_id})
 
         assert response.status_code == 200
 
@@ -333,7 +335,7 @@ class TestMiddlewareChain:
                 if isinstance(logged_headers, dict):
                     # Custom headers should be present (case-insensitive)
                     assert any(
-                        k.lower() == "x-custom-header" for k in logged_headers.keys()
+                        k.lower() == "x-custom-header" for k in logged_headers
                     )
 
     async def test_performance_of_full_middleware_stack(self):

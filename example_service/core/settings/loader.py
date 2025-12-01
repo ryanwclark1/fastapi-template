@@ -30,12 +30,15 @@ from .auth import AuthSettings
 from .backup import BackupSettings
 from .consul import ConsulSettings
 from .graphql import GraphQLSettings
+from .health import HealthCheckSettings
+from .i18n import I18nSettings
 from .logs import LoggingSettings
 from .otel import OtelSettings
 from .postgres import PostgresSettings
 from .rabbit import RabbitSettings
 from .redis import RedisSettings
 from .storage import StorageSettings
+from .tasks import TaskSettings
 from .websocket import WebSocketSettings
 
 
@@ -159,6 +162,36 @@ def get_graphql_settings() -> GraphQLSettings:
     return GraphQLSettings()
 
 
+@lru_cache(maxsize=1)
+def get_i18n_settings() -> I18nSettings:
+    """Get cached internationalization settings.
+
+    Returns:
+        Validated and frozen I18nSettings instance.
+    """
+    return I18nSettings()
+
+
+@lru_cache(maxsize=1)
+def get_health_settings() -> HealthCheckSettings:
+    """Get cached health check settings.
+
+    Returns:
+        Validated and frozen HealthCheckSettings instance.
+    """
+    return HealthCheckSettings()
+
+
+@lru_cache(maxsize=1)
+def get_task_settings() -> TaskSettings:
+    """Get cached task management settings.
+
+    Returns:
+        Validated and frozen TaskSettings instance.
+    """
+    return TaskSettings()
+
+
 def clear_all_caches() -> None:
     """Clear all settings caches.
 
@@ -177,3 +210,6 @@ def clear_all_caches() -> None:
     get_storage_settings.cache_clear()
     get_websocket_settings.cache_clear()
     get_graphql_settings.cache_clear()
+    get_i18n_settings.cache_clear()
+    get_health_settings.cache_clear()
+    get_task_settings.cache_clear()

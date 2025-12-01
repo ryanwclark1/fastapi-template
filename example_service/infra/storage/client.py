@@ -10,9 +10,18 @@ import asyncio
 import fnmatch
 import hashlib
 import logging
-from datetime import datetime
+from collections.abc import Callable
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, BinaryIO, Callable
+from typing import TYPE_CHECKING, Any, BinaryIO
+
+from example_service.infra.storage.exceptions import (
+    StorageDownloadError,
+    StorageError,
+    StorageFileNotFoundError,
+    StorageNotConfiguredError,
+    StorageUploadError,
+    map_boto_error,
+)
 
 if TYPE_CHECKING:
     from example_service.core.settings.storage import StorageSettings
@@ -32,16 +41,6 @@ except ImportError:
     ClientError = Exception
     BotoCoreError = Exception
     AIOBOTO3_AVAILABLE = False
-
-# Import domain-specific exceptions
-from example_service.infra.storage.exceptions import (
-    StorageDownloadError,
-    StorageError,
-    StorageFileNotFoundError,
-    StorageNotConfiguredError,
-    StorageUploadError,
-    map_boto_error,
-)
 
 
 # Legacy exception aliases for backward compatibility
@@ -116,7 +115,7 @@ class StorageClient:
         self._client = None
         self._client_context = None
 
-    async def __aenter__(self) -> "StorageClient":
+    async def __aenter__(self) -> StorageClient:
         """Async context manager entry."""
         await self.ensure_client()
         return self

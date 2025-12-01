@@ -27,7 +27,9 @@ from example_service.core.settings import (
     get_app_settings,
     get_auth_settings,
     get_backup_settings,
+    get_consul_settings,
     get_db_settings,
+    get_health_settings,
     get_rabbit_settings,
     get_redis_settings,
 )
@@ -85,6 +87,8 @@ class HealthService(BaseService):
         self._auth_settings = get_auth_settings()
         self._rabbit_settings = get_rabbit_settings()
         self._backup_settings = get_backup_settings()
+        self._consul_settings = get_consul_settings()
+        self._health_settings = get_health_settings()
 
     def _get_aggregator(self) -> HealthAggregator:
         """Get or create the health aggregator.
@@ -101,7 +105,8 @@ class HealthService(BaseService):
         # Import here to avoid circular dependencies
         from example_service.features.health.aggregator import HealthAggregator
 
-        self._aggregator = HealthAggregator()
+        # Create aggregator with health settings
+        self._aggregator = HealthAggregator(settings=self._health_settings)
         self._configure_providers()
         return self._aggregator
 
@@ -111,24 +116,36 @@ class HealthService(BaseService):
             return
 
         # Database provider
-        if self._db_settings.health_checks_enabled:
+        if self._db_settings.health_checks_enabled and self._health_settings.database.enabled:
             try:
                 from example_service.features.health.providers import (
                     DatabaseHealthProvider,
+                    DatabasePoolHealthProvider,
                 )
                 from example_service.infra.database.session import engine
 
+                # Database connectivity check with per-provider configuration
                 self._aggregator.add_provider(
                     DatabaseHealthProvider(
                         engine=engine,
-                        timeout=self._db_settings.health_check_timeout,
+                        config=self._health_settings.database,
+                    )
+                )
+
+                # Database connection pool monitoring
+                # Pool health is not critical for readiness - service can start even if pool is stressed
+                self._aggregator.add_provider(
+                    DatabasePoolHealthProvider(
+                        engine=engine,
+                        degraded_threshold=0.7,  # Alert at 70% utilization
+                        unhealthy_threshold=0.9,  # Critical at 90% utilization
                     )
                 )
             except Exception as e:
                 logger.warning(f"Could not configure database health provider: {e}")
 
         # Redis provider
-        if self._redis_settings.health_checks_enabled:
+        if self._redis_settings.health_checks_enabled and self._health_settings.cache.enabled:
             try:
                 from example_service.features.health.providers import (
                     RedisHealthProvider,
@@ -137,25 +154,37 @@ class HealthService(BaseService):
 
                 cache = get_redis_cache()
                 if cache is not None:
-                    self._aggregator.add_provider(RedisHealthProvider(cache=cache))
+                    self._aggregator.add_provider(
+                        RedisHealthProvider(
+                            cache=cache,
+                            config=self._health_settings.cache,
+                        )
+                    )
             except Exception as e:
                 logger.warning(f"Could not configure Redis health provider: {e}")
 
         # RabbitMQ provider
-        if self._rabbit_settings.is_configured:
+        if self._rabbit_settings.is_configured and self._health_settings.rabbitmq.enabled:
             try:
                 from example_service.features.health.providers import (
                     RabbitMQHealthProvider,
                 )
 
                 self._aggregator.add_provider(
-                    RabbitMQHealthProvider(connection_url=self._rabbit_settings.get_url())
+                    RabbitMQHealthProvider(
+                        connection_url=self._rabbit_settings.get_url(),
+                        config=self._health_settings.rabbitmq,
+                    )
                 )
             except Exception as e:
                 logger.warning(f"Could not configure RabbitMQ health provider: {e}")
 
         # External auth service provider
-        if self._auth_settings.service_url and self._auth_settings.health_checks_enabled:
+        if (
+            self._auth_settings.service_url
+            and self._auth_settings.health_checks_enabled
+            and self._health_settings.accent_auth.enabled
+        ):
             try:
                 from example_service.features.health.providers import (
                     ExternalServiceHealthProvider,
@@ -165,13 +194,14 @@ class HealthService(BaseService):
                     ExternalServiceHealthProvider(
                         name="auth_service",
                         base_url=str(self._auth_settings.service_url),
+                        config=self._health_settings.accent_auth,
                     )
                 )
             except Exception as e:
                 logger.warning(f"Could not configure auth service health provider: {e}")
 
         # S3 storage provider
-        if self._backup_settings.is_s3_configured:
+        if self._backup_settings.is_s3_configured and self._health_settings.s3.enabled:
             try:
                 from example_service.features.health.providers import (
                     S3StorageHealthProvider,
@@ -179,9 +209,48 @@ class HealthService(BaseService):
                 from example_service.infra.storage.s3 import S3Client
 
                 s3_client = S3Client(self._backup_settings)
-                self._aggregator.add_provider(S3StorageHealthProvider(s3_client=s3_client))
+                self._aggregator.add_provider(
+                    S3StorageHealthProvider(
+                        s3_client=s3_client,
+                        config=self._health_settings.s3,
+                    )
+                )
             except Exception as e:
                 logger.warning(f"Could not configure S3 health provider: {e}")
+
+        # Consul provider (if discovery configured)
+        if self._consul_settings.is_configured and self._health_settings.consul.enabled:
+            try:
+                from example_service.features.health.providers import (
+                    ConsulHealthProvider,
+                    ProviderConfig,
+                )
+                from example_service.infra.discovery import get_discovery_service
+
+                # Get the Consul service (may be None if not started yet)
+                discovery_service = get_discovery_service()
+                if discovery_service is not None and discovery_service._client is not None:
+                    # Convert health settings to ProviderConfig
+                    config = ProviderConfig(
+                        enabled=self._health_settings.consul.enabled,
+                        timeout=self._health_settings.consul.timeout,
+                        latency_threshold_ms=self._health_settings.consul.degraded_threshold_ms,
+                    )
+
+                    self._aggregator.add_provider(
+                        ConsulHealthProvider(
+                            consul_client=discovery_service._client,
+                            service_name=self._app_settings.service_name,
+                            config=config,
+                        )
+                    )
+                    logger.info("Consul health provider configured")
+                else:
+                    logger.debug(
+                        "Consul health provider not configured: discovery service not started"
+                    )
+            except Exception as e:
+                logger.warning(f"Could not configure Consul health provider: {e}")
 
     async def check_health(self) -> dict[str, Any]:
         """Perform comprehensive health check.
@@ -284,13 +353,8 @@ class HealthService(BaseService):
         """
         aggregator = self._get_aggregator()
 
-        # For readiness, we only check critical dependencies
-        # Database is critical by default; cache can be made critical via config
-        critical_providers = ["database"]
-
-        # Add cache to critical providers if configured
-        if self._redis_settings.critical_for_readiness:
-            critical_providers.append("cache")
+        # Get list of providers marked as critical for readiness
+        critical_providers = self._health_settings.list_critical_providers()
 
         checks: dict[str, bool] = {}
 

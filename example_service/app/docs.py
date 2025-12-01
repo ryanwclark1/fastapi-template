@@ -206,8 +206,8 @@ def _patch_asyncapi_template() -> None:
         schemas: bool = True,
         errors: bool = True,
         expand_message_examples: bool = True,
-        asyncapi_js_url: str | None = None,  # ignored, use local assets
-        asyncapi_css_url: str | None = None,  # ignored, use local assets
+        asyncapi_js_url: str | None = None,  # noqa: ARG001 - ignored, use local assets
+        asyncapi_css_url: str | None = None,  # noqa: ARG001 - ignored, use local assets
     ) -> str:
         config = {
             "show": {

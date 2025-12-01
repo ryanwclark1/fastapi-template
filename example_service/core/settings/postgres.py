@@ -370,10 +370,7 @@ class PostgresSettings(BaseSettings):
         if include_driver and async_enabled is not None:
             driver = "psycopg" if async_enabled else "psycopg2"
 
-        if include_driver:
-            scheme = f"postgresql+{driver}"
-        else:
-            scheme = "postgresql"
+        scheme = f"postgresql+{driver}" if include_driver else "postgresql"
 
         base = f"{scheme}://{self.user}:{safe_password}@{self.host}:{self.port}/{self.name}"
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -16,8 +17,8 @@ from example_service.features.reminders.schemas import ReminderResponse
 from example_service.features.tags.models import Tag, reminder_tags
 from example_service.features.tags.schemas import (
     AddTagsRequest,
-    RemoveTagsRequest,
     ReminderTagsUpdate,
+    RemoveTagsRequest,
     TagCreate,
     TagListResponse,
     TagResponse,
@@ -41,7 +42,7 @@ logger = logging.getLogger(__name__)
     description="Return all tags with optional sorting and filtering.",
 )
 async def list_tags(
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     include_counts: bool = False,
     search: str | None = None,
 ) -> TagListResponse:
@@ -99,7 +100,7 @@ async def list_tags(
 )
 async def get_tag(
     tag_id: UUID,
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> TagWithCountResponse:
     """Get a single tag by ID with its reminder count."""
     result = await session.execute(select(Tag).where(Tag.id == tag_id))
@@ -132,7 +133,7 @@ async def get_tag(
 )
 async def create_tag(
     payload: TagCreate,
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> TagResponse:
     """Create a new tag."""
     # Check for existing tag with same name
@@ -173,7 +174,7 @@ async def create_tag(
 async def update_tag(
     tag_id: UUID,
     payload: TagUpdate,
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> TagResponse:
     """Update an existing tag."""
     result = await session.execute(select(Tag).where(Tag.id == tag_id))
@@ -215,7 +216,7 @@ async def update_tag(
 )
 async def delete_tag(
     tag_id: UUID,
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> None:
     """Delete a tag permanently."""
     result = await session.execute(select(Tag).where(Tag.id == tag_id))
@@ -247,7 +248,7 @@ async def delete_tag(
 )
 async def get_tag_reminders(
     tag_id: UUID,
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     include_completed: bool = True,
 ) -> list[ReminderResponse]:
     """Get all reminders with a specific tag."""
@@ -291,7 +292,7 @@ reminder_tags_router = APIRouter(prefix="/reminders", tags=["reminders", "tags"]
 )
 async def get_reminder_tags(
     reminder_id: UUID,
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> list[TagResponse]:
     """Get all tags for a specific reminder."""
     result = await session.execute(
@@ -317,7 +318,7 @@ async def get_reminder_tags(
 async def set_reminder_tags(
     reminder_id: UUID,
     payload: ReminderTagsUpdate,
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> list[TagResponse]:
     """Set (replace) all tags for a reminder."""
     result = await session.execute(
@@ -371,7 +372,7 @@ async def set_reminder_tags(
 async def add_reminder_tags(
     reminder_id: UUID,
     payload: AddTagsRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> list[TagResponse]:
     """Add tags to a reminder."""
     result = await session.execute(
@@ -418,7 +419,7 @@ async def add_reminder_tags(
 async def remove_reminder_tags(
     reminder_id: UUID,
     payload: RemoveTagsRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> list[TagResponse]:
     """Remove tags from a reminder."""
     result = await session.execute(

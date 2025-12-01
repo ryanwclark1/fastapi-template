@@ -8,7 +8,7 @@ payloads across different event sources.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -181,7 +181,7 @@ def build_file_event_payload(
     # Return standardized payload structure
     return {
         "event_type": event_type,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "data": data,
     }
 
@@ -263,7 +263,7 @@ def build_reminder_event_payload(
     # Return standardized payload structure
     return {
         "event_type": event_type,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "data": data,
     }
 

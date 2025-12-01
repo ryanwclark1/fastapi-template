@@ -1,6 +1,7 @@
 """Tests for the file service layer."""
 
 from __future__ import annotations
+
 import os
 from collections.abc import AsyncGenerator
 from hashlib import sha256
@@ -134,7 +135,7 @@ def postgres_dsn():
 
 
 @pytest.fixture
-async def session(postgres_dsn) -> AsyncGenerator[AsyncSession, None]:
+async def session(postgres_dsn) -> AsyncGenerator[AsyncSession]:
     """Provide an isolated PostgreSQL-backed session with file tables."""
     engine = create_async_engine(postgres_dsn)
     async with engine.begin() as conn:

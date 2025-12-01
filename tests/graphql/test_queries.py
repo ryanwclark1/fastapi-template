@@ -11,7 +11,6 @@ from example_service.features.graphql.schema import schema
 from tests.graphql.conftest import REMINDER_QUERY, REMINDERS_QUERY
 
 if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
 
     from example_service.features.graphql.context import GraphQLContext
     from example_service.features.reminders.models import Reminder

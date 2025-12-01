@@ -162,7 +162,7 @@ if broker is not None:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to queue task: {str(e)}",
-            )
+            ) from e
 
     @router.post(
         "/notify/{user_id}",
@@ -211,7 +211,7 @@ if broker is not None:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to queue notification: {str(e)}",
-            )
+            ) from e
 
     @router.get(
         "/status/{task_id}",
@@ -262,7 +262,7 @@ if broker is not None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Task not found: {task_id}",
-            )
+            ) from e
 
     @router.delete(
         "/cancel/{task_id}",
@@ -295,7 +295,7 @@ if broker is not None:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to cancel task: {str(e)}",
-            )
+            ) from e
 
 
 # To use this router in your FastAPI app:

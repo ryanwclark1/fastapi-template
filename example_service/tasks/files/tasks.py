@@ -130,13 +130,13 @@ async def download_from_s3(s3_key: str) -> bytes:
     return b""
 
 
-async def upload_to_s3(s3_key: str, content: bytes, content_type: str) -> str:
+async def upload_to_s3(s3_key: str, content: bytes, content_type: str) -> str:  # noqa: ARG001
     """Upload file content to S3.
 
     Args:
         s3_key: S3 object key.
         content: File content as bytes.
-        content_type: MIME type of content.
+        content_type: MIME type of content (currently unused in placeholder).
 
     Returns:
         S3 URI of uploaded file.

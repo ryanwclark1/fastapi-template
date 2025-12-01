@@ -19,7 +19,7 @@ from typing import Any
 
 # Global context variable for log context
 # Each async task gets its own copy automatically
-_log_context: ContextVar[dict[str, Any]] = ContextVar("log_context", default={})
+_log_context: ContextVar[dict[str, Any] | None] = ContextVar("log_context", default=None)
 
 
 def set_log_context(**kwargs: Any) -> None:
@@ -42,7 +42,8 @@ def set_log_context(**kwargs: Any) -> None:
         # All subsequent logs automatically include this context:
         logger.info("Processing request")  # Includes request_id, user_id, etc.
     """
-    current = _log_context.get().copy()
+    current_context = _log_context.get()
+    current = current_context.copy() if current_context is not None else {}
     current.update(kwargs)
     _log_context.set(current)
 
@@ -57,7 +58,8 @@ def get_log_context() -> dict[str, Any]:
             context = get_log_context()
         print(context)  # {'request_id': 'abc-123', 'user_id': 42}
     """
-    return _log_context.get().copy()
+    current = _log_context.get()
+    return current.copy() if current is not None else {}
 
 
 def clear_log_context() -> None:
@@ -76,7 +78,7 @@ def clear_log_context() -> None:
             set_log_context(item_id=item.id)
             process_item(item)
     """
-    _log_context.set({})
+    _log_context.set(None)
 
 
 def update_log_context(**kwargs: Any) -> None:
@@ -104,7 +106,8 @@ def remove_from_log_context(*keys: str) -> None:
             set_log_context(request_id="abc-123", temp="value")
         remove_from_log_context("temp")  # Only request_id remains
     """
-    current = _log_context.get().copy()
+    current_context = _log_context.get()
+    current = current_context.copy() if current_context is not None else {}
     for key in keys:
         current.pop(key, None)
     _log_context.set(current)
@@ -148,12 +151,13 @@ class ContextInjectingFilter(logging.Filter):
         # Get current context
         context = _log_context.get()
 
-        # Inject all context fields into the record
+        # Inject all context fields into the record if context exists
         # This makes them available to formatters
-        for key, value in context.items():
-            # Don't overwrite existing attributes
-            if not hasattr(record, key):
-                setattr(record, key, value)
+        if context is not None:
+            for key, value in context.items():
+                # Don't overwrite existing attributes
+                if not hasattr(record, key):
+                    setattr(record, key, value)
 
         return True
 

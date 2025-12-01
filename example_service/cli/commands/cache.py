@@ -6,6 +6,7 @@ import click
 
 from example_service.cli.utils import coro, error, info, success, warning
 from example_service.core.settings import get_redis_settings
+from example_service.infra.cache.redis import RedisCache
 
 
 @click.group(name="cache")
@@ -24,7 +25,9 @@ async def test() -> None:
 
         info(f"Connecting to: {redis_settings.redis_url}")
 
-        redis = get_cache()
+        cache = RedisCache()
+        await cache.connect()
+        redis = cache.client
 
         # Test ping
         response = await redis.ping()
@@ -39,7 +42,7 @@ async def test() -> None:
         info(f"Redis version: {info_dict.get('redis_version', 'unknown')}")
         info(f"Redis mode: {info_dict.get('redis_mode', 'unknown')}")
 
-        await redis.aclose()
+        await cache.disconnect()
 
     except Exception as e:
         error(f"Failed to connect to Redis: {e}")
@@ -53,7 +56,9 @@ async def info_cmd() -> None:
     info("Fetching Redis server information...")
 
     try:
-        redis = get_cache()
+        cache = RedisCache()
+        await cache.connect()
+        redis = cache.client
 
         # Get server info
         server_info = await redis.info("server")
@@ -65,7 +70,7 @@ async def info_cmd() -> None:
 
         # Get memory info
         memory_info = await redis.info("memory")
-        used_memory = int(memory_info.get("used_memory", 0))
+        int(memory_info.get("used_memory", 0))
         used_memory_human = memory_info.get("used_memory_human")
         click.echo("\n💾 Memory Usage:")
         click.echo(f"  Used memory: {used_memory_human}")
@@ -89,7 +94,7 @@ async def info_cmd() -> None:
         else:
             click.echo("\n🔑 Keyspace: Empty")
 
-        await redis.aclose()
+        await cache.disconnect()
         success("\nRedis info retrieved successfully!")
 
     except Exception as e:
@@ -123,7 +128,9 @@ async def flush(pattern: str, force: bool) -> None:
     info("Flushing cache...")
 
     try:
-        redis = get_cache()
+        cache = RedisCache()
+        await cache.connect()
+        redis = cache.client
 
         if pattern == "*":
             # Flush all keys
@@ -145,7 +152,7 @@ async def flush(pattern: str, force: bool) -> None:
 
             success(f"Deleted {deleted_count} keys matching pattern '{pattern}'")
 
-        await redis.aclose()
+        await cache.disconnect()
 
     except Exception as e:
         error(f"Failed to flush cache: {e}")
@@ -170,7 +177,9 @@ async def keys(pattern: str, limit: int) -> None:
     info(f"Searching for keys matching pattern: {pattern}")
 
     try:
-        redis = get_cache()
+        cache = RedisCache()
+        await cache.connect()
+        redis = cache.client
 
         all_keys = []
         cursor = 0
@@ -200,7 +209,7 @@ async def keys(pattern: str, limit: int) -> None:
         else:
             warning("No keys found matching pattern")
 
-        await redis.aclose()
+        await cache.disconnect()
 
     except Exception as e:
         error(f"Failed to list cache keys: {e}")
@@ -215,13 +224,15 @@ async def get(key: str) -> None:
     info(f"Retrieving value for key: {key}")
 
     try:
-        redis = get_cache()
+        cache = RedisCache()
+        await cache.connect()
+        redis = cache.client
 
         # Check if key exists
         exists = await redis.exists(key)
         if not exists:
             warning(f"Key '{key}' does not exist")
-            await redis.aclose()
+            await cache.disconnect()
             return
 
         # Get key type
@@ -255,7 +266,7 @@ async def get(key: str) -> None:
         ttl_str = f"{ttl}s" if ttl > 0 else "no expiration" if ttl == -1 else "expired"
         info(f"TTL: {ttl_str}")
 
-        await redis.aclose()
+        await cache.disconnect()
 
     except Exception as e:
         error(f"Failed to get cache key: {e}")

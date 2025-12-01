@@ -1,8 +1,8 @@
 """Integration-style tests for the reminder repository queries."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 pytest.importorskip("dateutil.rrule", reason="Reminder models require python-dateutil")
 
 from example_service.features.reminders.models import Reminder
-from example_service.features.tags.models import Tag, reminder_tags
 from example_service.features.reminders.repository import ReminderRepository
+from example_service.features.tags.models import Tag, reminder_tags
 
 
 @pytest.fixture
@@ -52,7 +52,7 @@ async def test_find_pending_excludes_completed(session: AsyncSession) -> None:
 @pytest.mark.asyncio
 async def test_find_overdue_filters_by_time(session: AsyncSession) -> None:
     repo = ReminderRepository()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await _persist(
         session,
         title="overdue",
@@ -74,7 +74,7 @@ async def test_find_overdue_filters_by_time(session: AsyncSession) -> None:
 @pytest.mark.asyncio
 async def test_find_pending_notifications_respects_sent_flag(session: AsyncSession) -> None:
     repo = ReminderRepository()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await _persist(
         session,
         title="notify",
@@ -99,7 +99,7 @@ async def test_find_pending_notifications_respects_sent_flag(session: AsyncSessi
 @pytest.mark.asyncio
 async def test_search_reminders_supports_filters(session: AsyncSession) -> None:
     repo = ReminderRepository()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await _persist(session, title="groceries", description="buy milk", created_at=now)
     await _persist(
         session,

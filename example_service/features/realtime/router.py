@@ -12,7 +12,7 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import JSONResponse
 
 from example_service.core.settings import get_websocket_settings

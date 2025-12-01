@@ -141,7 +141,8 @@ class EventOutbox(Base, UUIDv7PKMixin, TimestampMixin):
             return False
         if self.next_retry_at is None:
             return True
-        from datetime import UTC, datetime as dt
+        from datetime import UTC
+        from datetime import datetime as dt
 
         return dt.now(UTC) >= self.next_retry_at
 

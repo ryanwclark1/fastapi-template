@@ -48,13 +48,14 @@ except ImportError:
     StreamScheduler = None
     LabelScheduleSource = None
 
-from example_service.core.settings import get_rabbit_settings, get_redis_settings
+from example_service.core.settings import get_db_settings, get_rabbit_settings, get_redis_settings, get_task_settings
 
 logger = logging.getLogger(__name__)
 
 # Get settings from modular configuration
 redis_settings = get_redis_settings()
 rabbit_settings = get_rabbit_settings()
+task_settings = get_task_settings()
 setup_logging()
 
 # =============================================================================
@@ -66,8 +67,67 @@ setup_logging()
 
 broker: AioPikaBrokerType | None = None
 
-if AioPikaBroker is not None and rabbit_settings.is_configured and redis_settings.is_configured:
+
+def _create_result_backend():
+    """Create the appropriate result backend based on settings.
+
+    Returns:
+        Result backend instance (Redis or Postgres).
+    """
+    if task_settings.is_postgres_backend:
+        from example_service.infra.results import PostgresAsyncResultBackend
+
+        db_settings = get_db_settings()
+        logger.info(
+            "Using PostgreSQL result backend for tasks",
+            extra={"retention_hours": task_settings.tracking_retention_hours},
+        )
+        return PostgresAsyncResultBackend(
+            dsn=db_settings.async_url,
+            keep_results=True,
+            result_ttl_seconds=task_settings.tracking_retention_seconds,
+        )
+    else:
+        logger.info(
+            "Using Redis result backend for tasks",
+            extra={"ttl_seconds": task_settings.redis_result_ttl_seconds},
+        )
+        return RedisAsyncResultBackend(
+            redis_url=redis_settings.get_url(),
+            result_ex_time=task_settings.redis_result_ttl_seconds,
+            prefix_str=task_settings.redis_key_prefix,
+        )
+
+
+def _can_create_broker() -> bool:
+    """Check if broker can be created based on configuration."""
+    if AioPikaBroker is None:
+        logger.warning("taskiq-aio-pika not installed - background tasks disabled")
+        return False
+
+    if not rabbit_settings.is_configured:
+        logger.warning("RabbitMQ not configured - background tasks disabled")
+        return False
+
+    # For Redis backend, we need Redis configured
+    if task_settings.is_redis_backend and not redis_settings.is_configured:
+        logger.warning("Redis not configured but TASK_RESULT_BACKEND=redis - background tasks disabled")
+        return False
+
+    # For Postgres backend, we need database configured
+    if task_settings.is_postgres_backend:
+        db_settings = get_db_settings()
+        if not db_settings.is_configured:
+            logger.warning("PostgreSQL not configured but TASK_RESULT_BACKEND=postgres - background tasks disabled")
+            return False
+
+    return True
+
+
+if _can_create_broker():
     from example_service.tasks.middleware import TracingMiddleware, TrackingMiddleware
+
+    result_backend = _create_result_backend()
 
     broker = (
         AioPikaBroker(
@@ -76,7 +136,7 @@ if AioPikaBroker is not None and rabbit_settings.is_configured and redis_setting
             declare_exchange=True,
             declare_queues=True,
         )
-        .with_result_backend(RedisAsyncResultBackend(redis_settings.get_url()))
+        .with_result_backend(result_backend)
         .with_middlewares(
             TracingMiddleware(),
             TrackingMiddleware(),
@@ -84,16 +144,12 @@ if AioPikaBroker is not None and rabbit_settings.is_configured and redis_setting
     )
 
     logger.info(
-        "Taskiq background task broker configured with tracing and tracking middleware",
-        extra={"queue": rabbit_settings.get_prefixed_queue("taskiq-tasks")},
+        "Taskiq background task broker configured",
+        extra={
+            "queue": rabbit_settings.get_prefixed_queue("taskiq-tasks"),
+            "result_backend": task_settings.result_backend,
+        },
     )
-else:
-    if AioPikaBroker is None:
-        logger.warning("taskiq-aio-pika not installed - background tasks disabled")
-    elif not rabbit_settings.is_configured:
-        logger.warning("RabbitMQ not configured - background tasks disabled")
-    elif not redis_settings.is_configured:
-        logger.warning("Redis not configured - background tasks disabled")
 
 
 # =============================================================================

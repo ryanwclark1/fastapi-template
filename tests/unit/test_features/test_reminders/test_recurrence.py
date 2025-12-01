@@ -23,7 +23,6 @@ from example_service.features.reminders.recurrence import (
     validate_rrule,
 )
 
-
 # ──────────────────────────────────────────────────────────────
 # Test RecurrenceRule
 # ──────────────────────────────────────────────────────────────

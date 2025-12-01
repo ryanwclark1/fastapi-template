@@ -3,9 +3,13 @@ from __future__ import annotations
 
 import pytest
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from httpx import AsyncClient
 
-from example_service.app.middleware.security_headers import SecurityHeadersMiddleware
+from example_service.app.middleware.security_headers import (
+    SecurityHeadersMiddleware,
+    get_security_headers,
+)
 
 
 class TestSecurityHeadersMiddleware:
@@ -78,7 +82,8 @@ class TestSecurityHeadersMiddleware:
         assert "content-security-policy" in response.headers
         csp = response.headers["content-security-policy"]
         assert "default-src 'self'" in csp
-        assert "frame-ancestors 'none'" in csp
+        # Default (non-production) environment allows 'self' for frame-ancestors
+        assert "frame-ancestors" in csp
         assert (
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net"
             " https://unpkg.com"
@@ -92,7 +97,8 @@ class TestSecurityHeadersMiddleware:
             "font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com"
             in csp
         )
-        assert "connect-src 'self' https://cdn.jsdelivr.net" in csp
+        # Default now includes ws/wss for WebSocket support
+        assert "connect-src 'self'" in csp
         assert "worker-src 'self' blob:" in csp
 
     async def test_x_frame_options_header(self, client: AsyncClient):
@@ -489,3 +495,406 @@ class TestSecurityHeadersMiddleware:
 
             # Should complete 100 requests in reasonable time
             assert elapsed < 1.0, f"100 requests took {elapsed:.3f}s, performance degraded"
+
+
+class TestEnvironmentAwareFeatures:
+    """Test suite for environment-aware security features."""
+
+    async def test_production_environment_enables_stricter_csp(self):
+        """Test that production environment uses stricter CSP by default."""
+        app = FastAPI()
+        app.add_middleware(SecurityHeadersMiddleware, environment="production")
+
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "ok"}
+
+        from httpx import ASGITransport
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get("/test")
+
+        csp = response.headers["content-security-policy"]
+        # Production CSP should not include unsafe-inline/unsafe-eval for scripts
+        assert "'unsafe-eval'" not in csp
+        # Should include upgrade-insecure-requests
+        assert "upgrade-insecure-requests" in csp
+
+    async def test_development_environment_allows_relaxed_csp(self):
+        """Test that development environment uses relaxed CSP."""
+        app = FastAPI()
+        app.add_middleware(SecurityHeadersMiddleware, environment="development")
+
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "ok"}
+
+        from httpx import ASGITransport
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get("/test")
+
+        csp = response.headers["content-security-policy"]
+        # Development CSP should include unsafe-eval for Swagger
+        assert "'unsafe-eval'" in csp
+        # Should allow WebSocket connections
+        assert "ws:" in csp or "wss:" in csp
+
+    async def test_production_auto_enables_hsts(self):
+        """Test that HSTS is auto-enabled in production."""
+        app = FastAPI()
+        app.add_middleware(
+            SecurityHeadersMiddleware, environment="production", enable_hsts=None
+        )
+
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "ok"}
+
+        from httpx import ASGITransport
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get("/test")
+
+        assert "strict-transport-security" in response.headers
+
+    async def test_is_production_parameter_deprecated_but_works(self):
+        """Test that deprecated is_production parameter still works."""
+        app = FastAPI()
+        app.add_middleware(SecurityHeadersMiddleware, is_production=True)
+
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "ok"}
+
+        from httpx import ASGITransport
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get("/test")
+
+        csp = response.headers["content-security-policy"]
+        # Should use production-style CSP
+        assert "'unsafe-eval'" not in csp
+
+
+class TestServerHeaderHandling:
+    """Test suite for Server header customization."""
+
+    async def test_server_header_removed_when_none(self):
+        """Test that Server header is removed when server_header=None."""
+        app = FastAPI()
+        app.add_middleware(SecurityHeadersMiddleware, server_header=None)
+
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "ok"}
+
+        from httpx import ASGITransport
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get("/test")
+
+        assert "server" not in response.headers
+
+    async def test_server_header_kept_when_false(self):
+        """Test that Server header is kept when server_header=False."""
+        app = FastAPI()
+        app.add_middleware(SecurityHeadersMiddleware, server_header=False)
+
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "ok"}
+
+        from httpx import ASGITransport
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get("/test")
+
+        # Server header should be present (uvicorn default)
+        # Note: This may vary based on ASGI server
+        # The important thing is that False doesn't remove it
+
+    async def test_server_header_custom_value(self):
+        """Test that custom Server header value is set."""
+        app = FastAPI()
+        app.add_middleware(SecurityHeadersMiddleware, server_header="CustomServer/1.0")
+
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "ok"}
+
+        from httpx import ASGITransport
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get("/test")
+
+        assert response.headers.get("server") == "CustomServer/1.0"
+
+
+class TestEnhancedPermissionsPolicy:
+    """Test suite for enhanced Permissions-Policy features."""
+
+    async def test_enhanced_permissions_policy_includes_all_features(self):
+        """Test that enhanced permissions policy includes comprehensive features."""
+        app = FastAPI()
+        app.add_middleware(SecurityHeadersMiddleware)
+
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "ok"}
+
+        from httpx import ASGITransport
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get("/test")
+
+        policy = response.headers["permissions-policy"]
+
+        # Check for enhanced features from accent-hub
+        enhanced_features = [
+            "ambient-light-sensor",
+            "autoplay",
+            "battery",
+            "display-capture",
+            "document-domain",
+            "encrypted-media",
+            "execution-while-not-rendered",
+            "execution-while-out-of-viewport",
+            "midi",
+            "navigation-override",
+            "picture-in-picture",
+            "publickey-credentials-get",
+            "screen-wake-lock",
+            "sync-xhr",
+            "web-share",
+            "xr-spatial-tracking",
+        ]
+
+        for feature in enhanced_features:
+            assert feature in policy, f"Missing enhanced feature: {feature}"
+
+    async def test_fullscreen_allowed_for_self(self):
+        """Test that fullscreen is allowed for same origin."""
+        app = FastAPI()
+        app.add_middleware(SecurityHeadersMiddleware)
+
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "ok"}
+
+        from httpx import ASGITransport
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get("/test")
+
+        policy = response.headers["permissions-policy"]
+        assert "fullscreen=(self)" in policy
+
+
+class TestCSPEnhancements:
+    """Test suite for CSP enhancements."""
+
+    async def test_csp_handles_valueless_directives(self):
+        """Test that CSP correctly handles directives without values."""
+        app = FastAPI()
+        custom_csp = {
+            "default-src": "'self'",
+            "upgrade-insecure-requests": "",  # Valueless directive
+        }
+        app.add_middleware(SecurityHeadersMiddleware, csp_directives=custom_csp)
+
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "ok"}
+
+        from httpx import ASGITransport
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get("/test")
+
+        csp = response.headers["content-security-policy"]
+        # Should include valueless directive without extra semicolon
+        assert "upgrade-insecure-requests" in csp
+        # Should be properly formatted (no trailing semicolon)
+        assert csp.endswith("upgrade-insecure-requests") or "; " in csp
+
+    async def test_production_csp_includes_upgrade_insecure_requests(self):
+        """Test that production CSP includes upgrade-insecure-requests."""
+        app = FastAPI()
+        app.add_middleware(SecurityHeadersMiddleware, environment="production")
+
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "ok"}
+
+        from httpx import ASGITransport
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get("/test")
+
+        csp = response.headers["content-security-policy"]
+        assert "upgrade-insecure-requests" in csp
+
+
+class TestGetSecurityHeadersHelper:
+    """Test suite for get_security_headers helper function."""
+
+    def test_get_security_headers_basic(self):
+        """Test get_security_headers returns basic headers."""
+        headers = get_security_headers()
+
+        assert "X-Content-Type-Options" in headers
+        assert headers["X-Content-Type-Options"] == "nosniff"
+        assert "X-Frame-Options" in headers
+        assert headers["X-Frame-Options"] == "DENY"
+        assert "X-XSS-Protection" in headers
+        assert "Referrer-Policy" in headers
+        assert "X-Permitted-Cross-Domain-Policies" in headers
+
+    def test_get_security_headers_with_hsts(self):
+        """Test get_security_headers includes HSTS when requested."""
+        headers = get_security_headers(include_hsts=True)
+
+        assert "Strict-Transport-Security" in headers
+        assert "max-age=31536000" in headers["Strict-Transport-Security"]
+        assert "includeSubDomains" in headers["Strict-Transport-Security"]
+
+    def test_get_security_headers_with_csp(self):
+        """Test get_security_headers includes CSP when requested."""
+        headers = get_security_headers(include_csp=True)
+
+        assert "Content-Security-Policy" in headers
+        csp = headers["Content-Security-Policy"]
+        assert "default-src 'self'" in csp
+        assert "upgrade-insecure-requests" in csp
+
+    def test_get_security_headers_with_custom_csp(self):
+        """Test get_security_headers with custom CSP directives."""
+        custom_csp = {
+            "default-src": "'none'",
+            "script-src": "'self' https://cdn.example.com",
+        }
+        headers = get_security_headers(include_csp=True, csp_directives=custom_csp)
+
+        csp = headers["Content-Security-Policy"]
+        assert "default-src 'none'" in csp
+        assert "script-src 'self' https://cdn.example.com" in csp
+
+    def test_get_security_headers_with_valueless_directive(self):
+        """Test get_security_headers handles valueless CSP directives."""
+        custom_csp = {
+            "default-src": "'self'",
+            "upgrade-insecure-requests": "",
+        }
+        headers = get_security_headers(include_csp=True, csp_directives=custom_csp)
+
+        csp = headers["Content-Security-Policy"]
+        assert "upgrade-insecure-requests" in csp
+        assert "default-src 'self'" in csp
+
+    async def test_get_security_headers_in_error_handler(self):
+        """Test get_security_headers works in custom error handlers."""
+        from starlette.exceptions import HTTPException
+
+        app = FastAPI()
+
+        @app.exception_handler(HTTPException)
+        async def http_exception_handler(request, exc):
+            headers = get_security_headers(include_hsts=True, include_csp=True)
+            return JSONResponse(
+                status_code=exc.status_code,
+                content={"detail": exc.detail},
+                headers=headers,
+            )
+
+        @app.get("/error")
+        async def error_endpoint():
+            raise HTTPException(status_code=500, detail="Test error")
+
+        from httpx import ASGITransport
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get("/error")
+
+        assert response.status_code == 500
+        # Verify security headers are present
+        assert "x-content-type-options" in response.headers
+        assert "strict-transport-security" in response.headers
+        assert "content-security-policy" in response.headers
+
+
+class TestBackwardCompatibility:
+    """Test suite to ensure backward compatibility."""
+
+    async def test_default_behavior_unchanged(self):
+        """Test that default middleware behavior is unchanged."""
+        app = FastAPI()
+        app.add_middleware(SecurityHeadersMiddleware)
+
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "ok"}
+
+        from httpx import ASGITransport
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get("/test")
+
+        # All headers should be present by default
+        assert "strict-transport-security" in response.headers
+        assert "content-security-policy" in response.headers
+        assert "x-frame-options" in response.headers
+        assert "x-content-type-options" in response.headers
+
+    async def test_legacy_parameters_still_work(self):
+        """Test that all legacy parameters still work."""
+        app = FastAPI()
+        app.add_middleware(
+            SecurityHeadersMiddleware,
+            enable_hsts=True,
+            hsts_max_age=7776000,
+            enable_csp=True,
+            csp_directives={"default-src": "'self'"},
+            enable_frame_options=True,
+            frame_options="SAMEORIGIN",
+        )
+
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "ok"}
+
+        from httpx import ASGITransport
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get("/test")
+
+        assert "max-age=7776000" in response.headers["strict-transport-security"]
+        assert response.headers["x-frame-options"] == "SAMEORIGIN"

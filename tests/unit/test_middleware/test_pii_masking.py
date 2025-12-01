@@ -83,7 +83,7 @@ class TestPIIMasker:
             ("555 123 4567", "*** *** 4567"),
         ]
 
-        for phone, expected_pattern in test_cases:
+        for phone, _expected_pattern in test_cases:
             masked = masker.mask_phone(phone)
             # Check last 4 digits preserved
             assert "4567" in masked

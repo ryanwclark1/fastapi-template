@@ -1,294 +1,50 @@
-"""Admin API endpoints for task management.
+"""Admin API endpoints.
 
-Provides endpoints to:
-- List scheduled jobs and their status
-- Trigger background tasks on-demand
-- Pause/resume scheduled jobs
-- View task execution history and statistics
+This module provides administrative endpoints for system management.
+
+Note: Task management endpoints have been migrated to the dedicated
+tasks feature module at /api/v1/tasks/*. See:
+- GET /api/v1/tasks - Search task history
+- GET /api/v1/tasks/running - Running tasks
+- GET /api/v1/tasks/stats - Task statistics
+- GET /api/v1/tasks/{task_id} - Task details
+- POST /api/v1/tasks/trigger - Trigger a task
+- POST /api/v1/tasks/cancel - Cancel a task
+- GET /api/v1/tasks/scheduled - Scheduled jobs
+- POST /api/v1/tasks/scheduled/{job_id}/pause - Pause job
+- POST /api/v1/tasks/scheduled/{job_id}/resume - Resume job
 """
 
 from __future__ import annotations
 
-from typing import Any, Literal
-
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
-
-from example_service.features.admin.schemas import (
-    RunningTaskResponse,
-    TaskExecutionResponse,
-    TaskStatsResponse,
-)
-from example_service.features.admin.service import (
-    AdminService,
-    BrokerNotConfiguredError,
-    JobNotFoundError,
-    TaskName,
-    TaskNotFoundError,
-    TrackerNotAvailableError,
-    get_admin_service,
-)
-from example_service.infra.metrics.tracking import track_feature_usage
+from fastapi import APIRouter
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
-# =============================================================================
-# Request/Response Schemas
-# =============================================================================
-
-
-class TriggerTaskRequest(BaseModel):
-    """Request body for triggering a task."""
-
-    task: TaskName
-    params: dict[str, Any] | None = None
-
-
-class TriggerTaskResponse(BaseModel):
-    """Response after triggering a task."""
-
-    task_id: str
-    task_name: str
-    status: str
-    message: str
-
-
-class JobStatusResponse(BaseModel):
-    """Scheduled job status."""
-
-    id: str
-    name: str
-    next_run_time: str | None
-    trigger: str
-
-
-class JobActionRequest(BaseModel):
-    """Request for pausing/resuming a job."""
-
-    job_id: str
-
-
-# =============================================================================
-# Scheduled Job Endpoints
-# =============================================================================
+# ──────────────────────────────────────────────────────────────
+# System Information
+# ──────────────────────────────────────────────────────────────
 
 
 @router.get(
-    "/tasks/scheduled",
-    response_model=list[JobStatusResponse],
-    summary="List scheduled jobs",
-    description="Get status of all scheduled background jobs.",
+    "/info",
+    summary="Get system information",
+    description="Get basic system and application information.",
 )
-async def list_scheduled_jobs(
-    service: AdminService = Depends(get_admin_service),
-) -> list[dict]:
-    """List all scheduled jobs with their next run times."""
-    return service.list_scheduled_jobs()
+async def get_system_info() -> dict:
+    """Get system information.
 
-
-@router.post(
-    "/tasks/scheduled/pause",
-    summary="Pause a scheduled job",
-    description="Pause a scheduled job by its ID.",
-)
-async def pause_scheduled_job(
-    request: JobActionRequest,
-    service: AdminService = Depends(get_admin_service),
-) -> dict:
-    """Pause a scheduled job."""
-    track_feature_usage("admin_job_management", is_authenticated=True)
-
-    try:
-        return service.pause_job(request.job_id)
-    except JobNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        ) from e
-
-
-@router.post(
-    "/tasks/scheduled/resume",
-    summary="Resume a paused job",
-    description="Resume a previously paused scheduled job.",
-)
-async def resume_scheduled_job(
-    request: JobActionRequest,
-    service: AdminService = Depends(get_admin_service),
-) -> dict:
-    """Resume a paused scheduled job."""
-    track_feature_usage("admin_job_management", is_authenticated=True)
-
-    try:
-        return service.resume_job(request.job_id)
-    except JobNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        ) from e
-
-
-# =============================================================================
-# Task Triggering Endpoint
-# =============================================================================
-
-
-@router.post(
-    "/tasks/trigger",
-    response_model=TriggerTaskResponse,
-    summary="Trigger a task",
-    description="Trigger a background task for immediate execution.",
-)
-async def trigger_task(
-    request: TriggerTaskRequest,
-    service: AdminService = Depends(get_admin_service),
-) -> TriggerTaskResponse:
-    """Trigger a background task on-demand.
-
-    The task will be queued for execution by a Taskiq worker.
-    Make sure a worker is running: `taskiq worker example_service.tasks.broker:broker`
+    Returns basic information about the running application
+    and system status.
     """
-    # Track admin feature usage (admin endpoints require authentication in production)
-    track_feature_usage("admin_task_trigger", is_authenticated=True)
+    from example_service.core.settings import get_app_settings
 
-    try:
-        result = await service.trigger_task(request.task, request.params)
-        return TriggerTaskResponse(**result)
-    except BrokerNotConfiguredError as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(e),
-        ) from e
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to trigger task: {e}",
-        ) from e
+    settings = get_app_settings()
 
-
-# =============================================================================
-# Task Execution History Endpoints
-# =============================================================================
-
-
-@router.get(
-    "/tasks/history",
-    response_model=list[TaskExecutionResponse],
-    summary="Get task execution history",
-    description="Get recent task executions with optional filters.",
-)
-async def get_task_history(
-    limit: int = Query(default=100, ge=1, le=500, description="Max results"),
-    offset: int = Query(default=0, ge=0, description="Results to skip"),
-    task_name: str | None = Query(default=None, description="Filter by task name"),
-    task_status: Literal["success", "failure"] | None = Query(
-        default=None, alias="status", description="Filter by status"
-    ),
-    service: AdminService = Depends(get_admin_service),
-) -> list[TaskExecutionResponse]:
-    """Get recent task executions.
-
-    Returns task execution records from the last 24 hours, newest first.
-    Use filters to narrow down results by task name or status.
-    """
-    try:
-        history = await service.get_task_history(
-            limit=limit,
-            offset=offset,
-            task_name=task_name,
-            status=task_status,
-        )
-        return [TaskExecutionResponse(**task) for task in history]
-    except TrackerNotAvailableError as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(e),
-        ) from e
-
-
-@router.get(
-    "/tasks/running",
-    response_model=list[RunningTaskResponse],
-    summary="Get running tasks",
-    description="Get all currently executing tasks.",
-)
-async def get_running_tasks(
-    service: AdminService = Depends(get_admin_service),
-) -> list[RunningTaskResponse]:
-    """Get currently running tasks.
-
-    Returns information about tasks that are currently being executed
-    by workers, including how long they have been running.
-    """
-    try:
-        running = await service.get_running_tasks()
-        return [RunningTaskResponse(**task) for task in running]
-    except TrackerNotAvailableError as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(e),
-        ) from e
-
-
-@router.get(
-    "/tasks/stats",
-    response_model=TaskStatsResponse,
-    summary="Get task statistics",
-    description="Get aggregate statistics about task executions.",
-)
-async def get_task_stats(
-    service: AdminService = Depends(get_admin_service),
-) -> TaskStatsResponse:
-    """Get task execution statistics.
-
-    Returns aggregate statistics including:
-    - Total executions in last 24 hours
-    - Counts by status (success, failure, running)
-    - Counts by task name
-    - Average execution duration
-    """
-    try:
-        stats = await service.get_task_stats()
-        return TaskStatsResponse(
-            total_24h=stats["total_24h"],
-            success_count=stats["success_count"],
-            failure_count=stats["failure_count"],
-            running_count=stats["running_count"],
-            by_task_name=stats["by_task_name"],
-            avg_duration_ms=stats["avg_duration_ms"],
-        )
-    except TrackerNotAvailableError as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(e),
-        ) from e
-
-
-@router.get(
-    "/tasks/{task_id}",
-    response_model=TaskExecutionResponse,
-    summary="Get task details",
-    description="Get full execution details for a specific task.",
-)
-async def get_task_details(
-    task_id: str,
-    service: AdminService = Depends(get_admin_service),
-) -> TaskExecutionResponse:
-    """Get details for a specific task execution.
-
-    Returns full execution details including return value or error information.
-    """
-    try:
-        task = await service.get_task_details(task_id)
-        return TaskExecutionResponse(**task)
-    except TrackerNotAvailableError as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(e),
-        ) from e
-    except TaskNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        ) from e
+    return {
+        "service_name": settings.service_name,
+        "version": settings.version,
+        "environment": settings.environment,
+        "api_prefix": settings.api_prefix,
+    }

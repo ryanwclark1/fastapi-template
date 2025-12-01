@@ -9,7 +9,6 @@ import pytest
 from example_service.core.events.base import DomainEvent
 from example_service.core.events.registry import EventRegistry
 
-
 # ──────────────────────────────────────────────────────────────
 # Test DomainEvent base class
 # ──────────────────────────────────────────────────────────────

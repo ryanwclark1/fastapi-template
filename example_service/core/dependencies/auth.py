@@ -98,24 +98,24 @@ async def validate_token_with_auth_service(token: str) -> TokenPayload:
             data = response.json()
             return TokenPayload(**data)
 
-    except httpx.TimeoutException:
+    except httpx.TimeoutException as err:
         logger.error("Timeout calling auth service")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Authentication service timeout",
-        )
+        ) from err
     except httpx.NetworkError as e:
         logger.error("Network error calling auth service", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Authentication service unavailable",
-        )
+        ) from e
     except Exception as e:
         logger.exception("Unexpected error validating token", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Authentication error",
-        )
+        ) from e
 
 
 async def get_current_user(
@@ -216,7 +216,7 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Authentication error",
-        )
+        ) from e
 
 
 async def get_current_user_optional(

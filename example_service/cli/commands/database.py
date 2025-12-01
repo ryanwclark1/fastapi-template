@@ -598,10 +598,9 @@ async def truncate_cmd(exclude: tuple[str, ...], confirm: bool) -> None:
     """
     warning("This will DELETE ALL DATA in the database!")
 
-    if not confirm:
-        if not click.confirm("Are you sure you want to truncate all tables?"):
-            info("Truncate cancelled")
-            return
+    if not confirm and not click.confirm("Are you sure you want to truncate all tables?"):
+        info("Truncate cancelled")
+        return
 
     try:
         from example_service.infra.database import engine

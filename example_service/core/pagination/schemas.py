@@ -18,7 +18,7 @@ Both styles use the same underlying cursor mechanism.
 
 from __future__ import annotations
 
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -58,7 +58,7 @@ class PageInfo(BaseModel):
     )
 
 
-class Edge(BaseModel, Generic[T]):
+class Edge[T](BaseModel):
     """Edge wrapper for paginated items (Relay pattern).
 
     Each edge contains a node (the actual item) and its cursor
@@ -73,7 +73,7 @@ class Edge(BaseModel, Generic[T]):
     cursor: str = Field(description="Cursor for this item")
 
 
-class Connection(BaseModel, Generic[T]):
+class Connection[T](BaseModel):
     """GraphQL Connection pattern for cursor pagination.
 
     The Connection pattern provides a standardized way to return
@@ -120,7 +120,7 @@ class Connection(BaseModel, Generic[T]):
         """
         return [edge.node for edge in self.edges]
 
-    def to_cursor_page(self) -> "CursorPage[T]":
+    def to_cursor_page(self) -> CursorPage[T]:
         """Convert to simple REST-style pagination.
 
         Returns:
@@ -135,7 +135,7 @@ class Connection(BaseModel, Generic[T]):
         )
 
 
-class CursorPage(BaseModel, Generic[T]):
+class CursorPage[T](BaseModel):
     """Simple REST-style cursor pagination response.
 
     A cleaner alternative to the Connection pattern for REST APIs

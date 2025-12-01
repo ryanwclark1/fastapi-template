@@ -320,7 +320,7 @@ def _configure_with_dictconfig(
     )
 
     # Build handlers configuration (for QueueListener, not root)
-    handlers_config = _build_handlers_config(
+    _build_handlers_config(
         console_enabled=console_enabled,
         console_level=console_level,
         file_path=file_path,

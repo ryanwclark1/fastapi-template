@@ -1,7 +1,7 @@
 """create initial
 
 Revision ID: 8799a08c3b18
-Revises: 
+Revises:
 Create Date: 2025-11-24 15:51:10.816055
 
 """

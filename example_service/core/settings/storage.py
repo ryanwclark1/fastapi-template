@@ -237,18 +237,25 @@ class StorageSettings(BaseSettings):
 
     @field_validator("access_key", "secret_key", mode="after")
     @classmethod
-    def _validate_credentials(cls, value: SecretStr | None, info) -> SecretStr | None:
+    def _validate_credentials(cls, value: SecretStr | None, info) -> SecretStr | None:  # noqa: ARG003
         """Validate that both access_key and secret_key are provided together or neither.
 
         This validator ensures credential consistency - you can't have just one credential.
         Both must be provided for static credentials, or neither for IAM role authentication.
+
+        Args:
+            value: The credential value being validated
+            info: Pydantic validation context (required by Pydantic protocol)
+
+        Returns:
+            The validated credential value unchanged
         """
         # This runs for each field individually, so we'll do the cross-field check
         # in the model validator below
         return value
 
     @model_validator(mode="after")
-    def _validate_credential_consistency(self) -> "StorageSettings":
+    def _validate_credential_consistency(self) -> StorageSettings:
         """Validate that both credentials are provided together or neither.
 
         Ensures you can't have just one credential - both must be provided for static

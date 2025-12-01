@@ -8,11 +8,10 @@ Provides:
 
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 from uuid import uuid4
-
-import os
 
 import pytest
 
@@ -32,7 +31,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from example_service.core.database import Base
 from example_service.features.graphql.context import GraphQLContext
 from example_service.features.graphql.dataloaders import create_dataloaders
-from example_service.features.graphql.schema import schema
 from example_service.features.reminders.models import Reminder
 
 if TYPE_CHECKING:
@@ -40,7 +38,7 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture
-async def graphql_session() -> AsyncGenerator[AsyncSession, None]:
+async def graphql_session() -> AsyncGenerator[AsyncSession]:
     """Create an in-memory SQLite session for GraphQL tests.
 
     SQLite doesn't support all PostgreSQL features, but works for basic tests.

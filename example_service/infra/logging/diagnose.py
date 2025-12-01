@@ -265,7 +265,4 @@ def should_enable_diagnose() -> bool:
         return True
 
     # Check Python debug mode
-    if sys.flags.debug:
-        return True
-
-    return False
+    return bool(sys.flags.debug)

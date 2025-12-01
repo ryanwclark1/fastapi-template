@@ -15,6 +15,7 @@ The manager supports two modes:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import time
@@ -136,19 +137,15 @@ class ConnectionManager:
         # Cancel heartbeat task
         if self._heartbeat_task:
             self._heartbeat_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._heartbeat_task
-            except asyncio.CancelledError:
-                pass
             self._heartbeat_task = None
 
         # Stop PubSub listener
         if self._listener_task:
             self._listener_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._listener_task
-            except asyncio.CancelledError:
-                pass
             self._listener_task = None
 
         if self._pubsub:
@@ -161,10 +158,8 @@ class ConnectionManager:
 
         # Close all connections
         for conn_info in list(self._connections.values()):
-            try:
+            with contextlib.suppress(Exception):
                 await conn_info.websocket.close(code=1001, reason="Server shutdown")
-            except Exception:
-                pass
 
         self._connections.clear()
         self._channel_connections.clear()
@@ -258,10 +253,8 @@ class ConnectionManager:
                     await self._pubsub.unsubscribe(f"{self._channel_prefix}{channel}")
 
         # Close WebSocket
-        try:
+        with contextlib.suppress(Exception):
             await conn_info.websocket.close()
-        except Exception:
-            pass
 
         # Update metrics
         self._update_connection_metrics()
@@ -411,9 +404,8 @@ class ConnectionManager:
         """
         count = 0
         for conn_info in list(self._connections.values()):
-            if conn_info.user_id == user_id:
-                if await self.send_to_connection(conn_info.connection_id, message):
-                    count += 1
+            if conn_info.user_id == user_id and await self.send_to_connection(conn_info.connection_id, message):
+                count += 1
         return count
 
     def get_connection(self, connection_id: str) -> ConnectionInfo | None:

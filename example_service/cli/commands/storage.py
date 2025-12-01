@@ -66,7 +66,7 @@ def info_cmd() -> None:
 
         if settings.endpoint:
             click.echo(f"Endpoint: {settings.endpoint}")
-            click.echo(f"Type: S3-compatible (MinIO/LocalStack)")
+            click.echo("Type: S3-compatible (MinIO/LocalStack)")
         else:
             click.echo("Endpoint: AWS S3 (default)")
             click.echo("Type: AWS S3")
@@ -141,8 +141,8 @@ async def list_files(prefix: str, limit: int) -> None:
             sys.exit(1)
 
         # Import here to avoid dependency issues
-        from example_service.infra.storage.s3 import S3Client
         from example_service.core.settings import get_backup_settings
+        from example_service.infra.storage.s3 import S3Client
 
         # Note: Using S3Client for listing as StorageClient doesn't have list method
         # You may want to extend StorageClient with list_objects method
@@ -251,8 +251,8 @@ async def check() -> None:
         # Check 3: Bucket accessibility
         click.echo("\n3. Bucket Accessibility:")
         try:
-            from example_service.infra.storage.s3 import S3Client
             from example_service.core.settings import get_backup_settings
+            from example_service.infra.storage.s3 import S3Client
 
             backup_settings = get_backup_settings()
 
@@ -266,7 +266,7 @@ async def check() -> None:
 
             # Test listing (this will fail if bucket doesn't exist or is inaccessible)
             start_time = time.time()
-            objects = await client.list_objects(prefix="", max_keys=1)
+            await client.list_objects(prefix="", max_keys=1)
             latency = (time.time() - start_time) * 1000  # Convert to ms
 
             success(f"   Bucket '{backup_settings.s3_bucket}' is accessible")
@@ -387,12 +387,11 @@ async def upload(
         from example_service.infra.storage.client import StorageClient
 
         # Validate arguments
-        if len(files) == 1 and not Path(files[0]).is_dir():
+        if len(files) == 1 and not Path(files[0]).is_dir() and not key:
             # Single file upload - require --key
-            if not key:
-                error("Single file upload requires --key parameter")
-                info("Usage: example-service storage upload file.pdf --key uploads/file.pdf")
-                sys.exit(1)
+            error("Single file upload requires --key parameter")
+            info("Usage: example-service storage upload file.pdf --key uploads/file.pdf")
+            sys.exit(1)
 
         # Collect all files to upload
         upload_tasks = []
@@ -434,7 +433,7 @@ async def upload(
                     info(f"Uploading {local_path.name} -> {s3_key} ({_format_bytes(file_size)})")
 
                     with open(local_path, "rb") as f:
-                        result = await client.upload_file(
+                        await client.upload_file(
                             file_obj=f,
                             key=s3_key,
                             bucket=bucket,
@@ -526,9 +525,9 @@ async def download(
             info("   or: example-service storage download --prefix uploads/ --output ./dir/")
             sys.exit(1)
 
+        from example_service.core.settings import get_backup_settings
         from example_service.infra.storage.client import StorageClient
         from example_service.infra.storage.s3 import S3Client
-        from example_service.core.settings import get_backup_settings
 
         output_path = Path(output)
 
@@ -694,9 +693,9 @@ async def delete(
             info("   or: example-service storage delete --prefix uploads/old/ --confirm")
             sys.exit(1)
 
+        from example_service.core.settings import get_backup_settings
         from example_service.infra.storage.client import StorageClient
         from example_service.infra.storage.s3 import S3Client
-        from example_service.core.settings import get_backup_settings
 
         # Get list of files to delete
         delete_tasks = []
@@ -974,7 +973,7 @@ async def move(
             # Delete source
             info(f"Deleting source file: {source_key}")
             await client.delete_file(key=source_key, bucket=target_bucket)
-            success(f"Deleted source file")
+            success("Deleted source file")
 
             click.echo(f"\n{'=' * 80}")
             success(f"Successfully moved {source_key} -> {dest_key}")

@@ -20,6 +20,7 @@ Configuration:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 from datetime import datetime
@@ -100,10 +101,8 @@ class EventBridge:
 
         if self._consumer_task:
             self._consumer_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._consumer_task
-            except asyncio.CancelledError:
-                pass
             self._consumer_task = None
 
         logger.info("Event bridge stopped")
@@ -127,8 +126,13 @@ class EventBridge:
 
         # Register the handler
         @broker.subscriber(queue, exchange)
-        async def handle_websocket_event(body: dict[str, Any], msg: Any) -> None:
-            """Handle incoming events and broadcast to WebSocket clients."""
+        async def handle_websocket_event(body: dict[str, Any], msg: Any) -> None:  # noqa: ARG001
+            """Handle incoming events and broadcast to WebSocket clients.
+
+            Args:
+                body: Event payload dictionary
+                msg: RabbitMQ message object (required by FastStream protocol)
+            """
             await self._handle_event(body)
 
         logger.debug(

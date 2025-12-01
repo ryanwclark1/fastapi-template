@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 from strawberry.printer import print_schema
 
 from example_service.features.graphql.schema import schema

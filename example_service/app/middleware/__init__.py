@@ -1,15 +1,51 @@
-"""Middleware configuration for FastAPI application."""
+"""Middleware configuration for FastAPI application.
+
+This module provides a centralized middleware configuration system that ensures
+consistent middleware stack across all environments with proper ordering.
+
+The middleware stack includes:
+- Debug: Comprehensive debugging with trace context (optional)
+- Request ID: Request tracking for distributed tracing
+- Security Headers: HTTP security headers and protections
+- Metrics: Request metrics collection and observability
+- CORS: Cross-Origin Resource Sharing (development only)
+- Trusted Host: Host header validation (production only)
+- Rate Limiting: DDoS protection via rate limits (optional)
+- Request Logging: Detailed logging with PII masking (debug only)
+- Size Limit: Payload size protection (optional)
+- N+1 Detection: SQL query pattern detection (optional)
+
+Middleware order is critical for correct request processing. This module
+documents and enforces the correct order.
+
+Example Usage:
+    from example_service.app.middleware import configure_middleware
+    from example_service.core.settings import get_settings
+
+    # In FastAPI application setup
+    settings = get_settings()
+    configure_middleware(app, settings)
+"""
 from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING
 
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from example_service.app.middleware.base import HeaderContextMiddleware
 from example_service.app.middleware.constants import EXEMPT_PATHS
 from example_service.app.middleware.correlation_id import CorrelationIDMiddleware
+from example_service.app.middleware.debug import DebugMiddleware
+from example_service.app.middleware.i18n import I18nMiddleware, create_i18n_middleware
 from example_service.app.middleware.metrics import MetricsMiddleware
+from example_service.app.middleware.n_plus_one_detection import (
+    NPlusOneDetectionMiddleware,
+    QueryNormalizer,
+    QueryPattern,
+    setup_n_plus_one_monitoring,
+)
 from example_service.app.middleware.rate_limit import RateLimitMiddleware
 from example_service.app.middleware.request_id import RequestIDMiddleware
 from example_service.app.middleware.request_logging import (
@@ -18,114 +54,197 @@ from example_service.app.middleware.request_logging import (
 )
 from example_service.app.middleware.security_headers import SecurityHeadersMiddleware
 from example_service.app.middleware.size_limit import RequestSizeLimitMiddleware
-from example_service.core.settings import (
-    get_app_settings,
-    get_logging_settings,
-    get_otel_settings,
-)
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
+
+    from example_service.core.settings import Settings
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
     "CorrelationIDMiddleware",
+    "DebugMiddleware",
     "HeaderContextMiddleware",
+    "I18nMiddleware",
     "MetricsMiddleware",
+    "NPlusOneDetectionMiddleware",
     "PIIMasker",
+    "QueryNormalizer",
+    "QueryPattern",
     "RateLimitMiddleware",
     "RequestIDMiddleware",
     "RequestLoggingMiddleware",
     "RequestSizeLimitMiddleware",
     "SecurityHeadersMiddleware",
     "configure_middleware",
+    "create_i18n_middleware",
+    "setup_n_plus_one_monitoring",
 ]
 
 
-def configure_middleware(app: FastAPI) -> None:
-    """Configure middleware for the application.
+def configure_middleware(app: FastAPI, settings: Settings) -> None:
+    """Configure all middleware for the FastAPI application.
 
-    Uses modular settings for CORS and other configuration.
-    Middleware execution order (last registered = outermost = first to run):
-    1. CORS (outermost)
-    2. Rate Limit (optional, early rejection for DDoS protection)
-    3. Request Size Limit (early rejection for large payload DoS)
-    4. Security Headers (add security headers to all responses)
-    5. CorrelationID (transaction-level ID across services, sets logging context)
-    6. RequestID (request-level ID per hop, sets logging context)
-    7. Request Logging (detailed request/response logging with PII masking)
-    8. Metrics (collects metrics + trace correlation + timing header)
+    This function centralizes middleware configuration and ensures
+    consistent middleware stack across all environments.
 
-    IMPORTANT:
-    - Rate limiting and size limits run early for fast rejection
-    - CorrelationID runs before RequestID (transaction scope > request scope)
-    - Both IDs MUST run before Request Logging so both are available in logs
+    Middleware Order (Critical for Request Processing):
+    ====================================================
+    Middleware is applied in REVERSE order (last added = first to execute).
+    The order below represents EXECUTION order (outermost to innermost):
 
-    Correlation ID vs Request ID:
-    - Correlation ID: Shared across all services in a transaction (Service A → B → C)
-    - Request ID: Unique per HTTP request (one per service hop)
+    1. Debug Middleware (optional - first to capture all requests)
+       - Adds comprehensive debugging with trace IDs and request logging
+       - Only enabled when APP_ENABLE_DEBUG_MIDDLEWARE=true
+       - Must be first to capture complete request/response lifecycle
+
+    2. Request ID Middleware
+       - Generates unique request IDs for tracing individual requests
+       - Should be early so subsequent middleware can access request ID
+       - Sets request_id in logging context for all downstream logs
+
+    3. Security Headers Middleware
+       - Adds HTTP security headers to all responses
+       - Production-aware (stricter in production, relaxed for docs)
+       - Protects against XSS, clickjacking, MIME sniffing, etc.
+
+    4. Metrics Middleware
+       - Collects HTTP request metrics for observability
+       - Tracks request duration, status codes, and trace correlation
+       - Adds X-Process-Time header with request duration
+
+    5. CORS Middleware (development only)
+       - Handles cross-origin requests for browser-based clients
+       - Only enabled in debug mode (APP_DEBUG=true)
+       - Configure origins via APP_CORS_ORIGINS
+
+    6. Trusted Host Middleware (production only)
+       - Validates Host header to prevent host header attacks
+       - Only enabled in production (APP_DEBUG=false)
+       - Configure allowed hosts via APP_ALLOWED_HOSTS
+
+    7. Rate Limit Middleware (optional)
+       - Protects against DDoS attacks via rate limiting
+       - Requires Redis connection
+       - Only enabled when APP_ENABLE_RATE_LIMITING=true
+
+    8. Request Logging Middleware (debug only)
+       - Logs detailed request/response information with PII masking
+       - Only enabled in debug mode or when LOG_LEVEL=DEBUG
+       - Expensive operation - use only for debugging
+
+    9. Size Limit Middleware (optional)
+       - Protects against large payload DoS attacks
+       - Rejects requests exceeding APP_REQUEST_SIZE_LIMIT
+       - Only enabled when APP_ENABLE_REQUEST_SIZE_LIMIT=true
+
+    10. N+1 Detection Middleware (optional)
+        - Detects N+1 query patterns in SQLAlchemy queries
+        - Must be configured separately via setup_n_plus_one_monitoring()
+        - Development tool - not recommended for production
+
+    Environment Variables:
+    =====================
+    Core Settings:
+        APP_DEBUG: Enable debug mode (default: false)
+        APP_ENVIRONMENT: Environment name (development|staging|production|test)
+
+    Middleware Toggles:
+        APP_ENABLE_DEBUG_MIDDLEWARE: Enable debug middleware (default: false)
+        APP_ENABLE_RATE_LIMITING: Enable rate limiting (default: false)
+        APP_ENABLE_REQUEST_SIZE_LIMIT: Enable size limit (default: true)
+
+    CORS Configuration (development only):
+        APP_CORS_ORIGINS: Allowed origins (JSON array or comma-separated)
+        APP_CORS_ALLOW_CREDENTIALS: Allow credentials (default: true)
+        APP_CORS_ALLOW_METHODS: Allowed methods (default: ["*"])
+        APP_CORS_ALLOW_HEADERS: Allowed headers (default: ["*"])
+
+    Trusted Host Configuration (production only):
+        APP_ALLOWED_HOSTS: Allowed host headers (JSON array or comma-separated)
+
+    Rate Limiting Configuration:
+        APP_RATE_LIMIT_PER_MINUTE: Requests per minute (default: 100)
+        APP_RATE_LIMIT_WINDOW_SECONDS: Window size in seconds (default: 60)
+
+    Security Configuration:
+        APP_STRICT_CSP: Use strict CSP (default: true)
+        APP_DISABLE_DOCS: Disable API docs (default: false)
+
+    Logging Configuration:
+        LOG_LEVEL: Logging level (default: INFO)
+        LOG_INCLUDE_REQUEST_ID: Include request ID in logs (default: true)
 
     Args:
-        app: FastAPI application instance.
+        app: FastAPI application instance
+        settings: Unified settings instance with all configuration domains
+
+    Raises:
+        Exception: If rate limiting is enabled but Redis connection fails
+                  (logs error and continues without rate limiting)
+
+    Example:
+        >>> from fastapi import FastAPI
+        >>> from example_service.core.settings import get_settings
+        >>> from example_service.app.middleware import configure_middleware
+        >>>
+        >>> app = FastAPI()
+        >>> settings = get_settings()
+        >>> configure_middleware(app, settings)
+
+    Notes:
+        - Authentication is handled at endpoint level via dependency injection
+          (see example_service.core.dependencies.accent_auth)
+        - Tracing is handled automatically via FastAPIInstrumentor in lifespan
+          (see example_service.app.lifespan)
+        - N+1 detection requires separate setup via setup_n_plus_one_monitoring()
     """
-    app_settings = get_app_settings()
-    log_settings = get_logging_settings()
-    otel_settings = get_otel_settings()
+    # Extract domain settings from unified settings
+    app_settings = settings.app
+    log_settings = settings.logging
+    otel_settings = settings.otel
 
-    # CORS middleware (configure origins from settings)
-    cors_origins = app_settings.cors_origins or ["*"]
-    logger.info(f"Configuring CORS with origins: {cors_origins}")
-
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=cors_origins,
-        allow_credentials=app_settings.cors_allow_credentials,
-        allow_methods=app_settings.cors_allow_methods,
-        allow_headers=app_settings.cors_allow_headers,
-        max_age=3600,
+    logger.info(
+        "Configuring middleware stack",
+        extra={
+            "environment": app_settings.environment,
+            "debug": app_settings.debug,
+            "service": app_settings.service_name,
+        },
     )
 
-    # Rate limiting middleware (optional, requires Redis)
-    # Must be early in the chain for fast rejection before expensive processing
-    if app_settings.enable_rate_limiting:
-        try:
-            from example_service.infra.cache import get_cache
-            from example_service.infra.ratelimit import RateLimiter
-
-            redis = get_cache()
-            limiter = RateLimiter(redis)
-
-            app.add_middleware(
-                RateLimitMiddleware,
-                limiter=limiter,
-                default_limit=app_settings.rate_limit_per_minute,
-                default_window=app_settings.rate_limit_window_seconds,
-                exempt_paths=EXEMPT_PATHS,
-            )
-            logger.info(
-                f"Rate limiting enabled: {app_settings.rate_limit_per_minute}/min "
-                f"(window: {app_settings.rate_limit_window_seconds}s)"
-            )
-        except Exception as e:
-            logger.error(f"Failed to enable rate limiting: {e}", exc_info=True)
-            logger.warning("Continuing without rate limiting")
-
-    # Request size limit middleware (protects against DoS via large payloads)
-    # Must be early for fast rejection before reading request body
-    if app_settings.enable_request_size_limit:
+    # 1. Debug Middleware (optional, first to capture all requests)
+    # Adds comprehensive debugging with trace IDs and request logging
+    if app_settings.enable_debug_middleware:
         app.add_middleware(
-            RequestSizeLimitMiddleware,
-            max_size=app_settings.request_size_limit,
+            DebugMiddleware,
+            enabled=True,
+            log_requests=app_settings.debug_log_requests,
+            log_responses=app_settings.debug_log_responses,
+            log_timing=app_settings.debug_log_timing,
+            header_prefix=app_settings.debug_header_prefix,
         )
         logger.info(
-            f"Request size limit enabled: {app_settings.request_size_limit} bytes "
-            f"({app_settings.request_size_limit / (1024 * 1024):.1f}MB)"
+            "DebugMiddleware enabled",
+            extra={
+                "log_requests": app_settings.debug_log_requests,
+                "log_responses": app_settings.debug_log_responses,
+                "log_timing": app_settings.debug_log_timing,
+                "header_prefix": app_settings.debug_header_prefix,
+            },
         )
 
-    # Security headers middleware (protects against common vulnerabilities)
+    # 2. Request ID Middleware
+    # Generates unique request IDs for tracing individual requests
+    # This should be added early so subsequent middleware can access request ID
+    if log_settings.include_request_id:
+        app.add_middleware(RequestIDMiddleware)
+        logger.info("RequestIDMiddleware enabled")
+
+    # 3. Security Headers Middleware
+    # Adds security headers to all responses (production-aware)
     # Use strict CSP when docs are disabled OR strict_csp is explicitly enabled
-    # Strict CSP removes 'unsafe-inline' and 'unsafe-eval' for maximum XSS protection
     use_strict_csp = app_settings.disable_docs or (
         app_settings.strict_csp and not app_settings.debug
     )
@@ -152,28 +271,67 @@ def configure_middleware(app: FastAPI) -> None:
         enable_permissions_policy=True,
     )
     csp_mode = "strict (no unsafe-inline/eval)" if use_strict_csp else "relaxed (docs-compatible)"
-    logger.info(f"Security headers middleware enabled with {csp_mode} CSP")
+    logger.info(f"SecurityHeadersMiddleware enabled with {csp_mode} CSP")
 
-    # Correlation ID middleware (for distributed tracing across services)
-    # Sets correlation_id in logging context for transaction-level tracking
-    # Must run BEFORE RequestID so both IDs are available in correct order
-    app.add_middleware(
-        CorrelationIDMiddleware,
-        header_name="x-correlation-id",
-        generate_if_missing=True,  # Generate if not provided by upstream service
-    )
-    logger.info("Correlation ID middleware enabled")
+    # 4. Metrics Middleware
+    # Collects HTTP request metrics for observability
+    if otel_settings.is_configured:
+        app.add_middleware(MetricsMiddleware)
+        logger.info("MetricsMiddleware enabled with trace correlation and timing header")
 
-    # Request ID middleware (for per-request tracking within this service)
-    # Sets request_id in logging context for request-level debugging
-    # Must run BEFORE logging so request_id is available in logs
-    if log_settings.include_request_id:
-        app.add_middleware(RequestIDMiddleware)
-        logger.info("Request ID middleware enabled")
+    # 5. CORS Middleware (development only)
+    # Configure CORS for development environments
+    if app_settings.debug:
+        cors_origins = app_settings.cors_origins or ["*"]
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_credentials=app_settings.cors_allow_credentials,
+            allow_methods=app_settings.cors_allow_methods,
+            allow_headers=app_settings.cors_allow_headers,
+            max_age=3600,
+        )
+        logger.info(f"CORSMiddleware enabled for development with origins: {cors_origins}")
 
-    # Request/response logging middleware (with PII masking)
+    # 6. Trusted Host Middleware (production only)
+    # Validates host headers to prevent host header attacks
+    if not app_settings.debug:
+        app.add_middleware(
+            TrustedHostMiddleware,
+            allowed_hosts=app_settings.allowed_hosts,
+        )
+        logger.info(
+            f"TrustedHostMiddleware enabled for production with hosts: {app_settings.allowed_hosts}"
+        )
+
+    # 7. Rate Limiting Middleware (optional, requires Redis)
+    # Must be early in the chain for fast rejection before expensive processing
+    if app_settings.enable_rate_limiting:
+        try:
+            from example_service.infra.cache import get_cache
+            from example_service.infra.ratelimit import RateLimiter
+
+            redis = get_cache()
+            limiter = RateLimiter(redis)
+
+            app.add_middleware(
+                RateLimitMiddleware,
+                limiter=limiter,
+                default_limit=app_settings.rate_limit_per_minute,
+                default_window=app_settings.rate_limit_window_seconds,
+                exempt_paths=EXEMPT_PATHS,
+            )
+            logger.info(
+                f"RateLimitMiddleware enabled: {app_settings.rate_limit_per_minute}/min "
+                f"(window: {app_settings.rate_limit_window_seconds}s)"
+            )
+        except Exception as e:
+            logger.error(f"Failed to enable rate limiting: {e}", exc_info=True)
+            logger.warning("Continuing without rate limiting")
+
+    # 8. Request Logging Middleware (debug only)
+    # Logs detailed request/response information with PII masking
     # Only enable in debug mode or when explicitly configured
-    # IMPORTANT: Runs AFTER RequestIDMiddleware so logs contain request_id
     if app_settings.debug or log_settings.level == "DEBUG":
         app.add_middleware(
             RequestLoggingMiddleware,
@@ -181,10 +339,45 @@ def configure_middleware(app: FastAPI) -> None:
             log_response_body=False,  # Expensive, enable only when debugging
             max_body_size=10000,  # 10KB
         )
-        logger.info("Request logging middleware enabled")
+        logger.info("RequestLoggingMiddleware enabled")
 
-    # Metrics middleware (with trace correlation via exemplars + timing header)
-    # Note: Consolidates timing functionality from old TimingMiddleware
-    if otel_settings.is_configured:
-        app.add_middleware(MetricsMiddleware)
-        logger.info("Metrics middleware enabled with trace correlation and timing header")
+    # 9. Size Limit Middleware (optional)
+    # Protects against DoS via large payloads
+    # Must be early for fast rejection before reading request body
+    if app_settings.enable_request_size_limit:
+        app.add_middleware(
+            RequestSizeLimitMiddleware,
+            max_size=app_settings.request_size_limit,
+        )
+        logger.info(
+            f"RequestSizeLimitMiddleware enabled: {app_settings.request_size_limit} bytes "
+            f"({app_settings.request_size_limit / (1024 * 1024):.1f}MB)"
+        )
+
+    # 10. Correlation ID Middleware (for distributed tracing across services)
+    # Sets correlation_id in logging context for transaction-level tracking
+    # Note: This is separate from Request ID (correlation = transaction, request = per-hop)
+    app.add_middleware(
+        CorrelationIDMiddleware,
+        header_name="x-correlation-id",
+        generate_if_missing=True,  # Generate if not provided by upstream service
+    )
+    logger.info("CorrelationIDMiddleware enabled")
+
+    # Note: N+1 detection middleware must be configured separately via
+    # setup_n_plus_one_monitoring() (see example_service/app/middleware/n_plus_one_detection.py)
+    # This is a development tool and should not be enabled in production.
+
+    # Note: Authentication is handled at the endpoint level via dependency injection
+    # (see example_service/core/dependencies/accent_auth) for better testability and granularity.
+
+    # Note: Tracing middleware is handled automatically via FastAPIInstrumentor in lifespan
+    # (see example_service/app/lifespan.py)
+
+    logger.info(
+        "All middleware configured successfully",
+        extra={
+            "middleware_count": len(app.user_middleware),
+            "environment": app_settings.environment,
+        },
+    )

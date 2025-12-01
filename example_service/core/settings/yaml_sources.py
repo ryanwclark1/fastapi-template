@@ -273,3 +273,20 @@ def create_storage_yaml_source(settings_cls: type[BaseSettings]) -> ConfDYamlCon
         confd_dir="storage.d",
         config_dir_env="STORAGE_CONFIG_DIR",
     )
+
+
+def create_i18n_yaml_source(settings_cls: type[BaseSettings]) -> ConfDYamlConfigSettingsSource:
+    """Create YAML source for I18nSettings.
+
+    Loads from:
+    - conf/i18n.yaml (base)
+    - conf/i18n.d/*.yaml (overrides)
+
+    Override directory with: I18N_CONFIG_DIR=/custom/path
+    """
+    return ConfDYamlConfigSettingsSource(
+        settings_cls,
+        yaml_file="i18n.yaml",
+        confd_dir="i18n.d",
+        config_dir_env="I18N_CONFIG_DIR",
+    )

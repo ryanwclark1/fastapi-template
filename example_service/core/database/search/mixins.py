@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from sqlalchemy import Index, String
+from sqlalchemy import Index
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column
 
 from example_service.core.database.search.types import TSVECTOR

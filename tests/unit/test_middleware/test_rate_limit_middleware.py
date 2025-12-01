@@ -9,7 +9,6 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from example_service.app.middleware.rate_limit import RateLimitMiddleware
-from example_service.core.exceptions import RateLimitException
 
 
 class StubLimiter:

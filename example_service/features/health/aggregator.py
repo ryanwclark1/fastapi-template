@@ -41,7 +41,7 @@ from example_service.features.health.providers import HealthCheckResult, HealthP
 from example_service.infra.metrics.tracking import track_dependency_check, update_dependency_health
 
 if TYPE_CHECKING:
-    pass
+    from example_service.core.settings.health import HealthCheckSettings
 
 logger = logging.getLogger(__name__)
 
@@ -182,30 +182,64 @@ class HealthAggregator:
 
     def __init__(
         self,
-        cache_ttl_seconds: float = DEFAULT_CACHE_TTL_SECONDS,
-        history_size: int = DEFAULT_HISTORY_SIZE,
-        check_timeout_seconds: float = DEFAULT_CHECK_TIMEOUT_SECONDS,
+        settings: HealthCheckSettings | None = None,
+        cache_ttl_seconds: float | None = None,
+        history_size: int | None = None,
+        check_timeout_seconds: float | None = None,
     ) -> None:
         """Initialize the health aggregator.
 
         Args:
-            cache_ttl_seconds: How long to cache results (0 to disable)
-            history_size: Maximum number of history entries to keep
-            check_timeout_seconds: Timeout for the entire check_all operation
+            settings: Optional HealthCheckSettings for configuration (recommended)
+            cache_ttl_seconds: How long to cache results (legacy, use settings instead)
+            history_size: Maximum number of history entries to keep (legacy, use settings instead)
+            check_timeout_seconds: Timeout for the entire check_all operation (legacy, use settings instead)
+
+        Note:
+            If settings is provided, it takes precedence over individual parameters.
+            Legacy parameters are maintained for backward compatibility.
         """
+        from example_service.core.settings.health import HealthCheckSettings
+
+        # Use settings if provided, otherwise use legacy parameters or defaults
+        if settings is not None:
+            self._cache_ttl = settings.cache_ttl_seconds
+            self._check_timeout = settings.global_timeout
+            history_max = settings.history_size
+            self._settings = settings
+        else:
+            self._cache_ttl = (
+                cache_ttl_seconds
+                if cache_ttl_seconds is not None
+                else DEFAULT_CACHE_TTL_SECONDS
+            )
+            self._check_timeout = (
+                check_timeout_seconds
+                if check_timeout_seconds is not None
+                else DEFAULT_CHECK_TIMEOUT_SECONDS
+            )
+            history_max = history_size if history_size is not None else DEFAULT_HISTORY_SIZE
+            # Create settings from legacy parameters
+            self._settings = HealthCheckSettings(
+                cache_ttl_seconds=self._cache_ttl,
+                history_size=history_max,
+                global_timeout=self._check_timeout,
+            )
+
         self._providers: dict[str, HealthProvider] = {}
-        self._cache_ttl = cache_ttl_seconds
-        self._check_timeout = check_timeout_seconds
 
         # Caching
         self._cached_result: AggregatedHealthResult | None = None
         self._cache_timestamp: float = 0.0
 
         # History tracking
-        self._history: deque[HealthHistoryEntry] = deque(maxlen=history_size)
-        self._history_size = history_size
+        self._history: deque[HealthHistoryEntry] = deque(maxlen=history_max)
+        self._history_size = history_max
         self._last_status: HealthStatus | None = None
         self._last_status_change: datetime | None = None
+
+        # Per-provider status tracking for transitions
+        self._provider_last_status: dict[str, HealthStatus] = {}
 
     def add_provider(self, provider: HealthProvider) -> None:
         """Register a health check provider.
@@ -308,29 +342,57 @@ class HealthAggregator:
 
         async def check_provider(name: str, provider: HealthProvider) -> tuple[str, HealthCheckResult]:
             """Run a single provider check with error handling and metrics tracking."""
+            from example_service.features.health.providers import (
+                record_health_check_result,
+                track_health_check,
+            )
+
             try:
-                # Track dependency check duration with context manager
-                async with track_dependency_check(name):
+                # Track health check duration with new metrics
+                async with track_health_check(name):
                     result = await provider.check_health()
 
-                # Update dependency health gauge based on result
+                # Get previous status for transition tracking
+                previous_status = self._provider_last_status.get(name)
+
+                # Record health check result with all metrics
+                record_health_check_result(name, result, previous_status)
+
+                # Update last status
+                self._provider_last_status[name] = result.status
+
+                # Also track with legacy dependency metrics
                 dependency_type = PROVIDER_TYPE_MAPPING.get(name, "api")
                 is_healthy = result.status == HealthStatus.HEALTHY
                 update_dependency_health(name, dependency_type, is_healthy)
 
                 return name, result
             except Exception as e:
+                from example_service.infra.metrics.health import health_check_errors_total
+
                 logger.exception("Health check failed for provider", extra={"provider": name})
 
-                # Update metrics for failed check
+                # Record error metric
+                health_check_errors_total.labels(
+                    provider=name, error_type=type(e).__name__
+                ).inc()
+
+                # Update legacy metrics for failed check
                 dependency_type = PROVIDER_TYPE_MAPPING.get(name, "api")
                 update_dependency_health(name, dependency_type, False)
 
-                return name, HealthCheckResult(
+                result = HealthCheckResult(
                     status=HealthStatus.UNHEALTHY,
                     message=f"Check error: {e}",
                     metadata={"error": str(e), "error_type": type(e).__name__},
                 )
+
+                # Record unhealthy result
+                previous_status = self._provider_last_status.get(name)
+                record_health_check_result(name, result, previous_status)
+                self._provider_last_status[name] = result.status
+
+                return name, result
 
         # Create tasks for all providers
         tasks = [
@@ -379,33 +441,59 @@ class HealthAggregator:
         Returns:
             HealthCheckResult or None if provider not found
         """
+        from example_service.features.health.providers import (
+            record_health_check_result,
+            track_health_check,
+        )
+
         provider = self._providers.get(name)
         if provider is None:
             return None
 
         try:
-            # Track dependency check duration with context manager
-            async with track_dependency_check(name):
+            # Track health check duration with new metrics
+            async with track_health_check(name):
                 result = await provider.check_health()
 
-            # Update dependency health gauge based on result
+            # Get previous status for transition tracking
+            previous_status = self._provider_last_status.get(name)
+
+            # Record health check result with all metrics
+            record_health_check_result(name, result, previous_status)
+
+            # Update last status
+            self._provider_last_status[name] = result.status
+
+            # Also track with legacy dependency metrics
             dependency_type = PROVIDER_TYPE_MAPPING.get(name, "api")
             is_healthy = result.status == HealthStatus.HEALTHY
             update_dependency_health(name, dependency_type, is_healthy)
 
             return result
         except Exception as e:
+            from example_service.infra.metrics.health import health_check_errors_total
+
             logger.exception("Health check failed for provider", extra={"provider": name})
 
-            # Update metrics for failed check
+            # Record error metric
+            health_check_errors_total.labels(provider=name, error_type=type(e).__name__).inc()
+
+            # Update legacy metrics for failed check
             dependency_type = PROVIDER_TYPE_MAPPING.get(name, "api")
             update_dependency_health(name, dependency_type, False)
 
-            return HealthCheckResult(
+            result = HealthCheckResult(
                 status=HealthStatus.UNHEALTHY,
                 message=f"Check error: {e}",
                 metadata={"error": str(e)},
             )
+
+            # Record unhealthy result
+            previous_status = self._provider_last_status.get(name)
+            record_health_check_result(name, result, previous_status)
+            self._provider_last_status[name] = result.status
+
+            return result
 
     # =========================================================================
     # Caching

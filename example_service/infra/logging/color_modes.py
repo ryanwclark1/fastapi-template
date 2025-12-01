@@ -136,7 +136,7 @@ def detect_color_mode(stream: TextIO | None = None) -> ColorMode:
         wt_session = os.getenv("WT_SESSION")
         if wt_session:  # Windows Terminal
             return ColorMode.TRUECOLOR
-        if "ConEmu" in os.getenv("ConEmuANSI", ""):
+        if "ConEmu" in os.getenv("CONEMUANSI", ""):
             return ColorMode.TRUECOLOR
 
     # Default to basic 16 colors if we can't determine better
