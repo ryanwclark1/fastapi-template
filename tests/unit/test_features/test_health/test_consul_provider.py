@@ -158,7 +158,7 @@ class TestConsulHealthProvider:
         provider = ConsulHealthProvider(
             consul_client=mock_client,
             service_name="example-service",
-            config=ProviderConfig(timeout=5.0, latency_threshold_ms=10.0),
+            config=ProviderConfig(timeout=5.0, degraded_threshold_ms=10.0),
         )
 
         # Mock time to simulate high latency
@@ -366,7 +366,7 @@ class TestConsulHealthProvider:
         custom_config = ProviderConfig(
             enabled=True,
             timeout=2.0,
-            latency_threshold_ms=500.0,
+            degraded_threshold_ms=500.0,
         )
 
         provider = ConsulHealthProvider(
@@ -376,7 +376,7 @@ class TestConsulHealthProvider:
         )
 
         assert provider._config.timeout == 2.0
-        assert provider._config.latency_threshold_ms == 500.0
+        assert provider._config.degraded_threshold_ms == 500.0
 
     async def test_concurrent_checks_use_asyncio_gather(self):
         """Test that sub-checks run concurrently using asyncio.gather."""

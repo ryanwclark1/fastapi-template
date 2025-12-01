@@ -9,15 +9,17 @@ Provides:
 
 from __future__ import annotations
 
+from datetime import datetime  # noqa: TC003 - Strawberry needs this at runtime
 from enum import Enum
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
 
-if TYPE_CHECKING:
-    from datetime import datetime
+from example_service.features.graphql.types.base import (
+    PageInfoType,  # noqa: TC001 - Strawberry needs this at runtime
+)
 
-    from example_service.features.graphql.types.base import PageInfoType
+if TYPE_CHECKING:
     from example_service.features.reminders.models import Reminder
 
 

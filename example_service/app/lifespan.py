@@ -17,6 +17,7 @@ from example_service.core.settings import (
     get_otel_settings,
     get_rabbit_settings,
     get_redis_settings,
+    get_storage_settings,
     get_task_settings,
     get_websocket_settings,
 )
@@ -29,7 +30,11 @@ from example_service.infra.events.outbox.processor import (
 )
 from example_service.infra.logging.config import setup_logging
 from example_service.infra.messaging.broker import start_broker, stop_broker
-from example_service.infra.metrics.prometheus import application_info
+from example_service.infra.metrics.prometheus import (
+    application_info,
+    database_pool_max_overflow,
+    database_pool_size,
+)
 from example_service.infra.realtime import (
     start_connection_manager,
     start_event_bridge,
@@ -138,6 +143,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     consul_settings = get_consul_settings()
     db_settings = get_db_settings()
     redis_settings = get_redis_settings()
+    storage_settings = get_storage_settings()
     rabbit_settings = get_rabbit_settings()
     otel_settings = get_otel_settings()
     log_settings = get_logging_settings()
@@ -192,6 +198,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         try:
             await init_database()
             logger.info("Database connection initialized")
+
+            # Set database pool configuration gauges for monitoring
+            # These are static values set once at startup
+            database_pool_size.set(db_settings.pool_size)
+            database_pool_max_overflow.set(db_settings.max_overflow)
+            logger.debug(
+                "Database pool metrics initialized",
+                extra={
+                    "pool_size": db_settings.pool_size,
+                    "max_overflow": db_settings.max_overflow,
+                    "pool_timeout": db_settings.pool_timeout,
+                    "pool_recycle": db_settings.pool_recycle,
+                },
+            )
         except Exception as e:
             if db_settings.startup_require_db:
                 logger.error(
@@ -286,6 +306,34 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                     set_rate_limit_tracker(tracker)
                 except Exception:
                     pass
+
+    # Initialize storage service
+    if storage_settings.is_configured:
+        try:
+            from example_service.infra.storage import get_storage_service
+
+            storage_service = get_storage_service()
+            await storage_service.startup()
+            logger.info(
+                "Storage service initialized",
+                extra={
+                    "bucket": storage_settings.bucket,
+                    "endpoint": storage_settings.endpoint,
+                    "health_checks_enabled": storage_settings.health_check_enabled,
+                },
+            )
+        except Exception as e:
+            if storage_settings.startup_require_storage:
+                logger.error(
+                    "Storage service required but unavailable, failing startup",
+                    extra={"error": str(e)},
+                )
+                raise
+            else:
+                logger.warning(
+                    "Storage service unavailable, continuing in degraded mode",
+                    extra={"error": str(e)},
+                )
 
     # Initialize task execution tracker (for querying task history via REST API)
     # Supports both Redis and PostgreSQL backends based on TASK_RESULT_BACKEND setting
@@ -405,6 +453,51 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         },
     )
 
+    # Log that application is live and ready to serve requests
+    logger.info(
+        "Application is LIVE and ready to serve requests on http://%s:%s",
+        app_settings.host,
+        app_settings.port,
+        extra={
+            "service": app_settings.service_name,
+            "host": app_settings.host,
+            "port": app_settings.port,
+            "environment": app_settings.environment,
+            "version": app_settings.version,
+        },
+    )
+
+    # In debug mode, log important configuration settings
+    if app_settings.debug:
+        logger.debug(
+            "Debug mode: Application configuration",
+            extra={
+                "service": app_settings.service_name,
+                "environment": app_settings.environment,
+                "version": app_settings.version,
+                "host": app_settings.host,
+                "port": app_settings.port,
+                "api_prefix": app_settings.api_prefix,
+                "docs_enabled": app_settings.docs_enabled,
+                "docs_url": app_settings.get_docs_url(),
+                "redoc_url": app_settings.get_redoc_url(),
+                "openapi_url": app_settings.get_openapi_url(),
+                "root_path": app_settings.root_path,
+                "debug": app_settings.debug,
+                "tracing_enabled": otel_settings.is_configured,
+                "database_enabled": db_settings.is_configured,
+                "cache_enabled": redis_settings.is_configured,
+                "messaging_enabled": rabbit_settings.is_configured,
+                "storage_enabled": storage_settings.is_configured,
+                "websocket_enabled": websocket_enabled,
+                "service_discovery_enabled": consul_settings.is_configured,
+                "rate_limiting_enabled": app_settings.enable_rate_limiting,
+                "request_size_limit": app_settings.request_size_limit,
+                "enable_debug_middleware": app_settings.enable_debug_middleware,
+                "strict_csp": app_settings.strict_csp,
+            },
+        )
+
     yield
 
     # Shutdown
@@ -447,6 +540,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if tracker_started:
         await stop_tracker()
         logger.info("Task execution tracker closed")
+
+    # Shutdown storage service
+    if storage_settings.is_configured:
+        try:
+            from example_service.infra.storage import get_storage_service
+
+            storage_service = get_storage_service()
+            if storage_service.is_ready:
+                await storage_service.shutdown()
+                logger.info("Storage service shutdown complete")
+        except Exception as e:
+            logger.warning(
+                "Error during storage service shutdown",
+                extra={"error": str(e)},
+            )
 
     # Close Redis cache
     if redis_settings.is_configured:

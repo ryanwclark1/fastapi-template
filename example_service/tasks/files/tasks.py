@@ -18,11 +18,11 @@ from sqlalchemy.orm import selectinload
 
 from example_service.core.settings import get_storage_settings
 from example_service.infra.database.session import get_async_session
+from example_service.infra.storage import get_storage_service
 from example_service.infra.storage.client import (
     FileNotFoundError,
     InvalidFileError,
     StorageClientError,
-    get_storage_client,
 )
 from example_service.tasks.broker import broker
 
@@ -140,12 +140,12 @@ async def download_from_s3(s3_key: str) -> bytes:
     Raises:
         FileProcessingError: If download fails.
     """
-    client = get_storage_client()
-    if client is None:
-        raise FileProcessingError("Storage client not configured for downloads")
+    storage = get_storage_service()
+    if not storage.is_ready:
+        raise FileProcessingError("Storage not available for downloads")
 
     try:
-        return await client.download_file(s3_key)
+        return await storage.download_file(s3_key)
     except StorageClientError as e:
         raise FileProcessingError(f"Failed to download {s3_key}: {e}") from e
 
@@ -164,18 +164,18 @@ async def upload_to_s3(s3_key: str, content: bytes, content_type: str) -> str:  
     Raises:
         FileProcessingError: If upload fails.
     """
-    client = get_storage_client()
-    if client is None:
-        raise FileProcessingError("Storage client not configured for uploads")
+    storage = get_storage_service()
+    if not storage.is_ready:
+        raise FileProcessingError("Storage not available for uploads")
 
     try:
-        result = await client.upload_file(
+        result = await storage.upload_file(
             file_obj=io.BytesIO(content),
             key=s3_key,
             content_type=content_type,
             metadata={},
         )
-        bucket = result.get("bucket", client.settings.bucket)
+        bucket = result.get("bucket", storage.settings.bucket)
         return f"s3://{bucket}/{s3_key}"
     except StorageClientError as e:
         raise FileProcessingError(f"Failed to upload {s3_key}: {e}") from e
@@ -260,13 +260,13 @@ async def delete_file_from_storage(s3_key: str) -> None:
     Args:
         s3_key: S3 object key to delete.
     """
-    client = get_storage_client()
-    if client is None:
-        logger.warning("Storage client unavailable; skipping delete", extra={"s3_key": s3_key})
+    storage = get_storage_service()
+    if not storage.is_ready:
+        logger.warning("Storage not available; skipping delete", extra={"s3_key": s3_key})
         return
 
     try:
-        await client.delete_file(s3_key)
+        await storage.delete_file(s3_key)
         logger.info("File deleted from storage", extra={"s3_key": s3_key})
     except StorageClientError as e:
         logger.warning(
@@ -279,17 +279,17 @@ async def delete_thumbnails(thumbnail_keys: list[str]) -> None:
     if not thumbnail_keys:
         return
 
-    client = get_storage_client()
-    if client is None:
+    storage = get_storage_service()
+    if not storage.is_ready:
         logger.warning(
-            "Storage client unavailable; skipping thumbnail deletes",
+            "Storage not available; skipping thumbnail deletes",
             extra={"count": len(thumbnail_keys)},
         )
         return
 
     for key in thumbnail_keys:
         try:
-            await client.delete_file(key)
+            await storage.delete_file(key)
             logger.debug("Deleted thumbnail", extra={"s3_key": key})
         except StorageClientError as e:
             logger.warning("Failed to delete thumbnail", extra={"s3_key": key, "error": str(e)})

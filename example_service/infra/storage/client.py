@@ -131,6 +131,115 @@ class StorageClient:
         """Async context manager exit."""
         await self.close()
 
+    async def startup(self) -> None:
+        """Initialize the S3 client connection.
+
+        Called during application startup in lifespan context.
+        Creates the boto3 client, validates connection, and initializes the pool.
+
+        Raises:
+            StorageNotConfiguredError: If storage is not configured
+            StorageError: If client initialization fails
+        """
+        if self._client is not None:
+            logger.debug("Storage client already initialized")
+            return
+
+        logger.info(
+            "Initializing storage client",
+            extra={
+                "bucket": self.settings.bucket,
+                "endpoint": self.settings.endpoint,
+                "region": self.settings.region,
+            },
+        )
+
+        try:
+            # Record initialization attempt
+            from .metrics import storage_client_initializations
+
+            # Use existing ensure_client logic but track metrics
+            await self.ensure_client()
+
+            # Validate connection with a simple operation
+            await self._validate_connection()
+
+            storage_client_initializations.labels(status="success").inc()
+            logger.info("Storage client initialized successfully")
+
+        except Exception:
+            from .metrics import storage_client_initializations
+
+            storage_client_initializations.labels(status="error").inc()
+            logger.exception("Failed to initialize storage client")
+            raise
+
+    async def shutdown(self) -> None:
+        """Shutdown the S3 client connection gracefully.
+
+        Called during application shutdown in lifespan context.
+        Drains the connection pool and closes the client.
+        """
+        if self._client is None:
+            logger.debug("Storage client not initialized, nothing to shutdown")
+            return
+
+        logger.info("Shutting down storage client")
+
+        try:
+            await self.close()
+            logger.info("Storage client shutdown complete")
+        except Exception:
+            logger.exception("Error during storage client shutdown")
+
+    async def health_check(self) -> bool:
+        """Check S3 connectivity and credentials.
+
+        Performs a lightweight HEAD request to verify the bucket is accessible.
+
+        Returns:
+            True if healthy, False otherwise
+        """
+        if self._client is None:
+            return False
+
+        try:
+            await self.ensure_client()
+            # HEAD request on the bucket
+            await self._client.head_bucket(Bucket=self.settings.bucket)
+            return True
+        except Exception as e:
+            logger.warning(
+                "Storage health check failed",
+                extra={"error": str(e), "bucket": self.settings.bucket},
+            )
+            return False
+
+    async def _validate_connection(self) -> None:
+        """Validate the S3 connection by performing a test operation.
+
+        Raises:
+            StorageError: If connection validation fails
+        """
+        if self._client is None:
+            raise StorageError(
+                message="Storage client not initialized",
+                code="STORAGE_CLIENT_ERROR",
+            )
+        try:
+            await self._client.head_bucket(Bucket=self.settings.bucket)
+        except Exception as e:
+            raise StorageError(
+                message=f"Failed to validate storage connection: {e}",
+                code="STORAGE_CONNECTION_ERROR",
+                metadata={"bucket": self.settings.bucket, "error": str(e)},
+            ) from e
+
+    @property
+    def is_ready(self) -> bool:
+        """Check if the client is initialized and ready for operations."""
+        return self._client is not None
+
     async def ensure_client(self) -> Any:
         """Ensure S3 client is initialized and return it.
 
@@ -1110,46 +1219,9 @@ class StorageClient:
             ) from e
 
 
-# Global client instance (initialized lazily)
-_storage_client: StorageClient | None = None
-
-
-def get_storage_client() -> StorageClient | None:
-    """Get the global storage client instance.
-
-    Returns:
-        StorageClient if configured and available, None otherwise.
-    """
-    global _storage_client
-
-    if _storage_client is not None:
-        return _storage_client
-
-    from example_service.core.settings import get_storage_settings
-
-    settings = get_storage_settings()
-
-    if not settings.is_configured:
-        logger.debug("Storage not configured, skipping client initialization")
-        return None
-
-    if not AIOBOTO3_AVAILABLE:
-        logger.warning("aioboto3 not installed, storage client unavailable")
-        return None
-
-    try:
-        _storage_client = StorageClient(settings)
-        logger.info("Storage client initialized")
-        return _storage_client
-    except StorageClientError as e:
-        logger.warning(f"Failed to initialize storage client: {e}")
-        return None
-
-
 __all__ = [
     "StorageClient",
     "StorageClientError",
     "FileNotFoundError",
     "InvalidFileError",
-    "get_storage_client",
 ]

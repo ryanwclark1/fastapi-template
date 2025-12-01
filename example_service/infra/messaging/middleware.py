@@ -14,6 +14,28 @@ Primary Tracing (Recommended):
     when OTel is enabled. This automatically traces all handlers with proper
     W3C trace context propagation.
 
+Retry Integration:
+    For retry logic, use the retry decorator from example_service.utils.retry
+    instead of custom retry implementations. The retry decorator:
+    - Provides exponential backoff with jitter
+    - Integrates with existing metrics infrastructure
+    - Supports exception-based retry decisions
+    - Tracks retry statistics
+
+    Example combining retry and tracing:
+        from example_service.utils.retry import retry
+        from example_service.infra.messaging.middleware import (
+            add_message_span_attributes,
+            traced_handler,
+        )
+
+        @router.subscriber(queue)
+        @retry(max_attempts=3, initial_delay=1.0, max_delay=10.0)
+        @traced_handler()
+        async def handle_event(event: Event) -> None:
+            add_message_span_attributes({"event.id": event.event_id})
+            # Handler logic...
+
 Supplementary Usage:
     Use these utilities when you need to add custom span data or selectively
     trace specific handlers:

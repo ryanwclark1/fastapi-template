@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 from example_service.core.settings import get_otel_settings, get_rabbit_settings
@@ -33,6 +34,25 @@ if TYPE_CHECKING:
     from faststream.rabbit.fastapi import RabbitRouter as RabbitRouterType
 else:
     RabbitRouterType = Any
+
+
+class ConnectionState(str, Enum):
+    """Connection states for the RabbitMQ broker.
+
+    Attributes:
+        DISCONNECTED: Broker is not connected.
+        CONNECTING: Broker is attempting to connect.
+        CONNECTED: Broker is connected and operational.
+        RECONNECTING: Broker is attempting to reconnect after connection loss.
+        FAILED: Connection failed and max retries exceeded.
+    """
+
+    DISCONNECTED = "disconnected"
+    CONNECTING = "connecting"
+    CONNECTED = "connected"
+    RECONNECTING = "reconnecting"
+    FAILED = "failed"
+
 
 otel_settings = get_otel_settings()
 
@@ -201,3 +221,79 @@ async def broker_context() -> AsyncIterator[RabbitBroker | None]:
             logger.debug("Broker disconnected via context manager")
         except Exception as e:
             logger.warning("Error closing broker in context manager", extra={"error": str(e)})
+
+
+async def check_broker_health() -> dict[str, Any]:
+    """Check RabbitMQ broker health status.
+
+    Returns health information including connection state, broker status,
+    and any error details. This can be used by health check endpoints
+    to report messaging infrastructure status.
+
+    Returns:
+        Dictionary containing:
+            - status: Health status ("healthy", "unhealthy", "unavailable", "unknown")
+            - state: Connection state (DISCONNECTED, CONNECTING, CONNECTED, etc.)
+            - is_connected: Boolean connection status
+            - reason: Optional reason for unhealthy/unavailable status
+
+    Example:
+        >>> health = await check_broker_health()
+        >>> if health["status"] == "healthy":
+        ...     print("Broker is operational")
+    """
+    if broker is None:
+        return {
+            "status": "unavailable",
+            "state": ConnectionState.DISCONNECTED.value,
+            "is_connected": False,
+            "reason": "broker_not_configured",
+        }
+
+    if not rabbit_settings.is_configured:
+        return {
+            "status": "unavailable",
+            "state": ConnectionState.DISCONNECTED.value,
+            "is_connected": False,
+            "reason": "rabbitmq_not_enabled",
+        }
+
+    try:
+        # Check if broker is running
+        if hasattr(broker, "running") and broker.running:
+            # Check connection state
+            if hasattr(broker, "connection") and broker.connection:
+                if hasattr(broker.connection, "is_closed") and broker.connection.is_closed:
+                    return {
+                        "status": "unhealthy",
+                        "state": ConnectionState.DISCONNECTED.value,
+                        "is_connected": False,
+                        "reason": "connection_closed",
+                    }
+                return {
+                    "status": "healthy",
+                    "state": ConnectionState.CONNECTED.value,
+                    "is_connected": True,
+                }
+            # Broker running but connection state unknown
+            return {
+                "status": "healthy",
+                "state": ConnectionState.CONNECTED.value,
+                "is_connected": True,
+            }
+        else:
+            # Broker not running
+            return {
+                "status": "unhealthy",
+                "state": ConnectionState.DISCONNECTED.value,
+                "is_connected": False,
+                "reason": "broker_not_running",
+            }
+    except Exception as e:
+        logger.exception("Error checking broker health", extra={"error": str(e)})
+        return {
+            "status": "unhealthy",
+            "state": ConnectionState.FAILED.value,
+            "is_connected": False,
+            "reason": str(e),
+        }

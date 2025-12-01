@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Index, Integer, LargeBinary, String, Text
+from sqlalchemy import JSON, DateTime, Index, Integer, LargeBinary, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -139,7 +139,7 @@ class TaskExecution(Base):
     # ──────────────────────────────────────────────────────────────
 
     return_value: Mapped[dict | None] = mapped_column(
-        JSONB,
+        JSONB().with_variant(JSON(), "sqlite"),
         nullable=True,
         comment="Task return value (JSON serialized)",
     )
@@ -172,19 +172,19 @@ class TaskExecution(Base):
     # ──────────────────────────────────────────────────────────────
 
     task_args: Mapped[dict | None] = mapped_column(
-        JSONB,
+        JSONB().with_variant(JSON(), "sqlite"),
         nullable=True,
         comment="Task positional arguments (JSON)",
     )
 
     task_kwargs: Mapped[dict | None] = mapped_column(
-        JSONB,
+        JSONB().with_variant(JSON(), "sqlite"),
         nullable=True,
         comment="Task keyword arguments (JSON)",
     )
 
     labels: Mapped[dict | None] = mapped_column(
-        JSONB,
+        JSONB().with_variant(JSON(), "sqlite"),
         nullable=True,
         comment="Task labels/metadata for categorization",
     )
@@ -211,7 +211,7 @@ class TaskExecution(Base):
     # ──────────────────────────────────────────────────────────────
 
     progress: Mapped[dict | None] = mapped_column(
-        JSONB,
+        JSONB().with_variant(JSON(), "sqlite"),
         nullable=True,
         comment="Task progress data for long-running tasks",
     )

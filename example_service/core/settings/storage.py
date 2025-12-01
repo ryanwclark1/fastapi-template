@@ -201,6 +201,52 @@ class StorageSettings(BaseSettings):
         description="Health check timeout in seconds",
     )
 
+    health_check_key: str = Field(
+        default=".health-check",
+        description="Key used for health check operations (should be a small object)",
+    )
+
+    # ──────────────────────────────────────────────────────────────
+    # Streaming Configuration
+    # ──────────────────────────────────────────────────────────────
+
+    streaming_chunk_size: int = Field(
+        default=1024 * 1024,  # 1MB
+        ge=65536,  # 64KB minimum
+        le=104857600,  # 100MB maximum
+        description="Chunk size in bytes for streaming uploads/downloads",
+    )
+
+    streaming_buffer_size: int = Field(
+        default=4,
+        ge=1,
+        le=32,
+        description="Number of chunks to buffer during streaming operations",
+    )
+
+    # ──────────────────────────────────────────────────────────────
+    # Service Lifecycle Configuration
+    # ──────────────────────────────────────────────────────────────
+
+    startup_require_storage: bool = Field(
+        default=False,
+        description="Whether to fail application startup if storage is unavailable (False = degraded mode)",
+    )
+
+    startup_timeout: float = Field(
+        default=10.0,
+        ge=1.0,
+        le=60.0,
+        description="Timeout in seconds for storage service initialization",
+    )
+
+    shutdown_timeout: float = Field(
+        default=5.0,
+        ge=1.0,
+        le=30.0,
+        description="Timeout in seconds for graceful shutdown",
+    )
+
     # ──────────────────────────────────────────────────────────────
     # Validators
     # ──────────────────────────────────────────────────────────────
@@ -354,6 +400,21 @@ class StorageSettings(BaseSettings):
         if self.endpoint:
             config["endpoint_url"] = self.endpoint
 
+        return config
+
+    def get_client_config_with_lifecycle(self) -> dict[str, Any]:
+        """Get boto3 config suitable for persistent client with lifecycle management.
+
+        Returns configuration optimized for long-running service with:
+        - Connection pooling
+        - Retry configuration
+        - Timeout settings
+
+        Returns:
+            Dictionary suitable for creating S3 client with lifecycle-aware settings.
+        """
+        config = self.get_boto3_config()
+        # Add any additional lifecycle-specific config
         return config
 
     # ──────────────────────────────────────────────────────────────

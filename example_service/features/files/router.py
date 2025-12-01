@@ -32,10 +32,10 @@ from example_service.features.files.schemas import (
 from example_service.features.files.service import FileService
 from example_service.infra.logging import get_lazy_logger
 from example_service.infra.metrics.tracking import track_feature_usage, track_user_action
+from example_service.infra.storage import get_storage_service
 from example_service.infra.storage.client import (
     InvalidFileError,
     StorageClientError,
-    get_storage_client,
 )
 
 if TYPE_CHECKING:
@@ -55,13 +55,13 @@ def get_file_service(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> FileService:
     """Dependency for file service."""
-    storage_client = get_storage_client()
-    if storage_client is None:
+    storage = get_storage_service()
+    if not storage.is_ready:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="File storage is not configured",
         )
-    return FileService(session=session, storage_client=storage_client)
+    return FileService(session=session, storage_service=storage)
 
 
 @router.post(

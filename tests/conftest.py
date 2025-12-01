@@ -20,7 +20,7 @@ When adding new features:
 from __future__ import annotations
 
 import os
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterator
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
@@ -99,15 +99,48 @@ async def client(app) -> AsyncGenerator[AsyncClient]:
 # ============================================================================
 
 
-@pytest.fixture
-async def db_engine() -> AsyncGenerator[AsyncEngine]:
-    """Create async SQLAlchemy engine with in-memory SQLite.
+@pytest.fixture(scope="session")
+def postgres_container() -> Iterator[str]:
+    """Create a PostgreSQL container for testing using testcontainers.
 
-    This fixture creates a fresh in-memory database for each test that needs it.
-    The database is automatically cleaned up after the test completes.
+    This fixture starts a PostgreSQL container that will be reused across all tests
+    in the session. The container is automatically stopped after all tests complete.
 
     Yields:
-        Async SQLAlchemy engine connected to in-memory SQLite.
+        Database connection URL for async PostgreSQL (postgresql+psycopg://...).
+
+    Example:
+        def test_with_postgres(postgres_container):
+            # postgres_container contains the connection URL
+            assert postgres_container.startswith("postgresql+psycopg://")
+    """
+    pytest.importorskip("testcontainers.postgres", reason="testcontainers.postgres is required")
+    from testcontainers.postgres import PostgresContainer
+
+    container = PostgresContainer("postgres:16-alpine")
+    try:
+        container.start()
+    except Exception as exc:  # pragma: no cover - environment dependent
+        pytest.skip(f"PostgreSQL container unavailable: {exc}", allow_module_level=True)
+
+    # Convert to async connection URL
+    url = container.get_connection_url().replace("postgresql://", "postgresql+psycopg://")
+    yield url
+    container.stop()
+
+
+@pytest.fixture
+async def db_engine(postgres_container: str) -> AsyncGenerator[AsyncEngine]:
+    """Create async SQLAlchemy engine with PostgreSQL via testcontainers.
+
+    This fixture creates a fresh database engine for each test that needs it.
+    The engine connects to a PostgreSQL container that is shared across the test session.
+
+    Args:
+        postgres_container: PostgreSQL connection URL from container fixture.
+
+    Yields:
+        Async SQLAlchemy engine connected to PostgreSQL.
 
     Example:
         async def test_with_db(db_engine):
@@ -115,7 +148,7 @@ async def db_engine() -> AsyncGenerator[AsyncEngine]:
                 await conn.execute(text("SELECT 1"))
     """
     engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
+        postgres_container,
         echo=False,
         future=True,
     )

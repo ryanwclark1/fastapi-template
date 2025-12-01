@@ -252,16 +252,88 @@ groups:
           summary: "Dependency {{ $labels.dependency_name }} is unhealthy"
           description: "{{ $labels.dependency_type }} dependency {{ $labels.dependency_name }} has been unhealthy for more than 2 minutes"
 
-      - alert: DatabaseConnectionPoolExhausted
+  # ============================================================================
+  # Database Connection Pool Alerts
+  # ============================================================================
+  - name: database_pool
+    interval: 30s
+    rules:
+      - alert: DatabasePoolHighUtilization
         expr: |
-          database_connections_active > 90
+          (database_pool_checkedout / (database_pool_size + database_pool_max_overflow)) > 0.8
         for: 5m
         labels:
           severity: warning
           component: database
         annotations:
-          summary: "Database connection pool near capacity"
-          description: "{{ $value }} active database connections (threshold: 90)"
+          summary: "Database connection pool utilization above 80%"
+          description: "Pool utilization is {{ $value | humanizePercentage }}. Checked out: {{ with printf \"database_pool_checkedout\" | query }}{{ . | first | value }}{{ end }} / {{ with printf \"database_pool_size + database_pool_max_overflow\" | query }}{{ . | first | value }}{{ end }}"
+
+      - alert: DatabasePoolExhausted
+        expr: |
+          (database_pool_checkedout / (database_pool_size + database_pool_max_overflow)) > 0.95
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "Pool utilization is {{ $value | humanizePercentage }}. Immediate action required to prevent connection timeouts."
+
+      - alert: DatabasePoolCheckoutTimeouts
+        expr: |
+          rate(database_pool_checkout_timeout_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database pool checkout timeouts occurring"
+          description: "{{ $value }} checkout timeouts per second. Requests are failing to acquire database connections."
+
+      - alert: HighPoolCheckoutTime
+        expr: |
+          histogram_quantile(0.95, rate(database_pool_checkout_time_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High database pool checkout time"
+          description: "P95 checkout time is {{ $value }}s. Pool may be under contention."
+
+      - alert: CriticalPoolCheckoutTime
+        expr: |
+          histogram_quantile(0.95, rate(database_pool_checkout_time_seconds_bucket[5m])) > 2
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Critical database pool checkout time"
+          description: "P95 checkout time is {{ $value }}s. Pool is severely congested."
+
+      - alert: DatabasePoolOverflowInUse
+        expr: |
+          database_pool_overflow > 0
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Database pool using overflow connections"
+          description: "{{ $value }} overflow connections in use. Consider increasing pool_size if this persists."
+
+      - alert: HighConnectionInvalidationRate
+        expr: |
+          sum(rate(database_pool_invalidations_total{reason="error"}[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High database connection invalidation rate"
+          description: "{{ $value }} error-based invalidations per second. Check database connectivity."
 
   # ============================================================================
   # Cache Performance Alerts
@@ -283,6 +355,86 @@ groups:
         annotations:
           summary: "Low cache hit rate for {{ $labels.cache_name }}"
           description: "Cache hit rate is {{ $value | humanizePercentage }} for {{ $labels.cache_name }} (threshold: 80%)"
+
+      - alert: CriticalCacheHitRate
+        expr: |
+          (
+            rate(cache_hits_total[5m])
+            /
+            (rate(cache_hits_total[5m]) + rate(cache_misses_total[5m]))
+          ) < 0.50
+        for: 5m
+        labels:
+          severity: critical
+          component: cache
+        annotations:
+          summary: "Critical cache hit rate for {{ $labels.cache_name }}"
+          description: "Cache hit rate is {{ $value | humanizePercentage }} for {{ $labels.cache_name }}. Cache may be ineffective or misconfigured."
+
+      - alert: CacheMemoryPressure
+        expr: |
+          (
+            cache_memory_bytes
+            /
+            cache_memory_max_bytes
+          ) > 0.85
+          and cache_memory_max_bytes > 0
+        for: 5m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "High Redis memory usage for {{ $labels.cache_name }}"
+          description: "Redis memory utilization is {{ $value | humanizePercentage }} for {{ $labels.cache_name }}. Evictions may occur."
+
+      - alert: CacheMemoryCritical
+        expr: |
+          (
+            cache_memory_bytes
+            /
+            cache_memory_max_bytes
+          ) > 0.95
+          and cache_memory_max_bytes > 0
+        for: 2m
+        labels:
+          severity: critical
+          component: cache
+        annotations:
+          summary: "Critical Redis memory usage for {{ $labels.cache_name }}"
+          description: "Redis memory utilization is {{ $value | humanizePercentage }} for {{ $labels.cache_name }}. Immediate action required."
+
+      - alert: HighCacheEvictionRate
+        expr: |
+          rate(cache_evictions_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "High cache eviction rate for {{ $labels.cache_name }}"
+          description: "{{ $value }} evictions per second for {{ $labels.cache_name }}. Consider increasing maxmemory or reviewing cache patterns."
+
+      - alert: CacheConnectionSpike
+        expr: |
+          cache_connections_active > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "High Redis connection count for {{ $labels.cache_name }}"
+          description: "{{ $value }} active connections to {{ $labels.cache_name }}. Check for connection leaks."
+
+      - alert: CacheOperationLatencyHigh
+        expr: |
+          histogram_quantile(0.95, rate(cache_operation_duration_seconds_bucket[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "High cache operation latency for {{ $labels.cache_name }}"
+          description: "P95 {{ $labels.operation }} latency is {{ $value }}s for {{ $labels.cache_name }} (threshold: 100ms)"
 
   # ============================================================================
   # Resource Utilization Alerts

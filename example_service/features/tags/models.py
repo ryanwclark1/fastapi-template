@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import Column, ForeignKey, String, Table, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from example_service.core.database import Base, TimestampedBase
-from example_service.features.reminders.models import Reminder
+
+if TYPE_CHECKING:
+    from example_service.features.reminders.models import Reminder
 
 # Many-to-many association table for reminders <-> tags
 reminder_tags = Table(
@@ -60,7 +63,7 @@ class Tag(TimestampedBase):
     )
 
     # Many-to-many relationship with reminders
-    reminders: Mapped[list[Reminder]] = relationship(
+    reminders: Mapped[list["Reminder"]] = relationship(
         "Reminder",
         secondary=reminder_tags,
         back_populates="tags",

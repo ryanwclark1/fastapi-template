@@ -42,13 +42,18 @@ except ModuleNotFoundError:  # pragma: no cover - executed in test env without e
     sys.modules["email_validator"] = email_validator
 
 # Provide a stub GraphQL router to avoid optional dependencies during import
+# Try to import the real router first; only stub if import fails
 if "example_service.features.graphql.router" not in sys.modules:  # pragma: no cover
-    graphql_pkg = ModuleType("example_service.features.graphql")
-    graphql_router_module = ModuleType("example_service.features.graphql.router")
-    graphql_router_module.router = object()
-    graphql_pkg.router = graphql_router_module.router
-    sys.modules["example_service.features.graphql"] = graphql_pkg
-    sys.modules["example_service.features.graphql.router"] = graphql_router_module
+    try:
+        # Try to import the real router - if this works, no stub needed
+        from example_service.features.graphql.router import router  # noqa: F401
+    except (ImportError, ModuleNotFoundError, Exception):
+        # Real router can't be imported (missing deps, schema errors, etc.), create minimal stub
+        # Only stub the router module, not the entire package
+        # This allows other submodules (like playground) to be imported normally
+        graphql_router_module = ModuleType("example_service.features.graphql.router")
+        graphql_router_module.router = object()
+        sys.modules["example_service.features.graphql.router"] = graphql_router_module
 
 pytest.importorskip("dateutil.rrule", reason="Reminder router relies on python-dateutil")
 
@@ -102,6 +107,7 @@ def test_setup_routers_without_rabbit(
         call(router_module.admin_router, prefix="/api", tags=["Admin"]),
         call(router_module.files_router, prefix="/api", tags=["files"]),
         call(router_module.webhooks_router, prefix="/api", tags=["webhooks"]),
+        call(router_module.tasks_router, prefix="/api", tags=["tasks"]),
     ]
 
 

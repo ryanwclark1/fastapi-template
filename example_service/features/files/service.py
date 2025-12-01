@@ -24,9 +24,11 @@ from example_service.features.webhooks.events import (
 )
 from example_service.infra.storage.client import (
     InvalidFileError,
-    StorageClient,
     StorageClientError,
-    get_storage_client,
+)
+from example_service.infra.storage.service import (
+    StorageService,
+    get_storage_service,
 )
 
 if TYPE_CHECKING:
@@ -41,24 +43,24 @@ class FileService(BaseService):
     def __init__(
         self,
         session: AsyncSession,
-        storage_client: StorageClient | None = None,
+        storage_service: StorageService | None = None,
         repository: FileRepository | None = None,
     ) -> None:
         super().__init__()
         self._session = session
-        self._storage = storage_client or get_storage_client()
+        self._storage = storage_service or get_storage_service()
         self._repository = repository or get_file_repository()
 
-    def _ensure_storage(self) -> StorageClient:
-        """Ensure storage client is available, raising error if not configured."""
-        if self._storage is None:
+    def _ensure_storage(self) -> StorageService:
+        """Ensure storage service is available, raising error if not configured."""
+        if not self._storage.is_ready:
             from example_service.infra.storage.exceptions import StorageNotConfiguredError
 
-            raise StorageNotConfiguredError("Storage client is not configured")
+            raise StorageNotConfiguredError(
+                message="Storage service is not available",
+                metadata={"is_configured": False},
+            )
         return self._storage
-
-        if self._storage is None:
-            raise StorageClientError("Storage client not configured")
 
     async def _dispatch_thumbnail_task(self, file_id: UUID, content_type: str) -> bool:
         """Queue thumbnail generation for image files if the task is available."""

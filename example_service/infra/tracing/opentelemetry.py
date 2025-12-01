@@ -12,7 +12,6 @@ import logging
 from typing import Any
 
 from opentelemetry import trace
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.instrumentation.psycopg import PsycopgInstrumentor
@@ -22,6 +21,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from example_service.core.settings import get_app_settings, get_otel_settings
+from example_service.infra.tracing.exporters import create_observable_otlp_exporter
 
 logger = logging.getLogger(__name__)
 otel_settings = get_otel_settings()
@@ -70,8 +70,11 @@ def setup_tracing() -> None:
         else:
             resource = Resource(attributes=resource_attrs)
 
-        # Configure OTLP exporter using settings helper method
-        otlp_exporter = OTLPSpanExporter(**otel_settings.exporter_kwargs())
+        # Configure OTLP exporter with observability wrapper
+        otlp_exporter = create_observable_otlp_exporter(
+            exporter_type="otlp",
+            **otel_settings.exporter_kwargs(),
+        )
 
         # Get configured sampler
         sampler = otel_settings.get_sampler()

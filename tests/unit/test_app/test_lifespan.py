@@ -27,6 +27,7 @@ class DummySettings:
     application_name: str = "example-service"
     driver: str = "psycopg"
     endpoint: str = "http://otel.test"
+    debug: bool = False
 
 
 @pytest.mark.asyncio

@@ -10,17 +10,20 @@ from example_service.infra.database import session as session_module
 
 
 @pytest.mark.asyncio
-async def test_ensure_event_outbox_table_creates_table(monkeypatch):
+async def test_ensure_event_outbox_table_creates_table(monkeypatch, postgres_container: str):
     """_ensure_event_outbox_table should create the table when missing."""
-    temp_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    temp_engine = create_async_engine(postgres_container)
     monkeypatch.setattr(session_module, "engine", temp_engine)
     monkeypatch.setattr(session_module, "_outbox_table_initialized", False)
 
     await session_module._ensure_event_outbox_table()
 
+    # Check if table exists using PostgreSQL-compatible query
     async with temp_engine.connect() as conn:
         result = await conn.execute(
-            text("SELECT name FROM sqlite_master WHERE type='table' AND name='event_outbox'")
+            text(
+                "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'event_outbox'"
+            )
         )
         assert result.scalar_one() == "event_outbox"
 
@@ -29,9 +32,9 @@ async def test_ensure_event_outbox_table_creates_table(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_ensure_event_outbox_table_is_idempotent(monkeypatch):
+async def test_ensure_event_outbox_table_is_idempotent(monkeypatch, postgres_container: str):
     """Subsequent calls should no-op once initialization has run."""
-    temp_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    temp_engine = create_async_engine(postgres_container)
     monkeypatch.setattr(session_module, "engine", temp_engine)
     monkeypatch.setattr(session_module, "_outbox_table_initialized", False)
 

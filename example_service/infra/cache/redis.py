@@ -24,7 +24,16 @@ from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from example_service.core.settings import get_redis_settings
 from example_service.infra.metrics.prometheus import (
+    cache_commands_total,
+    cache_connections_active,
+    cache_evictions_total,
+    cache_expired_keys_total,
     cache_hits_total,
+    cache_keys_total,
+    cache_keyspace_hits_total,
+    cache_keyspace_misses_total,
+    cache_memory_bytes,
+    cache_memory_max_bytes,
     cache_misses_total,
     cache_operation_duration_seconds,
 )
@@ -410,6 +419,128 @@ class RedisCache:
             logger.error("Redis health check failed", extra={"error": str(e)})
             return False
 
+    async def collect_stats(self, cache_name: str = "redis") -> dict[str, Any]:
+        """Collect Redis INFO stats and update Prometheus metrics.
+
+        This method should be called periodically (e.g., every 15-30 seconds)
+        to update infrastructure metrics from Redis server.
+
+        Args:
+            cache_name: Label value for cache_name in metrics.
+
+        Returns:
+            Dictionary with collected stats.
+
+        Example:
+                # In a background task
+            stats = await cache.collect_stats()
+            logger.debug("Redis stats", extra=stats)
+        """
+        try:
+            # Get Redis INFO - returns dict with server stats
+            info = await cast("Awaitable[dict[str, Any]]", self.client.info())
+
+            # Memory metrics
+            used_memory = info.get("used_memory", 0)
+            max_memory = info.get("maxmemory", 0)
+            cache_memory_bytes.labels(cache_name=cache_name).set(used_memory)
+            cache_memory_max_bytes.labels(cache_name=cache_name).set(max_memory)
+
+            # Key count (from db0 if available)
+            db_info = info.get("db0", {})
+            if isinstance(db_info, dict):
+                keys = db_info.get("keys", 0)
+            else:
+                # Sometimes Redis returns this as a string like "keys=123,expires=45"
+                keys = 0
+                if isinstance(db_info, str):
+                    for part in db_info.split(","):
+                        if part.startswith("keys="):
+                            keys = int(part.split("=")[1])
+                            break
+            cache_keys_total.labels(cache_name=cache_name).set(keys)
+
+            # Connection count
+            connected_clients = info.get("connected_clients", 0)
+            cache_connections_active.labels(cache_name=cache_name).set(connected_clients)
+
+            # Evictions and expirations (these are cumulative counters in Redis)
+            # We track them as Prometheus counters by storing the previous value
+            evicted_keys = info.get("evicted_keys", 0)
+            expired_keys = info.get("expired_keys", 0)
+            total_commands = info.get("total_commands_processed", 0)
+            keyspace_hits = info.get("keyspace_hits", 0)
+            keyspace_misses = info.get("keyspace_misses", 0)
+
+            # Update counters with delta since last collection
+            self._update_counter_metric(
+                cache_evictions_total.labels(cache_name=cache_name),
+                "_last_evicted_keys",
+                evicted_keys,
+            )
+            self._update_counter_metric(
+                cache_expired_keys_total.labels(cache_name=cache_name),
+                "_last_expired_keys",
+                expired_keys,
+            )
+            self._update_counter_metric(
+                cache_commands_total.labels(cache_name=cache_name),
+                "_last_total_commands",
+                total_commands,
+            )
+            self._update_counter_metric(
+                cache_keyspace_hits_total.labels(cache_name=cache_name),
+                "_last_keyspace_hits",
+                keyspace_hits,
+            )
+            self._update_counter_metric(
+                cache_keyspace_misses_total.labels(cache_name=cache_name),
+                "_last_keyspace_misses",
+                keyspace_misses,
+            )
+
+            stats = {
+                "used_memory": used_memory,
+                "max_memory": max_memory,
+                "keys": keys,
+                "connected_clients": connected_clients,
+                "evicted_keys": evicted_keys,
+                "expired_keys": expired_keys,
+                "total_commands": total_commands,
+                "keyspace_hits": keyspace_hits,
+                "keyspace_misses": keyspace_misses,
+            }
+
+            logger.debug("Redis stats collected", extra=stats)
+            return stats
+
+        except Exception as e:
+            logger.warning("Failed to collect Redis stats", extra={"error": str(e)})
+            return {}
+
+    def _update_counter_metric(
+        self,
+        metric: Any,
+        attr_name: str,
+        current_value: int,
+    ) -> None:
+        """Update a Prometheus counter with delta from Redis cumulative value.
+
+        Args:
+            metric: Prometheus counter metric (already labeled).
+            attr_name: Attribute name to store previous value on self.
+            current_value: Current cumulative value from Redis.
+        """
+        # Get previous value, default to current (first run = no increment)
+        previous = getattr(self, attr_name, current_value)
+        delta = max(0, current_value - previous)
+
+        if delta > 0:
+            metric.inc(delta)
+
+        # Store current value for next collection
+        setattr(self, attr_name, current_value)
+
 
 # Global cache instance
 _cache: RedisCache | None = None
@@ -474,3 +605,33 @@ async def stop_cache() -> None:
             logger.info("Redis cache stopped successfully")
         except Exception as e:
             logger.exception("Error stopping Redis cache", extra={"error": str(e)})
+
+
+def get_cache_instance() -> RedisCache | None:
+    """Get the global Redis cache instance if initialized.
+
+    Returns:
+        RedisCache instance or None if not initialized.
+
+    Note:
+        Use this for background tasks that need cache access.
+        For request handlers, use the get_cache() context manager.
+    """
+    return _cache
+
+
+async def collect_cache_stats() -> dict[str, Any]:
+    """Collect cache statistics from the global cache instance.
+
+    Returns:
+        Dictionary with stats or empty dict if cache not available.
+
+    Example:
+            # In a periodic background task
+        stats = await collect_cache_stats()
+        if stats:
+            logger.info("Cache stats", extra=stats)
+    """
+    if _cache is None:
+        return {}
+    return await _cache.collect_stats()

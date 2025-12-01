@@ -169,9 +169,7 @@ class HealthService(BaseService):
                 )
 
                 self._aggregator.add_provider(
-                    RabbitMQHealthProvider(
-                        connection_url=self._rabbit_settings.get_url(),
-                    )
+                    RabbitMQHealthProvider(),
                 )
             except Exception as e:
                 logger.warning(f"Could not configure RabbitMQ health provider: {e}")

@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "FastAPI service template following standard architecture"
 authors = [{ name = "Your Name", email = "your.email@example.com" }]
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 license = { text = "MIT" }
 
 dependencies = [
@@ -100,6 +100,7 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-report=html",
     "--cov-branch",
+    "--ignore=**/examples/*",
     "-v",
 ]
 markers = [
@@ -118,6 +119,7 @@ norecursedirs = [
     ".ruff_cache",
     "htmlcov",
     "logs",
+    "examples",
 ]
 
 [tool.coverage.run]
@@ -156,7 +158,7 @@ exclude_lines = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py313"
+target-version = "py312"
 exclude = [
     ".git",
     ".venv",
@@ -165,6 +167,7 @@ exclude = [
     ".pytest_cache",
     ".mypy_cache",
     ".ruff_cache",
+    "**/examples/*",
 ]
 
 [tool.ruff.lint]
@@ -193,6 +196,12 @@ ignore = [
 ]
 # Pydantic schemas evaluate annotations at runtime, so keep imports available
 "**/schemas.py" = [
+    "TC001", # typing-only first-party import
+    "TC002", # typing-only third-party import
+    "TC003", # typing-only standard-library import
+]
+# Strawberry GraphQL types evaluate annotations at runtime, so keep imports available
+"**/graphql/types/*.py" = [
     "TC001", # typing-only first-party import
     "TC002", # typing-only third-party import
     "TC003", # typing-only standard-library import
@@ -255,7 +264,7 @@ line-ending = "auto"
 known-first-party = ["example_service"]
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.12"
 files = ["example_service", "tests", "alembic"]
 warn_return_any = true
 warn_unused_configs = true
@@ -268,7 +277,7 @@ warn_unused_ignores = true
 warn_no_return = true
 strict_equality = true
 plugins = ["pydantic.mypy"]
-exclude = ["^alembic/env\\.py$"]
+exclude = ["^alembic/env\\.py$", ".*/examples/.*"]
 
 [[tool.mypy.overrides]]
 module = "tests.*"

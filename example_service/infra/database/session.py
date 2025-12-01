@@ -14,6 +14,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from example_service.core.settings import get_app_settings, get_db_settings
 from example_service.infra.metrics.prometheus import (
     database_connections_active,
+    database_pool_checkedout,
+    database_pool_checkout_time_seconds,
+    database_pool_checkout_timeout_total,
+    database_pool_invalidations_total,
+    database_pool_overflow,
+    database_pool_recycles_total,
     database_query_duration_seconds,
 )
 from example_service.infra.metrics.tracking import track_slow_query
@@ -101,6 +107,131 @@ def _receive_close(dbapi_conn: Any, connection_record: Any) -> None:
     _ = dbapi_conn, connection_record
     database_connections_active.dec()
     logger.debug("Database connection closed")
+
+
+# ============================================================================
+# Pool Checkout/Checkin Metrics
+# ============================================================================
+
+# Store checkout start time in connection_record.info for timing
+@event.listens_for(engine.sync_engine.pool, "checkout")
+def _receive_checkout(
+    dbapi_conn: Any, connection_record: Any, connection_proxy: Any
+) -> None:
+    """Track connection checkout from pool.
+
+    Records checkout time and tracks overflow connections.
+    The checkout time is stored to calculate wait time on checkin.
+    """
+    _ = dbapi_conn, connection_proxy
+
+    # Record checkout start time for duration calculation
+    connection_record.info["checkout_start"] = time.perf_counter()
+
+    # Increment checked out connections
+    database_pool_checkedout.inc()
+
+    # Check if this is an overflow connection
+    pool = engine.sync_engine.pool
+    if hasattr(pool, "overflow") and pool.overflow() > 0:
+        database_pool_overflow.set(pool.overflow())
+
+    logger.debug("Connection checked out from pool")
+
+
+@event.listens_for(engine.sync_engine.pool, "checkin")
+def _receive_checkin(dbapi_conn: Any, connection_record: Any) -> None:
+    """Track connection checkin to pool.
+
+    Records the total time the connection was checked out and
+    decrements the checkout counter.
+    """
+    _ = dbapi_conn
+
+    # Calculate checkout duration if start time was recorded
+    checkout_start = connection_record.info.pop("checkout_start", None)
+    if checkout_start is not None:
+        checkout_duration = time.perf_counter() - checkout_start
+        database_pool_checkout_time_seconds.observe(checkout_duration)
+
+    # Decrement checked out connections
+    database_pool_checkedout.dec()
+
+    # Update overflow gauge
+    pool = engine.sync_engine.pool
+    if hasattr(pool, "overflow"):
+        database_pool_overflow.set(max(0, pool.overflow()))
+
+    logger.debug("Connection checked in to pool")
+
+
+# ============================================================================
+# Pool Invalidation and Recycle Metrics
+# ============================================================================
+
+
+@event.listens_for(engine.sync_engine.pool, "invalidate")
+def _receive_invalidate(
+    dbapi_conn: Any, connection_record: Any, exception: Any
+) -> None:
+    """Track connection invalidation.
+
+    Called when a connection is permanently removed from the pool,
+    typically due to an error or explicit invalidation.
+    """
+    _ = dbapi_conn, connection_record
+
+    reason = "error" if exception else "explicit"
+    database_pool_invalidations_total.labels(reason=reason).inc()
+    logger.debug("Connection invalidated", extra={"reason": reason})
+
+
+@event.listens_for(engine.sync_engine.pool, "soft_invalidate")
+def _receive_soft_invalidate(
+    dbapi_conn: Any, connection_record: Any, exception: Any
+) -> None:
+    """Track soft connection invalidation.
+
+    Called when a connection is marked for recycling but not
+    immediately removed. It will be recycled on next checkout.
+    """
+    _ = dbapi_conn, connection_record, exception
+
+    database_pool_invalidations_total.labels(reason="soft").inc()
+    logger.debug("Connection soft-invalidated (will recycle)")
+
+
+@event.listens_for(engine.sync_engine.pool, "reset")
+def _receive_reset(dbapi_conn: Any, connection_record: Any) -> None:
+    """Track connection reset events.
+
+    Called when a connection is returned to the pool and reset
+    to a clean state (rollback, etc.). We track recycles here
+    when the connection age exceeds pool_recycle.
+    """
+    _ = dbapi_conn
+
+    # Check if connection was recycled due to age
+    if connection_record.info.get("_was_recycled"):
+        database_pool_recycles_total.inc()
+        connection_record.info.pop("_was_recycled", None)
+
+
+# ============================================================================
+# Checkout Timeout Detection
+# ============================================================================
+# Note: SQLAlchemy raises TimeoutError when pool_timeout is exceeded.
+# We catch this in the session context manager and track it there.
+# This marker helps identify when a checkout was attempted but timed out.
+
+
+def track_checkout_timeout() -> None:
+    """Increment the checkout timeout counter.
+
+    Call this when a TimeoutError is caught during session acquisition.
+    """
+    database_pool_checkout_timeout_total.inc()
+    logger.warning("Database pool checkout timeout")
 
 
 # Track query execution duration with trace correlation

@@ -100,14 +100,17 @@ class MinimalSoftDelete(Base, IntegerPKMixin, SoftDeleteMixin):
 
 
 @pytest.fixture
-async def async_engine():
-    """Create async SQLite engine for testing.
+async def async_engine(postgres_container: str):
+    """Create async PostgreSQL engine for testing using testcontainers.
+
+    Args:
+        postgres_container: PostgreSQL connection URL from container fixture.
 
     Returns:
-        SQLAlchemy async engine configured for in-memory SQLite.
+        SQLAlchemy async engine configured for PostgreSQL.
     """
     engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
+        postgres_container,
         echo=False,
     )
 

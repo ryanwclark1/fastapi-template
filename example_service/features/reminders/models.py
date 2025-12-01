@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
@@ -11,7 +11,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from example_service.core.database import TimestampedBase
 from example_service.core.database.search import TSVECTOR
-from example_service.features.tags.models import Tag
+
+if TYPE_CHECKING:
+    from example_service.features.tags.models import Tag
 
 
 class Reminder(TimestampedBase):
@@ -75,7 +77,7 @@ class Reminder(TimestampedBase):
     )
 
     # Many-to-many relationship with tags
-    tags: Mapped[list[Tag]] = relationship(
+    tags: Mapped[list["Tag"]] = relationship(
         "Tag",
         secondary="reminder_tags",
         back_populates="reminders",

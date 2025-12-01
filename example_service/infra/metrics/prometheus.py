@@ -133,6 +133,73 @@ database_query_duration_seconds = Histogram(
     registry=REGISTRY,
 )
 
+# Database Pool metrics
+# These metrics provide deep visibility into SQLAlchemy connection pool health
+database_pool_size = Gauge(
+    "database_pool_size",
+    "Configured maximum pool size. "
+    "Set at startup from DB_POOL_SIZE setting. "
+    "Use with database_pool_checkedout for utilization calculation.",
+    registry=REGISTRY,
+)
+
+database_pool_max_overflow = Gauge(
+    "database_pool_max_overflow",
+    "Configured maximum overflow connections beyond pool_size. "
+    "Set at startup from DB_MAX_OVERFLOW setting. "
+    "Overflow connections are created when pool is exhausted.",
+    registry=REGISTRY,
+)
+
+database_pool_checkedout = Gauge(
+    "database_pool_checkedout",
+    "Number of connections currently checked out from the pool. "
+    "Incremented on checkout, decremented on checkin. "
+    "Alert when approaching pool_size + max_overflow.",
+    registry=REGISTRY,
+)
+
+database_pool_overflow = Gauge(
+    "database_pool_overflow",
+    "Current number of overflow connections in use. "
+    "Non-zero indicates pool exhaustion requiring temporary connections. "
+    "Sustained overflow suggests pool_size needs increase.",
+    registry=REGISTRY,
+)
+
+database_pool_checkout_time_seconds = Histogram(
+    "database_pool_checkout_time_seconds",
+    "Time spent waiting to acquire a connection from the pool. "
+    "High values indicate pool contention or exhaustion. "
+    "Excludes actual query time - measures only pool wait.",
+    buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0),
+    registry=REGISTRY,
+)
+
+database_pool_checkout_timeout_total = Counter(
+    "database_pool_checkout_timeout_total",
+    "Total connection checkout timeouts. "
+    "Occurs when pool_timeout exceeded waiting for connection. "
+    "Critical alert - indicates capacity issues.",
+    registry=REGISTRY,
+)
+
+database_pool_invalidations_total = Counter(
+    "database_pool_invalidations_total",
+    "Total connections invalidated and removed from pool. "
+    "Tracked by reason: stale (age exceeded), error (connection failed), soft (recyclable).",
+    ["reason"],
+    registry=REGISTRY,
+)
+
+database_pool_recycles_total = Counter(
+    "database_pool_recycles_total",
+    "Total connections recycled due to exceeding pool_recycle age. "
+    "Normal maintenance - prevents stale connections. "
+    "High rate may indicate pool_recycle set too low.",
+    registry=REGISTRY,
+)
+
 # Cache metrics
 cache_hits_total = Counter(
     "cache_hits_total",
@@ -153,6 +220,89 @@ cache_operation_duration_seconds = Histogram(
     "Cache operation duration in seconds",
     ["operation", "cache_name"],
     buckets=DEFAULT_LATENCY_BUCKETS,
+    registry=REGISTRY,
+)
+
+# Cache Infrastructure Metrics
+# These metrics track Redis server health and resource usage
+cache_memory_bytes = Gauge(
+    "cache_memory_bytes",
+    "Redis memory usage in bytes. "
+    "Collected from Redis INFO command (used_memory field). "
+    "Monitor for memory pressure and capacity planning.",
+    ["cache_name"],
+    registry=REGISTRY,
+)
+
+cache_memory_max_bytes = Gauge(
+    "cache_memory_max_bytes",
+    "Redis maximum memory limit in bytes. "
+    "0 means no limit configured. "
+    "Use with cache_memory_bytes for utilization calculation.",
+    ["cache_name"],
+    registry=REGISTRY,
+)
+
+cache_keys_total = Gauge(
+    "cache_keys_total",
+    "Total number of keys in Redis database. "
+    "Collected from Redis INFO command (db0.keys). "
+    "Useful for capacity monitoring.",
+    ["cache_name"],
+    registry=REGISTRY,
+)
+
+cache_evictions_total = Counter(
+    "cache_evictions_total",
+    "Total number of keys evicted from cache. "
+    "High eviction rate indicates memory pressure. "
+    "Tracked from Redis INFO evicted_keys delta.",
+    ["cache_name"],
+    registry=REGISTRY,
+)
+
+cache_expired_keys_total = Counter(
+    "cache_expired_keys_total",
+    "Total number of keys expired due to TTL. "
+    "Normal cache behavior - indicates TTL is working. "
+    "Tracked from Redis INFO expired_keys delta.",
+    ["cache_name"],
+    registry=REGISTRY,
+)
+
+cache_connections_active = Gauge(
+    "cache_connections_active",
+    "Number of active Redis client connections. "
+    "From Redis INFO connected_clients. "
+    "Spike may indicate connection leak.",
+    ["cache_name"],
+    registry=REGISTRY,
+)
+
+cache_commands_total = Counter(
+    "cache_commands_total",
+    "Total commands processed by Redis. "
+    "From Redis INFO total_commands_processed delta. "
+    "Useful for throughput monitoring.",
+    ["cache_name"],
+    registry=REGISTRY,
+)
+
+cache_keyspace_hits_total = Counter(
+    "cache_keyspace_hits_total",
+    "Total keyspace hits from Redis server perspective. "
+    "From Redis INFO keyspace_hits. "
+    "Compare with cache_hits_total for validation.",
+    ["cache_name"],
+    registry=REGISTRY,
+)
+
+cache_keyspace_misses_total = Counter(
+    "cache_keyspace_misses_total",
+    "Total keyspace misses from Redis server perspective. "
+    "From Redis INFO keyspace_misses. "
+    "Compare with cache_misses_total for validation.",
+    ["cache_name"],
     registry=REGISTRY,
 )
 
@@ -227,5 +377,84 @@ application_info = Gauge(
     "application_info",
     "Application information",
     ["version", "service", "environment"],
+    registry=REGISTRY,
+)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# OpenTelemetry Exporter Metrics
+# ──────────────────────────────────────────────────────────────────────────────
+# These metrics provide visibility into the health and performance of OTLP span export
+
+otel_spans_exported_total = Counter(
+    "otel_spans_exported_total",
+    "Total number of spans exported via OTLP. "
+    "Tracks successful span delivery to collector. "
+    "Usage: Incremented after each successful batch export.",
+    ["exporter_type"],
+    registry=REGISTRY,
+)
+
+otel_spans_failed_total = Counter(
+    "otel_spans_failed_total",
+    "Total number of spans that failed to export. "
+    "Indicates connectivity or collector issues. "
+    "Usage: Incremented when export returns non-success result.",
+    ["exporter_type", "error_type"],
+    registry=REGISTRY,
+)
+
+otel_spans_dropped_total = Counter(
+    "otel_spans_dropped_total",
+    "Total number of spans dropped due to queue overflow. "
+    "Indicates BatchSpanProcessor queue exhaustion. "
+    "Critical - spans are permanently lost when this increments.",
+    ["exporter_type"],
+    registry=REGISTRY,
+)
+
+otel_export_duration_seconds = Histogram(
+    "otel_export_duration_seconds",
+    "Duration of OTLP export operations in seconds. "
+    "Measures time from export call to completion. "
+    "High latency may indicate network or collector issues.",
+    ["exporter_type"],
+    buckets=(0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0),
+    registry=REGISTRY,
+)
+
+otel_export_batch_size = Histogram(
+    "otel_export_batch_size",
+    "Number of spans per export batch. "
+    "Tracks how full batches are before export. "
+    "Consistently small batches may indicate low traffic or aggressive scheduling.",
+    ["exporter_type"],
+    buckets=(1, 5, 10, 25, 50, 100, 250, 500, 1000, 2000),
+    registry=REGISTRY,
+)
+
+otel_exporter_state = Gauge(
+    "otel_exporter_state",
+    "Current state of the OTLP exporter. "
+    "Values: 0=unknown, 1=healthy, 2=degraded, 3=failing. "
+    "Based on recent export success rate.",
+    ["exporter_type"],
+    registry=REGISTRY,
+)
+
+otel_export_retries_total = Counter(
+    "otel_export_retries_total",
+    "Total number of export retry attempts. "
+    "Non-zero indicates transient collector connectivity issues. "
+    "Usage: Incremented on each retry attempt before success or final failure.",
+    ["exporter_type"],
+    registry=REGISTRY,
+)
+
+otel_last_successful_export_timestamp = Gauge(
+    "otel_last_successful_export_timestamp",
+    "Unix timestamp of the last successful export. "
+    "Use for alerting on export staleness. "
+    "Compare with current time to detect export failures.",
+    ["exporter_type"],
     registry=REGISTRY,
 )

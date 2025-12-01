@@ -382,7 +382,7 @@ async def upload(
             error("Storage is not configured. Run 'example-service storage info' for details.")
             sys.exit(1)
 
-        from example_service.infra.storage.client import StorageClient
+        from example_service.infra.storage import get_storage_service
 
         # Validate arguments
         if len(files) == 1 and not Path(files[0]).is_dir() and not key:
@@ -424,14 +424,16 @@ async def upload(
         success_count = 0
         failed_count = 0
 
-        async with StorageClient(settings) as client:
+        service = get_storage_service()
+        await service.startup()
+        try:
             for local_path, s3_key in upload_tasks:
                 try:
                     file_size = local_path.stat().st_size
                     info(f"Uploading {local_path.name} -> {s3_key} ({_format_bytes(file_size)})")
 
                     with open(local_path, "rb") as f:
-                        await client.upload_file(
+                        await service.upload_file(
                             file_obj=f,
                             key=s3_key,
                             bucket=bucket,
@@ -444,6 +446,8 @@ async def upload(
                 except Exception as e:
                     error(f"  Failed to upload {local_path.name}: {e}")
                     failed_count += 1
+        finally:
+            await service.shutdown()
 
         click.echo(f"\n{'=' * 80}")
         click.secho("Upload Summary", fg="cyan", bold=True)
@@ -524,7 +528,7 @@ async def download(
             sys.exit(1)
 
         from example_service.core.settings import get_backup_settings
-        from example_service.infra.storage.client import StorageClient
+        from example_service.infra.storage import get_storage_service
         from example_service.infra.storage.s3 import S3Client
 
         output_path = Path(output)
@@ -569,7 +573,9 @@ async def download(
         success_count = 0
         failed_count = 0
 
-        async with StorageClient(settings) as client:
+        service = get_storage_service()
+        await service.startup()
+        try:
             for s3_key in download_tasks:
                 try:
                     info(f"Downloading {s3_key}")
@@ -586,7 +592,7 @@ async def download(
                     local_path.parent.mkdir(parents=True, exist_ok=True)
 
                     # Download file
-                    file_data = await client.download_file(key=s3_key, bucket=bucket)
+                    file_data = await service.download_file(key=s3_key, bucket=bucket)
 
                     # Write to local file
                     with open(local_path, "wb") as f:
@@ -600,6 +606,8 @@ async def download(
                 except Exception as e:
                     error(f"  Failed to download {s3_key}: {e}")
                     failed_count += 1
+        finally:
+            await service.shutdown()
 
         click.echo(f"\n{'=' * 80}")
         click.secho("Download Summary", fg="cyan", bold=True)
@@ -694,7 +702,7 @@ async def delete(
             sys.exit(1)
 
         from example_service.core.settings import get_backup_settings
-        from example_service.infra.storage.client import StorageClient
+        from example_service.infra.storage import get_storage_service
         from example_service.infra.storage.s3 import S3Client
 
         # Get list of files to delete
@@ -767,18 +775,22 @@ async def delete(
         success_count = 0
         failed_count = 0
 
-        async with StorageClient(settings) as client:
+        service = get_storage_service()
+        await service.startup()
+        try:
             for item in delete_tasks:
                 file_key = item[0] if isinstance(item, tuple) else item
                 try:
                     info(f"Deleting {file_key}")
-                    await client.delete_file(key=file_key, bucket=bucket)
+                    await service.delete_file(key=file_key, bucket=bucket)
                     success(f"  Deleted {file_key}")
                     success_count += 1
 
                 except Exception as e:
                     error(f"  Failed to delete {file_key}: {e}")
                     failed_count += 1
+        finally:
+            await service.shutdown()
 
         click.echo(f"\n{'=' * 80}")
         click.secho("Delete Summary", fg="cyan", bold=True)
@@ -850,7 +862,7 @@ async def copy(
             info("   or: example-service storage copy SOURCE_KEY --to-key DEST_KEY")
             sys.exit(1)
 
-        from example_service.infra.storage.client import StorageClient
+        from example_service.infra.storage import get_storage_service
 
         source_bucket = bucket or settings.bucket
         dest_bucket = to_bucket or source_bucket
@@ -862,27 +874,29 @@ async def copy(
         click.echo(f"Destination: s3://{dest_bucket}/{destination_key}")
         click.echo(f"{'=' * 80}\n")
 
-        async with StorageClient(settings) as client:
+        service = get_storage_service()
+        await service.startup()
+        try:
             # Check if source exists
             info(f"Checking source file: {source_key}")
-            exists = await client.file_exists(key=source_key, bucket=source_bucket)
+            exists = await service.file_exists(key=source_key, bucket=source_bucket)
             if not exists:
                 error(f"Source file not found: {source_key}")
                 sys.exit(1)
 
             # Get file info
-            file_info = await client.get_file_info(key=source_key, bucket=source_bucket)
+            file_info = await service.get_file_info(key=source_key, bucket=source_bucket)
             if file_info:
                 info(f"Source file size: {_format_bytes(file_info['size_bytes'])}")
 
             # Download and re-upload (S3 copy_object requires same region)
             info("Downloading source file...")
-            file_data = await client.download_file(key=source_key, bucket=source_bucket)
+            file_data = await service.download_file(key=source_key, bucket=source_bucket)
 
             info(f"Uploading to destination: {destination_key}")
             from io import BytesIO
 
-            result = await client.upload_file(
+            result = await service.upload_file(
                 file_obj=BytesIO(file_data),
                 key=destination_key,
                 bucket=dest_bucket,
@@ -893,6 +907,8 @@ async def copy(
             click.echo(f"\nDestination: s3://{result['bucket']}/{result['key']}")
             click.echo(f"Size: {_format_bytes(result['size_bytes'])}")
             click.echo(f"ETag: {result['etag']}")
+        finally:
+            await service.shutdown()
 
     except Exception as e:
         error(f"Copy operation failed: {e}")
@@ -933,7 +949,7 @@ async def move(
             error("Storage is not configured. Run 'example-service storage info' for details.")
             sys.exit(1)
 
-        from example_service.infra.storage.client import StorageClient
+        from example_service.infra.storage import get_storage_service
 
         target_bucket = bucket or settings.bucket
 
@@ -944,28 +960,30 @@ async def move(
         click.echo(f"Destination: s3://{target_bucket}/{dest_key}")
         click.echo(f"{'=' * 80}\n")
 
-        async with StorageClient(settings) as client:
+        service = get_storage_service()
+        await service.startup()
+        try:
             # Check if source exists
             info(f"Checking source file: {source_key}")
-            exists = await client.file_exists(key=source_key, bucket=target_bucket)
+            exists = await service.file_exists(key=source_key, bucket=target_bucket)
             if not exists:
                 error(f"Source file not found: {source_key}")
                 sys.exit(1)
 
             # Get file info
-            file_info = await client.get_file_info(key=source_key, bucket=target_bucket)
+            file_info = await service.get_file_info(key=source_key, bucket=target_bucket)
             if file_info:
                 info(f"Source file size: {_format_bytes(file_info['size_bytes'])}")
 
             # Download source
             info("Downloading source file...")
-            file_data = await client.download_file(key=source_key, bucket=target_bucket)
+            file_data = await service.download_file(key=source_key, bucket=target_bucket)
 
             # Upload to destination
             info(f"Uploading to destination: {dest_key}")
             from io import BytesIO
 
-            result = await client.upload_file(
+            result = await service.upload_file(
                 file_obj=BytesIO(file_data),
                 key=dest_key,
                 bucket=target_bucket,
@@ -976,7 +994,7 @@ async def move(
 
             # Delete source
             info(f"Deleting source file: {source_key}")
-            await client.delete_file(key=source_key, bucket=target_bucket)
+            await service.delete_file(key=source_key, bucket=target_bucket)
             success("Deleted source file")
 
             click.echo(f"\n{'=' * 80}")
@@ -985,6 +1003,8 @@ async def move(
             click.echo(f"Destination: s3://{result['bucket']}/{result['key']}")
             click.echo(f"Size: {_format_bytes(result['size_bytes'])}")
             click.echo(f"ETag: {result['etag']}")
+        finally:
+            await service.shutdown()
 
     except Exception as e:
         error(f"Move operation failed: {e}")
