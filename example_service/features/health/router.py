@@ -12,6 +12,8 @@ Provides Kubernetes-ready health check endpoints for:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from fastapi import APIRouter, Query, Response, status
 
 from example_service.features.health.schemas import (
@@ -29,7 +31,9 @@ from example_service.features.health.schemas import (
     ReadinessResponse,
     StartupResponse,
 )
-from example_service.features.health.service import HealthAggregatorDep, HealthServiceDep
+
+if TYPE_CHECKING:
+    from example_service.features.health.service import HealthAggregatorDep, HealthServiceDep
 
 router = APIRouter(prefix="/health", tags=["health"])
 

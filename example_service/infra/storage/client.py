@@ -10,7 +10,6 @@ import asyncio
 import fnmatch
 import hashlib
 import logging
-from collections.abc import Callable
 from io import BytesIO
 from typing import TYPE_CHECKING, Any, BinaryIO
 
@@ -24,6 +23,8 @@ from example_service.infra.storage.exceptions import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from example_service.core.settings.storage import StorageSettings
 
 logger = logging.getLogger(__name__)

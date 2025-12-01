@@ -30,7 +30,6 @@ from example_service.core.database.base import (
 )
 from example_service.core.database.repository import BaseRepository
 
-
 # ============================================================================
 # Test Models
 # ============================================================================
@@ -624,7 +623,6 @@ async def test_complete_lifecycle_create_update_soft_delete_recover(
     post = FullAuditPost(title="Lifecycle Post", body="Initial content", created_by=current_user)
     post = await repo.create(session, post)
     await session.commit()
-    post_id = post.id
 
     assert post.created_by == current_user
     assert post.updated_by is None

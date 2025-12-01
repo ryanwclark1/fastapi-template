@@ -3,12 +3,10 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import Annotated
-from uuid import UUID
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from example_service.core.database import (
     BeforeAfter,
@@ -19,7 +17,6 @@ from example_service.core.database import (
 )
 from example_service.core.database.search import FullTextSearchFilter, WebSearchFilter
 from example_service.core.dependencies.database import get_db_session
-from example_service.core.dependencies.events import EventPublisherDep
 from example_service.features.reminders.events import (
     ReminderCompletedEvent,
     ReminderCreatedEvent,
@@ -46,6 +43,13 @@ from example_service.features.reminders.schemas import (
 )
 from example_service.infra.logging import get_lazy_logger
 from example_service.infra.metrics.tracking import track_feature_usage, track_user_action
+
+if TYPE_CHECKING:
+    from uuid import UUID
+
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from example_service.core.dependencies.events import EventPublisherDep
 
 router = APIRouter(prefix="/reminders", tags=["reminders"])
 

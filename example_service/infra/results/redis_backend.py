@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from redis.asyncio import BlockingConnectionPool, Redis, Sentinel
 from redis.asyncio.cluster import RedisCluster
-from redis.asyncio.connection import Connection
 from taskiq import AsyncResultBackend
 from taskiq.abc.serializer import TaskiqSerializer
 from taskiq.compat import model_dump, model_validate
@@ -33,6 +32,7 @@ from example_service.infra.results.exceptions import (
 )
 
 if TYPE_CHECKING:
+    from redis.asyncio.connection import Connection
     type _Redis = Redis[bytes]  # type: ignore
     type _BlockingConnectionPool = BlockingConnectionPool[Connection]  # type: ignore
 else:

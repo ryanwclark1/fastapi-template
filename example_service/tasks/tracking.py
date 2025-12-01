@@ -21,16 +21,13 @@ import contextlib
 import json
 import logging
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from redis.asyncio import ConnectionPool, Redis
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from example_service.core.settings import get_redis_settings
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 redis_settings = get_redis_settings()

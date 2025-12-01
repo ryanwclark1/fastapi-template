@@ -3,19 +3,20 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from example_service.app.middleware.constants import EXEMPT_PATHS
 from example_service.core.exceptions import RateLimitException
-from example_service.infra.ratelimit.limiter import RateLimiter
 
 if TYPE_CHECKING:
-    pass
+    from collections.abc import Callable
+
+    from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+    from example_service.infra.ratelimit.limiter import RateLimiter
 
 logger = logging.getLogger(__name__)
 

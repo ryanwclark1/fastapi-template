@@ -44,14 +44,11 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from functools import wraps
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import Any, TypeVar
 
 from opentelemetry import trace
 
 from example_service.infra.tracing.opentelemetry import get_tracer
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 

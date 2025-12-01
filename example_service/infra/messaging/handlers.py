@@ -11,16 +11,19 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from faststream.rabbit import RabbitQueue
 
 from example_service.core.settings import get_rabbit_settings
 from example_service.infra.messaging.broker import router
-from example_service.infra.messaging.events import (
-    ExampleCreatedEvent,
-    ExampleDeletedEvent,
-    ExampleUpdatedEvent,
-)
+
+if TYPE_CHECKING:
+    from example_service.infra.messaging.events import (
+        ExampleCreatedEvent,
+        ExampleDeletedEvent,
+        ExampleUpdatedEvent,
+    )
 
 logger = logging.getLogger(__name__)
 

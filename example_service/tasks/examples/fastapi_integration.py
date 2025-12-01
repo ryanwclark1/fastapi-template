@@ -20,6 +20,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from example_service.tasks.broker import broker
+from example_service.tasks.tracking import get_tracker
 
 logger = logging.getLogger(__name__)
 
@@ -100,9 +101,7 @@ if broker is not None:
         logger.info(f"Sending {notification_type} notification to user {user_id}")
 
         try:
-            # TODO: Implement actual notification sending
-            # This would integrate with email service, SMS, push notifications, etc.
-
+            # Simulated send; replace with email/SMS/push integration when available
             result = {
                 "status": "sent",
                 "user_id": user_id,
@@ -241,20 +240,27 @@ if broker is not None:
         """
         logger.info(f"Checking status for task {task_id}")
 
-        try:
-            # Get task result from broker
-            # Note: This requires the task to be completed
-            # For pending tasks, you may need to track them separately
-            # or use a different mechanism
+        tracker = get_tracker()
 
-            # TODO: Implement proper task status tracking
-            # For now, we'll return a placeholder response
+        if not tracker or not tracker.is_connected:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Task tracker unavailable",
+            )
+
+        try:
+            details = await tracker.get_task_details(task_id)
+            if not details:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Task not found: {task_id}",
+                )
 
             return TaskStatusResponse(
                 task_id=task_id,
-                status="pending",
-                result=None,
-                error=None,
+                status=details.get("status", "unknown"),
+                result=details.get("return_value"),
+                error=details.get("error_message"),
             )
 
         except Exception as e:
@@ -283,13 +289,23 @@ if broker is not None:
         """
         logger.info(f"Attempting to cancel task {task_id}")
 
+        tracker = get_tracker()
+        if not tracker or not tracker.is_connected:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Task tracker unavailable; cannot cancel task",
+            )
+
         try:
-            # TODO: Implement task cancellation
-            # This may require tracking task instances and
-            # using asyncio.Task.cancel() or similar mechanism
-
+            cancelled = await tracker.cancel_task(task_id)
+            if not cancelled:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Task {task_id} could not be cancelled",
+                )
             logger.info(f"Task {task_id} cancelled")
-
+        except HTTPException:
+            raise
         except Exception as e:
             logger.exception(f"Failed to cancel task: {e}")
             raise HTTPException(

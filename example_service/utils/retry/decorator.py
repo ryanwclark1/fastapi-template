@@ -3,9 +3,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import Callable
 from functools import wraps
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from example_service.infra.metrics.tracking import (
     track_retry_attempt,
@@ -15,6 +14,9 @@ from example_service.infra.metrics.tracking import (
 
 from .exceptions import RetryError, RetryStatistics
 from .strategies import RetryStrategy
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 

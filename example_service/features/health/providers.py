@@ -780,7 +780,7 @@ class ConsulHealthProvider:
 
             # Check if our service is registered
             service_health = "not_registered"
-            for service_id, service_data in services.items():
+            for _service_id, service_data in services.items():
                 if service_data.get("Service") == self._service_name:
                     service_health = "registered"
                     break
@@ -917,10 +917,7 @@ class DatabasePoolHealthProvider:
 
             # Calculate utilization
             total_capacity = pool_size + overflow
-            if total_capacity == 0:
-                utilization = 0.0
-            else:
-                utilization = checked_out / total_capacity
+            utilization = 0.0 if total_capacity == 0 else checked_out / total_capacity
 
             utilization_percent = utilization * 100
             available = checked_in

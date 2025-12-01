@@ -17,9 +17,9 @@ dependencies that are not under test.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
-from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import FastAPI, HTTPException, Request
@@ -39,10 +39,7 @@ from example_service.infra.resilience.circuit_breaker import (
     CircuitBreaker,
     CircuitState,
 )
-
-if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
-
+from tests.integration.conftest import IntegrationTestHelper
 
 # ============================================================================
 # Circuit Breaker Integration Tests
@@ -154,10 +151,8 @@ class TestCircuitBreakerIntegration:
         external_service_mock.side_effect = Exception("Service down")
 
         for _ in range(5):
-            try:
+            with contextlib.suppress(Exception):
                 await call_service()
-            except Exception:
-                pass
 
         assert circuit_breaker_instance.state == CircuitState.OPEN
 
@@ -179,9 +174,7 @@ class TestCircuitBreakerIntegration:
         assert circuit_breaker_instance.state == CircuitState.CLOSED
 
     @pytest.mark.asyncio
-    async def test_circuit_breaker_with_concurrent_requests(
-        self, external_service_mock: AsyncMock
-    ):
+    async def test_circuit_breaker_with_concurrent_requests(self, external_service_mock: AsyncMock):
         """Test circuit breaker behavior under concurrent load.
 
         Scenario:
@@ -198,7 +191,6 @@ class TestCircuitBreakerIntegration:
         )
 
         call_count = 0
-        failure_count = 0
 
         @breaker.protected
         async def flaky_service(should_fail: bool):
@@ -238,12 +230,8 @@ class TestCircuitBreakerIntegration:
             3. Verify only that circuit opens
             4. Verify the other remains closed
         """
-        breaker_a = CircuitBreaker(
-            name="service_a", failure_threshold=3, recovery_timeout=1.0
-        )
-        breaker_b = CircuitBreaker(
-            name="service_b", failure_threshold=3, recovery_timeout=1.0
-        )
+        breaker_a = CircuitBreaker(name="service_a", failure_threshold=3, recovery_timeout=1.0)
+        breaker_b = CircuitBreaker(name="service_b", failure_threshold=3, recovery_timeout=1.0)
 
         @breaker_a.protected
         async def service_a():
@@ -255,10 +243,8 @@ class TestCircuitBreakerIntegration:
 
         # Fail service A
         for _ in range(5):
-            try:
+            with contextlib.suppress(Exception):
                 await service_a()
-            except Exception:
-                pass
 
         # Service A circuit should be open
         assert breaker_a.state == CircuitState.OPEN
@@ -277,9 +263,7 @@ class TestCircuitBreakerIntegration:
             2. Verify it handles exceptions properly
             3. Verify state transitions
         """
-        breaker = CircuitBreaker(
-            name="context_test", failure_threshold=2, recovery_timeout=1.0
-        )
+        breaker = CircuitBreaker(name="context_test", failure_threshold=2, recovery_timeout=1.0)
 
         # Successful usage
         async with breaker:
@@ -307,9 +291,7 @@ class TestCircuitBreakerIntegration:
             2. Verify metrics are tracked correctly
             3. Check success/failure counts
         """
-        breaker = CircuitBreaker(
-            name="metrics_test", failure_threshold=3, recovery_timeout=1.0
-        )
+        breaker = CircuitBreaker(name="metrics_test", failure_threshold=3, recovery_timeout=1.0)
 
         @breaker.protected
         async def operation(should_fail: bool):
@@ -319,10 +301,8 @@ class TestCircuitBreakerIntegration:
 
         # Mix of success and failure
         for i in range(10):
-            try:
+            with contextlib.suppress(Exception):
                 await operation(should_fail=(i % 3 == 0))
-            except Exception:
-                pass
 
         metrics = breaker.get_metrics()
 
@@ -342,9 +322,7 @@ class TestNPlusOneDetectionIntegration:
     """Integration tests for N+1 query detection with real SQL queries."""
 
     @pytest.fixture
-    def app_with_n_plus_one_detection(
-        self, mock_sqlalchemy_engine: MagicMock
-    ) -> FastAPI:
+    def app_with_n_plus_one_detection(self, mock_sqlalchemy_engine: MagicMock) -> FastAPI:
         """Create FastAPI app with N+1 detection middleware.
 
         Args:
@@ -425,9 +403,7 @@ class TestNPlusOneDetectionIntegration:
             assert int(response.headers["X-N-Plus-One-Detected"]) > 0
 
     @pytest.mark.asyncio
-    async def test_optimized_queries_no_detection(
-        self, app_with_n_plus_one_detection: FastAPI
-    ):
+    async def test_optimized_queries_no_detection(self, app_with_n_plus_one_detection: FastAPI):
         """Test that optimized queries don't trigger N+1 detection.
 
         Scenario:
@@ -474,9 +450,7 @@ class TestNPlusOneDetectionIntegration:
         assert "?" in normalized1
 
     @pytest.mark.asyncio
-    async def test_slow_query_logging(
-        self, app_with_n_plus_one_detection: FastAPI, capture_logs
-    ):
+    async def test_slow_query_logging(self, app_with_n_plus_one_detection: FastAPI, capture_logs):
         """Test slow query logging functionality.
 
         Scenario:
@@ -543,9 +517,7 @@ class TestNPlusOneDetectionIntegration:
         """
         app = FastAPI()
 
-        middleware = NPlusOneDetectionMiddleware(
-            app, threshold=3, enable_detailed_logging=True
-        )
+        middleware = NPlusOneDetectionMiddleware(app, threshold=3, enable_detailed_logging=True)
 
         from starlette.requests import Request as StarletteRequest
 
@@ -567,15 +539,15 @@ class TestNPlusOneDetectionIntegration:
 
         # Simulate N+1 with UPDATEs
         for i in range(5):
-            middleware.record_query(request, f"UPDATE posts SET views = views + 1 WHERE id = {i}", 0.003)
+            middleware.record_query(
+                request, f"UPDATE posts SET views = views + 1 WHERE id = {i}", 0.003
+            )
 
         assert request.state.query_count == 10
         assert len(request.state.query_patterns) == 2  # Two distinct patterns
 
     @pytest.mark.asyncio
-    async def test_performance_headers_accuracy(
-        self, app_with_n_plus_one_detection: FastAPI
-    ):
+    async def test_performance_headers_accuracy(self, app_with_n_plus_one_detection: FastAPI):
         """Test accuracy of performance headers.
 
         Scenario:
@@ -644,9 +616,7 @@ class TestDebugMiddlewareIntegration:
         return app
 
     @pytest.mark.asyncio
-    async def test_trace_id_generation_and_propagation(
-        self, app_with_debug_middleware: FastAPI
-    ):
+    async def test_trace_id_generation_and_propagation(self, app_with_debug_middleware: FastAPI):
         """Test trace ID is generated and propagated.
 
         Scenario:
@@ -679,9 +649,7 @@ class TestDebugMiddlewareIntegration:
         assert data["span_id"] == span_id
 
     @pytest.mark.asyncio
-    async def test_trace_id_preservation_from_client(
-        self, app_with_debug_middleware: FastAPI
-    ):
+    async def test_trace_id_preservation_from_client(self, app_with_debug_middleware: FastAPI):
         """Test that client-provided trace ID is preserved.
 
         Scenario:
@@ -697,9 +665,7 @@ class TestDebugMiddlewareIntegration:
             transport=ASGITransport(app=app_with_debug_middleware),
             base_url="http://test",
         ) as client:
-            response = await client.get(
-                "/test", headers={"X-Trace-Id": client_trace_id}
-            )
+            response = await client.get("/test", headers={"X-Trace-Id": client_trace_id})
 
         assert response.status_code == 200
         assert response.headers["x-trace-id"] == client_trace_id
@@ -708,9 +674,7 @@ class TestDebugMiddlewareIntegration:
         assert data["trace_id"] == client_trace_id
 
     @pytest.mark.asyncio
-    async def test_backward_compatibility_with_request_id(
-        self, app_with_debug_middleware: FastAPI
-    ):
+    async def test_backward_compatibility_with_request_id(self, app_with_debug_middleware: FastAPI):
         """Test backward compatibility with X-Request-Id.
 
         Scenario:
@@ -799,9 +763,7 @@ class TestDebugMiddlewareIntegration:
                 "trace_id": getattr(request.state, "trace_id", None),
             }
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         assert response.status_code == 200
@@ -811,9 +773,7 @@ class TestDebugMiddlewareIntegration:
         assert "x-trace-id" in response.headers
 
     @pytest.mark.asyncio
-    async def test_request_timing_accuracy(
-        self, app_with_debug_middleware: FastAPI
-    ):
+    async def test_request_timing_accuracy(self, app_with_debug_middleware: FastAPI):
         """Test request timing measurement accuracy.
 
         Scenario:
@@ -829,9 +789,7 @@ class TestDebugMiddlewareIntegration:
             await asyncio.sleep(0.1)  # 100ms delay
             return {"status": "ok"}
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             start = time.time()
             response = await client.get("/slow")
             elapsed = time.time() - start
@@ -840,9 +798,7 @@ class TestDebugMiddlewareIntegration:
         assert elapsed >= 0.1  # At least 100ms
 
     @pytest.mark.asyncio
-    async def test_user_and_tenant_context_in_logs(
-        self, app_with_debug_middleware: FastAPI
-    ):
+    async def test_user_and_tenant_context_in_logs(self, app_with_debug_middleware: FastAPI):
         """Test user and tenant context inclusion in logs.
 
         Scenario:
@@ -860,9 +816,7 @@ class TestDebugMiddlewareIntegration:
             request.state.tenant_id = "tenant-456"
             return {"status": "ok"}
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         assert response.status_code == 200
@@ -877,9 +831,7 @@ class TestI18nMiddlewareIntegration:
     """Integration tests for internationalization middleware."""
 
     @pytest.fixture
-    def translation_loader(
-        self, translation_provider: dict[str, dict[str, str]]
-    ) -> callable:
+    def translation_loader(self, translation_provider: dict[str, dict[str, str]]) -> callable:
         """Create translation loader function.
 
         Args:
@@ -925,9 +877,7 @@ class TestI18nMiddlewareIntegration:
         return app
 
     @pytest.mark.asyncio
-    async def test_locale_detection_from_accept_language(
-        self, app_with_i18n: FastAPI
-    ):
+    async def test_locale_detection_from_accept_language(self, app_with_i18n: FastAPI):
         """Test locale detection from Accept-Language header.
 
         Scenario:
@@ -950,9 +900,7 @@ class TestI18nMiddlewareIntegration:
         assert response.headers["content-language"] == "es"
 
     @pytest.mark.asyncio
-    async def test_locale_detection_from_query_parameter(
-        self, app_with_i18n: FastAPI
-    ):
+    async def test_locale_detection_from_query_parameter(self, app_with_i18n: FastAPI):
         """Test locale detection from query parameter.
 
         Scenario:
@@ -1021,13 +969,9 @@ class TestI18nMiddlewareIntegration:
         async def test_endpoint(request: Request):
             return {"locale": request.state.locale}
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # Query param should override Accept-Language
-            response = await client.get(
-                "/test?lang=fr", headers={"Accept-Language": "es"}
-            )
+            response = await client.get("/test?lang=fr", headers={"Accept-Language": "es"})
 
             assert response.status_code == 200
             assert response.json()["locale"] == "fr"
@@ -1045,7 +989,8 @@ class TestI18nMiddlewareIntegration:
             transport=ASGITransport(app=app_with_i18n), base_url="http://test"
         ) as client:
             response = await client.get(
-                "/hello", headers={"Accept-Language": "de"}  # Not supported
+                "/hello",
+                headers={"Accept-Language": "de"},  # Not supported
             )
 
         assert response.status_code == 200
@@ -1078,9 +1023,7 @@ class TestI18nMiddlewareIntegration:
         async def test_endpoint(request: Request):
             return {"locale": request.state.locale}
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # fr has highest quality among supported
             response = await client.get(
                 "/test",
@@ -1115,22 +1058,16 @@ class TestI18nMiddlewareIntegration:
         @app.middleware("http")
         async def add_user_context(request: Request, call_next):
             # Simulate auth middleware
-            request.state.user = type(
-                "User", (), {"preferred_language": "es"}
-            )()
+            request.state.user = type("User", (), {"preferred_language": "es"})()
             return await call_next(request)
 
         @app.get("/test")
         async def test_endpoint(request: Request):
             return {"locale": request.state.locale}
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # Even with Accept-Language, user preference wins
-            response = await client.get(
-                "/test", headers={"Accept-Language": "fr"}
-            )
+            response = await client.get("/test", headers={"Accept-Language": "fr"})
 
             assert response.status_code == 200
             assert response.json()["locale"] == "es"
@@ -1269,9 +1206,7 @@ class TestSecurityHeadersIntegration:
         async def test_endpoint():
             return {"status": "ok"}
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         assert response.status_code == 200
@@ -1292,16 +1227,15 @@ class TestSecurityHeadersIntegration:
         """
         app = FastAPI()
         app.add_middleware(
-            SecurityHeadersMiddleware, server_header=None  # Remove header
+            SecurityHeadersMiddleware,
+            server_header=None,  # Remove header
         )
 
         @app.get("/test")
         async def test_endpoint():
             return {"status": "ok"}
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
         assert response.status_code == 200
@@ -1309,9 +1243,7 @@ class TestSecurityHeadersIntegration:
         # Note: May still be present from test framework
 
     @pytest.mark.asyncio
-    async def test_permissions_policy_restrictions(
-        self, app_with_security_headers: FastAPI
-    ):
+    async def test_permissions_policy_restrictions(self, app_with_security_headers: FastAPI):
         """Test Permissions-Policy header restrictions.
 
         Scenario:
@@ -1350,9 +1282,7 @@ class TestSecurityHeadersIntegration:
         async def error_endpoint():
             raise HTTPException(status_code=500, detail="Internal error")
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/error")
 
         assert response.status_code == 500
@@ -1420,9 +1350,7 @@ class TestFullMiddlewareStackIntegration:
         async with AsyncClient(
             transport=ASGITransport(app=full_stack_app), base_url="http://test"
         ) as client:
-            response = await client.get(
-                "/test?lang=es", headers={"Accept-Language": "fr"}
-            )
+            response = await client.get("/test?lang=es", headers={"Accept-Language": "fr"})
 
         assert response.status_code == 200
 
@@ -1519,9 +1447,7 @@ class TestFullMiddlewareStackIntegration:
         async def error_endpoint():
             raise ValueError("Test error")
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             with pytest.raises(ValueError):
                 await client.get("/error")
 
@@ -1604,7 +1530,7 @@ class TestFullMiddlewareStackIntegration:
             assert header in response.headers
 
         # No duplicate headers (httpx combines them)
-        for key in response.headers.keys():
+        for key in response.headers:
             # Each header should appear only once
             values = response.headers.get_list(key)
             if key.lower() in expected_headers:

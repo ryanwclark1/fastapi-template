@@ -35,7 +35,6 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
-
 class FileService(BaseService):
     """Orchestrates file upload and management operations."""
 
@@ -52,6 +51,41 @@ class FileService(BaseService):
 
         if self._storage is None:
             raise StorageClientError("Storage client not configured")
+
+    async def _dispatch_thumbnail_task(self, file_id: UUID, content_type: str) -> bool:
+        """Queue thumbnail generation for image files if the task is available."""
+        if not content_type.startswith("image/"):
+            return False
+
+        try:
+            from example_service.tasks.files import generate_thumbnails
+        except Exception as e:  # pragma: no cover - import errors are non-fatal
+            self.logger.warning(
+                "Thumbnail task import failed; skipping thumbnail generation",
+                extra={"file_id": str(file_id), "error": str(e)},
+            )
+            return False
+
+        if not generate_thumbnails:
+            self.logger.info(
+                "Thumbnail task not configured; skipping thumbnail generation",
+                extra={"file_id": str(file_id)},
+            )
+            return False
+
+        try:
+            await generate_thumbnails.kiq(file_id=str(file_id))
+            self.logger.info(
+                "Thumbnail generation queued",
+                extra={"file_id": str(file_id)},
+            )
+            return True
+        except Exception as e:
+            self.logger.warning(
+                "Failed to queue thumbnail generation",
+                extra={"file_id": str(file_id), "error": str(e)},
+            )
+            return False
 
     def _validate_file(self, content_type: str, size_bytes: int) -> None:
         """Validate file type and size against settings.
@@ -200,9 +234,8 @@ class FileService(BaseService):
             },
         )
 
-        # TODO: Dispatch background task for thumbnail generation if image
-        # if content_type.startswith("image/"):
-        #     await self._dispatch_thumbnail_task(created.id)
+        # Dispatch background task for thumbnails when applicable
+        await self._dispatch_thumbnail_task(created.id, content_type)
 
         # Dispatch webhook event
         await dispatch_event(
@@ -338,13 +371,9 @@ class FileService(BaseService):
             },
         )
 
-        # TODO: Dispatch background task for thumbnail generation if image
-        # if file.content_type.startswith("image/"):
-        #     await self._dispatch_thumbnail_task(file_id)
-        # else:
-        #     file.status = FileStatus.READY
+        # Dispatch thumbnail generation if appropriate; keep READY for compatibility
+        await self._dispatch_thumbnail_task(file_id, file.content_type)
 
-        # For now, mark as ready immediately
         file.status = FileStatus.READY
         await self._session.flush()
         await self._session.refresh(file)

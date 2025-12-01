@@ -16,7 +16,6 @@ tests for new features.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import pytest
@@ -34,8 +33,6 @@ from example_service.core.database.base import (
 
 # Import shared test utilities
 from tests.utils import (
-    ModelFactory,
-    UserBuilder,
     assert_audit_trail,
     assert_primary_key_set,
     assert_soft_deleted,
@@ -428,7 +425,7 @@ class TestProductEdgeCases:
     ):
         """Test that products can be soft-deleted and recovered multiple times."""
         # Act & Assert - Multiple cycles
-        for i in range(3):
+        for _i in range(3):
             # Delete
             sample_product.deleted_at = datetime.now(UTC)
             sample_product.deleted_by = admin_user["email"]

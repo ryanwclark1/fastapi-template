@@ -38,7 +38,7 @@ from typing import TYPE_CHECKING, Any
 
 from example_service.core.schemas.common import HealthStatus
 from example_service.features.health.providers import HealthCheckResult, HealthProvider
-from example_service.infra.metrics.tracking import track_dependency_check, update_dependency_health
+from example_service.infra.metrics.tracking import update_dependency_health
 
 if TYPE_CHECKING:
     from example_service.core.settings.health import HealthCheckSettings

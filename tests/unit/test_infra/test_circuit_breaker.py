@@ -532,7 +532,7 @@ class TestCircuitBreakerHalfOpenState:
         breaker._success_count = 0
 
         # Perform successful calls up to threshold
-        for i in range(breaker.success_threshold):
+        for _i in range(breaker.success_threshold):
             result = await breaker.call(successful_func)
             assert result == "success"
 

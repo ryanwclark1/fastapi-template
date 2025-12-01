@@ -620,7 +620,7 @@ class TestServerHeaderHandling:
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
-            response = await client.get("/test")
+            await client.get("/test")
 
         # Server header should be present (uvicorn default)
         # Note: This may vary based on ASGI server

@@ -3,9 +3,8 @@ from __future__ import annotations
 
 import re
 import time
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from fastapi import Request, Response
 from opentelemetry import trace
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -14,6 +13,11 @@ from example_service.infra.metrics.prometheus import (
     http_requests_in_progress,
     http_requests_total,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from fastapi import Request, Response
 
 
 class MetricsMiddleware(BaseHTTPMiddleware):

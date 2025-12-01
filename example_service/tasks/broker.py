@@ -48,7 +48,12 @@ except ImportError:
     StreamScheduler = None
     LabelScheduleSource = None
 
-from example_service.core.settings import get_db_settings, get_rabbit_settings, get_redis_settings, get_task_settings
+from example_service.core.settings import (
+    get_db_settings,
+    get_rabbit_settings,
+    get_redis_settings,
+    get_task_settings,
+)
 
 logger = logging.getLogger(__name__)
 

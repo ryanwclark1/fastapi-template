@@ -6,6 +6,7 @@ import os
 from collections.abc import AsyncGenerator
 from hashlib import sha256
 from io import BytesIO
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -261,11 +262,32 @@ async def test_create_presigned_upload_rejects_invalid_files(
         )
 
 
+async def test_upload_file_queues_thumbnail_task(
+    file_service: FileService,
+) -> None:
+    dispatcher = AsyncMock(return_value=True)
+    file_service._dispatch_thumbnail_task = dispatcher  # type: ignore[assignment]
+
+    file = await file_service.upload_file(
+        file_obj=BytesIO(b"image-bytes"),
+        filename="avatar.png",
+        content_type="image/png",
+    )
+
+    dispatcher.assert_awaited_once()
+    dispatched_id, dispatched_type = dispatcher.call_args.args
+    assert str(dispatched_id) == str(file.id)
+    assert dispatched_type == "image/png"
+
+
 async def test_complete_upload_marks_file_ready_when_storage_has_object(
     session: AsyncSession,
     file_service: FileService,
     fake_storage_client: FakeStorageClient,
 ) -> None:
+    dispatcher = AsyncMock(return_value=True)
+    file_service._dispatch_thumbnail_task = dispatcher  # type: ignore[assignment]
+
     file = await create_file(session, status=FileStatus.PENDING)
     await fake_storage_client.upload_file(
         BytesIO(b"payload"),
@@ -278,6 +300,7 @@ async def test_complete_upload_marks_file_ready_when_storage_has_object(
 
     assert updated.status == FileStatus.READY
     assert updated.etag == "manual-etag"
+    dispatcher.assert_awaited_once_with(file.id, file.content_type)
 
 
 async def test_complete_upload_marks_failed_when_storage_missing(

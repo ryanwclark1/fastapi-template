@@ -3,12 +3,9 @@ from __future__ import annotations
 
 import inspect
 import logging
-from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from importlib import import_module
-from types import ModuleType
-
-from fastapi import FastAPI
+from typing import TYPE_CHECKING
 
 from example_service.core.settings import (
     get_app_settings,
@@ -40,6 +37,12 @@ from example_service.infra.realtime import (
 )
 from example_service.infra.tracing.opentelemetry import setup_tracing
 from example_service.tasks.tracking import start_tracker, stop_tracker
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+    from types import ModuleType
+
+    from fastapi import FastAPI
 
 logger = logging.getLogger(__name__)
 

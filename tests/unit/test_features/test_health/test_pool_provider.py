@@ -1,6 +1,6 @@
 """Tests for DatabasePoolHealthProvider."""
 
-from unittest.mock import AsyncMock, MagicMock, PropertyMock
+from unittest.mock import MagicMock
 
 import pytest
 

@@ -7,7 +7,6 @@ multiple ID lookups into a single database query.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from uuid import UUID
 
 from sqlalchemy import select
 from strawberry.dataloader import DataLoader
@@ -15,6 +14,8 @@ from strawberry.dataloader import DataLoader
 from example_service.features.reminders.models import Reminder
 
 if TYPE_CHECKING:
+    from uuid import UUID
+
     from sqlalchemy.ext.asyncio import AsyncSession
 
 

@@ -2,12 +2,10 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated
-from uuid import UUID
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from example_service.core.database import NotFoundError
@@ -25,6 +23,11 @@ from example_service.features.tags.schemas import (
     TagUpdate,
     TagWithCountResponse,
 )
+
+if TYPE_CHECKING:
+    from uuid import UUID
+
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/tags", tags=["tags"])
 logger = logging.getLogger(__name__)

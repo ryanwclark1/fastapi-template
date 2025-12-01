@@ -5,7 +5,7 @@ import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from httpx import AsyncClient
 
 from example_service.app.middleware.request_logging import (

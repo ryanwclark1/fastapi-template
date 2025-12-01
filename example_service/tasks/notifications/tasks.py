@@ -126,23 +126,23 @@ if broker is not None:
 
         channels_sent = ["log"]
 
-        # TODO: Add email notification
-        # from example_service.tasks.tasks import send_email_task
-        # if user_email:
-        #     await send_email_task.kiq(
-        #         to=user_email,
-        #         subject=f"Reminder: {title}",
-        #         body=description or title,
-        #     )
-        #     channels_sent.append("email")
+        # Optional: log-only pseudo email/webhook hooks for observability
+        user_email = None
+        webhook_url = None
 
-        # TODO: Add webhook notification
-        # if webhook_url:
-        #     await notify_webhook.kiq(
-        #         url=webhook_url,
-        #         payload={"reminder_id": reminder_id, "title": title},
-        #     )
-        #     channels_sent.append("webhook")
+        if user_email:
+            logger.info(
+                "Simulated email notification",
+                extra={"reminder_id": reminder_id, "email": user_email},
+            )
+            channels_sent.append("email")
+
+        if webhook_url:
+            logger.info(
+                "Simulated webhook notification",
+                extra={"reminder_id": reminder_id, "webhook": webhook_url},
+            )
+            channels_sent.append("webhook")
 
         return {
             "status": "sent",

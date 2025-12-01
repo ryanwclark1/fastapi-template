@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from prometheus_client import Counter, Gauge, Histogram
 
-from example_service.infra.metrics.prometheus import DEFAULT_LATENCY_BUCKETS, REGISTRY
+from example_service.infra.metrics.prometheus import REGISTRY
 
 # ──────────────────────────────────────────────────────────────
 # Health Check Counters

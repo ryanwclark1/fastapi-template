@@ -163,6 +163,35 @@ class BaseTaskTracker(ABC):
         ...
 
     @abstractmethod
+    async def count_task_history(
+        self,
+        task_name: str | None = None,
+        status: str | None = None,
+        worker_id: str | None = None,
+        error_type: str | None = None,
+        created_after: str | None = None,
+        created_before: str | None = None,
+        min_duration_ms: int | None = None,
+        max_duration_ms: int | None = None,
+    ) -> int:
+        """Count task executions matching the given filters.
+
+        Args:
+            task_name: Filter by task name.
+            status: Filter by status ("success", "failure", "running").
+            worker_id: Filter by worker ID.
+            error_type: Filter by error type.
+            created_after: Filter for tasks created after this ISO datetime.
+            created_before: Filter for tasks created before this ISO datetime.
+            min_duration_ms: Filter for tasks with duration >= this value.
+            max_duration_ms: Filter for tasks with duration <= this value.
+
+        Returns:
+            Total number of matching task execution records.
+        """
+        ...
+
+    @abstractmethod
     async def get_task_details(self, task_id: str) -> dict[str, Any] | None:
         """Get full details for a specific task execution.
 
@@ -193,7 +222,7 @@ class BaseTaskTracker(ABC):
         """
         ...
 
-    async def cancel_task(self, task_id: str) -> bool:
+    async def cancel_task(self, _task_id: str) -> bool:
         """Mark a task as cancelled.
 
         This method updates the task status to "cancelled". It does not

@@ -155,21 +155,20 @@ class PostgresTaskTracker(BaseTaskTracker):
                 kwargs_json = {"raw": str(task_kwargs)}
 
         try:
-            async with self._get_session() as session:
-                async with session.begin():
-                    execution = TaskExecution(
-                        task_id=task_id,
-                        task_name=task_name,
-                        status="running",
-                        worker_id=worker_id,
-                        queue_name=queue_name,
-                        created_at=now,
-                        started_at=now,
-                        task_args=args_json,
-                        task_kwargs=kwargs_json,
-                        labels=labels,
-                    )
-                    session.add(execution)
+            async with self._get_session() as session, session.begin():
+                execution = TaskExecution(
+                    task_id=task_id,
+                    task_name=task_name,
+                    status="running",
+                    worker_id=worker_id,
+                    queue_name=queue_name,
+                    created_at=now,
+                    started_at=now,
+                    task_args=args_json,
+                    task_kwargs=kwargs_json,
+                    labels=labels,
+                )
+                session.add(execution)
 
             logger.debug(
                 "Task started",
@@ -215,22 +214,21 @@ class PostgresTaskTracker(BaseTaskTracker):
             )
 
         try:
-            async with self._get_session() as session:
-                async with session.begin():
-                    stmt = (
-                        update(TaskExecution)
-                        .where(TaskExecution.task_id == task_id)
-                        .values(
-                            status=status,
-                            finished_at=now,
-                            duration_ms=duration_ms,
-                            return_value=return_value_json,
-                            error_type=error_type,
-                            error_message=error_message,
-                            error_traceback=error_tb,
-                        )
+            async with self._get_session() as session, session.begin():
+                stmt = (
+                    update(TaskExecution)
+                    .where(TaskExecution.task_id == task_id)
+                    .values(
+                        status=status,
+                        finished_at=now,
+                        duration_ms=duration_ms,
+                        return_value=return_value_json,
+                        error_type=error_type,
+                        error_message=error_message,
+                        error_traceback=error_tb,
                     )
-                    await session.execute(stmt)
+                )
+                await session.execute(stmt)
 
             logger.debug(
                 "Task finished",
@@ -283,6 +281,42 @@ class PostgresTaskTracker(BaseTaskTracker):
             logger.warning("Failed to get running tasks", extra={"error": str(e)})
             return []
 
+    def _build_history_conditions(
+        self,
+        *,
+        task_name: str | None = None,
+        status: str | None = None,
+        worker_id: str | None = None,
+        error_type: str | None = None,
+        created_after: str | None = None,
+        created_before: str | None = None,
+        min_duration_ms: int | None = None,
+        max_duration_ms: int | None = None,
+    ) -> list[Any]:
+        """Build SQLAlchemy filter conditions for task history queries."""
+        conditions = []
+
+        if task_name:
+            conditions.append(TaskExecution.task_name == task_name)
+        if status:
+            conditions.append(TaskExecution.status == status)
+        if worker_id:
+            conditions.append(TaskExecution.worker_id == worker_id)
+        if error_type:
+            conditions.append(TaskExecution.error_type == error_type)
+        if created_after:
+            after_dt = datetime.fromisoformat(created_after.replace("Z", "+00:00"))
+            conditions.append(TaskExecution.created_at >= after_dt)
+        if created_before:
+            before_dt = datetime.fromisoformat(created_before.replace("Z", "+00:00"))
+            conditions.append(TaskExecution.created_at <= before_dt)
+        if min_duration_ms is not None:
+            conditions.append(TaskExecution.duration_ms >= min_duration_ms)
+        if max_duration_ms is not None:
+            conditions.append(TaskExecution.duration_ms <= max_duration_ms)
+
+        return conditions
+
     async def get_task_history(
         self,
         limit: int = 100,
@@ -304,27 +338,16 @@ class PostgresTaskTracker(BaseTaskTracker):
             async with self._get_session() as session:
                 stmt = select(TaskExecution)
 
-                # Apply filters
-                conditions = []
-
-                if task_name:
-                    conditions.append(TaskExecution.task_name == task_name)
-                if status:
-                    conditions.append(TaskExecution.status == status)
-                if worker_id:
-                    conditions.append(TaskExecution.worker_id == worker_id)
-                if error_type:
-                    conditions.append(TaskExecution.error_type == error_type)
-                if created_after:
-                    after_dt = datetime.fromisoformat(created_after.replace("Z", "+00:00"))
-                    conditions.append(TaskExecution.created_at >= after_dt)
-                if created_before:
-                    before_dt = datetime.fromisoformat(created_before.replace("Z", "+00:00"))
-                    conditions.append(TaskExecution.created_at <= before_dt)
-                if min_duration_ms is not None:
-                    conditions.append(TaskExecution.duration_ms >= min_duration_ms)
-                if max_duration_ms is not None:
-                    conditions.append(TaskExecution.duration_ms <= max_duration_ms)
+                conditions = self._build_history_conditions(
+                    task_name=task_name,
+                    status=status,
+                    worker_id=worker_id,
+                    error_type=error_type,
+                    created_after=created_after,
+                    created_before=created_before,
+                    min_duration_ms=min_duration_ms,
+                    max_duration_ms=max_duration_ms,
+                )
 
                 if conditions:
                     stmt = stmt.where(and_(*conditions))
@@ -353,6 +376,46 @@ class PostgresTaskTracker(BaseTaskTracker):
         except Exception as e:
             logger.warning("Failed to get task history", extra={"error": str(e)})
             return []
+
+    async def count_task_history(
+        self,
+        task_name: str | None = None,
+        status: str | None = None,
+        worker_id: str | None = None,
+        error_type: str | None = None,
+        created_after: str | None = None,
+        created_before: str | None = None,
+        min_duration_ms: int | None = None,
+        max_duration_ms: int | None = None,
+    ) -> int:
+        """Count task executions matching the given filters."""
+        if not self.is_connected:
+            return 0
+
+        try:
+            async with self._get_session() as session:
+                stmt = select(func.count()).select_from(TaskExecution)
+
+                conditions = self._build_history_conditions(
+                    task_name=task_name,
+                    status=status,
+                    worker_id=worker_id,
+                    error_type=error_type,
+                    created_after=created_after,
+                    created_before=created_before,
+                    min_duration_ms=min_duration_ms,
+                    max_duration_ms=max_duration_ms,
+                )
+
+                if conditions:
+                    stmt = stmt.where(and_(*conditions))
+
+                result = await session.execute(stmt)
+                count = result.scalar_one() or 0
+                return int(count)
+        except Exception as e:
+            logger.warning("Failed to count task history", extra={"error": str(e)})
+            return 0
 
     async def get_task_details(self, task_id: str) -> dict[str, Any] | None:
         """Get full details for a specific task execution."""

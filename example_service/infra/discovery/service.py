@@ -23,10 +23,10 @@ from uuid import uuid4
 from example_service.core.settings.consul import ConsulSettings, HealthCheckMode
 from example_service.infra.discovery.address import resolve_advertise_address
 from example_service.infra.discovery.client import ConsulClient
-from example_service.infra.discovery.protocols import ConsulClientProtocol
 
 if TYPE_CHECKING:
     from example_service.core.services.health import HealthService
+    from example_service.infra.discovery.protocols import ConsulClientProtocol
 
 logger = logging.getLogger(__name__)
 

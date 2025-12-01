@@ -19,9 +19,8 @@ Usage:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
-from uuid import UUID
 
 if TYPE_CHECKING:
     from example_service.core.database.base import Base

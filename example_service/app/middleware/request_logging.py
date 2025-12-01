@@ -15,26 +15,32 @@ Key Features:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import re
 import time
 import uuid
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.types import ASGIApp
 
 from example_service.infra.logging.context import set_log_context
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from fastapi import Request, Response
+    from starlette.types import ASGIApp
 
 logger = logging.getLogger(__name__)
 SLOW_REQUEST_THRESHOLD = 5.0
 
 # Security event detection patterns
 SECURITY_PATTERNS = {
-    "sql_injection": re.compile(r"(\bunion\b.*\bselect\b|\bor\b.*=.*|\bdrop\b.*\btable\b)", re.IGNORECASE),
+    "sql_injection": re.compile(
+        r"(\bunion\b.*\bselect\b|\bor\b.*=.*|\bdrop\b.*\btable\b)", re.IGNORECASE
+    ),
     "xss": re.compile(r"(<script|javascript:|onerror=|onload=)", re.IGNORECASE),
     "path_traversal": re.compile(r"(\.\./|\.\.\\|%2e%2e)", re.IGNORECASE),
     "command_injection": re.compile(r"(;|\||&|\$\(|`)", re.IGNORECASE),
@@ -43,6 +49,7 @@ SECURITY_PATTERNS = {
 try:
     from example_service.tasks import tracking as _task_tracking
 except Exception:  # pragma: no cover - optional dependency
+
     class _TrackingStub:
         @staticmethod
         def track_api_call(**_: Any) -> None:
@@ -449,7 +456,11 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         return context
 
     def _detect_security_event(
-        self, request: Request, path: str, query_params: dict[str, Any], body_data: dict[str, Any] | None
+        self,
+        _request: Request,
+        path: str,
+        query_params: dict[str, Any],
+        body_data: dict[str, Any] | None,
     ) -> list[str]:
         """Detect potential security threats in request.
 
@@ -475,17 +486,15 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         # Check query parameters
         query_string = str(query_params)
         for event_type, pattern in SECURITY_PATTERNS.items():
-            if pattern.search(query_string):
-                if event_type not in detected_events:
-                    detected_events.append(event_type)
+            if pattern.search(query_string) and event_type not in detected_events:
+                detected_events.append(event_type)
 
         # Check body data
         if body_data:
             body_string = json.dumps(body_data)
             for event_type, pattern in SECURITY_PATTERNS.items():
-                if pattern.search(body_string):
-                    if event_type not in detected_events:
-                        detected_events.append(event_type)
+                if pattern.search(body_string) and event_type not in detected_events:
+                    detected_events.append(event_type)
 
         return detected_events
 
@@ -585,10 +594,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         request_size = 0
         content_length_header = request.headers.get("content-length")
         if content_length_header:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 request_size = int(content_length_header)
-            except (ValueError, TypeError):
-                pass
 
         # Get user and tenant context
         user_context = self._get_user_context(request)

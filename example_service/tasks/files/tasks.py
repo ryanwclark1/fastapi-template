@@ -10,8 +10,20 @@ from __future__ import annotations
 
 import io
 import logging
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from sqlalchemy import delete, select
+from sqlalchemy.orm import selectinload
+
+from example_service.core.settings import get_storage_settings
+from example_service.infra.database.session import get_async_session
+from example_service.infra.storage.client import (
+    FileNotFoundError,
+    InvalidFileError,
+    StorageClientError,
+    get_storage_client,
+)
 from example_service.tasks.broker import broker
 
 logger = logging.getLogger(__name__)
@@ -37,36 +49,23 @@ async def get_file_from_storage(file_id: str) -> dict[str, Any]:
     Raises:
         FileNotFoundError: If file does not exist.
     """
-    # TODO: Replace with actual database query
-    # Example:
-    # async with get_db_session() as session:
-    #     result = await session.execute(
-    #         select(File).where(File.id == file_id)
-    #     )
-    #     file = result.scalar_one_or_none()
-    #     if not file:
-    #         raise FileNotFoundError(f"File {file_id} not found")
-    #     return {
-    #         "id": file.id,
-    #         "filename": file.filename,
-    #         "content_type": file.content_type,
-    #         "s3_key": file.s3_key,
-    #         "status": file.status,
-    #     }
+    from example_service.features.files.models import File
 
-    logger.warning(
-        "Using placeholder file storage - replace with actual implementation",
-        extra={"file_id": file_id},
-    )
+    async with get_async_session() as session:
+        result = await session.execute(select(File).where(File.id == file_id))
+        file = result.scalar_one_or_none()
 
-    # Placeholder implementation
-    return {
-        "id": file_id,
-        "filename": f"file_{file_id}.jpg",
-        "content_type": "image/jpeg",
-        "s3_key": f"uploads/{file_id}.jpg",
-        "status": "pending",
-    }
+        if not file:
+            raise FileNotFoundError(f"File {file_id} not found")
+
+        return {
+            "id": str(file.id),
+            "filename": file.original_filename,
+            "content_type": file.content_type,
+            "s3_key": file.storage_key,
+            "status": file.status.value if hasattr(file, "status") else str(file.status),
+            "size_bytes": file.size_bytes,
+        }
 
 
 async def update_file_status(
@@ -81,26 +80,52 @@ async def update_file_status(
         status: New status (ready, failed, processing).
         error_message: Optional error message if status is failed.
     """
-    # TODO: Replace with actual database update
-    # Example:
-    # async with get_db_session() as session:
-    #     result = await session.execute(
-    #         select(File).where(File.id == file_id)
-    #     )
-    #     file = result.scalar_one()
-    #     file.status = status
-    #     file.error_message = error_message
-    #     file.processed_at = datetime.now(UTC)
-    #     await session.commit()
+    from example_service.features.files.models import File, FileStatus
+
+    async with get_async_session() as session:
+        result = await session.execute(select(File).where(File.id == file_id))
+        file = result.scalar_one_or_none()
+        if not file:
+            logger.warning("File not found while updating status", extra={"file_id": file_id})
+            return
+
+        # Update status and timestamps
+        try:
+            file.status = FileStatus(status)
+        except Exception:
+            file.status = status  # type: ignore[assignment]
+        file.updated_at = datetime.now(UTC)
+
+        if hasattr(file, "error_message"):
+            file.error_message = error_message  # type: ignore[attr-defined]
+
+        await session.commit()
 
     logger.info(
-        "File status updated (placeholder)",
+        "File status updated",
         extra={
             "file_id": file_id,
             "status": status,
             "error_message": error_message,
         },
     )
+
+
+def _validate_file_metadata(file_data: dict[str, Any]) -> None:
+    """Validate file metadata against storage settings."""
+    settings = get_storage_settings()
+
+    content_type = file_data.get("content_type") or ""
+    if settings.allowed_content_types and content_type not in settings.allowed_content_types:
+        raise InvalidFileError(f"Content type '{content_type}' not allowed")
+
+    size_bytes = file_data.get("size_bytes")
+    if size_bytes is not None and size_bytes > settings.max_file_size_bytes:
+        raise InvalidFileError(
+            f"File size {size_bytes} exceeds max {settings.max_file_size_bytes} bytes"
+        )
+    if size_bytes is not None and size_bytes <= 0:
+        raise InvalidFileError("File size must be greater than 0")
 
 
 async def download_from_s3(s3_key: str) -> bytes:
@@ -115,19 +140,14 @@ async def download_from_s3(s3_key: str) -> bytes:
     Raises:
         FileProcessingError: If download fails.
     """
-    # TODO: Replace with actual S3 client
-    # Example:
-    # from example_service.infra.storage.s3 import S3Client
-    # s3_client = S3Client()
-    # return await s3_client.download_file(s3_key)
+    client = get_storage_client()
+    if client is None:
+        raise FileProcessingError("Storage client not configured for downloads")
 
-    logger.warning(
-        "Using placeholder S3 download - replace with actual implementation",
-        extra={"s3_key": s3_key},
-    )
-
-    # Placeholder: return empty bytes
-    return b""
+    try:
+        return await client.download_file(s3_key)
+    except StorageClientError as e:
+        raise FileProcessingError(f"Failed to download {s3_key}: {e}") from e
 
 
 async def upload_to_s3(s3_key: str, content: bytes, content_type: str) -> str:  # noqa: ARG001
@@ -144,19 +164,21 @@ async def upload_to_s3(s3_key: str, content: bytes, content_type: str) -> str:  
     Raises:
         FileProcessingError: If upload fails.
     """
-    # TODO: Replace with actual S3 client
-    # Example:
-    # from example_service.infra.storage.s3 import S3Client
-    # s3_client = S3Client()
-    # return await s3_client.upload_bytes(s3_key, content, content_type)
+    client = get_storage_client()
+    if client is None:
+        raise FileProcessingError("Storage client not configured for uploads")
 
-    logger.warning(
-        "Using placeholder S3 upload - replace with actual implementation",
-        extra={"s3_key": s3_key, "size_bytes": len(content)},
-    )
-
-    # Placeholder: return mock S3 URI
-    return f"s3://bucket/{s3_key}"
+    try:
+        result = await client.upload_file(
+            file_obj=io.BytesIO(content),
+            key=s3_key,
+            content_type=content_type,
+            metadata={},
+        )
+        bucket = result.get("bucket", client.settings.bucket)
+        return f"s3://{bucket}/{s3_key}"
+    except StorageClientError as e:
+        raise FileProcessingError(f"Failed to upload {s3_key}: {e}") from e
 
 
 async def create_thumbnail_record(
@@ -171,20 +193,21 @@ async def create_thumbnail_record(
         size: Thumbnail size in pixels.
         s3_key: S3 key where thumbnail is stored.
     """
-    # TODO: Replace with actual database insert
-    # Example:
-    # async with get_db_session() as session:
-    #     thumbnail = FileThumbnail(
-    #         file_id=file_id,
-    #         size=size,
-    #         s3_key=s3_key,
-    #         created_at=datetime.now(UTC),
-    #     )
-    #     session.add(thumbnail)
-    #     await session.commit()
+    from example_service.features.files.models import FileThumbnail
+
+    async with get_async_session() as session:
+        thumbnail = FileThumbnail(
+            file_id=file_id,
+            storage_key=s3_key,
+            width=size,
+            height=size,
+            size_bytes=0,  # Set actual size after upload if available
+        )
+        session.add(thumbnail)
+        await session.commit()
 
     logger.info(
-        "Thumbnail record created (placeholder)",
+        "Thumbnail record created",
         extra={
             "file_id": file_id,
             "size": size,
@@ -202,31 +225,33 @@ async def find_expired_files(expiry_days: int = 30) -> list[dict[str, Any]]:
     Returns:
         List of expired file dictionaries.
     """
-    # TODO: Replace with actual database query
-    # Example:
-    # async with get_db_session() as session:
-    #     cutoff = datetime.now(UTC) - timedelta(days=expiry_days)
-    #     result = await session.execute(
-    #         select(File)
-    #         .where(File.created_at < cutoff)
-    #         .where(File.status == "ready")
-    #     )
-    #     return [
-    #         {
-    #             "id": file.id,
-    #             "s3_key": file.s3_key,
-    #             "created_at": file.created_at,
-    #         }
-    #         for file in result.scalars()
-    #     ]
+    from example_service.features.files.models import File, FileStatus
 
-    logger.warning(
-        "Using placeholder expired file query - replace with actual implementation",
-        extra={"expiry_days": expiry_days},
-    )
+    cutoff = datetime.now(UTC) - timedelta(days=expiry_days)
 
-    # Placeholder: return empty list
-    return []
+    async with get_async_session() as session:
+        result = await session.execute(
+            select(File)
+            .options(selectinload(File.thumbnails))
+            .where(
+                (
+                    (File.expires_at.is_not(None) & (File.expires_at < datetime.now(UTC)))
+                    | (File.expires_at.is_(None) & (File.created_at < cutoff))
+                ),
+                File.status == FileStatus.READY,
+            )
+        )
+        files = result.scalars().all()
+
+    return [
+        {
+            "id": str(file.id),
+            "s3_key": file.storage_key,
+            "created_at": file.created_at,
+            "thumbnails": [t.storage_key for t in file.thumbnails],
+        }
+        for file in files
+    ]
 
 
 async def delete_file_from_storage(s3_key: str) -> None:
@@ -235,16 +260,39 @@ async def delete_file_from_storage(s3_key: str) -> None:
     Args:
         s3_key: S3 object key to delete.
     """
-    # TODO: Replace with actual S3 client
-    # Example:
-    # from example_service.infra.storage.s3 import S3Client
-    # s3_client = S3Client()
-    # await s3_client.delete_file(s3_key)
+    client = get_storage_client()
+    if client is None:
+        logger.warning("Storage client unavailable; skipping delete", extra={"s3_key": s3_key})
+        return
 
-    logger.info(
-        "File deleted from storage (placeholder)",
-        extra={"s3_key": s3_key},
-    )
+    try:
+        await client.delete_file(s3_key)
+        logger.info("File deleted from storage", extra={"s3_key": s3_key})
+    except StorageClientError as e:
+        logger.warning(
+            "Failed to delete file from storage", extra={"s3_key": s3_key, "error": str(e)}
+        )
+
+
+async def delete_thumbnails(thumbnail_keys: list[str]) -> None:
+    """Delete thumbnail objects from storage."""
+    if not thumbnail_keys:
+        return
+
+    client = get_storage_client()
+    if client is None:
+        logger.warning(
+            "Storage client unavailable; skipping thumbnail deletes",
+            extra={"count": len(thumbnail_keys)},
+        )
+        return
+
+    for key in thumbnail_keys:
+        try:
+            await client.delete_file(key)
+            logger.debug("Deleted thumbnail", extra={"s3_key": key})
+        except StorageClientError as e:
+            logger.warning("Failed to delete thumbnail", extra={"s3_key": key, "error": str(e)})
 
 
 async def delete_file_record(file_id: str) -> None:
@@ -253,16 +301,14 @@ async def delete_file_record(file_id: str) -> None:
     Args:
         file_id: File identifier to delete.
     """
-    # TODO: Replace with actual database delete
-    # Example:
-    # async with get_db_session() as session:
-    #     await session.execute(
-    #         delete(File).where(File.id == file_id)
-    #     )
-    #     await session.commit()
+    from example_service.features.files.models import File
+
+    async with get_async_session() as session:
+        await session.execute(delete(File).where(File.id == file_id))
+        await session.commit()
 
     logger.info(
-        "File record deleted (placeholder)",
+        "File record deleted",
         extra={"file_id": file_id},
     )
 
@@ -304,11 +350,7 @@ if broker is not None:
             await update_file_status(file_id, status="processing")
 
             # Step 3: Validate file (size, type, content)
-            # TODO: Add actual validation logic
-            # - Check file size limits
-            # - Validate MIME type
-            # - Scan for malware if needed
-            # - Validate file structure (e.g., valid image, valid PDF)
+            _validate_file_metadata(file_data)
 
             logger.info(
                 "File validation completed",
@@ -409,9 +451,7 @@ if broker is not None:
 
             # Step 2: Validate it's an image
             if not file_data["content_type"].startswith("image/"):
-                raise FileProcessingError(
-                    f"File is not an image: {file_data['content_type']}"
-                )
+                raise FileProcessingError(f"File is not an image: {file_data['content_type']}")
 
             # Step 3: Download image from S3
             image_bytes = await download_from_s3(file_data["s3_key"])
@@ -512,9 +552,7 @@ if broker is not None:
                 "Pillow not installed",
                 extra={"file_id": file_id, "error": str(e)},
             )
-            raise FileProcessingError(
-                "Pillow library required for thumbnail generation"
-            ) from e
+            raise FileProcessingError("Pillow library required for thumbnail generation") from e
 
         except Exception as e:
             logger.exception(
@@ -577,9 +615,7 @@ if broker is not None:
                     await delete_file_from_storage(file["s3_key"])
 
                     # Delete thumbnails if they exist
-                    # TODO: Query and delete associated thumbnails
-                    # for thumbnail in file.thumbnails:
-                    #     await delete_file_from_storage(thumbnail.s3_key)
+                    await delete_thumbnails(file.get("thumbnails", []))
 
                     # Delete database record
                     await delete_file_record(file["id"])

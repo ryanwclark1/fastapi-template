@@ -38,12 +38,12 @@ import inspect
 import json
 import logging
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, ParamSpec, TypeVar
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
 
 from example_service.infra.cache.redis import get_cache
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable
+    from collections.abc import Awaitable, Callable
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -100,7 +100,7 @@ def cache_key(*args: Any, **kwargs: Any) -> str:
     return ":".join(parts)
 
 
-def cached(
+def cached[R, **P](
     *,
     key_prefix: str | None = None,
     ttl: int = 300,
@@ -164,7 +164,7 @@ def cached(
         prefix = key_prefix or func_name
 
         # Get function signature for default key building
-        sig = inspect.signature(func)
+        inspect.signature(func)
 
         @wraps(func)
         async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
@@ -177,11 +177,7 @@ def cached(
                 return await func(*args, **kwargs)
 
             # Build cache key
-            if key_builder:
-                key_suffix = key_builder(*args, **kwargs)
-            else:
-                # Default: use all args and kwargs
-                key_suffix = cache_key(*args, **kwargs)
+            key_suffix = key_builder(*args, **kwargs) if key_builder else cache_key(*args, **kwargs)
 
             full_key = f"{prefix}:{key_suffix}" if key_suffix else prefix
 

@@ -11,14 +11,18 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
+from typing import TYPE_CHECKING
 
-from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.types import ASGIApp
 
 from example_service.core.schemas.tenant import TenantContext
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from fastapi import Request, Response
+    from starlette.types import ASGIApp
 
 logger = logging.getLogger(__name__)
 

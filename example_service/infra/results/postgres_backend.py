@@ -17,12 +17,11 @@ import json
 import logging
 import traceback
 from datetime import UTC, datetime
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from taskiq import AsyncResultBackend
-from taskiq.abc.serializer import TaskiqSerializer
 from taskiq.compat import model_dump, model_validate
 from taskiq.depends.progress_tracker import TaskProgress
 from taskiq.result import TaskiqResult
@@ -30,6 +29,9 @@ from taskiq.serializers import PickleSerializer
 
 from example_service.infra.results.exceptions import ResultIsMissingError
 from example_service.infra.results.models import TaskExecution
+
+if TYPE_CHECKING:
+    from taskiq.abc.serializer import TaskiqSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -142,9 +144,7 @@ class PostgresAsyncResultBackend(AsyncResultBackend[_ReturnType]):
             RuntimeError: If backend not started (startup() not called).
         """
         if self._session_factory is None:
-            raise RuntimeError(
-                "PostgresAsyncResultBackend not started. Call startup() first."
-            )
+            raise RuntimeError("PostgresAsyncResultBackend not started. Call startup() first.")
         return self._session_factory()
 
     async def set_result(
@@ -180,55 +180,58 @@ class PostgresAsyncResultBackend(AsyncResultBackend[_ReturnType]):
         if result.is_err and result.error:
             error_type = type(result.error).__name__
             error_message = str(result.error)
-            error_tb = "".join(traceback.format_exception(type(result.error), result.error, result.error.__traceback__))
+            error_tb = "".join(
+                traceback.format_exception(
+                    type(result.error), result.error, result.error.__traceback__
+                )
+            )
 
-        async with self._get_session() as session:
-            async with session.begin():
-                # Check if record exists (created during on_task_start)
-                stmt = select(TaskExecution).where(TaskExecution.task_id == task_id)
-                existing = (await session.execute(stmt)).scalar_one_or_none()
+        async with self._get_session() as session, session.begin():
+            # Check if record exists (created during on_task_start)
+            stmt = select(TaskExecution).where(TaskExecution.task_id == task_id)
+            existing = (await session.execute(stmt)).scalar_one_or_none()
 
-                if existing:
-                    # Update existing record with result
-                    existing.status = "failure" if result.is_err else "success"
-                    existing.finished_at = now
-                    existing.return_value = return_value
-                    existing.serialized_result = serialized
-                    existing.error_type = error_type
-                    existing.error_message = error_message
-                    existing.error_traceback = error_tb
+            if existing:
+                # Update existing record with result
+                existing.status = "failure" if result.is_err else "success"
+                existing.finished_at = now
+                existing.return_value = return_value
+                existing.serialized_result = serialized
+                existing.error_type = error_type
+                existing.error_message = error_message
+                existing.error_traceback = error_tb
 
-                    # Calculate duration if we have started_at
-                    if existing.started_at:
-                        existing.duration_ms = int(
-                            (now - existing.started_at).total_seconds() * 1000
-                        )
+                # Calculate duration if we have started_at
+                if existing.started_at:
+                    existing.duration_ms = int((now - existing.started_at).total_seconds() * 1000)
 
-                    logger.debug(
-                        "Updated task result",
-                        extra={"task_id": task_id, "status": existing.status},
-                    )
-                else:
-                    # Create new record (task started outside tracking)
-                    execution = TaskExecution(
-                        task_id=task_id,
-                        task_name=result.labels.get("task_name", "unknown") if result.labels else "unknown",
-                        status="failure" if result.is_err else "success",
-                        created_at=now,
-                        finished_at=now,
-                        return_value=return_value,
-                        serialized_result=serialized,
-                        error_type=error_type,
-                        error_message=error_message,
-                        error_traceback=error_tb,
-                        labels=result.labels,
-                    )
-                    session.add(execution)
+                logger.debug(
+                    "Updated task result",
+                    extra={"task_id": task_id, "status": existing.status},
+                )
+            else:
+                # Create new record (task started outside tracking)
+                execution = TaskExecution(
+                    task_id=task_id,
+                    task_name=result.labels.get("task_name", "unknown")
+                    if result.labels
+                    else "unknown",
+                    status="failure" if result.is_err else "success",
+                    created_at=now,
+                    finished_at=now,
+                    return_value=return_value,
+                    serialized_result=serialized,
+                    error_type=error_type,
+                    error_message=error_message,
+                    error_traceback=error_tb,
+                    labels=result.labels,
+                )
+                session.add(execution)
 
-                    logger.debug(
-                        "Created task result",
-                        extra={"task_id": task_id, "status": execution.status},
-                    )
+                logger.debug(
+                    "Created task result",
+                    extra={"task_id": task_id, "status": execution.status},
+                )
 
     async def is_result_ready(self, task_id: str) -> bool:
         """Check if a task result is available.
@@ -298,14 +301,13 @@ class PostgresAsyncResultBackend(AsyncResultBackend[_ReturnType]):
             task_id: ID of the task.
             progress: TaskProgress instance with current task progress.
         """
-        async with self._get_session() as session:
-            async with session.begin():
-                stmt = (
-                    update(TaskExecution)
-                    .where(TaskExecution.task_id == task_id)
-                    .values(progress=model_dump(progress))
-                )
-                await session.execute(stmt)
+        async with self._get_session() as session, session.begin():
+            stmt = (
+                update(TaskExecution)
+                .where(TaskExecution.task_id == task_id)
+                .values(progress=model_dump(progress))
+            )
+            await session.execute(stmt)
 
     async def get_progress(
         self,
@@ -320,9 +322,7 @@ class PostgresAsyncResultBackend(AsyncResultBackend[_ReturnType]):
             TaskProgress instance if progress data exists, None otherwise.
         """
         async with self._get_session() as session:
-            stmt = select(TaskExecution.progress).where(
-                TaskExecution.task_id == task_id
-            )
+            stmt = select(TaskExecution.progress).where(TaskExecution.task_id == task_id)
             progress_data = (await session.execute(stmt)).scalar_one_or_none()
 
             if progress_data is None:
@@ -375,21 +375,20 @@ class PostgresAsyncResultBackend(AsyncResultBackend[_ReturnType]):
             except (TypeError, ValueError):
                 kwargs_json = {"raw": str(task_kwargs)}
 
-        async with self._get_session() as session:
-            async with session.begin():
-                execution = TaskExecution(
-                    task_id=task_id,
-                    task_name=task_name,
-                    status="running",
-                    worker_id=worker_id,
-                    queue_name=queue_name,
-                    created_at=now,
-                    started_at=now,
-                    task_args=args_json,
-                    task_kwargs=kwargs_json,
-                    labels=labels,
-                )
-                session.add(execution)
+        async with self._get_session() as session, session.begin():
+            execution = TaskExecution(
+                task_id=task_id,
+                task_name=task_name,
+                status="running",
+                worker_id=worker_id,
+                queue_name=queue_name,
+                created_at=now,
+                started_at=now,
+                task_args=args_json,
+                task_kwargs=kwargs_json,
+                labels=labels,
+            )
+            session.add(execution)
 
         logger.debug(
             "Created task record",
@@ -429,14 +428,9 @@ class PostgresAsyncResultBackend(AsyncResultBackend[_ReturnType]):
                 traceback.format_exception(type(error), error, error.__traceback__)
             )
 
-        async with self._get_session() as session:
-            async with session.begin():
-                stmt = (
-                    update(TaskExecution)
-                    .where(TaskExecution.task_id == task_id)
-                    .values(**values)
-                )
-                await session.execute(stmt)
+        async with self._get_session() as session, session.begin():
+            stmt = update(TaskExecution).where(TaskExecution.task_id == task_id).values(**values)
+            await session.execute(stmt)
 
         logger.debug(
             "Updated task status",

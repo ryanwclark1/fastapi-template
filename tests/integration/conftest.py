@@ -16,8 +16,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
 from fastapi import FastAPI, Request
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture(scope="session")
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
+def event_loop() -> Generator[asyncio.AbstractEventLoop]:
     """Create event loop for async tests.
 
     Uses session scope to avoid creating new loops for each test.
@@ -115,7 +115,7 @@ def test_app_with_state() -> FastAPI:
 
 
 @pytest_asyncio.fixture
-async def async_client(test_app_minimal: FastAPI) -> AsyncGenerator[AsyncClient, None]:
+async def async_client(test_app_minimal: FastAPI) -> AsyncGenerator[AsyncClient]:
     """Create async HTTP client for testing.
 
     Args:

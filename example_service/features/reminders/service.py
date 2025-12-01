@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from uuid import UUID
 
 from example_service.core.services.base import BaseService
 from example_service.features.reminders.models import Reminder
@@ -10,10 +9,13 @@ from example_service.features.reminders.repository import (
     ReminderRepository,
     get_reminder_repository,
 )
-from example_service.features.reminders.schemas import ReminderCreate
 
 if TYPE_CHECKING:
+    from uuid import UUID
+
     from sqlalchemy.ext.asyncio import AsyncSession
+
+    from example_service.features.reminders.schemas import ReminderCreate
 
 
 class ReminderService(BaseService):

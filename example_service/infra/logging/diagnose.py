@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import logging
 import sys
-from types import TracebackType
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 
 class DiagnoseFormatter(logging.Formatter):

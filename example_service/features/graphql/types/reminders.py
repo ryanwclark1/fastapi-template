@@ -9,16 +9,16 @@ Provides:
 
 from __future__ import annotations
 
-from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
 
-from example_service.features.graphql.types.base import PageInfoType
-
 if TYPE_CHECKING:
 
+    from datetime import datetime
+
+    from example_service.features.graphql.types.base import PageInfoType
     from example_service.features.reminders.models import Reminder
 
 

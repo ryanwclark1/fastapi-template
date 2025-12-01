@@ -2,17 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
 from example_service.app.middleware.i18n import I18nMiddleware, create_i18n_middleware
-
-if TYPE_CHECKING:
-    pass
-
 
 # Fixtures
 

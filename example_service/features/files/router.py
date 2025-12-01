@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated
-from uuid import UUID
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from example_service.core.database import NotFoundError
 from example_service.core.dependencies.database import get_db_session
@@ -39,6 +37,11 @@ from example_service.infra.storage.client import (
     StorageClientError,
     get_storage_client,
 )
+
+if TYPE_CHECKING:
+    from uuid import UUID
+
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/files", tags=["files"])
 

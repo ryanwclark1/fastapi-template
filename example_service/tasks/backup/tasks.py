@@ -12,10 +12,13 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from example_service.core.settings import get_backup_settings, get_db_settings
 from example_service.tasks.broker import broker
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = logging.getLogger(__name__)
 

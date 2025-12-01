@@ -7,15 +7,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from sqlalchemy import Boolean, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from example_service.core.database import TimestampedBase
 
-if TYPE_CHECKING:
-    from .user import User
+from .user import User
 
 
 class Post(TimestampedBase):

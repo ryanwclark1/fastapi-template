@@ -19,9 +19,8 @@ Test Strategy:
 
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 

@@ -6,7 +6,6 @@ import ipaddress
 import secrets
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
-from uuid import UUID
 
 from example_service.core.services.base import BaseService
 from example_service.features.webhooks.models import Webhook, WebhookDelivery
@@ -23,6 +22,8 @@ from example_service.features.webhooks.schemas import (
 )
 
 if TYPE_CHECKING:
+    from uuid import UUID
+
     from sqlalchemy.ext.asyncio import AsyncSession
 
 

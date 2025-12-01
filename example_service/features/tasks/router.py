@@ -11,8 +11,7 @@ This module provides REST API endpoints for task management operations:
 from __future__ import annotations
 
 import logging
-from datetime import datetime
-from typing import Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
@@ -23,7 +22,6 @@ from example_service.features.tasks.schemas import (
     ScheduledJobListResponse,
     ScheduledJobResponse,
     TaskExecutionDetailResponse,
-    TaskExecutionResponse,
     TaskSearchParams,
     TaskSearchResponse,
     TaskStatsResponse,
@@ -37,6 +35,9 @@ from example_service.features.tasks.service import (
     TaskServiceError,
     get_task_service,
 )
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 logger = logging.getLogger(__name__)
 

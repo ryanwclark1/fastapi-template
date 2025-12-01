@@ -28,6 +28,7 @@ class MockTracker:
     def __init__(self, is_connected: bool = True):
         self._is_connected = is_connected
         self.get_task_history = AsyncMock(return_value=[])
+        self.count_task_history = AsyncMock(return_value=0)
         self.get_task_details = AsyncMock(return_value=None)
         self.get_running_tasks = AsyncMock(return_value=[])
         self.get_stats = AsyncMock(return_value={})
@@ -134,6 +135,7 @@ class TestSearchTasks:
                 "duration_ms": 300000,
             }
         ]
+        tracker.count_task_history.return_value = 1
 
         params = TaskSearchParams()
         tasks, total = await svc.search_tasks(params)
@@ -141,13 +143,16 @@ class TestSearchTasks:
         assert len(tasks) == 1
         assert tasks[0].task_id == "task-1"
         assert tasks[0].task_name == "backup_database"
+        assert total == 1
         tracker.get_task_history.assert_called_once()
+        tracker.count_task_history.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_search_with_filters(self, service):
         """Should pass filters to tracker."""
         svc, tracker = service
         tracker.get_task_history.return_value = []
+        tracker.count_task_history.return_value = 12
 
         params = TaskSearchParams(
             task_name="backup_database",
@@ -157,8 +162,10 @@ class TestSearchTasks:
             offset=5,
         )
 
-        await svc.search_tasks(params)
+        tasks, total = await svc.search_tasks(params)
 
+        assert tasks == []
+        assert total == 12
         tracker.get_task_history.assert_called_once()
         call_kwargs = tracker.get_task_history.call_args.kwargs
         assert call_kwargs["task_name"] == "backup_database"
@@ -166,6 +173,43 @@ class TestSearchTasks:
         assert call_kwargs["worker_id"] == "worker-1"
         assert call_kwargs["limit"] == 10
         assert call_kwargs["offset"] == 5
+        tracker.count_task_history.assert_called_once()
+        count_kwargs = tracker.count_task_history.call_args.kwargs
+        assert count_kwargs["task_name"] == "backup_database"
+        assert count_kwargs["status"] == "success"
+        assert count_kwargs["worker_id"] == "worker-1"
+
+    @pytest.mark.asyncio
+    async def test_search_falls_back_when_count_fails(self, service):
+        """Should fall back to page size when count raises."""
+        svc, tracker = service
+        tracker.get_task_history.return_value = [
+            {
+                "task_id": "task-1",
+                "task_name": "cleanup",
+                "status": "success",
+                "worker_id": "worker-1",
+                "started_at": "2024-01-15T10:00:00",
+                "finished_at": "2024-01-15T10:05:00",
+                "duration_ms": 300000,
+            },
+            {
+                "task_id": "task-2",
+                "task_name": "cleanup",
+                "status": "success",
+                "worker_id": "worker-2",
+                "started_at": "2024-01-15T10:10:00",
+                "finished_at": "2024-01-15T10:15:00",
+                "duration_ms": 300000,
+            },
+        ]
+        tracker.count_task_history.side_effect = RuntimeError("boom")
+
+        params = TaskSearchParams(limit=2, offset=5)
+        _, total = await svc.search_tasks(params)
+
+        assert total == 7  # 5 offset + 2 returned
+        tracker.count_task_history.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_search_with_disconnected_tracker(self):
@@ -179,6 +223,7 @@ class TestSearchTasks:
         assert tasks == []
         assert total == 0
         tracker.get_task_history.assert_not_called()
+        tracker.count_task_history.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_search_with_no_tracker(self):
@@ -195,6 +240,9 @@ class TestSearchTasks:
 
             assert tasks == []
             assert total == 0
+            tracker = mock_get_tracker.return_value
+            if tracker:
+                tracker.count_task_history.assert_not_called()
 
 
 class TestGetTaskDetails:

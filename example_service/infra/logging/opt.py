@@ -7,8 +7,10 @@ Allows fine-grained control over lazy evaluation, exception info, stack depth, e
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class OptLoggerAdapter(logging.LoggerAdapter):

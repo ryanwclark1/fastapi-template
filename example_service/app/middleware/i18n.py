@@ -125,11 +125,10 @@ class I18nMiddleware(BaseHTTPMiddleware):
             Detected locale code
         """
         # 1. Check user preference if available (highest priority)
-        if self.use_user_preference:
-            if hasattr(request.state, "user") and request.state.user:
-                user_locale = getattr(request.state.user, "preferred_language", None)
-                if user_locale and user_locale in self.supported_locales:
-                    return user_locale
+        if self.use_user_preference and hasattr(request.state, "user") and request.state.user:
+            user_locale = getattr(request.state.user, "preferred_language", None)
+            if user_locale and user_locale in self.supported_locales:
+                return user_locale
 
         # 2. Check Accept-Language header
         if self.use_accept_language:
@@ -204,7 +203,7 @@ class I18nMiddleware(BaseHTTPMiddleware):
         preferences.sort(key=lambda x: x[0], reverse=True)
 
         # Find first supported language
-        for quality, lang_codes in preferences:
+        for _quality, lang_codes in preferences:
             for lang_code in lang_codes:
                 if lang_code in self.supported_locales:
                     return lang_code

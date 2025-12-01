@@ -15,14 +15,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from starlette.background import BackgroundTasks
-from starlette.requests import Request
-from starlette.responses import Response
-from starlette.websockets import WebSocket
 from strawberry.fastapi import BaseContext
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
+    from starlette.background import BackgroundTasks
+    from starlette.requests import Request
+    from starlette.responses import Response
+    from starlette.websockets import WebSocket
 
     from example_service.core.schemas.auth import AuthUser
     from example_service.features.graphql.dataloaders import DataLoaders

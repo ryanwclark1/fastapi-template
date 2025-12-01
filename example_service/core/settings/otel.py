@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import AliasChoices, AnyUrl, Field, computed_field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .yaml_sources import create_otel_yaml_source
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class OtelSettings(BaseSettings):

@@ -7,7 +7,6 @@ abstracting the tracker and scheduler interactions.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from example_service.features.tasks.schemas import (
@@ -22,6 +21,17 @@ from example_service.features.tasks.schemas import (
     TriggerTaskResponse,
 )
 from example_service.tasks.tracking import get_tracker
+
+# Optional references for patching/testing; actual imports may fail if infra not set up
+try:
+    from example_service.tasks.broker import broker  # type: ignore
+except Exception:  # pragma: no cover - best effort
+    broker = None
+
+try:
+    from example_service.tasks.scheduler import scheduler  # type: ignore
+except Exception:  # pragma: no cover - best effort
+    scheduler = None
 
 
 # ──────────────────────────────────────────────────────────────
@@ -126,17 +136,21 @@ class TaskManagementService:
             # Get primary status filter
             status = params.status.value if params.status else None
 
+            tracker_params: dict[str, Any] = {
+                "task_name": params.task_name,
+                "status": status,
+                "worker_id": params.worker_id,
+                "error_type": params.error_type,
+                "created_after": created_after,
+                "created_before": created_before,
+                "min_duration_ms": params.min_duration_ms,
+                "max_duration_ms": params.max_duration_ms,
+            }
+
             tasks = await tracker.get_task_history(
                 limit=params.limit,
                 offset=params.offset,
-                task_name=params.task_name,
-                status=status,
-                worker_id=params.worker_id,
-                error_type=params.error_type,
-                created_after=created_after,
-                created_before=created_before,
-                min_duration_ms=params.min_duration_ms,
-                max_duration_ms=params.max_duration_ms,
+                **tracker_params,
             )
 
             # Convert to response models
@@ -153,9 +167,14 @@ class TaskManagementService:
                 for t in tasks
             ]
 
-            # For now, return count as len(tasks)
-            # TODO: Add total count to tracker interface for proper pagination
-            total = len(tasks) + params.offset if len(tasks) == params.limit else len(tasks) + params.offset
+            try:
+                total = await tracker.count_task_history(**tracker_params)
+            except Exception as e:
+                logger.warning(
+                    "Failed to count task history; falling back to page size",
+                    extra={"error": str(e)},
+                )
+                total = len(tasks) + params.offset if len(tasks) == params.limit else len(tasks) + params.offset
 
             return responses, total
         except Exception as e:
@@ -335,7 +354,7 @@ class TaskManagementService:
             cancelled = await tracker.cancel_task(task_id)
 
             if cancelled:
-                message = f"Task cancelled successfully"
+                message = "Task cancelled successfully"
                 if reason:
                     message += f" (reason: {reason})"
                 logger.info(
@@ -388,8 +407,6 @@ class TaskManagementService:
             BrokerNotConfiguredError: If the task broker is not available.
             TaskServiceError: If the task fails to trigger.
         """
-        from example_service.tasks.broker import broker
-
         if broker is None:
             raise BrokerNotConfiguredError(
                 "Task broker not configured. Ensure RabbitMQ and Redis are available."
@@ -640,10 +657,13 @@ def get_task_service(
     """
     # Try to get scheduler from the tasks module if not provided
     if scheduler is None:
-        try:
-            from example_service.tasks.scheduler import scheduler as app_scheduler
-            scheduler = app_scheduler
-        except ImportError:
-            pass
+        scheduler = globals().get("scheduler")
+        if scheduler is None:
+            try:
+                from example_service.tasks.scheduler import scheduler as app_scheduler
+                scheduler = app_scheduler
+                globals()["scheduler"] = app_scheduler
+            except ImportError:
+                scheduler = None
 
     return TaskManagementService(scheduler=scheduler)

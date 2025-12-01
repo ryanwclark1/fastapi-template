@@ -10,12 +10,14 @@ They can be consumed by other services or features for:
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from pydantic import Field
 
 from example_service.core.events import DomainEvent, event_registry
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 @event_registry.register

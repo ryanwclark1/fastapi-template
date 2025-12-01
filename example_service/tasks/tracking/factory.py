@@ -7,9 +7,12 @@ for task trackers, selecting the appropriate backend based on settings.
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from example_service.core.settings import get_db_settings, get_redis_settings, get_task_settings
-from example_service.tasks.tracking.base import BaseTaskTracker
+
+if TYPE_CHECKING:
+    from example_service.tasks.tracking.base import BaseTaskTracker
 
 logger = logging.getLogger(__name__)
 

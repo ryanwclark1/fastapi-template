@@ -20,12 +20,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal
 
 from sqlalchemy import Select, and_, func, or_
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from sqlalchemy.orm import InstrumentedAttribute
 
 

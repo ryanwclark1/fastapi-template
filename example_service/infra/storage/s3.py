@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from example_service.core.settings.backup import BackupSettings
 
 logger = logging.getLogger(__name__)

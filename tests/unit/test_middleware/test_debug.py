@@ -106,9 +106,7 @@ class TestTraceIDGeneration:
 
         # Verify trace ID is valid UUID format
         trace_id = response.headers["X-Trace-Id"]
-        uuid_pattern = re.compile(
-            r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-        )
+        uuid_pattern = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
         assert uuid_pattern.match(trace_id)
 
     async def test_propagates_existing_trace_id(
@@ -155,9 +153,7 @@ class TestTraceIDGeneration:
 class TestSpanIDGeneration:
     """Test span ID generation."""
 
-    async def test_generates_span_id(
-        self, app: FastAPI, async_client: AsyncClient
-    ) -> None:
+    async def test_generates_span_id(self, app: FastAPI, async_client: AsyncClient) -> None:
         """Test that span ID is generated for each request."""
         response = await async_client.get("/test")
 
@@ -169,9 +165,7 @@ class TestSpanIDGeneration:
         assert len(span_id) == 8
         assert re.match(r"^[0-9a-f]{8}$", span_id)
 
-    async def test_generates_unique_span_ids(
-        self, app: FastAPI, async_client: AsyncClient
-    ) -> None:
+    async def test_generates_unique_span_ids(self, app: FastAPI, async_client: AsyncClient) -> None:
         """Test that each request gets a unique span ID."""
         response1 = await async_client.get("/test")
         response2 = await async_client.get("/test")
@@ -257,7 +251,7 @@ class TestExceptionHandling:
     ) -> None:
         """Test that exceptions are logged with full trace context."""
         with caplog.at_level(logging.ERROR):
-            with pytest.raises(Exception):
+            with pytest.raises(ValueError):
                 await async_client.get("/error")
 
         # Find error log
@@ -276,7 +270,7 @@ class TestExceptionHandling:
     ) -> None:
         """Test that failed requests include timing information."""
         with caplog.at_level(logging.ERROR):
-            with pytest.raises(Exception):
+            with pytest.raises(ValueError):
                 await async_client.get("/error")
 
         error_logs = [r for r in caplog.records if "Request failed" in r.message]
@@ -289,13 +283,9 @@ class TestExceptionHandling:
 class TestContextInjection:
     """Test logging context injection."""
 
-    async def test_sets_log_context(
-        self, app: FastAPI, async_client: AsyncClient
-    ) -> None:
+    async def test_sets_log_context(self, app: FastAPI, async_client: AsyncClient) -> None:
         """Test that logging context is set for the request."""
-        with patch(
-            "example_service.app.middleware.debug.set_log_context"
-        ) as mock_set_context:
+        with patch("example_service.app.middleware.debug.set_log_context") as mock_set_context:
             await async_client.get("/test?filter=active")
 
             # Verify set_log_context was called
@@ -328,12 +318,8 @@ class TestContextInjection:
         app.add_middleware(DebugMiddleware, enabled=True)
         app.add_middleware(UserContextMiddleware)
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            with patch(
-                "example_service.app.middleware.debug.set_log_context"
-            ) as mock_set_context:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            with patch("example_service.app.middleware.debug.set_log_context") as mock_set_context:
                 response = await client.get("/test")
                 assert response.status_code == 200
 
@@ -360,12 +346,8 @@ class TestContextInjection:
         app.add_middleware(DebugMiddleware, enabled=True)
         app.add_middleware(TenantContextMiddleware)
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            with patch(
-                "example_service.app.middleware.debug.set_log_context"
-            ) as mock_set_context:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            with patch("example_service.app.middleware.debug.set_log_context") as mock_set_context:
                 response = await client.get("/test")
                 assert response.status_code == 200
 
@@ -403,9 +385,7 @@ class TestFeatureFlags:
             log_responses=True,
         )
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             with caplog.at_level(logging.INFO):
                 response = await client.get("/test")
 
@@ -434,9 +414,7 @@ class TestFeatureFlags:
             log_responses=False,  # Disable response logging
         )
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             with caplog.at_level(logging.INFO):
                 response = await client.get("/test")
 
@@ -468,9 +446,7 @@ class TestHeaderPrefix:
             header_prefix="Trace-",  # Custom prefix
         )
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/test")
 
             assert response.status_code == 200
@@ -491,13 +467,9 @@ class TestHeaderPrefix:
             header_prefix="Custom-",
         )
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             trace_id = "custom-trace-id"
-            response = await client.get(
-                "/test", headers={"Custom-Trace-Id": trace_id}
-            )
+            response = await client.get("/test", headers={"Custom-Trace-Id": trace_id})
 
             assert response.status_code == 200
             assert response.json()["trace_id"] == trace_id
@@ -506,9 +478,7 @@ class TestHeaderPrefix:
 class TestPerformance:
     """Test performance characteristics."""
 
-    async def test_minimal_overhead_when_disabled(
-        self, disabled_client: AsyncClient
-    ) -> None:
+    async def test_minimal_overhead_when_disabled(self, disabled_client: AsyncClient) -> None:
         """Test that disabled middleware has minimal overhead."""
         import time
 
@@ -554,9 +524,7 @@ class TestEdgeCases:
 
         app.add_middleware(DebugMiddleware, enabled=True)
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             with caplog.at_level(logging.INFO):
                 response = await client.get("/test")
 
@@ -590,9 +558,7 @@ class TestEdgeCases:
 class TestIntegrationWithLoggingContext:
     """Test integration with logging context system."""
 
-    async def test_context_available_in_endpoint(
-        self, caplog: LogCaptureFixture
-    ) -> None:
+    async def test_context_available_in_endpoint(self, caplog: LogCaptureFixture) -> None:
         """Test that trace context is available in endpoint via logging.
 
         Note: Context injection requires ContextInjectingFilter to be configured
@@ -618,9 +584,7 @@ class TestIntegrationWithLoggingContext:
 
         app.add_middleware(DebugMiddleware, enabled=True)
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             with caplog.at_level(logging.INFO):
                 response = await client.get("/test")
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
-from uuid import UUID
 
 from sqlalchemy import select
 
@@ -13,6 +12,7 @@ from example_service.features.webhooks.models import Webhook, WebhookDelivery
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from uuid import UUID
 
     from sqlalchemy.ext.asyncio import AsyncSession
 

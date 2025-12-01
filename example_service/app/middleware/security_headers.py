@@ -46,10 +46,9 @@ import logging
 from typing import TYPE_CHECKING
 
 from starlette.datastructures import MutableHeaders
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 if TYPE_CHECKING:
-    pass
+    from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 logger = logging.getLogger(__name__)
 

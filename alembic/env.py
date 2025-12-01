@@ -19,7 +19,6 @@ from logging.config import fileConfig
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import pool
-from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
@@ -36,6 +35,7 @@ from example_service.core.settings import get_db_settings
 if TYPE_CHECKING:
     from alembic.operations.ops import MigrationScript
     from alembic.runtime.migration import MigrationContext
+    from sqlalchemy.engine import Connection
 
 # Alembic Config object
 config = context.config

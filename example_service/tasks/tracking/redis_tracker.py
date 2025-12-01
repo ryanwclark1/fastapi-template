@@ -347,18 +347,60 @@ class RedisTaskTracker(BaseTaskTracker):
                         except ValueError:
                             pass
 
-                    tasks.append({
-                        "task_id": task_data.get("task_id", task_id),
-                        "task_name": task_data.get("task_name", "unknown"),
-                        "started_at": started_at,
-                        "running_for_ms": running_for_ms,
-                        "worker_id": task_data.get("worker_id", "") or None,
-                    })
+                    tasks.append(
+                        {
+                            "task_id": task_data.get("task_id", task_id),
+                            "task_name": task_data.get("task_name", "unknown"),
+                            "started_at": started_at,
+                            "running_for_ms": running_for_ms,
+                            "worker_id": task_data.get("worker_id", "") or None,
+                        }
+                    )
 
             return tasks
         except (RedisConnectionError, RedisTimeoutError) as e:
             logger.warning("Failed to get running tasks", extra={"error": str(e)})
             return []
+
+    def _passes_filters(
+        self,
+        task_data: dict[str, str],
+        *,
+        task_name: str | None = None,
+        status: str | None = None,
+        worker_id: str | None = None,
+        error_type: str | None = None,
+        created_after: str | None = None,
+        created_before: str | None = None,
+        min_duration_ms: int | None = None,
+        max_duration_ms: int | None = None,
+    ) -> tuple[bool, int | None]:
+        """Check whether task data matches provided filters."""
+        if task_name and status and task_data.get("status") != status:
+            return False, None
+        if worker_id and task_data.get("worker_id") != worker_id:
+            return False, None
+        if error_type and task_data.get("error_type") != error_type:
+            return False, None
+
+        duration_ms = None
+        duration_str = task_data.get("duration_ms", "")
+        if duration_str:
+            with contextlib.suppress(ValueError):
+                duration_ms = int(duration_str)
+
+        if min_duration_ms is not None and (duration_ms is None or duration_ms < min_duration_ms):
+            return False, duration_ms
+        if max_duration_ms is not None and (duration_ms is None or duration_ms > max_duration_ms):
+            return False, duration_ms
+
+        started_at = task_data.get("started_at", "")
+        if created_after and started_at and started_at < created_after:
+            return False, duration_ms
+        if created_before and started_at and started_at > created_before:
+            return False, duration_ms
+
+        return True, duration_ms
 
     async def get_task_history(
         self,
@@ -388,7 +430,11 @@ class RedisTaskTracker(BaseTaskTracker):
 
             # Get task IDs from index (newest first)
             # Fetch extra to account for secondary filters
-            fetch_limit = (offset + limit) * 3 if any([worker_id, error_type, min_duration_ms, max_duration_ms]) else offset + limit
+            fetch_limit = (
+                (offset + limit) * 3
+                if any([worker_id, error_type, min_duration_ms, max_duration_ms])
+                else offset + limit
+            )
             task_ids = await self.client.zrevrange(index_key, 0, fetch_limit - 1)
 
             if not task_ids:
@@ -405,37 +451,27 @@ class RedisTaskTracker(BaseTaskTracker):
                 if not task_data:
                     continue
 
-                # Apply secondary filters
-                if task_name and status and task_data.get("status") != status:
-                    continue
-                if worker_id and task_data.get("worker_id") != worker_id:
-                    continue
-                if error_type and task_data.get("error_type") != error_type:
-                    continue
+                matches_filters, duration_ms = self._passes_filters(
+                    task_data,
+                    task_name=task_name,
+                    status=status,
+                    worker_id=worker_id,
+                    error_type=error_type,
+                    created_after=created_after,
+                    created_before=created_before,
+                    min_duration_ms=min_duration_ms,
+                    max_duration_ms=max_duration_ms,
+                )
 
-                # Duration filter
-                duration_str = task_data.get("duration_ms", "")
-                duration_ms = None
-                if duration_str:
-                    with contextlib.suppress(ValueError):
-                        duration_ms = int(duration_str)
-
-                if min_duration_ms is not None and (duration_ms is None or duration_ms < min_duration_ms):
-                    continue
-                if max_duration_ms is not None and (duration_ms is None or duration_ms > max_duration_ms):
-                    continue
-
-                # Date range filter
-                started_at = task_data.get("started_at", "")
-                if created_after and started_at and started_at < created_after:
-                    continue
-                if created_before and started_at and started_at > created_before:
+                if not matches_filters:
                     continue
 
                 # Skip offset records
                 if skipped < offset:
                     skipped += 1
                     continue
+
+                started_at = task_data.get("started_at", "")
 
                 # Parse return_value
                 return_value = None
@@ -446,18 +482,20 @@ class RedisTaskTracker(BaseTaskTracker):
                     except (json.JSONDecodeError, TypeError):
                         return_value = return_value_str
 
-                tasks.append({
-                    "task_id": task_data.get("task_id", task_id),
-                    "task_name": task_data.get("task_name", "unknown"),
-                    "status": task_data.get("status", "unknown"),
-                    "started_at": started_at,
-                    "finished_at": task_data.get("finished_at", "") or None,
-                    "duration_ms": duration_ms,
-                    "return_value": return_value,
-                    "error_message": task_data.get("error_message", "") or None,
-                    "error_type": task_data.get("error_type", "") or None,
-                    "worker_id": task_data.get("worker_id", "") or None,
-                })
+                tasks.append(
+                    {
+                        "task_id": task_data.get("task_id", task_id),
+                        "task_name": task_data.get("task_name", "unknown"),
+                        "status": task_data.get("status", "unknown"),
+                        "started_at": started_at,
+                        "finished_at": task_data.get("finished_at", "") or None,
+                        "duration_ms": duration_ms,
+                        "return_value": return_value,
+                        "error_message": task_data.get("error_message", "") or None,
+                        "error_type": task_data.get("error_type", "") or None,
+                        "worker_id": task_data.get("worker_id", "") or None,
+                    }
+                )
 
                 if len(tasks) >= limit:
                     break
@@ -466,6 +504,60 @@ class RedisTaskTracker(BaseTaskTracker):
         except (RedisConnectionError, RedisTimeoutError) as e:
             logger.warning("Failed to get task history", extra={"error": str(e)})
             return []
+
+    async def count_task_history(
+        self,
+        task_name: str | None = None,
+        status: str | None = None,
+        worker_id: str | None = None,
+        error_type: str | None = None,
+        created_after: str | None = None,
+        created_before: str | None = None,
+        min_duration_ms: int | None = None,
+        max_duration_ms: int | None = None,
+    ) -> int:
+        """Count task executions matching the given filters."""
+        if not self.is_connected:
+            return 0
+
+        try:
+            if task_name:
+                index_key = self._index_name_key(task_name)
+            elif status:
+                index_key = self._index_status_key(status)
+            else:
+                index_key = self._index_all_key()
+
+            task_ids = await self.client.zrevrange(index_key, 0, -1)
+            if not task_ids:
+                return 0
+
+            total = 0
+            for task_id in task_ids:
+                exec_key = self._exec_key(task_id)
+                task_data = await self.client.hgetall(exec_key)
+                if not task_data:
+                    continue
+
+                matches_filters, _ = self._passes_filters(
+                    task_data,
+                    task_name=task_name,
+                    status=status,
+                    worker_id=worker_id,
+                    error_type=error_type,
+                    created_after=created_after,
+                    created_before=created_before,
+                    min_duration_ms=min_duration_ms,
+                    max_duration_ms=max_duration_ms,
+                )
+
+                if matches_filters:
+                    total += 1
+
+            return total
+        except (RedisConnectionError, RedisTimeoutError) as e:
+            logger.warning("Failed to count task history", extra={"error": str(e)})
+            return 0
 
     async def get_task_details(self, task_id: str) -> dict[str, Any] | None:
         """Get full details for a specific task execution."""
@@ -550,7 +642,7 @@ class RedisTaskTracker(BaseTaskTracker):
             )
             return None
 
-    async def get_stats(self, hours: int = 24) -> dict[str, Any]:
+    async def get_stats(self, _hours: int = 24) -> dict[str, Any]:
         """Get summary statistics for task executions."""
         if not self.is_connected:
             return {
@@ -642,10 +734,13 @@ class RedisTaskTracker(BaseTaskTracker):
             pipe = self.client.pipeline()
 
             # Update status
-            pipe.hset(exec_key, mapping={
-                "status": "cancelled",
-                "finished_at": now.isoformat(),
-            })
+            pipe.hset(
+                exec_key,
+                mapping={
+                    "status": "cancelled",
+                    "finished_at": now.isoformat(),
+                },
+            )
 
             # Update indices
             if current_status == "running":

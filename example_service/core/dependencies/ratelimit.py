@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends, Request
 
 from example_service.infra.cache import get_cache
 from example_service.infra.ratelimit.limiter import RateLimiter, check_rate_limit
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 

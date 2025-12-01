@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import Any, ClassVar
 from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
@@ -10,9 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from example_service.core.database import TimestampedBase
 from example_service.core.database.search import TSVECTOR
-
-if TYPE_CHECKING:
-    from example_service.features.tags.models import Tag
+from example_service.features.tags.models import Tag
 
 
 class Reminder(TimestampedBase):

@@ -15,12 +15,11 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import Column, Index, String, event, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import declarative_mixin, declared_attr
-from sqlalchemy.sql import Select
-
-if TYPE_CHECKING:
-    pass
 
 from example_service.core.middleware.tenant import get_tenant_context
+
+if TYPE_CHECKING:
+    from sqlalchemy.sql import Select
 
 logger = logging.getLogger(__name__)
 

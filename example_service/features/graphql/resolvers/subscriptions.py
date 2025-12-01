@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
@@ -20,6 +19,8 @@ from example_service.features.graphql.types.reminders import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
     from strawberry.types import Info
 
     from example_service.features.graphql.context import GraphQLContext

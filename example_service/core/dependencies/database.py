@@ -46,12 +46,13 @@ Why two getters?
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING
 
 from example_service.infra.database import get_async_session
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
     from sqlalchemy.ext.asyncio import AsyncSession
 
 

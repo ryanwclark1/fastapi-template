@@ -10,15 +10,11 @@ from __future__ import annotations
 import logging
 import threading
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
 
 from example_service.infra.ratelimit.status import (
     RateLimitProtectionState,
     RateLimitProtectionStatus,
 )
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 
