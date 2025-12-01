@@ -18,10 +18,21 @@ from example_service.core.settings import (
     get_otel_settings,
     get_rabbit_settings,
     get_redis_settings,
+    get_websocket_settings,
 )
 from example_service.infra.cache.redis import start_cache, stop_cache
 from example_service.infra.database.session import close_database, init_database
 from example_service.infra.discovery import start_discovery, stop_discovery
+from example_service.infra.events.outbox.processor import (
+    start_outbox_processor,
+    stop_outbox_processor,
+)
+from example_service.infra.realtime import (
+    start_connection_manager,
+    start_event_bridge,
+    stop_connection_manager,
+    stop_event_bridge,
+)
 from example_service.infra.logging.config import setup_logging
 from example_service.infra.messaging.broker import start_broker, stop_broker
 from example_service.infra.metrics.prometheus import application_info
@@ -255,6 +266,38 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await start_broker()
         logger.info("RabbitMQ/FastStream broker initialized")
 
+    # Initialize outbox processor for reliable event publishing
+    # Requires both database and RabbitMQ to be available
+    if db_settings.is_configured and rabbit_settings.is_configured:
+        try:
+            await start_outbox_processor()
+            logger.info("Event outbox processor started")
+        except Exception as e:
+            logger.warning(
+                "Failed to start outbox processor, events will not be published",
+                extra={"error": str(e)},
+            )
+
+    # Initialize WebSocket connection manager (requires Redis for horizontal scaling)
+    ws_settings = get_websocket_settings()
+    websocket_enabled = False
+    if ws_settings.enabled:
+        try:
+            await start_connection_manager()
+            websocket_enabled = True
+            logger.info("WebSocket connection manager initialized")
+
+            # Start event bridge (requires RabbitMQ)
+            if rabbit_settings.is_configured and ws_settings.event_bridge_enabled:
+                bridge_started = await start_event_bridge()
+                if bridge_started:
+                    logger.info("WebSocket event bridge started")
+        except Exception as e:
+            logger.warning(
+                "Failed to start WebSocket manager, realtime features disabled",
+                extra={"error": str(e)},
+            )
+
     # Initialize Taskiq broker for background tasks (independent of FastStream)
     # Taskiq uses its own RabbitMQ connection via taskiq-aio-pika
     initialization = _initialize_taskiq_and_scheduler(rabbit_settings, redis_settings)
@@ -276,6 +319,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "database_enabled": db_settings.is_configured,
             "cache_enabled": redis_settings.is_configured,
             "messaging_enabled": rabbit_settings.is_configured,
+            "outbox_enabled": db_settings.is_configured and rabbit_settings.is_configured,
+            "websocket_enabled": websocket_enabled,
             "host": app_settings.host,
             "port": app_settings.port,
         },
@@ -303,6 +348,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if rabbit_settings.is_configured and redis_settings.is_configured and taskiq_module:
         await taskiq_module.stop_taskiq()
         logger.info("Taskiq broker closed")
+
+    # Stop WebSocket event bridge and connection manager (before RabbitMQ/Redis)
+    if ws_settings.enabled and websocket_enabled:
+        await stop_event_bridge()
+        logger.info("WebSocket event bridge stopped")
+        await stop_connection_manager()
+        logger.info("WebSocket connection manager stopped")
+
+    # Stop outbox processor (before closing RabbitMQ broker)
+    if db_settings.is_configured and rabbit_settings.is_configured:
+        await stop_outbox_processor()
+        logger.info("Event outbox processor stopped")
 
     # Close RabbitMQ broker
     if rabbit_settings.is_configured:

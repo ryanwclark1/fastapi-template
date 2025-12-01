@@ -587,6 +587,143 @@ class BaseRepository[T]:
         )
         return total_inserted
 
+    async def paginate_cursor(
+        self,
+        session: AsyncSession,
+        statement: Select[tuple[T]],
+        *,
+        first: int | None = None,
+        after: str | None = None,
+        last: int | None = None,
+        before: str | None = None,
+        order_by: list[tuple[InstrumentedAttribute[Any], str]],
+        include_total: bool = False,
+    ) -> Any:  # Returns Connection[T]
+        """Execute cursor-paginated query.
+
+        Implements cursor-based (keyset) pagination with support for both
+        forward and backward navigation. Returns a GraphQL Connection-style
+        response that can be converted to simpler REST format.
+
+        Args:
+            session: Database session
+            statement: SQLAlchemy select statement (without pagination)
+            first: Number of items for forward pagination
+            after: Cursor for forward pagination (fetch items after this)
+            last: Number of items for backward pagination
+            before: Cursor for backward pagination (fetch items before this)
+            order_by: List of (column, direction) tuples
+            include_total: Whether to include total count (can be expensive)
+
+        Returns:
+            Connection[T] with edges and page_info
+
+        Example:
+            from example_service.core.pagination import Connection
+
+            stmt = select(User).where(User.is_active == True)
+            result: Connection[User] = await repo.paginate_cursor(
+                session,
+                stmt,
+                first=50,
+                after=cursor_from_request,
+                order_by=[(User.created_at, "desc"), (User.id, "asc")],
+            )
+
+            # Access items
+            for edge in result.edges:
+                print(edge.node, edge.cursor)
+
+            # Check for more pages
+            if result.page_info.has_next_page:
+                next_cursor = result.page_info.end_cursor
+        """
+        from example_service.core.pagination import (
+            Connection,
+            CursorCodec,
+            CursorFilter,
+            Edge,
+            PageInfo,
+        )
+
+        # Determine pagination direction and limit
+        if first is not None:
+            limit = first
+            cursor = after
+            direction = "after"
+        elif last is not None:
+            limit = last
+            cursor = before
+            direction = "before"
+        else:
+            limit = 50  # Default
+            cursor = None
+            direction = "after"
+
+        # Convert order_by to proper type hints
+        typed_order_by: list[tuple[InstrumentedAttribute[Any], str]] = [
+            (col, dir_) for col, dir_ in order_by
+        ]
+
+        # Apply cursor filter
+        cursor_filter = CursorFilter(
+            cursor=cursor,
+            order_by=typed_order_by,  # type: ignore[arg-type]
+            limit=limit,
+            direction=direction,  # type: ignore[arg-type]
+        )
+        paginated_stmt = cursor_filter.apply(statement)
+
+        # Execute query
+        result = await session.execute(paginated_stmt)
+        rows = list(result.scalars().all())
+
+        # Check if there are more items (we fetched limit+1)
+        has_more = len(rows) > limit
+        if has_more:
+            rows = rows[:limit]
+
+        # For backward pagination, reverse the results
+        if direction == "before":
+            rows = list(reversed(rows))
+
+        # Get total count if requested
+        total_count = None
+        if include_total:
+            from sqlalchemy import func
+
+            count_stmt = select(func.count()).select_from(statement.subquery())
+            total_count = (await session.execute(count_stmt)).scalar_one()
+
+        # Build sort field names for cursor creation
+        sort_fields = [col.key for col, _ in order_by]
+
+        # Build edges with cursors
+        edges: list[Edge[T]] = []
+        for row in rows:
+            item_cursor = CursorCodec.create_cursor(row, sort_fields, "forward")
+            edges.append(Edge(node=row, cursor=item_cursor))
+
+        # Build page info
+        has_next = has_more if direction == "after" else (cursor is not None)
+        has_prev = (cursor is not None) if direction == "after" else has_more
+
+        page_info = PageInfo(
+            has_previous_page=has_prev,
+            has_next_page=has_next,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+            total_count=total_count,
+        )
+
+        connection = Connection(edges=edges, page_info=page_info)
+
+        self._lazy.debug(
+            lambda: f"db.paginate_cursor: {self.model.__name__}(limit={limit}) -> {len(edges)} items, has_next={has_next}"
+        )
+
+        return connection
+
     def _pk_attr(self) -> InstrumentedAttribute[Any]:
         """Get primary key attribute.
 

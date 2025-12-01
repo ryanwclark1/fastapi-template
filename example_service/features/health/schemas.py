@@ -54,7 +54,6 @@ class HealthResponse(BaseModel):
                 "checks": {"database": True, "cache": True, "messaging": True},
             }
         },
-        json_encoders={datetime: lambda v: v.isoformat()},
         str_strip_whitespace=True,
     )
 
@@ -141,7 +140,6 @@ class DetailedHealthResponse(BaseModel):
                 },
             }
         },
-        json_encoders={datetime: lambda v: v.isoformat()},
         str_strip_whitespace=True,
     )
 
@@ -178,7 +176,6 @@ class ReadinessResponse(BaseModel):
                 "timestamp": "2025-01-01T00:00:00Z",
             }
         },
-        json_encoders={datetime: lambda v: v.isoformat()},
     )
 
 
@@ -210,7 +207,6 @@ class LivenessResponse(BaseModel):
                 "service": "example-service",
             }
         },
-        json_encoders={datetime: lambda v: v.isoformat()},
         str_strip_whitespace=True,
     )
 
@@ -240,7 +236,6 @@ class StartupResponse(BaseModel):
                 "timestamp": "2025-01-01T00:00:00Z",
             }
         },
-        json_encoders={datetime: lambda v: v.isoformat()},
     )
 
 
@@ -437,7 +432,6 @@ class HealthStatsResponse(BaseModel):
                 },
             }
         },
-        json_encoders={datetime: lambda v: v.isoformat() if v else None},
     )
 
 
@@ -568,7 +562,6 @@ class ProtectionHealthResponse(BaseModel):
                 },
             }
         },
-        json_encoders={datetime: lambda v: v.isoformat()},
     )
 
 

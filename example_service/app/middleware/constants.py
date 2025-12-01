@@ -12,4 +12,6 @@ EXEMPT_PATHS = [
     "/docs",
     "/redoc",
     "/openapi.json",
+    "/asyncapi",
+    "/graphql",
 ]

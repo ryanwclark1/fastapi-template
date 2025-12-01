@@ -29,12 +29,14 @@ from .app import AppSettings
 from .auth import AuthSettings
 from .backup import BackupSettings
 from .consul import ConsulSettings
+from .graphql import GraphQLSettings
 from .logs import LoggingSettings
 from .otel import OtelSettings
 from .postgres import PostgresSettings
 from .rabbit import RabbitSettings
 from .redis import RedisSettings
 from .storage import StorageSettings
+from .websocket import WebSocketSettings
 
 
 @lru_cache(maxsize=1)
@@ -137,6 +139,26 @@ def get_storage_settings() -> StorageSettings:
     return StorageSettings()
 
 
+@lru_cache(maxsize=1)
+def get_websocket_settings() -> WebSocketSettings:
+    """Get cached WebSocket settings.
+
+    Returns:
+        Validated and frozen WebSocketSettings instance.
+    """
+    return WebSocketSettings()
+
+
+@lru_cache(maxsize=1)
+def get_graphql_settings() -> GraphQLSettings:
+    """Get cached GraphQL settings.
+
+    Returns:
+        Validated and frozen GraphQLSettings instance.
+    """
+    return GraphQLSettings()
+
+
 def clear_all_caches() -> None:
     """Clear all settings caches.
 
@@ -153,3 +175,5 @@ def clear_all_caches() -> None:
     get_backup_settings.cache_clear()
     get_consul_settings.cache_clear()
     get_storage_settings.cache_clear()
+    get_websocket_settings.cache_clear()
+    get_graphql_settings.cache_clear()

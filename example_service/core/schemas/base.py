@@ -24,10 +24,6 @@ class CustomBase(BaseModel):
     """
 
     model_config = ConfigDict(
-        # Serialize datetimes as ISO 8601 strings
-        json_encoders={
-            datetime: lambda v: v.isoformat(),
-        },
         # Allow creation from ORM models (SQLAlchemy)
         from_attributes=True,
         # Validate on assignment (not just initialization)

@@ -255,7 +255,7 @@ async def validation_exception_handler(
     problem = ValidationProblemDetail(
         type="validation-error",
         title="Validation Error",
-        status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status=status.HTTP_422_UNPROCESSABLE_CONTENT,
         detail=f"Request validation failed for {len(validation_errors)} field(s)",
         instance=str(request.url),
         errors=validation_errors,
@@ -266,7 +266,7 @@ async def validation_exception_handler(
         response_data["request_id"] = request_id
 
     return ProblemJSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content=response_data,
     )
 
@@ -367,7 +367,7 @@ async def pydantic_validation_exception_handler(
     problem = ValidationProblemDetail(
         type="validation-error",
         title="Validation Error",
-        status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status=status.HTTP_422_UNPROCESSABLE_CONTENT,
         detail=f"Data validation failed for {len(validation_errors)} field(s)",
         instance=str(request.url),
         errors=validation_errors,
@@ -378,7 +378,7 @@ async def pydantic_validation_exception_handler(
         response_data["request_id"] = request_id
 
     return ProblemJSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content=response_data,
     )
 

@@ -34,7 +34,6 @@ class BaseEvent(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional event metadata")
 
     model_config = ConfigDict(
-        json_encoders={datetime: lambda v: v.isoformat()},
         str_strip_whitespace=True,
     )
 

@@ -50,6 +50,31 @@ AsyncSessionLocal = async_sessionmaker(
     autocommit=False,
 )
 
+# Track whether optional ancillary tables (like the event outbox) were ensured
+_outbox_table_initialized = False
+
+
+async def _ensure_event_outbox_table() -> None:
+    """Create the event_outbox table if migrations haven't run yet.
+
+    This provides a safety net for environments where Alembic migrations
+    aren't executed (e.g., ephemeral preview deployments or local tests
+    using a fresh database). The operation is idempotent thanks to
+    SQLAlchemy's `checkfirst` guard.
+    """
+    global _outbox_table_initialized
+    if _outbox_table_initialized:
+        return
+
+    from example_service.infra.events.outbox.models import EventOutbox
+
+    async with engine.begin() as conn:
+        await conn.run_sync(
+            lambda sync_conn: EventOutbox.__table__.create(bind=sync_conn, checkfirst=True)
+        )
+
+    _outbox_table_initialized = True
+
 
 # ============================================================================
 # Database Metrics Instrumentation
@@ -187,6 +212,8 @@ async def init_database() -> None:
             if db_settings.is_configured
             else "sqlite+aiosqlite:///./test.db"
         )
+        # Ensure optional tables needed for background processors exist
+        await _ensure_event_outbox_table()
         logger.info(
             "Database connection established successfully",
             extra={"url": db_url, "driver": "psycopg3"},

@@ -170,6 +170,41 @@ rabbitmq_messages_consumed_total = Counter(
     registry=REGISTRY,
 )
 
+# WebSocket metrics
+websocket_connections_total = Gauge(
+    "websocket_connections_total",
+    "Current number of active WebSocket connections",
+    registry=REGISTRY,
+)
+
+websocket_messages_received_total = Counter(
+    "websocket_messages_received_total",
+    "Total number of WebSocket messages received from clients",
+    ["message_type"],
+    registry=REGISTRY,
+)
+
+websocket_messages_sent_total = Counter(
+    "websocket_messages_sent_total",
+    "Total number of WebSocket messages sent to clients",
+    ["message_type"],
+    registry=REGISTRY,
+)
+
+websocket_connection_duration_seconds = Histogram(
+    "websocket_connection_duration_seconds",
+    "Duration of WebSocket connections in seconds",
+    buckets=(1, 5, 10, 30, 60, 120, 300, 600, 1800, 3600),
+    registry=REGISTRY,
+)
+
+websocket_broadcast_recipients = Histogram(
+    "websocket_broadcast_recipients",
+    "Number of recipients per broadcast message",
+    buckets=(1, 5, 10, 25, 50, 100, 250, 500, 1000),
+    registry=REGISTRY,
+)
+
 # Taskiq metrics
 taskiq_tasks_total = Counter(
     "taskiq_tasks_total",

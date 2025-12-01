@@ -34,11 +34,13 @@ from .loader import (
     get_backup_settings,
     get_consul_settings,
     get_db_settings,
+    get_graphql_settings,
     get_logging_settings,
     get_otel_settings,
     get_rabbit_settings,
     get_redis_settings,
     get_storage_settings,
+    get_websocket_settings,
 )
 from .unified import Settings, get_settings
 
@@ -49,11 +51,13 @@ __all__ = [
     "get_backup_settings",
     "get_consul_settings",
     "get_db_settings",
+    "get_graphql_settings",
     "get_logging_settings",
     "get_otel_settings",
     "get_rabbit_settings",
     "get_redis_settings",
     "get_storage_settings",
+    "get_websocket_settings",
     # Unified settings (convenient for development/testing)
     "Settings",
     "get_settings",

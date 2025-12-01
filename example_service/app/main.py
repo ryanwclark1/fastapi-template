@@ -4,6 +4,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from example_service.app.exception_handlers import configure_exception_handlers
+from example_service.app.docs import configure_documentation
 from example_service.app.lifespan import lifespan
 from example_service.app.middleware import configure_middleware
 from example_service.app.router import setup_routers
@@ -29,8 +30,8 @@ def create_app() -> FastAPI:
         description=settings.description,
         version=settings.version,
         # Documentation URLs
-        docs_url=settings.get_docs_url(),
-        redoc_url=settings.get_redoc_url(),
+        docs_url=None,
+        redoc_url=None,
         openapi_url=settings.get_openapi_url(),
         # OpenAPI configuration
         openapi_tags=settings.openapi_tags,
@@ -38,9 +39,9 @@ def create_app() -> FastAPI:
         root_path=settings.root_path,
         root_path_in_servers=settings.root_path_in_servers,
         # Swagger UI
-        swagger_ui_oauth2_redirect_url=settings.get_swagger_ui_oauth2_redirect_url(),
-        swagger_ui_init_oauth=settings.swagger_ui_init_oauth,
-        swagger_ui_parameters=settings.get_swagger_ui_parameters(),
+        swagger_ui_oauth2_redirect_url=None,
+        swagger_ui_init_oauth=None,
+        swagger_ui_parameters=None,
         # Behavioral settings
         debug=settings.debug,
         redirect_slashes=settings.redirect_slashes,
@@ -51,6 +52,9 @@ def create_app() -> FastAPI:
 
     # Configure exception handlers (must be before middleware)
     configure_exception_handlers(app)
+
+    # Serve documentation with CSP-friendly assets
+    configure_documentation(app)
 
     # Configure middleware (CORS, logging, etc.)
     configure_middleware(app)

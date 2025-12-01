@@ -30,7 +30,8 @@ class ReminderService(BaseService):
 
     async def create_reminder(self, payload: ReminderCreate) -> Reminder:
         """Create and persist a new reminder from user input."""
-        reminder = Reminder(**payload.model_dump())
+        reminder_data = payload.model_dump(exclude={"recurrence"})
+        reminder = Reminder(**reminder_data)
         created = await self._repository.create(self._session, reminder)
 
         # INFO level - business event (audit trail)
