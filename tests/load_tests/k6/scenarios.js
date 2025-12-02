@@ -5,16 +5,16 @@
  *
  * Usage:
  *   # Run with default scenario
- *   k6 run load_tests/k6/scenarios.js
+ *   k6 run tests/load_tests/k6/scenarios.js
  *
  *   # Run with specific scenario
- *   k6 run --env SCENARIO=spike load_tests/k6/scenarios.js
+ *   k6 run --env SCENARIO=spike tests/load_tests/k6/scenarios.js
  *
  *   # Run with custom parameters
- *   k6 run --vus 50 --duration 5m load_tests/k6/scenarios.js
+ *   k6 run --vus 50 --duration 5m tests/load_tests/k6/scenarios.js
  *
  *   # Output to JSON for analysis
- *   k6 run --out json=results.json load_tests/k6/scenarios.js
+ *   k6 run --out json=results.json tests/load_tests/k6/scenarios.js
  */
 
 import http from 'k6/http';

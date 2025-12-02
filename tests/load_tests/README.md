@@ -18,14 +18,14 @@ pip install locust
 
 ```bash
 # Start with web UI
-locust -f load_tests/locustfile.py --host=http://localhost:8000
+locust -f tests/load_tests/locustfile.py --host=http://localhost:8000
 
 # Run headless
-locust -f load_tests/locustfile.py --host=http://localhost:8000 \
+locust -f tests/load_tests/locustfile.py --host=http://localhost:8000 \
     --headless --users 100 --spawn-rate 10 --run-time 5m
 
 # Generate HTML report
-locust -f load_tests/locustfile.py --host=http://localhost:8000 \
+locust -f tests/load_tests/locustfile.py --host=http://localhost:8000 \
     --headless -u 50 -r 5 -t 2m --html=report.html
 ```
 
@@ -50,19 +50,19 @@ docker pull grafana/k6
 
 ```bash
 # Run default scenario
-k6 run load_tests/k6/scenarios.js
+k6 run tests/load_tests/k6/scenarios.js
 
 # Run with custom VUs and duration
-k6 run --vus 50 --duration 5m load_tests/k6/scenarios.js
+k6 run --vus 50 --duration 5m tests/load_tests/k6/scenarios.js
 
 # Run specific scenario
-k6 run --env SCENARIO=spike_test load_tests/k6/scenarios.js
+k6 run --env SCENARIO=spike_test tests/load_tests/k6/scenarios.js
 
 # Output results to JSON
-k6 run --out json=results.json load_tests/k6/scenarios.js
+k6 run --out json=results.json tests/load_tests/k6/scenarios.js
 
 # With Docker
-docker run --rm -i grafana/k6 run - < load_tests/k6/scenarios.js
+docker run --rm -i grafana/k6 run - < tests/load_tests/k6/scenarios.js
 ```
 
 ## Test Scenarios
@@ -135,7 +135,7 @@ load-test:
     - name: Run k6 Load Test
       uses: grafana/k6-action@v0.3.1
       with:
-        filename: load_tests/k6/scenarios.js
+        filename: tests/load_tests/k6/scenarios.js
         flags: --vus 10 --duration 1m
 
     - name: Upload Results
@@ -150,7 +150,7 @@ load-test:
 k6 can output metrics to InfluxDB/Grafana for visualization:
 
 ```bash
-k6 run --out influxdb=http://localhost:8086/k6 load_tests/k6/scenarios.js
+k6 run --out influxdb=http://localhost:8086/k6 tests/load_tests/k6/scenarios.js
 ```
 
 Import the [k6 dashboard](https://grafana.com/grafana/dashboards/2587) for real-time monitoring.

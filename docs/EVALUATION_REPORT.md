@@ -299,7 +299,7 @@ async def beta_feature(
 
 2. **Add load testing infrastructure:**
    ```
-   load_tests/
+   tests/load_tests/
    ├── locustfile.py      # Locust load tests
    ├── k6/
    │   └── scenarios.js   # k6 load test scenarios

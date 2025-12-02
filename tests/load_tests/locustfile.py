@@ -4,14 +4,14 @@ This module defines load test scenarios using Locust.
 
 Usage:
     # Start Locust web UI
-    locust -f load_tests/locustfile.py --host=http://localhost:8000
+    locust -f tests/load_tests/locustfile.py --host=http://localhost:8000
 
     # Run headless with specific parameters
-    locust -f load_tests/locustfile.py --host=http://localhost:8000 \
+    locust -f tests/load_tests/locustfile.py --host=http://localhost:8000 \
         --headless --users 100 --spawn-rate 10 --run-time 5m
 
     # Run specific user class
-    locust -f load_tests/locustfile.py --host=http://localhost:8000 \
+    locust -f tests/load_tests/locustfile.py --host=http://localhost:8000 \
         -u 50 -r 5 -t 2m --class-picker
 
 Configuration:
@@ -28,7 +28,6 @@ Output:
 
 from __future__ import annotations
 
-import json
 import random
 import string
 from datetime import datetime, timedelta

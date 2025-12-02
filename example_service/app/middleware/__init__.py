@@ -270,10 +270,9 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
 
     # 3. Security Headers Middleware
     # Adds security headers to all responses (production-aware)
-    # Use strict CSP when docs are disabled OR strict_csp is explicitly enabled
-    use_strict_csp = app_settings.disable_docs or (
-        app_settings.strict_csp and not app_settings.debug
-    )
+    # Use strict CSP only when docs are disabled; docs need inline/eval for bundles
+    docs_enabled = not app_settings.disable_docs
+    use_strict_csp = not docs_enabled and app_settings.strict_csp and not app_settings.debug
     csp_directives = (
         SecurityHeadersMiddleware._strict_csp_directives()
         if use_strict_csp
@@ -296,7 +295,11 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
         referrer_policy="strict-origin-when-cross-origin",
         enable_permissions_policy=True,
     )
-    csp_mode = "strict (no unsafe-inline/eval)" if use_strict_csp else "relaxed (docs-compatible)"
+    csp_mode = (
+        "strict (no unsafe-inline/eval)"
+        if use_strict_csp
+        else "relaxed (docs-compatible, AsyncAPI/Swagger)"
+    )
     logger.info(f"SecurityHeadersMiddleware enabled with {csp_mode} CSP")
 
     # 4. Metrics Middleware

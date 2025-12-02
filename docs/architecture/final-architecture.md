@@ -236,7 +236,7 @@ async def get_data(
     tenant_uuid = user.metadata.get("tenant_uuid")
 
     # Or from middleware context
-    from example_service.core.middleware.tenant import get_tenant_context
+    from example_service.app.middleware.tenant import get_tenant_context
     context = get_tenant_context()
     tenant_uuid = context.tenant_id if context else None
 ```

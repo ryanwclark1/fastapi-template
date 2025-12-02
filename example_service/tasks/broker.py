@@ -134,15 +134,19 @@ def _can_create_broker() -> bool:
 
 
 if _can_create_broker():
-    from taskiq.middlewares import PrometheusMiddleware, SimpleRetryMiddleware
+    from taskiq.middlewares import SimpleRetryMiddleware
 
-    from example_service.tasks.middleware import TracingMiddleware, TrackingMiddleware
+    from example_service.tasks.middleware import (
+        MetricsMiddleware,
+        TracingMiddleware,
+        TrackingMiddleware,
+    )
 
     result_backend = _create_result_backend()
 
     # Middleware order matters:
     # 1. SimpleRetryMiddleware - handles retry_on_error=True on tasks (must be first)
-    # 2. PrometheusMiddleware - exposes metrics including retried tasks
+    # 2. MetricsMiddleware - records Prometheus metrics (uses existing FastAPI registry)
     # 3. TracingMiddleware - creates OpenTelemetry spans for distributed tracing
     # 4. TrackingMiddleware - records task history in Redis/PostgreSQL
     broker = (
@@ -155,7 +159,7 @@ if _can_create_broker():
         .with_result_backend(result_backend)
         .with_middlewares(
             SimpleRetryMiddleware(),
-            PrometheusMiddleware(server_port=9001),  # Port 9000 used by FastAPI metrics
+            MetricsMiddleware(),  # Uses existing Prometheus registry - no separate server
             TracingMiddleware(),
             TrackingMiddleware(),
         )
@@ -166,8 +170,7 @@ if _can_create_broker():
         extra={
             "queue": rabbit_settings.get_prefixed_queue("taskiq-tasks"),
             "result_backend": task_settings.result_backend,
-            "middlewares": ["SimpleRetryMiddleware", "PrometheusMiddleware", "TracingMiddleware", "TrackingMiddleware"],
-            "prometheus_port": 9001,
+            "middlewares": ["SimpleRetryMiddleware", "MetricsMiddleware", "TracingMiddleware", "TrackingMiddleware"],
         },
     )
 

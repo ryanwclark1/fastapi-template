@@ -19,19 +19,16 @@ from example_service.core.database.search.filters import (
     WebSearchFilter,
 )
 from example_service.core.database.search.parser import (
-    ParsedQuery,
-    SearchQueryParser,
-    TokenType,
     QueryRewriter,
+    SearchQueryParser,
 )
+from example_service.core.database.search.types import TSVECTOR
 from example_service.core.database.search.utils import (
     FTSMigrationHelper,
     TrigramMigrationHelper,
     UnaccentMigrationHelper,
     generate_search_vector_sql,
 )
-from example_service.core.database.search.types import TSVECTOR
-
 
 # ──────────────────────────────────────────────────────────────
 # Test TSVECTOR Type

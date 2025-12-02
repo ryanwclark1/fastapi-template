@@ -271,7 +271,7 @@ curl -H "X-Auth-Token: <token>" \
 
 ```python
 from fastapi import FastAPI
-from example_service.core.middleware.tenant import (
+from example_service.app.middleware.tenant import (
     TenantMiddleware,
     HeaderTenantStrategy,
 )
@@ -291,7 +291,7 @@ app.add_middleware(
 ### Access Tenant in Endpoints
 
 ```python
-from example_service.core.middleware.tenant import get_tenant_context
+from example_service.app.middleware.tenant import get_tenant_context
 
 @router.get("/tenant-data")
 async def get_tenant_data(

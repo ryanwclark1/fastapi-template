@@ -42,6 +42,8 @@ dependencies = [
     # Email
     "aiosmtplib>=3.0.0",
     "jinja2>=3.1.0",
+    "taskiq-redis>=1.1.2",
+    "taskiq-postgresql>=0.4.0",
 ]
 
 [project.optional-dependencies]
@@ -80,6 +82,9 @@ loadtest = [
 [project.scripts]
 example-service = "example_service.cli:main"
 example-service-main = "example_service.main:main"
+
+[project.entry-points.taskiq_cli]
+track = "example_service.tasks.cli:TrackingCommand"
 
 [build-system]
 requires = ["hatchling"]
@@ -176,6 +181,7 @@ exclude = [
     ".mypy_cache",
     ".ruff_cache",
     "**/examples/*",
+    "scripts",
 ]
 
 [tool.ruff.lint]
@@ -291,7 +297,7 @@ warn_unused_ignores = true
 warn_no_return = true
 strict_equality = true
 plugins = ["pydantic.mypy"]
-exclude = ["^alembic/env\\.py$", ".*/examples/.*"]
+exclude = ["^alembic/env\\.py$", ".*/examples/.*", "^scripts/"]
 
 [[tool.mypy.overrides]]
 module = "tests.*"

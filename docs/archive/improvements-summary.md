@@ -162,7 +162,7 @@ print(f"API Key: {raw_key}")
 
 **Middleware Setup**:
 ```python
-from example_service.core.middleware.tenant import (
+from example_service.app.middleware.tenant import (
     TenantMiddleware,
     HeaderTenantStrategy,
     SubdomainTenantStrategy,
@@ -486,7 +486,7 @@ tokens = await client.exchange_code(code, state)
 3. **Enable Multi-Tenancy** (if needed):
    ```python
    # In app/asgi.py
-   from example_service.core.middleware.tenant import TenantMiddleware
+   from example_service.app.middleware.tenant import TenantMiddleware
    app.add_middleware(TenantMiddleware, ...)
    ```
 

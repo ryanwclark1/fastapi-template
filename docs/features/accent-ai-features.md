@@ -134,7 +134,7 @@ Complete tenant isolation with multiple identification strategies.
 #### Quick Example
 
 ```python
-from example_service.core.middleware.tenant import TenantMiddleware, HeaderTenantStrategy
+from example_service.app.middleware.tenant import TenantMiddleware, HeaderTenantStrategy
 from example_service.core.database.tenancy import TenantMixin
 
 # Add middleware
@@ -1039,7 +1039,7 @@ LOG_JSON_LOGS=true
 
 ```python
 # app/main.py
-from example_service.core.middleware.tenant import TenantMiddleware
+from example_service.app.middleware.tenant import TenantMiddleware
 
 app.add_middleware(TenantMiddleware, strategies=[...])
 ```

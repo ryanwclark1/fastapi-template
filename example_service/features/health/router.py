@@ -32,6 +32,8 @@ from example_service.features.health.schemas import (
     StartupResponse,
 )
 
+# Import dependencies at runtime so FastAPI treats them as Depends()
+
 if TYPE_CHECKING:
     from example_service.features.health.service import HealthAggregatorDep, HealthServiceDep
 

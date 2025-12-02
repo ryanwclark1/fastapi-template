@@ -7,7 +7,7 @@ which is a critical path in API request/response handling.
 from __future__ import annotations
 
 import json
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest

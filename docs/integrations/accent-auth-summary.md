@@ -119,7 +119,7 @@ async def create_admin(
 
 **Middleware Configuration**:
 ```python
-from example_service.core.middleware.tenant import (
+from example_service.app.middleware.tenant import (
     TenantMiddleware,
     HeaderTenantStrategy,
 )
@@ -139,7 +139,7 @@ app.add_middleware(
 tenant_uuid = user.metadata.get("tenant_uuid")
 
 # From middleware context
-from example_service.core.middleware.tenant import get_tenant_context
+from example_service.app.middleware.tenant import get_tenant_context
 context = get_tenant_context()
 tenant_uuid = context.tenant_id if context else None
 ```

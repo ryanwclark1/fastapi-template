@@ -340,7 +340,7 @@ REDIS_REDIS_URL=redis://localhost:6379/0
 **Code Setup**:
 ```python
 # app/main.py
-from example_service.core.middleware.tenant import (
+from example_service.app.middleware.tenant import (
     TenantMiddleware,
     HeaderTenantStrategy,
 )

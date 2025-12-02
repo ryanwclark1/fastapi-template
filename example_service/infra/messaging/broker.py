@@ -147,6 +147,10 @@ def get_router() -> RabbitRouterType | None:
     return _ensure_router_initialized()
 
 
+# Initialize router eagerly so handler modules can register subscribers during import.
+_ensure_router_initialized()
+
+
 # Legacy functions for backward compatibility
 # Note: With RabbitRouter, lifecycle is managed automatically by FastAPI
 

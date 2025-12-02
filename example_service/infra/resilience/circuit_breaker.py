@@ -66,6 +66,8 @@ from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, ParamSpec, Self, TypeVar
 
+from example_service.core.exceptions import CircuitBreakerOpenException
+
 from example_service.infra.metrics.tracking import (
     track_circuit_breaker_failure,
     track_circuit_breaker_state_change,
@@ -98,36 +100,16 @@ class CircuitState(StrEnum):
     HALF_OPEN = "half_open"  # Testing recovery
 
 
-class CircuitOpenError(Exception):
+class CircuitOpenError(CircuitBreakerOpenException):
     """Raised when circuit breaker is open.
 
-    This is a simple, standalone exception for circuit breaker open states.
-    Use this when you want a lightweight exception without HTTP semantics.
-
-    For HTTP APIs, prefer using CircuitBreakerOpenException which includes
-    proper status codes and RFC 7807 problem details.
-
-    Args:
-        message: Human-readable error message.
-
-    Example:
-        >>> try:
-        ...     async with breaker:
-        ...         await risky_operation()
-        ... except CircuitOpenError as e:
-        ...     logger.warning(f"Circuit breaker prevented call: {e}")
-        ...     # Implement fallback logic
-
+    Subclasses CircuitBreakerOpenException so callers can catch either the
+    lightweight form or the HTTP-friendly exception used across the app.
     """
 
     def __init__(self, message: str = "Circuit breaker is open") -> None:
-        """Initialize circuit open error.
-
-        Args:
-            message: Human-readable error message.
-
-        """
-        super().__init__(message)
+        """Initialize circuit open error."""
+        super().__init__(detail=message)
 
 
 class CircuitBreaker:
