@@ -519,11 +519,49 @@ class QueryRewriter:
     """Rewrites and normalizes search queries.
 
     Provides query expansion, synonym handling, and normalization.
+
+    Example:
+        # With simple dict synonyms
+        rewriter = QueryRewriter(
+            synonyms={"py": ["python", "python3"]}
+        )
+        expanded = rewriter.expand_synonyms("py tutorial")
+        # Returns: "(py OR python OR python3) tutorial"
+
+        # With SynonymDictionary
+        from example_service.core.database.search.synonyms import get_default_synonyms
+        rewriter = QueryRewriter.with_dictionary(get_default_synonyms())
     """
 
     synonyms: dict[str, list[str]] = field(default_factory=dict)
     stop_words: set[str] = field(default_factory=set)
     min_word_length: int = 2
+    _synonym_dictionary: Any = field(default=None, repr=False)
+
+    @classmethod
+    def with_dictionary(
+        cls,
+        dictionary: Any,
+        stop_words: set[str] | None = None,
+        min_word_length: int = 2,
+    ) -> "QueryRewriter":
+        """Create a QueryRewriter with a SynonymDictionary.
+
+        Args:
+            dictionary: SynonymDictionary instance.
+            stop_words: Set of stop words to filter.
+            min_word_length: Minimum word length to keep.
+
+        Returns:
+            QueryRewriter configured with the dictionary.
+        """
+        rewriter = cls(
+            synonyms=dictionary.to_dict() if dictionary else {},
+            stop_words=stop_words or set(),
+            min_word_length=min_word_length,
+        )
+        rewriter._synonym_dictionary = dictionary
+        return rewriter
 
     def expand_synonyms(self, query: str) -> str:
         """Expand query terms with synonyms.
@@ -534,6 +572,10 @@ class QueryRewriter:
         Returns:
             Query with synonym expansions using OR
         """
+        # Use SynonymDictionary if available (more sophisticated expansion)
+        if self._synonym_dictionary:
+            return self._synonym_dictionary.expand_query(query)
+
         words = query.split()
         expanded = []
 

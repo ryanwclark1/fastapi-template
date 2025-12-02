@@ -201,6 +201,55 @@ class RecordClickRequest(BaseModel):
     clicked_entity_id: str = Field(description="ID of the clicked entity")
 
 
+class SearchInsightResponse(BaseModel):
+    """A single search insight or recommendation."""
+
+    type: str = Field(description="Insight type: 'improvement', 'warning', 'info'")
+    title: str = Field(description="Short title")
+    description: str = Field(description="Detailed description")
+    metric: str | None = Field(default=None, description="Related metric name")
+    value: float | None = Field(default=None, description="Metric value")
+    recommendation: str | None = Field(default=None, description="Actionable recommendation")
+
+
+class SearchTrendPoint(BaseModel):
+    """A single point in the search trends time series."""
+
+    period: str = Field(description="Time period (ISO format)")
+    count: int = Field(description="Total searches in period")
+    unique_queries: int = Field(description="Unique queries in period")
+    zero_results: int = Field(description="Searches with no results")
+
+
+class SearchTrendsResponse(BaseModel):
+    """Search trends over time."""
+
+    interval: str = Field(description="Time grouping interval")
+    days: int = Field(description="Number of days analyzed")
+    trends: list[SearchTrendPoint] = Field(description="Time series data")
+    total_searches: int = Field(description="Total searches in period")
+    avg_daily_searches: float = Field(description="Average searches per day")
+
+
+class ZeroResultQuery(BaseModel):
+    """A query that returned no results."""
+
+    query: str = Field(description="The search query text")
+    count: int = Field(description="Number of times this was searched")
+
+
+class ZeroResultsResponse(BaseModel):
+    """Queries that returned no results."""
+
+    days: int = Field(description="Number of days analyzed")
+    total_zero_result_searches: int = Field(description="Total searches with no results")
+    queries: list[ZeroResultQuery] = Field(description="Zero-result queries by frequency")
+    recommendations: list[str] = Field(
+        default_factory=list,
+        description="Suggestions for addressing content gaps"
+    )
+
+
 __all__ = [
     "SearchSyntax",
     "SearchRequest",
@@ -218,4 +267,9 @@ __all__ = [
     "SearchAnalyticsRequest",
     "SearchAnalyticsResponse",
     "RecordClickRequest",
+    "SearchInsightResponse",
+    "SearchTrendPoint",
+    "SearchTrendsResponse",
+    "ZeroResultQuery",
+    "ZeroResultsResponse",
 ]

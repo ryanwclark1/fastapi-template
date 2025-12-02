@@ -9,6 +9,7 @@ with PostgreSQL full-text search, including:
 - "Did you mean?" suggestions
 - Faceted search
 - Search analytics
+- Redis caching for frequent queries
 """
 
 from __future__ import annotations
@@ -25,12 +26,15 @@ from example_service.core.database.search import (
     SearchQueryParser,
     RankNormalization,
 )
+from .cache import SearchCache, get_search_cache
 from .schemas import (
     DidYouMeanSuggestion,
     EntitySearchResult,
     FacetResult,
     FacetValue,
     SearchableEntity,
+    SearchAnalyticsRequest,
+    SearchAnalyticsResponse,
     SearchCapabilitiesResponse,
     SearchHit,
     SearchRequest,
@@ -39,6 +43,10 @@ from .schemas import (
     SearchSuggestionRequest,
     SearchSuggestionsResponse,
     SearchSyntax,
+    SearchTrendPoint,
+    SearchTrendsResponse,
+    ZeroResultQuery,
+    ZeroResultsResponse,
 )
 
 if TYPE_CHECKING:
@@ -120,6 +128,8 @@ class SearchService:
         *,
         enable_analytics: bool = True,
         enable_fuzzy_fallback: bool = True,
+        enable_cache: bool = True,
+        cache: SearchCache | None = None,
     ) -> None:
         """Initialize search service.
 
@@ -127,12 +137,16 @@ class SearchService:
             session: Database session.
             enable_analytics: Enable search analytics tracking.
             enable_fuzzy_fallback: Enable fuzzy search when FTS returns no results.
+            enable_cache: Enable Redis caching for search results.
+            cache: Optional pre-configured SearchCache instance.
         """
         self.session = session
         self.enable_analytics = enable_analytics
         self.enable_fuzzy_fallback = enable_fuzzy_fallback
+        self.enable_cache = enable_cache
         self._query_parser = SearchQueryParser()
         self._analytics = SearchAnalytics(session) if enable_analytics else None
+        self._cache = cache
 
     def get_capabilities(self) -> SearchCapabilitiesResponse:
         """Get search capabilities and searchable entities.
@@ -169,6 +183,22 @@ class SearchService:
             ],
         )
 
+    async def _get_cache(self) -> SearchCache | None:
+        """Get the search cache instance.
+
+        Returns:
+            SearchCache if caching is enabled, None otherwise.
+        """
+        if not self.enable_cache:
+            return None
+
+        if self._cache:
+            return self._cache
+
+        # Try to get global cache instance
+        self._cache = await get_search_cache()
+        return self._cache
+
     async def search(self, request: SearchRequest) -> SearchResponse:
         """Execute a search across entity types.
 
@@ -179,6 +209,26 @@ class SearchService:
             Search response with results and metadata.
         """
         start_time = time.monotonic()
+
+        # Try to get cached results
+        cache = await self._get_cache()
+        if cache:
+            cached = await cache.get_search_results(request)
+            if cached:
+                # Return cached response (add cache hit indicator to took_ms)
+                return SearchResponse(
+                    query=cached.get("query", request.query),
+                    total_hits=cached.get("total_hits", 0),
+                    results=[
+                        EntitySearchResult(**r) for r in cached.get("results", [])
+                    ],
+                    suggestions=cached.get("suggestions", []),
+                    did_you_mean=DidYouMeanSuggestion(**cached["did_you_mean"])
+                    if cached.get("did_you_mean") else None,
+                    facets=[FacetResult(**f) for f in cached.get("facets", [])]
+                    if cached.get("facets") else None,
+                    took_ms=0,  # Indicate cache hit with 0ms
+                )
 
         # Determine which entities to search
         entity_types = request.entity_types or list(SEARCHABLE_ENTITIES.keys())
@@ -231,7 +281,7 @@ class SearchService:
             except Exception as e:
                 logger.warning(f"Failed to record search analytics: {e}")
 
-        return SearchResponse(
+        response = SearchResponse(
             query=request.query,
             total_hits=total_hits,
             results=results,
@@ -240,6 +290,15 @@ class SearchService:
             facets=all_facets if request.include_facets else None,
             took_ms=took_ms,
         )
+
+        # Cache the results
+        if cache:
+            try:
+                await cache.set_search_results(request, response)
+            except Exception as e:
+                logger.warning(f"Failed to cache search results: {e}")
+
+        return response
 
     async def _search_entity(
         self,
@@ -747,6 +806,158 @@ class SearchService:
 
         module = importlib.import_module(module_path)
         return getattr(module, class_name)
+
+    # ──────────────────────────────────────────────────────────────
+    # Analytics Methods
+    # ──────────────────────────────────────────────────────────────
+
+    async def get_analytics(
+        self,
+        request: SearchAnalyticsRequest,
+    ) -> SearchAnalyticsResponse:
+        """Get search analytics summary.
+
+        Args:
+            request: Analytics request with time period.
+
+        Returns:
+            Analytics response with stats and insights.
+        """
+        if not self._analytics:
+            self._analytics = SearchAnalytics(self.session)
+
+        stats = await self._analytics.get_stats(days=request.days)
+
+        return SearchAnalyticsResponse(
+            total_searches=stats.total_searches,
+            unique_queries=stats.unique_queries,
+            zero_result_rate=stats.zero_result_rate,
+            avg_results_count=stats.avg_results_count,
+            avg_response_time_ms=stats.avg_response_time_ms,
+            click_through_rate=stats.click_through_rate,
+            top_queries=stats.top_queries,
+            zero_result_queries=stats.zero_result_queries,
+            period_days=request.days,
+        )
+
+    async def get_trends(
+        self,
+        days: int = 30,
+        interval: str = "day",
+    ) -> SearchTrendsResponse:
+        """Get search trends over time.
+
+        Args:
+            days: Number of days to analyze.
+            interval: Time grouping interval.
+
+        Returns:
+            Trends response with time series data.
+        """
+        if not self._analytics:
+            self._analytics = SearchAnalytics(self.session)
+
+        trends_data = await self._analytics.get_search_trends(
+            days=days,
+            interval=interval,
+        )
+
+        # Convert to response format
+        trends = [
+            SearchTrendPoint(
+                period=t["period"] or "",
+                count=t["count"],
+                unique_queries=t["unique_queries"],
+                zero_results=t["zero_results"],
+            )
+            for t in trends_data
+        ]
+
+        total_searches = sum(t.count for t in trends)
+        avg_daily = total_searches / days if days > 0 else 0
+
+        return SearchTrendsResponse(
+            interval=interval,
+            days=days,
+            trends=trends,
+            total_searches=total_searches,
+            avg_daily_searches=round(avg_daily, 2),
+        )
+
+    async def get_zero_result_queries(
+        self,
+        days: int = 7,
+        limit: int = 20,
+    ) -> ZeroResultsResponse:
+        """Get queries that returned no results.
+
+        Args:
+            days: Number of days to analyze.
+            limit: Maximum queries to return.
+
+        Returns:
+            Zero-results response with content gap information.
+        """
+        if not self._analytics:
+            self._analytics = SearchAnalytics(self.session)
+
+        zero_results = await self._analytics.get_zero_result_queries(
+            days=days,
+            limit=limit,
+        )
+
+        queries = [
+            ZeroResultQuery(
+                query=q["query"] or "",
+                count=q["count"],
+            )
+            for q in zero_results
+        ]
+
+        total_zero = sum(q.count for q in queries)
+
+        # Generate recommendations based on zero-result patterns
+        recommendations = []
+        if queries:
+            recommendations.append(
+                "Consider adding content that addresses these frequently searched topics."
+            )
+            recommendations.append(
+                "Review if synonyms could help match these queries to existing content."
+            )
+            if any(len(q.query.split()) == 1 for q in queries):
+                recommendations.append(
+                    "Some single-word queries may benefit from fuzzy matching improvements."
+                )
+
+        return ZeroResultsResponse(
+            days=days,
+            total_zero_result_searches=total_zero,
+            queries=queries,
+            recommendations=recommendations,
+        )
+
+    async def record_click(
+        self,
+        search_id: int,
+        clicked_position: int,
+        clicked_entity_id: str,
+    ) -> None:
+        """Record a click on a search result.
+
+        Args:
+            search_id: ID of the search query record.
+            clicked_position: Position of clicked result.
+            clicked_entity_id: ID of the clicked entity.
+        """
+        if not self._analytics:
+            self._analytics = SearchAnalytics(self.session)
+
+        await self._analytics.record_click(
+            search_id=search_id,
+            clicked_position=clicked_position,
+            clicked_entity_id=clicked_entity_id,
+        )
 
 
 async def get_search_service(

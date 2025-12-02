@@ -122,6 +122,14 @@ from example_service.core.database.search.analytics import (
     SearchStats,
     SearchSuggestionLog,
 )
+from example_service.core.database.search.synonyms import (
+    SynonymDictionary,
+    SynonymGroup,
+    DEFAULT_PROGRAMMING_SYNONYMS,
+    get_default_synonyms,
+    create_synonym_config_sql,
+    create_synonym_dictionary_sql,
+)
 
 __all__ = [
     # Types
@@ -160,4 +168,11 @@ __all__ = [
     "SearchQuery",
     "SearchStats",
     "SearchSuggestionLog",
+    # Synonyms
+    "SynonymDictionary",
+    "SynonymGroup",
+    "DEFAULT_PROGRAMMING_SYNONYMS",
+    "get_default_synonyms",
+    "create_synonym_config_sql",
+    "create_synonym_dictionary_sql",
 ]
