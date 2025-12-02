@@ -12,7 +12,7 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.13"
-  UV_VERSION: "0.9.12"
+  UV_VERSION: "0.9.14"
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 

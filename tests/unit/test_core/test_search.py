@@ -613,9 +613,7 @@ class TestQueryRewriter:
 
     def test_expand_synonyms(self):
         """Rewriter should expand synonyms."""
-        rewriter = QueryRewriter(
-            synonyms={"python": ["py", "python3"]}
-        )
+        rewriter = QueryRewriter(synonyms={"python": ["py", "python3"]})
 
         result = rewriter.expand_synonyms("python programming")
 
@@ -624,9 +622,7 @@ class TestQueryRewriter:
 
     def test_remove_stop_words(self):
         """Rewriter should remove stop words."""
-        rewriter = QueryRewriter(
-            stop_words={"the", "a", "an"}
-        )
+        rewriter = QueryRewriter(stop_words={"the", "a", "an"})
 
         result = rewriter.remove_stop_words("the python programming")
 
@@ -724,7 +720,7 @@ class TestSearchableMixin:
 
         sql = TestModel.get_backfill_sql("articles")
 
-        assert "UPDATE articles SET search_vector" in sql
+        assert 'UPDATE "articles" SET search_vector' in sql
         assert "to_tsvector" in sql
 
     def test_get_drop_trigger_sql(self):
@@ -862,7 +858,7 @@ class TestFTSMigrationHelper:
 
         sql = helper.get_backfill_sql()
 
-        assert "UPDATE posts SET search_vector" in sql
+        assert 'UPDATE "posts" SET search_vector' in sql
 
 
 # ──────────────────────────────────────────────────────────────
