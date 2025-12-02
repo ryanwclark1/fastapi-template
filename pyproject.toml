@@ -325,7 +325,7 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 warn_no_return = true
 strict_equality = true
-plugins = ["pydantic.mypy"]
+plugins = ["pydantic.mypy", "strawberry.ext.mypy_plugin"]
 exclude = ["^alembic/env\\.py$", ".*/examples/.*", "^scripts/"]
 
 [[tool.mypy.overrides]]

@@ -7,10 +7,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 
+from example_service.core.database import NotFoundError
 from example_service.core.dependencies.auth import get_current_user
 from example_service.core.dependencies.database import get_db_session
+from example_service.core.exceptions import ConflictException
 
 from .dependencies import FeatureFlags, get_feature_flags
 from .models import FlagStatus
@@ -60,9 +62,10 @@ async def create_flag(
     # Check if flag already exists
     existing = await service.get_by_key(data.key)
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
+        raise ConflictException(
             detail=f"Feature flag '{data.key}' already exists",
+            type="feature-flag-exists",
+            extra={"key": data.key},
         )
 
     flag = await service.create(data)
@@ -126,10 +129,7 @@ async def get_flag(
     flag = await service.get_by_key(key)
 
     if not flag:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Feature flag '{key}' not found",
-        )
+        raise NotFoundError("FeatureFlag", {"key": key})
 
     return FeatureFlagResponse.model_validate(flag)
 
@@ -159,10 +159,7 @@ async def update_flag(
     flag = await service.update(key, data)
 
     if not flag:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Feature flag '{key}' not found",
-        )
+        raise NotFoundError("FeatureFlag", {"key": key})
 
     return FeatureFlagResponse.model_validate(flag)
 
@@ -187,10 +184,7 @@ async def delete_flag(
     deleted = await service.delete(key)
 
     if not deleted:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Feature flag '{key}' not found",
-        )
+        raise NotFoundError("FeatureFlag", {"key": key})
 
 
 @router.post(
@@ -219,10 +213,7 @@ async def enable_flag(
     )
 
     if not flag:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Feature flag '{key}' not found",
-        )
+        raise NotFoundError("FeatureFlag", {"key": key})
 
     return FeatureFlagResponse.model_validate(flag)
 
@@ -253,10 +244,7 @@ async def disable_flag(
     )
 
     if not flag:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Feature flag '{key}' not found",
-        )
+        raise NotFoundError("FeatureFlag", {"key": key})
 
     return FeatureFlagResponse.model_validate(flag)
 
@@ -289,10 +277,7 @@ async def create_override(
     # Verify flag exists
     flag = await service.get_by_key(data.flag_key)
     if not flag:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Feature flag '{data.flag_key}' not found",
-        )
+        raise NotFoundError("FeatureFlag", {"key": data.flag_key})
 
     override = await service.create_override(data)
     return FlagOverrideResponse.model_validate(override)
@@ -354,9 +339,9 @@ async def delete_override(
     deleted = await service.delete_override(flag_key, entity_type, entity_id)
 
     if not deleted:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Override not found",
+        raise NotFoundError(
+            "FlagOverride",
+            {"flag_key": flag_key, "entity_type": entity_type, "entity_id": entity_id},
         )
 
 

@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.routing import APIRoute
 from httpx import ASGITransport, AsyncClient
 
+from example_service.app.exception_handlers import configure_exception_handlers
 from example_service.features.tasks.schemas import (
     CancelTaskResponse,
     TaskName,
@@ -44,6 +45,7 @@ class MockTaskService:
 def app_and_service():
     """Create FastAPI app with tasks router and mocked service dependency."""
     app = FastAPI()
+    configure_exception_handlers(app)  # Register RFC 7807 exception handlers
     service = MockTaskService()
 
     def get_service_override():

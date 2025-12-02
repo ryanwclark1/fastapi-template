@@ -6,9 +6,11 @@ import logging
 from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 
+from example_service.core.database import NotFoundError
 from example_service.core.dependencies.database import get_db_session
+from example_service.core.exceptions import BadRequestException
 from example_service.features.webhooks.client import WebhookClient
 from example_service.features.webhooks.models import WebhookDelivery
 from example_service.features.webhooks.schemas import (
@@ -71,9 +73,9 @@ async def create_webhook(
         await session.commit()
         return WebhookRead.model_validate(webhook)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+        raise BadRequestException(
             detail=str(e),
+            type="invalid-webhook-config",
         ) from e
 
 
@@ -142,10 +144,7 @@ async def get_webhook(
     webhook = await service.get_webhook(webhook_id)
 
     if webhook is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Webhook {webhook_id} not found",
-        )
+        raise NotFoundError("Webhook", {"id": str(webhook_id)})
 
     return WebhookRead.model_validate(webhook)
 
@@ -183,17 +182,14 @@ async def update_webhook(
     try:
         webhook = await service.update_webhook(webhook_id, payload)
         if webhook is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Webhook {webhook_id} not found",
-            )
+            raise NotFoundError("Webhook", {"id": str(webhook_id)})
 
         await session.commit()
         return WebhookRead.model_validate(webhook)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+        raise BadRequestException(
             detail=str(e),
+            type="invalid-webhook-update",
         ) from e
 
 
@@ -224,10 +220,7 @@ async def delete_webhook(
     deleted = await service.delete_webhook(webhook_id)
 
     if not deleted:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Webhook {webhook_id} not found",
-        )
+        raise NotFoundError("Webhook", {"id": str(webhook_id)})
 
     await session.commit()
 
@@ -267,10 +260,7 @@ async def test_webhook(
     webhook = await service.get_webhook(webhook_id)
 
     if webhook is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Webhook {webhook_id} not found",
-        )
+        raise NotFoundError("Webhook", {"id": str(webhook_id)})
 
     # Create test delivery record
     delivery = WebhookDelivery(
@@ -358,10 +348,7 @@ async def regenerate_secret(
     webhook = await service.regenerate_secret(webhook_id)
 
     if webhook is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Webhook {webhook_id} not found",
-        )
+        raise NotFoundError("Webhook", {"id": str(webhook_id)})
 
     await session.commit()
 
@@ -402,10 +389,7 @@ async def list_deliveries(
     webhook = await service.get_webhook(webhook_id)
 
     if webhook is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Webhook {webhook_id} not found",
-        )
+        raise NotFoundError("Webhook", {"id": str(webhook_id)})
 
     deliveries, total = await service.list_deliveries(
         webhook_id,
@@ -451,24 +435,18 @@ async def retry_delivery(
     # Verify webhook exists
     webhook = await service.get_webhook(webhook_id)
     if webhook is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Webhook {webhook_id} not found",
-        )
+        raise NotFoundError("Webhook", {"id": str(webhook_id)})
 
     # Get and retry delivery
     delivery = await service.retry_delivery(delivery_id)
     if delivery is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Delivery {delivery_id} not found",
-        )
+        raise NotFoundError("WebhookDelivery", {"id": str(delivery_id)})
 
     # Verify delivery belongs to this webhook
     if delivery.webhook_id != webhook_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Delivery {delivery_id} does not belong to webhook {webhook_id}",
+        raise NotFoundError(
+            "WebhookDelivery",
+            {"id": str(delivery_id), "webhook_id": str(webhook_id)},
         )
 
     await session.commit()

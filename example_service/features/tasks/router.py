@@ -14,8 +14,10 @@ import logging
 from datetime import datetime  # noqa: TC003
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 
+from example_service.core.database import NotFoundError
+from example_service.core.exceptions import InternalServerException, ServiceUnavailableException
 from example_service.features.tasks.schemas import (
     CancelTaskRequest,
     CancelTaskResponse,
@@ -191,10 +193,7 @@ async def get_task_details(
     """
     result = await service.get_task_details(task_id)
     if not result:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Task execution '{task_id}' not found",
-        )
+        raise NotFoundError("TaskExecution", {"task_id": task_id})
     return result
 
 
@@ -260,14 +259,14 @@ async def trigger_task(
     try:
         return await service.trigger_task(request.task, request.params)
     except BrokerNotConfiguredError as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        raise ServiceUnavailableException(
             detail=str(e),
+            type="broker-not-configured",
         ) from e
     except TaskServiceError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        raise InternalServerException(
             detail=str(e),
+            type="task-service-error",
         ) from e
 
 
@@ -311,10 +310,7 @@ async def get_scheduled_job(
     """
     result = service.get_scheduled_job(job_id)
     if not result:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Scheduled job '{job_id}' not found",
-        )
+        raise NotFoundError("ScheduledJob", {"job_id": job_id})
     return result
 
 
@@ -334,10 +330,7 @@ async def pause_scheduled_job(
     """
     success = service.pause_job(job_id)
     if not success:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Scheduled job '{job_id}' not found or could not be paused",
-        )
+        raise NotFoundError("ScheduledJob", {"job_id": job_id})
     return {"job_id": job_id, "paused": True, "message": "Job paused successfully"}
 
 
@@ -357,8 +350,5 @@ async def resume_scheduled_job(
     """
     success = service.resume_job(job_id)
     if not success:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Scheduled job '{job_id}' not found or could not be resumed",
-        )
+        raise NotFoundError("ScheduledJob", {"job_id": job_id})
     return {"job_id": job_id, "resumed": True, "message": "Job resumed successfully"}

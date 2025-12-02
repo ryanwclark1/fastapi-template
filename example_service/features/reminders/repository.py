@@ -234,6 +234,93 @@ class ReminderRepository(BaseRepository[Reminder]):
         self._lazy.debug(lambda: f"db.mark_completed({reminder_id}) -> success")
         return reminder
 
+    async def list_all(
+        self,
+        session: AsyncSession,
+        *,
+        include_completed: bool = True,
+    ) -> Sequence[Reminder]:
+        """List all reminders with smart ordering.
+
+        Args:
+            session: Database session
+            include_completed: Whether to include completed reminders
+
+        Returns:
+            Sequence of reminders ordered by: pending first, by date, newest created
+        """
+        stmt = select(Reminder)
+
+        if not include_completed:
+            stmt = stmt.where(Reminder.is_completed == False)  # noqa: E712
+
+        # Smart ordering: pending first, by date, newest created first
+        stmt = stmt.order_by(
+            Reminder.is_completed.asc(),  # Pending reminders first
+            Reminder.remind_at.asc().nullslast(),  # Soonest dates first
+            Reminder.created_at.desc(),  # Newest first
+        )
+
+        result = await session.execute(stmt)
+        items = result.scalars().all()
+
+        self._lazy.debug(
+            lambda: f"db.list_all: include_completed={include_completed} -> {len(items)} items"
+        )
+        return items
+
+    async def find_broken_out_occurrences(
+        self,
+        session: AsyncSession,
+        parent_id: UUID,
+    ) -> dict[datetime, Reminder]:
+        """Find all broken-out occurrences for a recurring reminder.
+
+        Args:
+            session: Database session
+            parent_id: ID of the parent recurring reminder
+
+        Returns:
+            Dict mapping occurrence_date to the broken-out reminder
+        """
+        stmt = (
+            select(Reminder)
+            .where(Reminder.parent_id == parent_id)
+            .where(Reminder.occurrence_date.is_not(None))
+        )
+        result = await session.execute(stmt)
+        items = result.scalars().all()
+
+        self._lazy.debug(
+            lambda: f"db.find_broken_out_occurrences({parent_id}) -> {len(items)} items"
+        )
+        # Filter ensures occurrence_date is not None (query already filters, but type checker needs help)
+        return {r.occurrence_date: r for r in items if r.occurrence_date is not None}
+
+    async def find_occurrence_by_date(
+        self,
+        session: AsyncSession,
+        parent_id: UUID,
+        occurrence_date: datetime,
+    ) -> Reminder | None:
+        """Find a broken-out occurrence by parent ID and date.
+
+        Args:
+            session: Database session
+            parent_id: ID of the parent recurring reminder
+            occurrence_date: The specific occurrence date
+
+        Returns:
+            The broken-out reminder or None if not found
+        """
+        stmt = (
+            select(Reminder)
+            .where(Reminder.parent_id == parent_id)
+            .where(Reminder.occurrence_date == occurrence_date)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def mark_notification_sent(
         self,
         session: AsyncSession,

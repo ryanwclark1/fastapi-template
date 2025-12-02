@@ -8,11 +8,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import StreamingResponse
 
 from example_service.core.dependencies.auth import get_current_user
 from example_service.core.dependencies.database import get_db_session
+from example_service.core.exceptions import BadRequestException
 
 from .schemas import (
     ExportFormat,
@@ -110,7 +111,10 @@ async def download_export(
     try:
         data, content_type, filename = await service.export_to_bytes(request)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise BadRequestException(
+            detail=str(e),
+            type="export-error",
+        ) from e
 
     return StreamingResponse(
         iter([data]),
@@ -175,7 +179,10 @@ async def import_data(
             update_existing=update_existing,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise BadRequestException(
+            detail=str(e),
+            type="import-error",
+        ) from e
 
     return result
 
@@ -216,7 +223,10 @@ async def validate_import(
             validate_only=True,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise BadRequestException(
+            detail=str(e),
+            type="validation-error",
+        ) from e
 
     return result
 

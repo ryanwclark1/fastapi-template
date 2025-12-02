@@ -69,32 +69,21 @@ lazy_logger = get_lazy_logger(__name__)
 )
 async def list_reminders(
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    repo: Annotated[ReminderRepository, Depends(get_reminder_repository)],
     include_completed: bool = True,
 ) -> list[ReminderResponse]:
     """List reminders with optional filtering.
 
     Args:
         session: Database session
+        repo: Reminder repository
         include_completed: Whether to include completed reminders
 
     Returns:
         List of reminders ordered by completion status and date
     """
-    stmt = select(Reminder)
-
-    if not include_completed:
-        stmt = stmt.where(Reminder.is_completed == False)  # noqa: E712
-
-    # Smart ordering: pending first, by date, newest created first
-    stmt = stmt.order_by(
-        Reminder.is_completed.asc(),  # Pending reminders first
-        Reminder.remind_at.asc().nullslast(),  # Soonest dates first
-        Reminder.created_at.desc(),  # Newest first
-    )
-
-    result = await session.execute(stmt)
-    reminders = result.scalars().all()
-    return [ReminderResponse.model_validate(reminder) for reminder in reminders]
+    reminders = await repo.list_all(session, include_completed=include_completed)
+    return [ReminderResponse.from_model(reminder) for reminder in reminders]
 
 
 @router.get(
@@ -169,7 +158,7 @@ async def list_reminders_paginated(
 
     # Transform items to response schema
     return ReminderCursorPage(
-        items=[ReminderResponse.model_validate(edge.node) for edge in connection.edges],
+        items=[ReminderResponse.from_model(edge.node) for edge in connection.edges],
         next_cursor=cursor_page.next_cursor,
         prev_cursor=cursor_page.prev_cursor,
         has_more=cursor_page.has_more,
@@ -254,7 +243,7 @@ async def search_reminders(
             },
         )
 
-    return [ReminderResponse.model_validate(reminder) for reminder in reminders]
+    return [ReminderResponse.from_model(reminder) for reminder in reminders]
 
 
 @router.get(
@@ -303,7 +292,7 @@ async def fulltext_search_reminders(
         reminders = result.scalars().all()
         return [
             ReminderSearchResult(
-                **ReminderResponse.model_validate(r).model_dump(),
+                **ReminderResponse.from_model(r).model_dump(),
                 relevance=0.0,
             )
             for r in reminders
@@ -349,7 +338,7 @@ async def fulltext_search_reminders(
         rank = row.search_rank if hasattr(row, "search_rank") else 0.0
         search_results.append(
             ReminderSearchResult(
-                **ReminderResponse.model_validate(reminder).model_dump(),
+                **ReminderResponse.from_model(reminder).model_dump(),
                 relevance=float(rank),
             )
         )
@@ -381,30 +370,11 @@ async def fulltext_search_reminders(
 )
 async def get_overdue_reminders(
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    repo: Annotated[ReminderRepository, Depends(get_reminder_repository)],
 ) -> list[ReminderResponse]:
     """Get overdue reminders that haven't been completed."""
-    now = datetime.now(UTC)
-    stmt = (
-        select(Reminder)
-        .where(
-            Reminder.is_completed == False,  # noqa: E712
-            Reminder.remind_at.is_not(None),
-            Reminder.remind_at < now,
-        )
-        .order_by(Reminder.remind_at.asc())
-    )
-
-    result = await session.execute(stmt)
-    reminders = result.scalars().all()
-
-    # INFO - actionable condition (overdue reminders need attention)
-    if reminders:
-        logger.info(
-            "Overdue reminders retrieved",
-            extra={"count": len(reminders), "operation": "endpoint.get_overdue_reminders"},
-        )
-
-    return [ReminderResponse.model_validate(reminder) for reminder in reminders]
+    reminders = await repo.find_overdue(session)
+    return [ReminderResponse.from_model(reminder) for reminder in reminders]
 
 
 @router.get(
@@ -417,15 +387,11 @@ async def get_overdue_reminders(
 async def get_reminder(
     reminder_id: UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    repo: Annotated[ReminderRepository, Depends(get_reminder_repository)],
 ) -> ReminderResponse:
     """Get a single reminder by ID."""
-    result = await session.execute(select(Reminder).where(Reminder.id == reminder_id))
-    reminder = result.scalar_one_or_none()
-
-    if reminder is None:
-        raise NotFoundError("Reminder", {"id": reminder_id})
-
-    return ReminderResponse.model_validate(reminder)
+    reminder = await repo.get_or_raise(session, reminder_id)
+    return ReminderResponse.from_model(reminder)
 
 
 @router.post(
@@ -615,7 +581,7 @@ async def complete_reminder(
     await session.commit()
     await session.refresh(reminder)
 
-    return ReminderResponse.model_validate(reminder)
+    return ReminderResponse.from_model(reminder)
 
 
 @router.delete(
@@ -680,6 +646,7 @@ Use query parameters to control the date range and number of occurrences.
 async def get_occurrences(
     reminder_id: UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    repo: Annotated[ReminderRepository, Depends(get_reminder_repository)],
     after: datetime | None = None,
     before: datetime | None = None,
     limit: int = 50,
@@ -688,6 +655,7 @@ async def get_occurrences(
 
     Args:
         reminder_id: ID of the recurring reminder
+        repo: Reminder repository
         after: Only show occurrences after this date (default: now)
         before: Only show occurrences before this date
         limit: Maximum number of occurrences to return (1-100)
@@ -695,11 +663,7 @@ async def get_occurrences(
     Returns:
         List of occurrence dates with modification status
     """
-    result = await session.execute(select(Reminder).where(Reminder.id == reminder_id))
-    reminder = result.scalar_one_or_none()
-
-    if reminder is None:
-        raise NotFoundError("Reminder", {"id": reminder_id})
+    reminder = await repo.get_or_raise(session, reminder_id)
 
     if not reminder.recurrence_rule:
         raise BadRequestException(
@@ -716,13 +680,8 @@ async def get_occurrences(
     if before is None and reminder.recurrence_end_at:
         before = reminder.recurrence_end_at
 
-    # Get broken-out occurrences (children of this reminder)
-    broken_out_result = await session.execute(
-        select(Reminder)
-        .where(Reminder.parent_id == reminder_id)
-        .where(Reminder.occurrence_date.is_not(None))
-    )
-    broken_out = {r.occurrence_date: r for r in broken_out_result.scalars().all()}
+    # Get broken-out occurrences using repository
+    broken_out = await repo.find_broken_out_occurrences(session, reminder_id)
 
     # Generate occurrences
     from example_service.features.reminders.recurrence import describe_rrule
@@ -786,6 +745,7 @@ async def break_out_occurrence(
     reminder_id: UUID,
     occurrence_date: datetime,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    repo: Annotated[ReminderRepository, Depends(get_reminder_repository)],
     publisher: EventPublisherDep,
 ) -> ReminderResponse:
     """Break out a single occurrence from a recurring series.
@@ -793,15 +753,12 @@ async def break_out_occurrence(
     Args:
         reminder_id: ID of the recurring reminder
         occurrence_date: The specific occurrence date to break out
+        repo: Reminder repository
 
     Returns:
         The new independent reminder
     """
-    result = await session.execute(select(Reminder).where(Reminder.id == reminder_id))
-    reminder = result.scalar_one_or_none()
-
-    if reminder is None:
-        raise NotFoundError("Reminder", {"id": reminder_id})
+    reminder = await repo.get_or_raise(session, reminder_id)
 
     if not reminder.recurrence_rule:
         raise BadRequestException(
@@ -810,13 +767,9 @@ async def break_out_occurrence(
             extra={"reminder_id": str(reminder_id)},
         )
 
-    # Check if occurrence already broken out
-    existing = await session.execute(
-        select(Reminder)
-        .where(Reminder.parent_id == reminder_id)
-        .where(Reminder.occurrence_date == occurrence_date)
-    )
-    if existing.scalar_one_or_none():
+    # Check if occurrence already broken out using repository
+    existing = await repo.find_occurrence_by_date(session, reminder_id, occurrence_date)
+    if existing:
         raise BadRequestException(
             detail="This occurrence has already been broken out",
             type="occurrence-already-broken-out",
@@ -876,22 +829,20 @@ async def break_out_occurrence(
 async def get_next_reminder_occurrence(
     reminder_id: UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    repo: Annotated[ReminderRepository, Depends(get_reminder_repository)],
     after: datetime | None = None,
 ) -> OccurrenceResponse | None:
     """Get the next occurrence for a recurring reminder.
 
     Args:
         reminder_id: ID of the recurring reminder
+        repo: Reminder repository
         after: Find next occurrence after this date (default: now)
 
     Returns:
         The next occurrence, or null if no more occurrences
     """
-    result = await session.execute(select(Reminder).where(Reminder.id == reminder_id))
-    reminder = result.scalar_one_or_none()
-
-    if reminder is None:
-        raise NotFoundError("Reminder", {"id": reminder_id})
+    reminder = await repo.get_or_raise(session, reminder_id)
 
     if not reminder.recurrence_rule:
         raise BadRequestException(
@@ -910,13 +861,8 @@ async def get_next_reminder_occurrence(
     if next_dt is None:
         return None
 
-    # Check if already broken out
-    existing = await session.execute(
-        select(Reminder)
-        .where(Reminder.parent_id == reminder_id)
-        .where(Reminder.occurrence_date == next_dt)
-    )
-    broken = existing.scalar_one_or_none()
+    # Check if already broken out using repository
+    broken = await repo.find_occurrence_by_date(session, reminder_id, next_dt)
 
     return OccurrenceResponse(
         date=next_dt,

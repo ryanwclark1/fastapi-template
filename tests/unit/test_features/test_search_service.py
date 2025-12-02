@@ -28,3 +28,14 @@ async def test_get_cache_respects_flags(monkeypatch: pytest.MonkeyPatch):
 
     svc_disabled = search_service.SearchService(session=None, enable_cache=False, enable_analytics=False)
     assert await svc_disabled._get_cache() is None
+
+    called = []
+
+    async def fake_get_search_cache():
+        called.append(True)
+        return cache
+
+    svc_global = search_service.SearchService(session=None, enable_cache=True, enable_analytics=False)
+    monkeypatch.setattr(search_service, "get_search_cache", fake_get_search_cache)
+    assert await svc_global._get_cache() is cache
+    assert called

@@ -6,10 +6,15 @@ import logging
 from typing import TYPE_CHECKING, Annotated
 from uuid import UUID  # noqa: TC003
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, UploadFile, status
 
 from example_service.core.database import NotFoundError
 from example_service.core.dependencies.database import get_db_session
+from example_service.core.exceptions import (
+    BadRequestException,
+    InternalServerException,
+    ServiceUnavailableException,
+)
 from example_service.features.files.repository import (
     FileRepository,
     get_file_repository,
@@ -56,9 +61,9 @@ def get_file_service(
     """Dependency for file service."""
     storage = get_storage_service()
     if not storage.is_ready:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        raise ServiceUnavailableException(
             detail="File storage is not configured",
+            type="storage-not-configured",
         )
     return FileService(session=session, storage_service=storage)
 
@@ -96,15 +101,15 @@ async def upload_file(
     track_user_action("upload", is_authenticated=False)
 
     if not file.filename:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+        raise BadRequestException(
             detail="Filename is required",
+            type="missing-filename",
         )
 
     if not file.content_type:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+        raise BadRequestException(
             detail="Content type is required",
+            type="missing-content-type",
         )
 
     try:
@@ -119,15 +124,15 @@ async def upload_file(
         return FileRead.model_validate(created_file)
 
     except InvalidFileError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+        raise BadRequestException(
             detail=str(e),
+            type="invalid-file",
         ) from e
     except StorageClientError as e:
         logger.error("Storage error during file upload", extra={"error": str(e)})
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        raise ServiceUnavailableException(
             detail="Failed to upload file to storage",
+            type="storage-upload-failed",
         ) from e
 
 
@@ -175,15 +180,15 @@ async def create_presigned_upload(
         return PresignedUploadResponse(**result)
 
     except InvalidFileError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+        raise BadRequestException(
             detail=str(e),
+            type="invalid-file",
         ) from e
     except StorageClientError as e:
         logger.error("Storage error during presigned upload creation", extra={"error": str(e)})
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        raise ServiceUnavailableException(
             detail="Failed to create presigned upload URL",
+            type="presigned-upload-failed",
         ) from e
 
 
@@ -215,9 +220,9 @@ async def complete_presigned_upload(
     track_user_action("upload_complete", is_authenticated=False)
 
     if completion.file_id != file_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+        raise BadRequestException(
             detail="File ID in URL does not match request body",
+            type="file-id-mismatch",
         )
 
     try:
@@ -228,21 +233,18 @@ async def complete_presigned_upload(
 
         return FileRead.model_validate(completed_file)
 
-    except NotFoundError as err:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found",
-        ) from err
+    except NotFoundError:
+        raise NotFoundError("File", {"id": str(file_id)}) from None
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+        raise BadRequestException(
             detail=str(e),
+            type="invalid-upload-state",
         ) from e
     except StorageClientError as e:
         logger.error("Storage error during upload completion", extra={"error": str(e)})
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+        raise BadRequestException(
             detail="Upload verification failed - file not found in storage",
+            type="upload-verification-failed",
         ) from e
 
 
@@ -317,10 +319,7 @@ async def get_file(
     file = await service.get_file(file_id)
 
     if file is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found",
-        )
+        raise NotFoundError("File", {"id": str(file_id)})
 
     return FileRead.model_validate(file)
 
@@ -359,14 +358,11 @@ async def get_download_url(
         return FileDownloadResponse(**download_data)
 
     except NotFoundError as err:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found",
-        ) from err
+        raise NotFoundError("File", {"id": str(file_id)}) from err
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+        raise BadRequestException(
             detail=str(e),
+            type="file-not-ready",
         ) from e
 
 
@@ -407,10 +403,7 @@ async def delete_file(
         )
 
     except NotFoundError as err:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found",
-        ) from err
+        raise NotFoundError("File", {"id": str(file_id)}) from err
 
 
 @router.get(
@@ -441,10 +434,7 @@ async def get_processing_status(
         return FileStatusResponse(**status_data)
 
     except NotFoundError as err:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found",
-        ) from err
+        raise NotFoundError("File", {"id": str(file_id)}) from err
 
 
 # Batch Operations
@@ -482,29 +472,29 @@ async def batch_upload_files(
     track_user_action("batch_upload", is_authenticated=False)
 
     if not files:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+        raise BadRequestException(
             detail="No files provided",
+            type="no-files",
         )
 
     if len(files) > 100:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+        raise BadRequestException(
             detail="Maximum 100 files per batch upload",
+            type="too-many-files",
         )
 
     # Prepare files for batch upload
     file_tuples = []
     for file in files:
         if not file.filename:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
+            raise BadRequestException(
                 detail="Filename is required for all files",
+                type="missing-filename",
             )
         if not file.content_type:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
+            raise BadRequestException(
                 detail="Content type is required for all files",
+                type="missing-content-type",
             )
         file_tuples.append((file.file, file.filename, file.content_type))
 
@@ -519,9 +509,9 @@ async def batch_upload_files(
 
     except StorageClientError as e:
         logger.error("Storage error during batch upload", extra={"error": str(e)})
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        raise ServiceUnavailableException(
             detail="Failed to upload files to storage",
+            type="storage-batch-upload-failed",
         ) from e
 
 
@@ -556,9 +546,9 @@ async def batch_download_files(
 
     except Exception as e:
         logger.error("Error during batch download", extra={"error": str(e)})
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        raise InternalServerException(
             detail="Failed to generate download URLs",
+            type="batch-download-failed",
         ) from e
 
 
@@ -598,9 +588,9 @@ async def batch_delete_files(
 
     except Exception as e:
         logger.error("Error during batch delete", extra={"error": str(e)})
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        raise InternalServerException(
             detail="Failed to delete files",
+            type="batch-delete-failed",
         ) from e
 
 
@@ -649,20 +639,17 @@ async def copy_file(
         return FileRead.model_validate(copied_file)
 
     except NotFoundError as err:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found",
-        ) from err
+        raise NotFoundError("File", {"id": str(file_id)}) from err
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+        raise BadRequestException(
             detail=str(e),
+            type="file-not-ready-for-copy",
         ) from e
     except StorageClientError as e:
         logger.error("Storage error during file copy", extra={"error": str(e)})
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        raise ServiceUnavailableException(
             detail="Failed to copy file in storage",
+            type="storage-copy-failed",
         ) from e
 
 
@@ -703,7 +690,4 @@ async def move_file(
         return FileRead.model_validate(moved_file)
 
     except NotFoundError as err:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found",
-        ) from err
+        raise NotFoundError("File", {"id": str(file_id)}) from err
