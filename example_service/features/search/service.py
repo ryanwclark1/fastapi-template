@@ -1,20 +1,35 @@
 """Search service for unified full-text search.
 
 Provides a high-level interface for searching across multiple entity types
-with PostgreSQL full-text search.
+with PostgreSQL full-text search, including:
+- Multi-entity search with a single query
+- Result ranking and highlighting
+- Search suggestions/autocomplete
+- Fuzzy matching with pg_trgm
+- "Did you mean?" suggestions
+- Faceted search
+- Search analytics
 """
 
 from __future__ import annotations
 
+import importlib
 import logging
 import time
 from typing import Any, TYPE_CHECKING
 
-from sqlalchemy import func, literal, select, text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, literal, or_, select, text
 
+from example_service.core.database.search import (
+    SearchAnalytics,
+    SearchQueryParser,
+    RankNormalization,
+)
 from .schemas import (
+    DidYouMeanSuggestion,
     EntitySearchResult,
+    FacetResult,
+    FacetValue,
     SearchableEntity,
     SearchCapabilitiesResponse,
     SearchHit,
@@ -27,7 +42,7 @@ from .schemas import (
 )
 
 if TYPE_CHECKING:
-    pass
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +57,31 @@ SEARCHABLE_ENTITIES: dict[str, dict[str, Any]] = {
         "snippet_field": "description",
         "id_field": "id",
         "config": "english",
+        "fuzzy_fields": ["title"],  # Fields for fuzzy matching
+        "facet_fields": ["is_completed"],  # Fields for faceted search
     },
-    # Add more searchable entities here
+    "posts": {
+        "display_name": "Posts",
+        "model_path": "example_service.core.models.post.Post",
+        "search_fields": ["title", "content", "slug"],
+        "title_field": "title",
+        "snippet_field": "content",
+        "id_field": "id",
+        "config": "english",
+        "fuzzy_fields": ["title"],
+        "facet_fields": ["is_published", "author_id"],
+    },
+    "users": {
+        "display_name": "Users",
+        "model_path": "example_service.core.models.user.User",
+        "search_fields": ["email", "username", "full_name"],
+        "title_field": "username",
+        "snippet_field": "full_name",
+        "id_field": "id",
+        "config": "simple",  # Use simple for identifiers
+        "fuzzy_fields": ["username", "full_name"],
+        "facet_fields": ["is_active"],
+    },
 }
 
 
@@ -55,6 +93,10 @@ class SearchService:
     - Result ranking and highlighting
     - Search suggestions/autocomplete
     - Configurable search syntax
+    - Fuzzy matching fallback
+    - "Did you mean?" suggestions
+    - Faceted search results
+    - Search analytics tracking
 
     Example:
         service = SearchService(session)
@@ -63,6 +105,7 @@ class SearchService:
         results = await service.search(SearchRequest(
             query="important meeting",
             highlight=True,
+            include_facets=True,
         ))
 
         # Get suggestions for autocomplete
@@ -71,13 +114,25 @@ class SearchService:
         ))
     """
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: "AsyncSession",
+        *,
+        enable_analytics: bool = True,
+        enable_fuzzy_fallback: bool = True,
+    ) -> None:
         """Initialize search service.
 
         Args:
             session: Database session.
+            enable_analytics: Enable search analytics tracking.
+            enable_fuzzy_fallback: Enable fuzzy search when FTS returns no results.
         """
         self.session = session
+        self.enable_analytics = enable_analytics
+        self.enable_fuzzy_fallback = enable_fuzzy_fallback
+        self._query_parser = SearchQueryParser()
+        self._analytics = SearchAnalytics(session) if enable_analytics else None
 
     def get_capabilities(self) -> SearchCapabilitiesResponse:
         """Get search capabilities and searchable entities.
@@ -94,6 +149,8 @@ class SearchService:
                     search_fields=config["search_fields"],
                     title_field=config.get("title_field"),
                     snippet_field=config.get("snippet_field"),
+                    supports_fuzzy=bool(config.get("fuzzy_fields")),
+                    facet_fields=config.get("facet_fields", []),
                 )
             )
 
@@ -102,6 +159,14 @@ class SearchService:
             supported_syntax=list(SearchSyntax),
             max_query_length=500,
             max_results_per_entity=100,
+            features=[
+                "full_text_search",
+                "fuzzy_matching",
+                "highlighting",
+                "faceted_search",
+                "autocomplete",
+                "did_you_mean",
+            ],
         )
 
     async def search(self, request: SearchRequest) -> SearchResponse:
@@ -130,11 +195,21 @@ class SearchService:
         # Search each entity type
         results: list[EntitySearchResult] = []
         total_hits = 0
+        all_facets: list[FacetResult] = []
 
         for entity_type in entity_types:
             entity_result = await self._search_entity(entity_type, request)
             results.append(entity_result)
             total_hits += entity_result.total
+
+            # Collect facets
+            if request.include_facets and entity_result.facets:
+                all_facets.extend(entity_result.facets)
+
+        # Generate "Did you mean?" suggestions for low/no results
+        did_you_mean = None
+        if total_hits < 3 and self.enable_fuzzy_fallback:
+            did_you_mean = await self._generate_did_you_mean(request.query, entity_types)
 
         # Generate suggestions if few results
         suggestions = []
@@ -143,11 +218,26 @@ class SearchService:
 
         took_ms = int((time.monotonic() - start_time) * 1000)
 
+        # Record analytics
+        if self._analytics:
+            try:
+                await self._analytics.record_search(
+                    query=request.query,
+                    results_count=total_hits,
+                    took_ms=took_ms,
+                    entity_types=entity_types,
+                    search_syntax=request.syntax.value,
+                )
+            except Exception as e:
+                logger.warning(f"Failed to record search analytics: {e}")
+
         return SearchResponse(
             query=request.query,
             total_hits=total_hits,
             results=results,
             suggestions=suggestions,
+            did_you_mean=did_you_mean,
+            facets=all_facets if request.include_facets else None,
             took_ms=took_ms,
         )
 
@@ -182,7 +272,20 @@ class SearchService:
 
         # Build search query with rank
         search_vector = model_class.search_vector
-        rank_expr = func.ts_rank(search_vector, ts_query)
+
+        # Use ts_rank_cd for better phrase proximity ranking
+        if request.syntax == SearchSyntax.PHRASE:
+            rank_expr = func.ts_rank_cd(
+                search_vector,
+                ts_query,
+                RankNormalization.SELF_PLUS_ONE,
+            )
+        else:
+            rank_expr = func.ts_rank(
+                search_vector,
+                ts_query,
+                RankNormalization.SELF_PLUS_ONE,
+            )
 
         # Main query
         stmt = (
@@ -201,6 +304,10 @@ class SearchService:
         result = await self.session.execute(stmt)
         rows = result.all()
 
+        # If no FTS results and fuzzy is enabled, try fuzzy search
+        if not rows and self.enable_fuzzy_fallback and config.get("fuzzy_fields"):
+            rows = await self._fuzzy_search(model_class, config, request)
+
         # Get total count
         count_stmt = (
             select(func.count())
@@ -214,8 +321,8 @@ class SearchService:
         # Build hits with optional highlighting
         hits = []
         for row in rows:
-            entity = row[0]
-            rank = float(row[1])
+            entity = row[0] if isinstance(row, tuple) else row
+            rank = float(row[1]) if isinstance(row, tuple) and len(row) > 1 else 0.5
 
             # Get title
             title = None
@@ -250,6 +357,9 @@ class SearchService:
             else:
                 data = {}
 
+            # Remove search_vector from data (it's not serializable)
+            data.pop("search_vector", None)
+
             hits.append(
                 SearchHit(
                     entity_type=entity_type,
@@ -262,11 +372,192 @@ class SearchService:
                 )
             )
 
+        # Get facets if requested
+        facets = None
+        if request.include_facets and config.get("facet_fields"):
+            facets = await self._get_facets(
+                model_class,
+                config,
+                ts_query,
+                search_vector,
+            )
+
         return EntitySearchResult(
             entity_type=entity_type,
             total=total,
             hits=hits,
+            facets=facets,
         )
+
+    async def _fuzzy_search(
+        self,
+        model_class: Any,
+        config: dict[str, Any],
+        request: SearchRequest,
+    ) -> list[Any]:
+        """Perform fuzzy search as fallback.
+
+        Args:
+            model_class: SQLAlchemy model class.
+            config: Entity configuration.
+            request: Search request.
+
+        Returns:
+            List of (entity, rank) tuples.
+        """
+        fuzzy_fields = config.get("fuzzy_fields", [])
+        if not fuzzy_fields:
+            return []
+
+        conditions = []
+        similarities = []
+
+        for field_name in fuzzy_fields:
+            if hasattr(model_class, field_name):
+                field = getattr(model_class, field_name)
+                # Use word_similarity for better matching in longer text
+                conditions.append(field.op("%")(request.query))
+                similarities.append(func.similarity(request.query, field))
+
+        if not conditions:
+            return []
+
+        # Get max similarity across fields
+        if len(similarities) == 1:
+            max_sim = similarities[0]
+        else:
+            max_sim = func.greatest(*similarities)
+
+        stmt = (
+            select(model_class, max_sim.label("rank"))
+            .where(or_(*conditions))
+            .order_by(max_sim.desc())
+            .offset(request.offset)
+            .limit(request.limit)
+        )
+
+        try:
+            result = await self.session.execute(stmt)
+            return result.all()
+        except Exception as e:
+            logger.warning(f"Fuzzy search failed: {e}")
+            return []
+
+    async def _get_facets(
+        self,
+        model_class: Any,
+        config: dict[str, Any],
+        ts_query: Any,
+        search_vector: Any,
+    ) -> list[FacetResult]:
+        """Get facet counts for search results.
+
+        Args:
+            model_class: SQLAlchemy model class.
+            config: Entity configuration.
+            ts_query: The tsquery for filtering.
+            search_vector: The search vector column.
+
+        Returns:
+            List of facet results.
+        """
+        facets = []
+        facet_fields = config.get("facet_fields", [])
+
+        for field_name in facet_fields:
+            if not hasattr(model_class, field_name):
+                continue
+
+            field = getattr(model_class, field_name)
+
+            # Get value counts
+            stmt = (
+                select(field, func.count().label("count"))
+                .where(search_vector.op("@@")(ts_query))
+                .group_by(field)
+                .order_by(text("count DESC"))
+                .limit(20)
+            )
+
+            try:
+                result = await self.session.execute(stmt)
+                values = [
+                    FacetValue(value=str(row[0]) if row[0] is not None else "null", count=row[1])
+                    for row in result.all()
+                ]
+
+                if values:
+                    facets.append(
+                        FacetResult(
+                            field=field_name,
+                            display_name=field_name.replace("_", " ").title(),
+                            values=values,
+                        )
+                    )
+            except Exception as e:
+                logger.warning(f"Facet query failed for {field_name}: {e}")
+
+        return facets
+
+    async def _generate_did_you_mean(
+        self,
+        query: str,
+        entity_types: list[str],
+    ) -> DidYouMeanSuggestion | None:
+        """Generate "Did you mean?" suggestion using fuzzy matching.
+
+        Args:
+            query: Original query.
+            entity_types: Entity types to search.
+
+        Returns:
+            Suggestion if found, None otherwise.
+        """
+        best_suggestion = None
+        best_similarity = 0.0
+
+        for entity_type in entity_types:
+            if entity_type not in SEARCHABLE_ENTITIES:
+                continue
+
+            config = SEARCHABLE_ENTITIES[entity_type]
+            model_class = self._import_model(config["model_path"])
+            fuzzy_fields = config.get("fuzzy_fields", [])
+
+            for field_name in fuzzy_fields:
+                if not hasattr(model_class, field_name):
+                    continue
+
+                field = getattr(model_class, field_name)
+
+                # Find similar values
+                stmt = (
+                    select(
+                        field,
+                        func.similarity(query, field).label("sim"),
+                    )
+                    .where(field.op("%")(query))
+                    .order_by(text("sim DESC"))
+                    .limit(1)
+                )
+
+                try:
+                    result = await self.session.execute(stmt)
+                    row = result.first()
+                    if row and row[1] > best_similarity and row[1] > 0.3:
+                        best_similarity = row[1]
+                        best_suggestion = str(row[0])
+                except Exception as e:
+                    logger.debug(f"Did you mean query failed: {e}")
+
+        if best_suggestion and best_suggestion.lower() != query.lower():
+            return DidYouMeanSuggestion(
+                original_query=query,
+                suggested_query=best_suggestion,
+                confidence=best_similarity,
+            )
+
+        return None
 
     async def suggest(
         self,
@@ -305,7 +596,12 @@ class SearchService:
             ts_config = config.get("config", "english")
             # Add :* for prefix matching
             prefix_query = request.prefix + ":*"
-            ts_query = func.to_tsquery(ts_config, prefix_query)
+
+            try:
+                ts_query = func.to_tsquery(ts_config, prefix_query)
+            except Exception:
+                # Fall back to plain text query if prefix query fails
+                ts_query = func.plainto_tsquery(ts_config, request.prefix)
 
             # Get matching titles
             title_field = config.get("title_field")
@@ -398,7 +694,7 @@ class SearchService:
 
         # Use ts_headline for highlighting
         close_tag = highlight_tag.replace("<", "</")
-        options = f"StartSel={highlight_tag}, StopSel={close_tag}, MaxWords=35, MinWords=15"
+        options = f"StartSel={highlight_tag}, StopSel={close_tag}, MaxWords=35, MinWords=15, ShortWord=3, HighlightAll=FALSE"
 
         try:
             stmt = select(
@@ -435,8 +731,6 @@ class SearchService:
                 if len(word) > 2:
                     suggestions.append(word)
 
-        # Could add spell-check, synonyms, etc. here
-
         return suggestions[:5]
 
     def _import_model(self, model_path: str):
@@ -450,19 +744,22 @@ class SearchService:
         """
         parts = model_path.rsplit(".", 1)
         module_path, class_name = parts
-        import importlib
 
         module = importlib.import_module(module_path)
         return getattr(module, class_name)
 
 
-async def get_search_service(session: AsyncSession) -> SearchService:
+async def get_search_service(
+    session: "AsyncSession",
+    enable_analytics: bool = True,
+) -> SearchService:
     """Get a search service instance.
 
     Args:
         session: Database session.
+        enable_analytics: Enable search analytics tracking.
 
     Returns:
         SearchService instance.
     """
-    return SearchService(session)
+    return SearchService(session, enable_analytics=enable_analytics)

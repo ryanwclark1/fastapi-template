@@ -38,6 +38,9 @@ class SearchRequest(BaseModel):
     min_rank: float = Field(
         default=0.0, ge=0.0, le=1.0, description="Minimum rank threshold"
     )
+    include_facets: bool = Field(
+        default=False, description="Include faceted search results"
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -45,6 +48,7 @@ class SearchRequest(BaseModel):
                 "query": "meeting tomorrow",
                 "entity_types": ["reminders"],
                 "highlight": True,
+                "include_facets": True,
             }
         }
     }
@@ -62,12 +66,42 @@ class SearchHit(BaseModel):
     created_at: datetime | None = Field(default=None, description="Entity creation time")
 
 
+class FacetValue(BaseModel):
+    """A single facet value with count."""
+
+    value: str = Field(description="Facet value")
+    count: int = Field(description="Number of results with this value")
+
+
+class FacetResult(BaseModel):
+    """Facet results for a field."""
+
+    field: str = Field(description="Field name")
+    display_name: str = Field(description="Human-readable field name")
+    values: list[FacetValue] = Field(description="Value counts")
+
+
 class EntitySearchResult(BaseModel):
     """Search results for a specific entity type."""
 
     entity_type: str
     total: int = Field(description="Total matching results")
     hits: list[SearchHit] = Field(description="Search results")
+    facets: list[FacetResult] | None = Field(
+        default=None, description="Facet counts for this entity type"
+    )
+
+
+class DidYouMeanSuggestion(BaseModel):
+    """'Did you mean?' suggestion for typos."""
+
+    original_query: str = Field(description="Original query with possible typo")
+    suggested_query: str = Field(description="Suggested correction")
+    confidence: float = Field(
+        description="Confidence score (0-1) for the suggestion",
+        ge=0.0,
+        le=1.0,
+    )
 
 
 class SearchResponse(BaseModel):
@@ -78,6 +112,12 @@ class SearchResponse(BaseModel):
     results: list[EntitySearchResult] = Field(description="Results by entity type")
     suggestions: list[str] = Field(
         default_factory=list, description="Query suggestions for no/few results"
+    )
+    did_you_mean: DidYouMeanSuggestion | None = Field(
+        default=None, description="Spelling correction suggestion"
+    )
+    facets: list[FacetResult] | None = Field(
+        default=None, description="Aggregated facet counts across all entity types"
     )
     took_ms: int = Field(description="Search time in milliseconds")
 
@@ -113,6 +153,12 @@ class SearchableEntity(BaseModel):
     search_fields: list[str] = Field(description="Fields included in search")
     title_field: str | None = Field(default=None, description="Field used for result title")
     snippet_field: str | None = Field(default=None, description="Field used for snippets")
+    supports_fuzzy: bool = Field(
+        default=False, description="Whether fuzzy matching is available"
+    )
+    facet_fields: list[str] = Field(
+        default_factory=list, description="Fields available for faceted search"
+    )
 
 
 class SearchCapabilitiesResponse(BaseModel):
@@ -122,17 +168,54 @@ class SearchCapabilitiesResponse(BaseModel):
     supported_syntax: list[SearchSyntax]
     max_query_length: int
     max_results_per_entity: int
+    features: list[str] = Field(
+        default_factory=list, description="List of available search features"
+    )
+
+
+class SearchAnalyticsRequest(BaseModel):
+    """Request for search analytics."""
+
+    days: int = Field(default=30, ge=1, le=365, description="Number of days to analyze")
+
+
+class SearchAnalyticsResponse(BaseModel):
+    """Search analytics summary."""
+
+    total_searches: int = Field(description="Total number of searches")
+    unique_queries: int = Field(description="Number of unique search queries")
+    zero_result_rate: float = Field(description="Percentage of searches with no results")
+    avg_results_count: float = Field(description="Average results per search")
+    avg_response_time_ms: float = Field(description="Average response time")
+    click_through_rate: float = Field(description="Percentage of searches with clicks")
+    top_queries: list[dict[str, Any]] = Field(description="Most popular queries")
+    zero_result_queries: list[dict[str, Any]] = Field(description="Queries with no results")
+    period_days: int = Field(description="Analysis period in days")
+
+
+class RecordClickRequest(BaseModel):
+    """Request to record a search result click."""
+
+    search_id: int = Field(description="ID of the search query record")
+    clicked_position: int = Field(ge=1, description="Position of clicked result (1-indexed)")
+    clicked_entity_id: str = Field(description="ID of the clicked entity")
 
 
 __all__ = [
     "SearchSyntax",
     "SearchRequest",
     "SearchHit",
+    "FacetValue",
+    "FacetResult",
     "EntitySearchResult",
+    "DidYouMeanSuggestion",
     "SearchResponse",
     "SearchSuggestionRequest",
     "SearchSuggestion",
     "SearchSuggestionsResponse",
     "SearchableEntity",
     "SearchCapabilitiesResponse",
+    "SearchAnalyticsRequest",
+    "SearchAnalyticsResponse",
+    "RecordClickRequest",
 ]
