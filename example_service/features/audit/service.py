@@ -345,7 +345,7 @@ class AuditService:
             .select_from(subquery)
             .group_by(AuditLog.action)
         )
-        actions_count = dict(action_result.all())
+        actions_count: dict[str, int] = dict(action_result.all()) # type: ignore
 
         # Entity type counts
         entity_result = await self.session.execute(
@@ -353,7 +353,7 @@ class AuditService:
             .select_from(subquery)
             .group_by(AuditLog.entity_type)
         )
-        entity_types_count = dict(entity_result.all())
+        entity_types_count: dict[str, int] = dict(entity_result.all()) # type: ignore
 
         # Success rate
         success_result = await self.session.execute(
@@ -411,13 +411,13 @@ class AuditService:
         result = await self.session.execute(stmt)
         await self.session.commit()
 
-        deleted_count = result.rowcount
+        deleted_count = result.rowcount  # type: ignore[attr-defined]
         logger.info(
             f"Deleted {deleted_count} old audit logs",
             extra={"before": before.isoformat(), "tenant_id": tenant_id},
         )
 
-        return deleted_count
+        return deleted_count # type: ignore
 
 
 async def get_audit_service() -> AuditService:

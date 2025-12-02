@@ -67,7 +67,6 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Any, ParamSpec, Self, TypeVar
 
 from example_service.core.exceptions import CircuitBreakerOpenException
-
 from example_service.infra.metrics.tracking import (
     track_circuit_breaker_failure,
     track_circuit_breaker_state_change,

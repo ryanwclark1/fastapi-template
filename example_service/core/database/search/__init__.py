@@ -113,6 +113,14 @@ from example_service.core.database.search.parser import (
     TokenType,
     parse_search_query,
 )
+from example_service.core.database.search.synonyms import (
+    DEFAULT_PROGRAMMING_SYNONYMS,
+    SynonymDictionary,
+    SynonymGroup,
+    create_synonym_config_sql,
+    create_synonym_dictionary_sql,
+    get_default_synonyms,
+)
 from example_service.core.database.search.types import TSVECTOR
 from example_service.core.database.search.utils import (
     FTSMigrationHelper,
@@ -121,14 +129,6 @@ from example_service.core.database.search.utils import (
     UnaccentMigrationHelper,
     build_ts_query_sql,
     generate_search_vector_sql,
-)
-from example_service.core.database.search.synonyms import (
-    SynonymDictionary,
-    SynonymGroup,
-    DEFAULT_PROGRAMMING_SYNONYMS,
-    get_default_synonyms,
-    create_synonym_config_sql,
-    create_synonym_dictionary_sql,
 )
 
 __all__ = [

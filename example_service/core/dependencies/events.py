@@ -47,8 +47,8 @@ def _get_correlation_id(request: Request) -> str | None:
 
 
 async def get_event_publisher(
-    session: AsyncSession = Depends(get_db_session),  # type: ignore[assignment]
-    request: Request = None,  # FastAPI will inject this automatically
+    session: Annotated[AsyncSession,Depends(get_db_session)],
+    request: Request | None = None,  # FastAPI will inject this automatically
 ) -> EventPublisher:
     """FastAPI dependency for event publisher.
 
@@ -85,7 +85,7 @@ async def get_event_publisher(
     """
     from example_service.core.events import EventPublisher
 
-    correlation_id = _get_correlation_id(request)
+    correlation_id = _get_correlation_id(request) if request else None
     return EventPublisher(session, correlation_id=correlation_id)
 
 

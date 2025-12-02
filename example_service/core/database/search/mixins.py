@@ -329,7 +329,6 @@ DROP FUNCTION IF EXISTS {table_name}_search_vector_update();
     async def rebuild_search_vectors(
         cls,
         session: AsyncSession,
-        batch_size: int = 1000,
     ) -> int:
         """Rebuild all search vectors for existing rows.
 
@@ -340,7 +339,6 @@ DROP FUNCTION IF EXISTS {table_name}_search_vector_update();
 
         Args:
             session: Database session
-            batch_size: Number of rows to update per batch
 
         Returns:
             Number of rows updated
@@ -352,7 +350,7 @@ DROP FUNCTION IF EXISTS {table_name}_search_vector_update();
         sql = cls.get_backfill_sql(table_name)
         result = await session.execute(text(sql))
         await session.commit()
-        return result.rowcount or 0
+        return result.rowcount or 0  # type: ignore[attr-defined]
 
     def update_search_vector(self) -> None:
         """Update search vector from current field values.

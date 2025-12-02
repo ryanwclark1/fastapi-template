@@ -15,7 +15,6 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-
 # ============================================================================
 # Fixtures
 # ============================================================================
@@ -49,7 +48,6 @@ async def search_db_engine(postgres_container: str):
 async def search_session(search_db_engine) -> AsyncSession:
     """Create session with search tables and triggers."""
     from example_service.core.database.base import Base
-    from example_service.features.reminders.models import Reminder
 
     # Create all tables
     async with search_db_engine.begin() as conn:

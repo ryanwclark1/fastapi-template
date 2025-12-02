@@ -108,6 +108,10 @@ def test_setup_routers_without_rabbit(
         call(router_module.files_router, prefix="/api", tags=["files"]),
         call(router_module.webhooks_router, prefix="/api", tags=["webhooks"]),
         call(router_module.tasks_router, prefix="/api", tags=["tasks"]),
+        call(router_module.audit_router, prefix="/api", tags=["audit"]),
+        call(router_module.datatransfer_router, prefix="/api", tags=["data-transfer"]),
+        call(router_module.featureflags_router, prefix="/api", tags=["feature-flags"]),
+        call(router_module.search_router, prefix="/api", tags=["search"]),
     ]
 
 

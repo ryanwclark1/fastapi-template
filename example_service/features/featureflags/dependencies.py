@@ -137,7 +137,7 @@ async def get_feature_flags(
     )
 
 
-def require_feature(flag_key: str, allow_missing: bool = False):
+def require_feature(flag_key: str, allow_missing: bool = False): # type: ignore[no-untyped-def]
     """Dependency factory that requires a feature flag to be enabled.
 
     Usage:

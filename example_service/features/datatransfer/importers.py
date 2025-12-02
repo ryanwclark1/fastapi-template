@@ -13,6 +13,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, TypeVar
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -65,7 +66,7 @@ class BaseImporter[T](ABC):
         self,
         required_fields: list[str] | None = None,
         field_types: dict[str, type] | None = None,
-        field_validators: dict[str, callable] | None = None,
+        field_validators: dict[str, Callable[[Any], bool]] | None = None,
     ) -> None:
         """Initialize importer.
 
@@ -133,14 +134,14 @@ class BaseImporter[T](ABC):
                 if field in self.field_types and value is not None and value != "":
                     expected_type = self.field_types[field]
                     try:
-                        if expected_type == bool:
+                        if expected_type is bool:
                             if isinstance(value, str):
                                 value = value.lower() in ("true", "1", "yes", "on")
                             else:
                                 value = bool(value)
-                        elif expected_type == int:
+                        elif expected_type is int:
                             value = int(value)
-                        elif expected_type == float:
+                        elif expected_type is float:
                             value = float(value)
                         else:
                             value = expected_type(value)
@@ -173,7 +174,7 @@ class CSVImporter(BaseImporter[T]):
         self,
         required_fields: list[str] | None = None,
         field_types: dict[str, type] | None = None,
-        field_validators: dict[str, callable] | None = None,
+        field_validators: dict[str, Callable[[Any], bool]] | None = None,
         delimiter: str = ",",
         encoding: str = "utf-8",
     ) -> None:
@@ -204,7 +205,7 @@ class CSVImporter(BaseImporter[T]):
         text = data.decode(self.encoding)
         return self._parse_csv(io.StringIO(text))
 
-    def _parse_csv(self, file_obj) -> list[ParsedRecord]:
+    def _parse_csv(self, file_obj: io.StringIO | Any) -> list[ParsedRecord]:
         """Parse CSV from file-like object."""
         reader = csv.DictReader(file_obj, delimiter=self.delimiter)
         records = []
@@ -225,7 +226,7 @@ class JSONImporter(BaseImporter[T]):
         self,
         required_fields: list[str] | None = None,
         field_types: dict[str, type] | None = None,
-        field_validators: dict[str, callable] | None = None,
+        field_validators: dict[str, Callable[[Any], bool]] | None = None,
         records_key: str = "records",
     ) -> None:
         """Initialize JSON importer.
@@ -294,7 +295,7 @@ class ExcelImporter(BaseImporter[T]):
         self,
         required_fields: list[str] | None = None,
         field_types: dict[str, type] | None = None,
-        field_validators: dict[str, callable] | None = None,
+        field_validators: dict[str, Callable[[Any], bool]] | None = None,
         sheet_name: str | None = None,
     ) -> None:
         """Initialize Excel importer.
@@ -315,9 +316,9 @@ class ExcelImporter(BaseImporter[T]):
     def parse_file(self, file_path: Path) -> list[ParsedRecord]:
         """Parse Excel file."""
         try:
-            from openpyxl import load_workbook
-        except ImportError:
-            raise ImportError("openpyxl is required for Excel import")
+            from openpyxl import load_workbook  # type: ignore[import-untyped]
+        except ImportError as err:
+            raise ImportError("openpyxl is required for Excel import") from err
 
         wb = load_workbook(file_path, read_only=True, data_only=True)
         ws = wb[self.sheet_name] if self.sheet_name else wb.active
@@ -328,15 +329,15 @@ class ExcelImporter(BaseImporter[T]):
         """Parse Excel bytes."""
         try:
             from openpyxl import load_workbook
-        except ImportError:
-            raise ImportError("openpyxl is required for Excel import")
+        except ImportError as err:
+            raise ImportError("openpyxl is required for Excel import") from err
 
         wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
         ws = wb[self.sheet_name] if self.sheet_name else wb.active
 
         return self._parse_worksheet(ws)
 
-    def _parse_worksheet(self, ws) -> list[ParsedRecord]:
+    def _parse_worksheet(self, ws: Any) -> list[ParsedRecord]:
         """Parse worksheet rows."""
         rows = list(ws.iter_rows(values_only=True))
         if not rows:
@@ -363,7 +364,7 @@ def get_importer(
     format: str,
     required_fields: list[str] | None = None,
     field_types: dict[str, type] | None = None,
-    field_validators: dict[str, callable] | None = None,
+    field_validators: dict[str, Callable[[Any], bool]] | None = None,
 ) -> BaseImporter:
     """Get the appropriate importer for a format.
 

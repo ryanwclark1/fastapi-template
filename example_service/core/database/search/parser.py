@@ -415,13 +415,13 @@ class SearchQueryParser:
 
             elif token.type == TokenType.FIELD_TERM:
                 if token.field not in result.field_filters:
-                    result.field_filters[token.field] = []
-                result.field_filters[token.field].append(token.value)
+                    result.field_filters[token.field] = [] # type: ignore[index]
+                result.field_filters[token.field].append(token.value) # type: ignore[index]
 
             elif token.type == TokenType.FIELD_PHRASE:
                 if token.field not in result.field_filters:
-                    result.field_filters[token.field] = []
-                result.field_filters[token.field].append(f'"{token.value}"')
+                    result.field_filters[token.field] = [] # type: ignore[index]
+                result.field_filters[token.field].append(f'"{token.value}"') # type: ignore[index]
 
             elif token.type == TokenType.FIELD_RANGE:
                 if token.field:
@@ -511,7 +511,7 @@ class SearchQueryParser:
         exclusion_query = " | ".join(parsed.exclusions)
         ts_query = func.plainto_tsquery(config, exclusion_query)
 
-        return not_(search_column.op("@@")(ts_query))
+        return not_(search_column.op("@@")(ts_query)) # type: ignore[no-any-return]
 
 
 @dataclass
@@ -544,7 +544,7 @@ class QueryRewriter:
         dictionary: Any,
         stop_words: set[str] | None = None,
         min_word_length: int = 2,
-    ) -> "QueryRewriter":
+    ) -> QueryRewriter:
         """Create a QueryRewriter with a SynonymDictionary.
 
         Args:
@@ -574,7 +574,7 @@ class QueryRewriter:
         """
         # Use SynonymDictionary if available (more sophisticated expansion)
         if self._synonym_dictionary:
-            return self._synonym_dictionary.expand_query(query)
+            return self._synonym_dictionary.expand_query(query) # type: ignore[no-any-return]
 
         words = query.split()
         expanded = []

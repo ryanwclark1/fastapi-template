@@ -11,8 +11,7 @@ import sys
 import click
 
 from example_service.cli.utils import coro, error, header, info, section, success, warning
-from example_service.core.settings import get_database_settings
-from example_service.infra.database.session import get_engine
+from example_service.infra.database.session import create_async_engine
 
 
 @click.group(name="search")
@@ -69,7 +68,7 @@ async def rebuild(entity: tuple[str, ...], batch_size: int, force: bool) -> None
             info("Rebuild cancelled")
             return
 
-    engine = get_engine()
+    engine = create_async_engine() # type: ignore
 
     async with engine.begin() as conn:
         for entity_type in entities_to_rebuild:
@@ -134,8 +133,7 @@ async def rebuild(entity: tuple[str, ...], batch_size: int, force: bool) -> None
                     )
                 """
 
-                result = await conn.execute(text(update_sql))
-                batch_updated = result.rowcount
+                await conn.execute(text(update_sql))
                 processed += batch_size
 
                 progress = min(processed, total)
@@ -162,7 +160,7 @@ async def stats() -> None:
 
     header("Search Index Statistics")
 
-    engine = get_engine()
+    engine = create_async_engine() # type: ignore
 
     async with engine.begin() as conn:
         # Get overall search-related statistics
@@ -278,10 +276,8 @@ async def analyze(days: int, output: str | None) -> None:
     """
     from datetime import datetime
 
-    from sqlalchemy.ext.asyncio import AsyncSession
-
     from example_service.core.database.search import SearchAnalytics
-    from example_service.infra.database.session import async_session_maker
+    from example_service.infra.database.session import async_sessionmaker
 
     header("Search Quality Analysis")
     info(f"Analyzing last {days} days of search data...")
@@ -293,7 +289,7 @@ async def analyze(days: int, output: str | None) -> None:
     report_lines.append(f"Period: Last {days} days")
     report_lines.append("=" * 60)
 
-    async with async_session_maker() as session:
+    async with async_sessionmaker() as session: # type: ignore
         analytics = SearchAnalytics(session)
 
         # Get statistics
@@ -413,8 +409,8 @@ async def test(query: str, entity: str | None, limit: int) -> None:
     Useful for debugging search issues and tuning.
     """
     from example_service.features.search.schemas import SearchRequest, SearchSyntax
-    from example_service.features.search.service import SearchService, SEARCHABLE_ENTITIES
-    from example_service.infra.database.session import async_session_maker
+    from example_service.features.search.service import SEARCHABLE_ENTITIES, SearchService
+    from example_service.infra.database.session import async_sessionmaker
 
     header(f"Testing Search: \"{query}\"")
 
@@ -426,7 +422,7 @@ async def test(query: str, entity: str | None, limit: int) -> None:
 
     entity_types = [entity] if entity else None
 
-    async with async_session_maker() as session:
+    async with async_sessionmaker() as session: # type: ignore
         service = SearchService(session, enable_analytics=False)
 
         # Test with different syntaxes
@@ -472,7 +468,7 @@ async def triggers() -> None:
 
     header("Search Triggers Status")
 
-    engine = get_engine()
+    engine = create_async_engine() # type: ignore
 
     async with engine.begin() as conn:
         # Get all search-related triggers

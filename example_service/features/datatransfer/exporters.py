@@ -246,10 +246,12 @@ class ExcelExporter(BaseExporter[T]):
     def export(self, records: list[T], output_path: Path) -> int:
         """Export records to Excel file."""
         try:
-            from openpyxl import Workbook
-            from openpyxl.utils import get_column_letter
-        except ImportError:
-            raise ImportError("openpyxl is required for Excel export. Install with: pip install openpyxl")
+            from openpyxl import Workbook  # type: ignore[import-untyped]
+            from openpyxl.utils import get_column_letter  # type: ignore[import-untyped]
+        except ImportError as err:
+            raise ImportError(
+                "openpyxl is required for Excel export. Install with: pip install openpyxl",
+            ) from err
 
         wb = Workbook()
         ws = wb.active
@@ -291,8 +293,8 @@ class ExcelExporter(BaseExporter[T]):
         try:
             from openpyxl import Workbook
             from openpyxl.utils import get_column_letter
-        except ImportError:
-            raise ImportError("openpyxl is required for Excel export")
+        except ImportError as err:
+            raise ImportError("openpyxl is required for Excel export") from err
 
         wb = Workbook()
         ws = wb.active

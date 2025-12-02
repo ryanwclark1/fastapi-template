@@ -110,7 +110,7 @@ async def download_export(
     try:
         data, content_type, filename = await service.export_to_bytes(request)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     return StreamingResponse(
         iter([data]),
@@ -175,7 +175,7 @@ async def import_data(
             update_existing=update_existing,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     return result
 
@@ -216,7 +216,7 @@ async def validate_import(
             validate_only=True,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     return result
 

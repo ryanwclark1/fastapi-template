@@ -135,7 +135,7 @@ class SMTPClient(BaseEmailClient):
         max_delay=10.0,
         exceptions=(OSError, ConnectionError, TimeoutError),
     )
-    async def send(self, message: EmailMessage) -> EmailResult:
+    async def send(self, message: EmailMessage) -> EmailResult:  # type: ignore[override]
         """Send email via SMTP.
 
         Args:
@@ -172,8 +172,8 @@ class SMTPClient(BaseEmailClient):
                 # Authenticate if credentials provided
                 if self.settings.requires_auth:
                     await smtp.login(
-                        self.settings.smtp_username,
-                        self.settings.smtp_password.get_secret_value(),
+                        self.settings.smtp_username,  # type: ignore[arg-type]
+                        self.settings.smtp_password.get_secret_value(),  # type: ignore[union-attr]
                     )
 
                 # Send the message
@@ -297,6 +297,10 @@ class SMTPClient(BaseEmailClient):
                 with open(attachment.path, "rb") as f:
                     content = f.read()
 
+            if content is None:
+                logger.warning(f"Skipping attachment {attachment.filename}: no content available")
+                continue
+
             part = MIMEApplication(content, Name=attachment.filename)
             part["Content-Disposition"] = f'attachment; filename="{attachment.filename}"'
             if attachment.content_id:
@@ -345,7 +349,9 @@ class ConsoleClient(BaseEmailClient):
         print(f"\n{separator}")
         print("EMAIL (Console Backend)")
         print(separator)
-        print(f"From: {message.from_name or self.settings.default_from_name} <{message.from_email or self.settings.default_from_email}>")
+        print(
+            f"From: {message.from_name or self.settings.default_from_name} <{message.from_email or self.settings.default_from_email}>"
+        )
         print(f"To: {', '.join(message.to)}")
         if message.cc:
             print(f"Cc: {', '.join(message.cc)}")

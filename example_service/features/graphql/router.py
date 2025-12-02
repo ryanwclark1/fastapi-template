@@ -31,10 +31,10 @@ if GraphQLRouter is not None:
     from example_service.features.graphql.schema import schema
 else:
     # Dummy imports to avoid NameError, but these won't be used
-    GraphQLContext = None  # type: ignore[assignment, misc]
-    create_dataloaders = None  # type: ignore[assignment, misc]
-    register_playground_routes = None  # type: ignore[assignment, misc]
-    schema = None  # type: ignore[assignment, misc]
+    GraphQLContext = None  # type: ignore[misc]
+    create_dataloaders = None
+    register_playground_routes = None
+    schema = None
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -85,7 +85,7 @@ if GraphQLRouter is not None:
         )
 else:
     # Dummy function to avoid NameError, but it won't be used
-    async def get_graphql_context(*args: Any, **kwargs: Any) -> Any:  # type: ignore[misc]
+    async def get_graphql_context(*_args: Any, **_kwargs: Any) -> Any:
         """Dummy function when GraphQL is not available."""
         raise ImportError("strawberry is required for GraphQL support")
 

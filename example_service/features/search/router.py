@@ -178,7 +178,7 @@ async def get_suggestions(
     description="Get search statistics and insights for monitoring search quality.",
 )
 async def get_search_analytics(
-    session: Annotated[AsyncSession, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     _user: Annotated[dict, Depends(get_current_user)],
     days: Annotated[int, Query(ge=1, le=365, description="Number of days to analyze")] = 30,
 ) -> SearchAnalyticsResponse:
@@ -211,7 +211,7 @@ async def get_search_analytics(
     description="View search volume and patterns over time.",
 )
 async def get_search_trends(
-    session: Annotated[AsyncSession, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     _user: Annotated[dict, Depends(get_current_user)],
     days: Annotated[int, Query(ge=1, le=365, description="Number of days")] = 30,
     interval: Annotated[str, Query(description="Grouping interval", regex="^(hour|day|week)$")] = "day",
@@ -238,7 +238,7 @@ async def get_search_trends(
     description="Get queries that returned no results to identify content gaps.",
 )
 async def get_zero_result_queries(
-    session: Annotated[AsyncSession, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     _user: Annotated[dict, Depends(get_current_user)],
     days: Annotated[int, Query(ge=1, le=365, description="Number of days")] = 7,
     limit: Annotated[int, Query(ge=1, le=100, description="Max results")] = 20,
@@ -268,7 +268,7 @@ async def get_zero_result_queries(
 )
 async def record_click(
     request: RecordClickRequest,
-    session: Annotated[AsyncSession, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     _user: Annotated[dict, Depends(get_current_user)],
 ) -> dict[str, bool]:
     """Record a click on a search result.

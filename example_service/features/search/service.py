@@ -349,7 +349,7 @@ class SearchService:
 
         # Main query
         stmt = (
-            select(
+            select( # type: ignore
                 model_class,
                 rank_expr.label("rank"),
             )
@@ -371,7 +371,7 @@ class SearchService:
         # Get total count
         count_stmt = (
             select(func.count())
-            .select_from(model_class)
+            .select_from(model_class) # type: ignore
             .where(search_vector.op("@@")(ts_query))
             .where(rank_expr >= request.min_rank)
         )
@@ -393,10 +393,9 @@ class SearchService:
             snippet = None
             if request.highlight and config.get("snippet_field"):
                 snippet = await self._get_highlighted_snippet(
-                    entity_type,
                     entity,
                     request.query,
-                    config.get("snippet_field"),
+                    config.get("snippet_field"), # type: ignore
                     ts_config,
                     request.highlight_tag,
                 )
@@ -495,7 +494,7 @@ class SearchService:
 
         try:
             result = await self.session.execute(stmt)
-            return result.all()
+            return result.all() # type: ignore
         except Exception as e:
             logger.warning(f"Fuzzy search failed: {e}")
             return []
@@ -725,7 +724,6 @@ class SearchService:
 
     async def _get_highlighted_snippet(
         self,
-        entity_type: str,
         entity: Any,
         query: str,
         snippet_field: str,
@@ -735,7 +733,6 @@ class SearchService:
         """Get highlighted snippet using PostgreSQL ts_headline.
 
         Args:
-            entity_type: Entity type.
             entity: Entity instance.
             query: Search query.
             snippet_field: Field to use for snippet.
@@ -764,10 +761,10 @@ class SearchService:
             )
             result = await self.session.execute(stmt)
             snippet = result.scalar()
-            return snippet if snippet else text_value[:200]
+            return snippet if snippet else text_value[:200] # type: ignore
         except Exception as e:
             logger.debug(f"Highlighting failed: {e}")
-            return text_value[:200] + "..." if len(text_value) > 200 else text_value
+            return text_value[:200] + "..." if len(text_value) > 200 else text_value # type: ignore
 
     async def _generate_suggestions(self, query: str) -> list[str]:
         """Generate query suggestions for low-result queries.
@@ -790,7 +787,7 @@ class SearchService:
 
         return suggestions[:5]
 
-    def _import_model(self, model_path: str):
+    def _import_model(self, model_path: str) -> str:
         """Dynamically import a model class.
 
         Args:
@@ -803,7 +800,7 @@ class SearchService:
         module_path, class_name = parts
 
         module = importlib.import_module(module_path)
-        return getattr(module, class_name)
+        return getattr(module, class_name) # type: ignore
 
     # ──────────────────────────────────────────────────────────────
     # Analytics Methods

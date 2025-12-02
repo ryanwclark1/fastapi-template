@@ -10,7 +10,7 @@ import logging
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import select
 
@@ -29,6 +29,7 @@ from .schemas import (
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
+
     pass
 
 logger = logging.getLogger(__name__)
@@ -198,7 +199,7 @@ class DataTransferService:
             )
         return ENTITY_REGISTRY[entity_type]
 
-    def _import_model(self, model_path: str):
+    def _import_model(self, model_path: str) -> type[Any]:
         """Dynamically import a model class.
 
         Args:
@@ -212,7 +213,8 @@ class DataTransferService:
         import importlib
 
         module = importlib.import_module(module_path)
-        return getattr(module, class_name)
+        model_class = getattr(module, class_name)
+        return cast("type[Any]", model_class)
 
     async def export(self, request: ExportRequest) -> ExportResult:
         """Export data to a file.
@@ -262,7 +264,7 @@ class DataTransferService:
             file_path = export_dir / filename
 
             # Export to file
-            record_count = exporter.export(records, file_path)
+            record_count = exporter.export(list(records), file_path)
             file_size = file_path.stat().st_size
 
             # Upload to storage if requested
@@ -330,7 +332,7 @@ class DataTransferService:
             include_headers=request.include_headers,
         )
 
-        data = exporter.export_to_bytes(records)
+        data = exporter.export_to_bytes(list(records))
         timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         filename = f"{request.entity_type}_{timestamp}.{exporter.file_extension}"
 

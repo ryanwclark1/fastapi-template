@@ -269,7 +269,7 @@ class EmailService:
             },
         )
 
-        return task.task_id
+        return task.task_id # type: ignore[no-any-return]
 
     async def send_template_async(
         self,
@@ -314,7 +314,7 @@ class EmailService:
             },
         )
 
-        return task.task_id
+        return task.task_id # type: ignore[no-any-return]
 
     async def send_batch(
         self,

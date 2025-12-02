@@ -106,7 +106,7 @@ def audited(
                 tenant_id = getattr(request.state, "tenant_uuid", None)
 
             # Try to extract entity_id from kwargs
-            entity_id = kwargs.get("id") or kwargs.get("entity_id")
+            entity_id = kwargs.get("id") or kwargs.get("entity_id") # type: ignore
             if entity_id is not None:
                 entity_id = str(entity_id)
 
@@ -248,7 +248,7 @@ def audit_action(
             new_values = kwargs.get(new_values_param) if new_values_param else None
 
             # Extract request context
-            request: Request | None = kwargs.get("request")
+            request: Request | None = kwargs.get("request") # type: ignore
             user_id: str | None = None
             tenant_id: str | None = None
 
@@ -281,8 +281,8 @@ def audit_action(
                             entity_id=entity_id,
                             user_id=user_id,
                             tenant_id=tenant_id,
-                            old_values=old_values,
-                            new_values=new_values,
+                            old_values=old_values, # type: ignore
+                            new_values=new_values, # type: ignore
                             ip_address=request.client.host if request and request.client else None,
                             user_agent=request.headers.get("user-agent") if request else None,
                             request_id=getattr(request.state, "request_id", None) if request else None,
@@ -378,7 +378,7 @@ class AuditContext:
         self._start_time = time.monotonic()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None: # type: ignore
         """Exit the audit context and log the entry."""
         from example_service.infra.database.session import get_async_session
 

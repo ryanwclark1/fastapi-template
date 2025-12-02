@@ -51,7 +51,7 @@ try:
 except Exception:
     scheduler = None
 
-    def get_job_status() -> list[dict[str, Any]]:
+    def get_job_status() -> list[dict[Any, Any]]:
         return []
 
     def pause_job(job_id: str) -> None:

@@ -77,7 +77,7 @@ class SearchCache:
 
     def __init__(
         self,
-        redis_cache: "RedisCache",
+        redis_cache: RedisCache,
         config: SearchCacheConfig | None = None,
     ) -> None:
         """Initialize search cache.
@@ -121,7 +121,7 @@ class SearchCache:
             Dictionary of parameters.
         """
         if hasattr(request, "model_dump"):
-            return request.model_dump()
+            return request.model_dump() # type: ignore[no-any-return]
         elif hasattr(request, "__dict__"):
             return {k: v for k, v in request.__dict__.items() if not k.startswith("_")}
         return {}
@@ -153,7 +153,7 @@ class SearchCache:
             cached = await self.redis.get(cache_key)
             if cached:
                 logger.debug(f"Search cache hit for key: {cache_key}")
-                return cached
+                return cached # type: ignore[no-any-return]
         except Exception as e:
             logger.warning(f"Failed to get search cache: {e}")
 
@@ -229,7 +229,7 @@ class SearchCache:
             cached = await self.redis.get(cache_key)
             if cached:
                 logger.debug(f"Suggestion cache hit for key: {cache_key}")
-                return cached
+                return cached # type: ignore[no-any-return]
         except Exception as e:
             logger.warning(f"Failed to get suggestion cache: {e}")
 
@@ -361,7 +361,7 @@ class SearchCache:
 
         except Exception as e:
             logger.warning(f"Failed to get cache stats: {e}")
-            stats["error"] = str(e)
+            stats["error"] = str(e) # type: ignore[assignment]
 
         return stats
 
@@ -380,7 +380,7 @@ async def get_search_cache() -> SearchCache | None:
     return _search_cache
 
 
-async def init_search_cache(redis_cache: "RedisCache") -> SearchCache:
+async def init_search_cache(redis_cache: RedisCache) -> SearchCache:
     """Initialize the global search cache.
 
     Args:

@@ -188,7 +188,7 @@ class EmailTemplateRenderer:
             List of unique template names (without extensions).
         """
         templates = set()
-        for template_path in self.env.loader.list_templates():
+        for template_path in self.env.loader.list_templates(): # type: ignore[union-attr]
             # Remove extension to get base name
             name = Path(template_path).stem
             templates.add(name)

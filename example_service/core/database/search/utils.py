@@ -232,7 +232,7 @@ UPDATE {self.table_name} SET {self.column_name} = {vector_expr};
         op.execute(self.get_drop_function_sql())
 
         # 3. Drop index
-        op.drop_index(self.index_name, table_name=self.table_name)
+        op.drop_index(self.index_name, table_name=self.table_name) # type: ignore[arg-type]
 
         # 4. Drop column
         op.drop_column(self.table_name, self.column_name)

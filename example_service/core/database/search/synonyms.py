@@ -56,7 +56,7 @@ class SynonymGroup:
     bidirectional: bool = True
     weight: float = 1.0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Set canonical term if not specified."""
         if self.canonical is None and self.terms:
             self.canonical = self.terms[0]
@@ -198,7 +198,7 @@ class SynonymDictionary:
         phrases = {}
         idx = 0
 
-        def replace_phrase(match):
+        def replace_phrase(match: Any) -> str:
             nonlocal idx
             placeholder = f"__PHRASE_{idx}__"
             phrases[placeholder] = match.group(0)
@@ -282,7 +282,7 @@ class SynonymDictionary:
         cls,
         data: dict[str, list[str]],
         name: str = "default",
-    ) -> "SynonymDictionary":
+    ) -> SynonymDictionary:
         """Create dictionary from a simple mapping.
 
         Args:
@@ -304,7 +304,7 @@ class SynonymDictionary:
         cls,
         path: str | Path,
         name: str | None = None,
-    ) -> "SynonymDictionary":
+    ) -> SynonymDictionary:
         """Load synonyms from a file.
 
         Supports formats:

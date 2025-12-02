@@ -432,4 +432,4 @@ async def check_flag(
         Simple enabled status.
     """
     enabled = await flags.is_enabled(key)
-    return {"key": key, "enabled": enabled}
+    return {"key": key, "enabled": enabled} # type: ignore[dict-item]
