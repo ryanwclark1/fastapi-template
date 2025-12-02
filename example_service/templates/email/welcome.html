@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block header_title %}Welcome!{% endblock %}
+
+{% block content %}
+<h2>Welcome{% if user_name %}, {{ user_name }}{% endif %}!</h2>
+
+<p>
+    Thank you for joining {{ service_name | default('our service') }}. We're excited to have you on board!
+</p>
+
+{% if features %}
+<p>Here's what you can do:</p>
+<ul>
+    {% for feature in features %}
+    <li>{{ feature }}</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+{% if action_url %}
+<div class="text-center">
+    <a href="{{ action_url }}" class="button">{{ action_text | default('Get Started') }}</a>
+</div>
+{% endif %}
+
+<hr class="divider">
+
+<p>If you have any questions, feel free to reach out to our support team.</p>
+
+<p class="text-muted">
+    Welcome aboard!<br>
+    The {{ service_name | default('Example Service') }} Team
+</p>
+{% endblock %}

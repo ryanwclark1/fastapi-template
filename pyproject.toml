@@ -39,6 +39,9 @@ dependencies = [
     # Recurrence rules (iCalendar RRULE)
     "python-dateutil>=2.9.0",
     "pwdlib[argon2]>=0.3.0",
+    # Email
+    "aiosmtplib>=3.0.0",
+    "jinja2>=3.1.0",
 ]
 
 [project.optional-dependencies]
@@ -59,6 +62,7 @@ dev = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.0.0",
+    "pytest-benchmark>=4.0.0",
     "aiosqlite>=0.20.0",
     "testcontainers>=4.9.0",
     "ruff>=0.7.0",
@@ -69,6 +73,9 @@ dev = [
     "types-redis>=4.6.0.20241004",
 ]
 tests = ["httpx>=0.28.1"]
+loadtest = [
+    "locust>=2.29.0",
+]
 
 [project.scripts]
 example-service = "example_service.cli:main"
@@ -108,6 +115,7 @@ markers = [
     "integration: Integration tests",
     "slow: Slow running tests",
     "asyncio: Async tests",
+    "benchmark: Performance benchmark tests",
 ]
 norecursedirs = [
     ".git",
