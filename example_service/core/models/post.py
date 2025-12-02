@@ -3,29 +3,48 @@
 # This model demonstrates SQLAlchemy patterns but is not used in production.
 # Safe to remove when building your application (update migrations accordingly).
 # =============================================================================
-"""Post model for demonstrating foreign key relationships."""
+"""Post model for demonstrating foreign key relationships and full-text search."""
 
 from __future__ import annotations
+
+from typing import Any, ClassVar
 
 from sqlalchemy import Boolean, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from example_service.core.database import TimestampedBase
+from example_service.core.database.search import TSVECTOR
 
 from .user import User
 
 
 class Post(TimestampedBase):
-    """Post model with foreign key to User.
+    """Post model with foreign key to User and full-text search.
 
     Demonstrates:
     - Foreign key relationships
     - Text fields
     - Indexes on foreign keys
     - Timestamps (via TimestampedBase)
+    - Full-text search with weighted fields
+
+    The search vector includes:
+    - Title (weight A - highest priority)
+    - Content (weight B - medium priority)
+    - Slug (weight C - lower priority for exact matches)
     """
 
     __tablename__ = "posts"
+
+    # Search configuration
+    __search_fields__: ClassVar[list[str]] = ["title", "content", "slug"]
+    __search_config__: ClassVar[str] = "english"
+    __search_weights__: ClassVar[dict[str, str]] = {
+        "title": "A",
+        "content": "B",
+        "slug": "C",
+    }
+    __trigram_fields__: ClassVar[list[str]] = ["title"]  # For fuzzy search
 
     # Primary key
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -41,6 +60,13 @@ class Post(TimestampedBase):
     # Foreign key to User
     author_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+    # Full-text search vector (managed by database trigger)
+    search_vector: Mapped[Any] = mapped_column(
+        TSVECTOR,
+        nullable=True,
+        comment="Full-text search vector for title, content, and slug",
     )
 
     # Relationships
