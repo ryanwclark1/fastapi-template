@@ -175,11 +175,7 @@ class TaskManagementService:
                     "Failed to count task history; falling back to page size",
                     extra={"error": str(e)},
                 )
-                total = (
-                    len(tasks) + params.offset
-                    if len(tasks) == params.limit
-                    else len(tasks) + params.offset
-                )
+                total = len(tasks) + params.offset
 
             return responses, total
         except Exception as e:
@@ -383,7 +379,7 @@ class TaskManagementService:
             return CancelTaskResponse(
                 task_id=task_id,
                 cancelled=False,
-                message=f"Error: {str(e)}",
+                message=f"Error: {e!s}",
                 previous_status=None,
             )
 

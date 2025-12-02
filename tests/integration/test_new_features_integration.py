@@ -736,7 +736,7 @@ class TestDebugMiddlewareIntegration:
             transport=ASGITransport(app=app_with_debug_middleware),
             base_url="http://test",
         ) as client:
-            with pytest.raises(ValueError):
+            with pytest.raises(ValueError, match=r"Test error"):
                 await client.get("/error")
 
         # Exception should be logged with trace context
@@ -1448,7 +1448,7 @@ class TestFullMiddlewareStackIntegration:
             raise ValueError("Test error")
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            with pytest.raises(ValueError):
+            with pytest.raises(ValueError, match=r"Test error"):
                 await client.get("/error")
 
     @pytest.mark.asyncio

@@ -1220,8 +1220,8 @@ class StorageClient:
 
 
 __all__ = [
-    "StorageClient",
-    "StorageClientError",
     "FileNotFoundError",
     "InvalidFileError",
+    "StorageClient",
+    "StorageClientError",
 ]

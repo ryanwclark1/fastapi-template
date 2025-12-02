@@ -116,7 +116,7 @@ class BaseRepository[T]:
                 return result.scalars().all()
     """
 
-    __slots__ = ("model", "_logger", "_lazy")
+    __slots__ = ("_lazy", "_logger", "model")
 
     def __init__(self, model: type[T]) -> None:
         """Initialize repository with model class.
@@ -133,7 +133,7 @@ class BaseRepository[T]:
     async def get(
         self,
         session: AsyncSession,
-        id: Any,  # noqa: A002
+        id: Any,
         *,
         options: Iterable[Any] | None = None,
     ) -> T | None:
@@ -167,7 +167,7 @@ class BaseRepository[T]:
     async def get_or_raise(
         self,
         session: AsyncSession,
-        id: Any,  # noqa: A002
+        id: Any,
         *,
         options: Iterable[Any] | None = None,
     ) -> T:
@@ -753,8 +753,8 @@ class BaseRepository[T]:
             if pk_cols and len(pk_cols) > 0:
                 # Return the first primary key column's attribute
                 return cast("InstrumentedAttribute[Any]", getattr(self.model, pk_cols[0].name))
-        except Exception:
-            pass
+        except Exception as e:
+            self._logger.debug("Failed to get primary key column", exc_info=e)
 
         # Fallback to 'id'
         # Most SQLAlchemy models have an 'id' attribute, but type checker doesn't know this

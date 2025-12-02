@@ -51,15 +51,15 @@ from example_service.infra.discovery.service import (
 )
 
 __all__ = [
-    # Protocol
-    "ConsulClientProtocol",
     # Clients
     "ConsulClient",
-    "MockConsulClient",
+    # Protocol
+    "ConsulClientProtocol",
     # Service
     "ConsulService",
+    "MockConsulClient",
+    "get_discovery_service",
     # Lifecycle functions
     "start_discovery",
     "stop_discovery",
-    "get_discovery_service",
 ]

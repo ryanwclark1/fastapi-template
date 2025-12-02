@@ -32,4 +32,4 @@ def get_extensions() -> list:
     return extensions
 
 
-__all__ = ["get_extensions", "MAX_QUERY_DEPTH"]
+__all__ = ["MAX_QUERY_DEPTH", "get_extensions"]

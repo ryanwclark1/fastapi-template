@@ -46,20 +46,20 @@ from .schemas import (
 from .service import SearchService, get_search_service
 
 __all__ = [
+    "EntitySearchResult",
+    "SearchCapabilitiesResponse",
+    "SearchHit",
+    "SearchRequest",
+    "SearchResponse",
     # Service
     "SearchService",
-    "get_search_service",
+    "SearchSuggestion",
+    "SearchSuggestionRequest",
+    "SearchSuggestionsResponse",
     # Schemas
     "SearchSyntax",
-    "SearchRequest",
-    "SearchHit",
-    "EntitySearchResult",
-    "SearchResponse",
-    "SearchSuggestionRequest",
-    "SearchSuggestion",
-    "SearchSuggestionsResponse",
     "SearchableEntity",
-    "SearchCapabilitiesResponse",
+    "get_search_service",
     # Router
     "router",
 ]

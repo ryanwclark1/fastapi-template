@@ -316,7 +316,6 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
             "exception_type": type(exc).__name__,
             "exception_message": str(exc),
         },
-        exc_info=True,
     )
 
     # Create generic error response

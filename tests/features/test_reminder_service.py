@@ -62,7 +62,9 @@ async def test_mark_completed_and_notification(session: AsyncSession) -> None:
     assert reminder.notification_sent is False
 
     completed = await service.mark_completed(reminder.id)
-    assert completed is not None and completed.is_completed
+    assert completed is not None
+    assert completed.is_completed
 
     notified = await service.mark_notification_sent(reminder.id)
-    assert notified is not None and notified.notification_sent
+    assert notified is not None
+    assert notified.notification_sent

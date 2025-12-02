@@ -7,6 +7,7 @@ Example:
     from example_service.core.database.validation import (
         validate_identifier,
         safe_table_reference,
+        safe_identifier_sql,
     )
 
     # Validate before using in raw SQL
@@ -14,11 +15,20 @@ Example:
 
     # Get safely quoted reference
     ref = safe_table_reference("users", schema="public")  # '"public"."users"'
+
+    # Use SQLAlchemy's identifier preparer for dialect-specific quoting
+    from sqlalchemy import create_engine
+    engine = create_engine("postgresql://...")
+    quoted = safe_identifier_sql("users", engine)  # Uses SQLAlchemy's preparer
 """
 
 from __future__ import annotations
 
 import re
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Engine
 
 # PostgreSQL identifier rules:
 # - Max 63 characters
@@ -131,7 +141,7 @@ def safe_table_reference(
     """Create a safely quoted table reference.
 
     Validates and quotes the table name (and optional schema) for safe
-    use in SQL queries.
+    use in SQL queries. Uses manual quoting for compatibility.
 
     Args:
         table_name: The table name to reference
@@ -158,8 +168,75 @@ def safe_table_reference(
     return f'"{validated_table}"'
 
 
+def safe_identifier_sql(
+    identifier: str,
+    engine: Engine,
+    *,
+    identifier_type: str = "identifier",
+) -> str:
+    """Create a safely quoted SQL identifier using SQLAlchemy's preparer.
+
+    This uses SQLAlchemy's dialect-specific identifier preparer to properly
+    quote identifiers according to the database dialect rules. This is the
+    recommended approach when you have access to an engine.
+
+    Args:
+        identifier: The identifier to quote (table name, column name, etc.)
+        engine: SQLAlchemy engine (used to get dialect-specific preparer)
+        identifier_type: Type description for validation error messages
+
+    Returns:
+        Properly quoted identifier string according to the dialect
+
+    Raises:
+        IdentifierValidationError: If identifier is invalid
+
+    Example:
+        >>> from sqlalchemy import create_engine
+        >>> engine = create_engine("postgresql://...")
+        >>> safe_identifier_sql("users", engine)
+        '"users"'
+    """
+    # Validate first
+    validated = validate_identifier(identifier, identifier_type=identifier_type)
+
+    # Use SQLAlchemy's identifier preparer for dialect-specific quoting
+    preparer = engine.dialect.identifier_preparer
+    return preparer.quote(validated)
+
+
+def safe_sql_text(
+    sql_template: str,
+    **validated_identifiers: str,
+) -> str:
+    """Construct SQL text with validated identifiers.
+
+    This helper function constructs SQL strings using validated identifiers,
+    making it clear that the identifiers have been checked for SQL injection.
+    The identifiers are expected to already be quoted (via safe_table_reference
+    or similar).
+
+    Args:
+        sql_template: SQL template string with {placeholder} format
+        **validated_identifiers: Keyword arguments mapping placeholders to
+            validated and quoted identifier strings
+
+    Returns:
+        SQL string with identifiers substituted
+
+    Example:
+        >>> table = safe_table_reference("users")
+        >>> sql = safe_sql_text("SELECT COUNT(*) FROM {table}", table=table)
+        >>> sql
+        'SELECT COUNT(*) FROM "users"'
+    """
+    # All identifiers should already be validated and quoted
+    return sql_template.format(**validated_identifiers)
+
+
 __all__ = [
     "IdentifierValidationError",
-    "validate_identifier",
+    "safe_identifier_sql",
     "safe_table_reference",
+    "validate_identifier",
 ]

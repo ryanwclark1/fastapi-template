@@ -107,7 +107,8 @@ class SearchCache:
         """
         # Sort params for consistent key generation
         sorted_params = json.dumps(params, sort_keys=True, default=str)
-        param_hash = hashlib.md5(sorted_params.encode()).hexdigest()[:16]
+        # MD5 used for non-cryptographic cache key hashing
+        param_hash = hashlib.md5(sorted_params.encode()).hexdigest()[:16]  # noqa: S324
 
         return f"{self.config.cache_prefix}:{prefix}:{param_hash}"
 

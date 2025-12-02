@@ -7,6 +7,7 @@ This module provides CLI commands for monitoring:
 - Log viewing
 """
 
+import shutil
 import sys
 from datetime import UTC, datetime
 from typing import Any, cast
@@ -468,7 +469,16 @@ def view_logs(lines: int, follow: bool, level: str | None) -> None:
     info(f"Reading logs from: {log_file}")
 
     try:
-        cmd = ["tail"]
+        # Resolve full paths for executables
+        tail_path = shutil.which("tail")
+        grep_path = shutil.which("grep")
+
+        if not tail_path:
+            raise FileNotFoundError("tail command not found")
+        if level and not grep_path:
+            raise FileNotFoundError("grep command not found")
+
+        cmd = [tail_path]
 
         if follow:
             cmd.append("-f")
@@ -479,12 +489,15 @@ def view_logs(lines: int, follow: bool, level: str | None) -> None:
 
         if level:
             # Pipe through grep for level filtering
-            tail_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+            # tail_path and grep_path are resolved via shutil.which(), level is validated enum
+            if grep_path is None:
+                raise FileNotFoundError("grep command not found")
+            tail_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)  # noqa: S603
             if tail_proc.stdout is None:
                 error("Failed to create tail process")
                 sys.exit(1)
-            grep_proc = subprocess.Popen(
-                ["grep", "--line-buffered", level],
+            grep_proc = subprocess.Popen(  # noqa: S603
+                [grep_path, "--line-buffered", level],
                 stdin=tail_proc.stdout,
                 stdout=subprocess.PIPE,
                 text=True,
@@ -500,7 +513,8 @@ def view_logs(lines: int, follow: bool, level: str | None) -> None:
             finally:
                 grep_proc.terminate()
         else:
-            subprocess.run(cmd)
+            # tail_path is resolved via shutil.which(), log_file is validated path
+            subprocess.run(cmd)  # noqa: S603
 
     except FileNotFoundError:
         error("tail command not found")

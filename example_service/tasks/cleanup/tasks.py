@@ -44,9 +44,10 @@ if broker is not None:
             print(result)
             # {'deleted_count': 5, 'deleted_size_mb': 12.5}
         """
+        # Temporary directories for cleanup (development/testing)
         temp_dirs = [
-            Path("/tmp/exports"),
-            Path("/tmp/uploads"),
+            Path("/tmp/exports"),  # noqa: S108
+            Path("/tmp/uploads"),  # noqa: S108
         ]
 
         cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
@@ -162,7 +163,7 @@ if broker is not None:
         Returns:
             Cleanup result with deletion counts.
         """
-        export_dir = Path("/tmp/exports")
+        export_dir = Path("/tmp/exports")  # noqa: S108
 
         if not export_dir.exists():
             return {

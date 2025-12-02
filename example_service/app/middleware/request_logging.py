@@ -21,7 +21,7 @@ import logging
 import re
 import time
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -91,7 +91,7 @@ class PIIMasker:
     API_KEY_PATTERN = re.compile(r"\b[A-Za-z0-9]{32,}\b")
 
     # Common sensitive field names
-    SENSITIVE_FIELDS = {
+    SENSITIVE_FIELDS: ClassVar[set[str]] = {
         "password",
         "passwd",
         "pwd",

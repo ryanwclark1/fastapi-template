@@ -188,7 +188,7 @@ class FeatureFlagService:
         update_data = data.model_dump(exclude_unset=True)
 
         # Handle targeting rules specially
-        if "targeting_rules" in update_data and update_data["targeting_rules"]:
+        if update_data.get("targeting_rules"):
             update_data["targeting_rules"] = [
                 r.model_dump() if hasattr(r, "model_dump") else r
                 for r in update_data["targeting_rules"]
@@ -490,7 +490,8 @@ class FeatureFlagService:
             Bucket number 0-99.
         """
         hash_input = f"{flag_key}:{identity}".encode()
-        hash_value = hashlib.md5(hash_input).hexdigest()
+        # MD5 used for non-cryptographic consistent hashing (bucketing)
+        hash_value = hashlib.md5(hash_input).hexdigest()  # noqa: S324
         return int(hash_value[:8], 16) % 100
 
     def _matches_rule(

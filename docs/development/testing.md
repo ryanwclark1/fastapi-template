@@ -6,19 +6,19 @@ This guide summarizes the project's testing strategy and provides the commands r
 
 - Install the development dependencies so pytest, coverage, and Testcontainers are available:
   ```bash
-  uv sync --group dev
+  uv sync --group dev --group tests
   ```
 - Docker must be available and running for the containerized integration suite (`tests/integration/test_containerized_api.py`), because it builds and runs the service image inside a disposable container.
 
 ## Test Matrix
 
-| Layer | Description | Command |
-| --- | --- | --- |
-| Unit | Fast feedback tests for isolated components (services, helpers, middleware units). | `uv run pytest tests/unit -m "not slow"` |
-| Integration (ASGI) | Exercises the FastAPI app via the in-process `httpx.AsyncClient` fixture. Covers health routes, middleware orchestration, etc. | `uv run pytest tests/integration -m "integration and not slow" -k "not containerized"` |
-| Integration (Containerized) | Builds the Docker image, runs it with Testcontainers, and hits live endpoints to verify packaging, settings, and probes. Marked as `integration` and `slow`. | `uv run pytest tests/integration/test_containerized_api.py -m "integration and slow"` |
-| End-to-End | Scenario tests that drive feature flows through the public API (see `tests/e2e`). | `uv run pytest tests/e2e` |
-| Full Suite | CI-quality run with coverage enabled (default `pyproject.toml` addopts). | `uv run pytest` |
+| Layer                       | Description                                                                                                                                                  | Command                                                                                |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| Unit                        | Fast feedback tests for isolated components (services, helpers, middleware units).                                                                           | `uv run pytest tests/unit -m "not slow"`                                               |
+| Integration (ASGI)          | Exercises the FastAPI app via the in-process `httpx.AsyncClient` fixture. Covers health routes, middleware orchestration, etc.                               | `uv run pytest tests/integration -m "integration and not slow" -k "not containerized"` |
+| Integration (Containerized) | Builds the Docker image, runs it with Testcontainers, and hits live endpoints to verify packaging, settings, and probes. Marked as `integration` and `slow`. | `uv run pytest tests/integration/test_containerized_api.py -m "integration and slow"`  |
+| End-to-End                  | Scenario tests that drive feature flows through the public API (see `tests/e2e`).                                                                            | `uv run pytest tests/e2e`                                                              |
+| Full Suite                  | CI-quality run with coverage enabled (default `pyproject.toml` addopts).                                                                                     | `uv run pytest`                                                                        |
 
 > **Tip:** Combine markers to skip long-running suites during inner-loop development, e.g. `uv run pytest -m "not slow"`.
 

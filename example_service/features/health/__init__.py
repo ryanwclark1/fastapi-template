@@ -115,46 +115,46 @@ from example_service.features.health.service import (
 )
 
 __all__ = [
-    # Router
-    "router",
-    # Service & DI
-    "HealthService",
-    "HealthServiceDep",
-    "get_health_service",
-    # Aggregator
-    "HealthAggregator",
-    "HealthAggregatorDep",
-    "AggregatedHealthResult",
-    "HealthHistoryEntry",
-    "HealthStats",
-    "get_health_aggregator",
-    "get_global_aggregator",
-    "set_global_aggregator",
     # Configuration defaults
     "DEFAULT_CACHE_TTL_SECONDS",
     "DEFAULT_CHECK_TIMEOUT_SECONDS",
     "DEFAULT_HISTORY_SIZE",
-    # Provider Protocol & Result
-    "HealthProvider",
-    "HealthCheckResult",
-    "HealthStatus",
     "DEGRADED_LATENCY_THRESHOLD_MS",
+    "AggregatedHealthResult",
+    "CacheInfoResponse",
+    "ComponentHealthDetail",
     # Built-in Providers
     "DatabaseHealthProvider",
-    "RedisHealthProvider",
-    "RabbitMQHealthProvider",
+    "DetailedHealthResponse",
     "ExternalServiceHealthProvider",
-    "S3StorageHealthProvider",
+    # Aggregator
+    "HealthAggregator",
+    "HealthAggregatorDep",
+    "HealthCheckResult",
+    "HealthHistoryEntry",
+    "HealthHistoryResponse",
+    # Provider Protocol & Result
+    "HealthProvider",
     # Response Schemas
     "HealthResponse",
-    "DetailedHealthResponse",
-    "ComponentHealthDetail",
-    "ReadinessResponse",
-    "LivenessResponse",
-    "StartupResponse",
-    "HealthHistoryResponse",
+    # Service & DI
+    "HealthService",
+    "HealthServiceDep",
+    "HealthStats",
     "HealthStatsResponse",
+    "HealthStatus",
+    "LivenessResponse",
     "ProviderStatsDetail",
-    "CacheInfoResponse",
     "ProvidersResponse",
+    "RabbitMQHealthProvider",
+    "ReadinessResponse",
+    "RedisHealthProvider",
+    "S3StorageHealthProvider",
+    "StartupResponse",
+    "get_global_aggregator",
+    "get_health_aggregator",
+    "get_health_service",
+    # Router
+    "router",
+    "set_global_aggregator",
 ]

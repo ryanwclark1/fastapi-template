@@ -11,12 +11,12 @@ from example_service.cli.utils.formatters import (
 )
 
 __all__ = [
-    "run_async",
     "coro",
     "error",
+    "header",
     "info",
+    "run_async",
+    "section",
     "success",
     "warning",
-    "header",
-    "section",
 ]

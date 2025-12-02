@@ -34,9 +34,9 @@ TaskExecutionTracker = BaseTaskTracker
 
 __all__ = [
     "BaseTaskTracker",
-    "TaskExecutionTracker",  # Backward compatibility
     "PostgresTaskTracker",
     "RedisTaskTracker",
+    "TaskExecutionTracker",  # Backward compatibility
     "create_tracker",
     "get_tracker",
     "start_tracker",

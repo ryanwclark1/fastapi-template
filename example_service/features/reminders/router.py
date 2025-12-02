@@ -18,6 +18,7 @@ from example_service.core.database import (
 )
 from example_service.core.database.search import FullTextSearchFilter, WebSearchFilter
 from example_service.core.dependencies.database import get_db_session
+from example_service.core.exceptions import BadRequestException
 from example_service.features.reminders.events import (
     ReminderCompletedEvent,
     ReminderCreatedEvent,
@@ -701,11 +702,10 @@ async def get_occurrences(
         raise NotFoundError("Reminder", {"id": reminder_id})
 
     if not reminder.recurrence_rule:
-        from fastapi import HTTPException
-
-        raise HTTPException(
-            status_code=400,
+        raise BadRequestException(
             detail="Reminder is not recurring",
+            type="reminder-not-recurring",
+            extra={"reminder_id": str(reminder_id)},
         )
 
     # Default to now if no after date specified
@@ -804,11 +804,10 @@ async def break_out_occurrence(
         raise NotFoundError("Reminder", {"id": reminder_id})
 
     if not reminder.recurrence_rule:
-        from fastapi import HTTPException
-
-        raise HTTPException(
-            status_code=400,
+        raise BadRequestException(
             detail="Reminder is not recurring",
+            type="reminder-not-recurring",
+            extra={"reminder_id": str(reminder_id)},
         )
 
     # Check if occurrence already broken out
@@ -818,11 +817,13 @@ async def break_out_occurrence(
         .where(Reminder.occurrence_date == occurrence_date)
     )
     if existing.scalar_one_or_none():
-        from fastapi import HTTPException
-
-        raise HTTPException(
-            status_code=400,
+        raise BadRequestException(
             detail="This occurrence has already been broken out",
+            type="occurrence-already-broken-out",
+            extra={
+                "reminder_id": str(reminder_id),
+                "occurrence_date": occurrence_date.isoformat(),
+            },
         )
 
     # Create the broken-out occurrence
@@ -893,11 +894,10 @@ async def get_next_reminder_occurrence(
         raise NotFoundError("Reminder", {"id": reminder_id})
 
     if not reminder.recurrence_rule:
-        from fastapi import HTTPException
-
-        raise HTTPException(
-            status_code=400,
+        raise BadRequestException(
             detail="Reminder is not recurring",
+            type="reminder-not-recurring",
+            extra={"reminder_id": str(reminder_id)},
         )
 
     # Default to now

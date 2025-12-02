@@ -47,7 +47,7 @@ class TestTracedHandler:
 
     async def test_creates_span_with_correct_name(self, mock_event, mock_tracer):
         """Test that span is created with handler name."""
-        tracer, span = mock_tracer
+        tracer, _span = mock_tracer
 
         @traced_handler()
         async def my_handler(event):
@@ -61,7 +61,7 @@ class TestTracedHandler:
 
     async def test_sets_span_attributes_from_event(self, mock_event, mock_tracer):
         """Test that span attributes include event fields."""
-        tracer, span = mock_tracer
+        tracer, _span = mock_tracer
 
         @traced_handler()
         async def handler(event):
@@ -77,7 +77,7 @@ class TestTracedHandler:
 
     async def test_records_success_status(self, mock_event, mock_tracer):
         """Test that successful handler sets success status."""
-        tracer, span = mock_tracer
+        _tracer, span = mock_tracer
 
         @traced_handler()
         async def handler(event):
@@ -90,13 +90,13 @@ class TestTracedHandler:
 
     async def test_records_exception_on_failure(self, mock_event, mock_tracer):
         """Test that failed handler records exception."""
-        tracer, span = mock_tracer
+        _tracer, span = mock_tracer
 
         @traced_handler()
         async def failing_handler(event):
             raise ValueError("Test error")
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r"Test error"):
             await failing_handler(mock_event)
 
         span.record_exception.assert_called_once()
@@ -106,7 +106,7 @@ class TestTracedHandler:
 
     async def test_custom_handler_name(self, mock_event, mock_tracer):
         """Test custom handler name in span."""
-        tracer, span = mock_tracer
+        tracer, _span = mock_tracer
 
         @traced_handler("custom-name")
         async def handler(event):
@@ -119,7 +119,7 @@ class TestTracedHandler:
 
     async def test_handles_missing_event_fields(self, mock_tracer):
         """Test graceful handling of events without standard fields."""
-        tracer, span = mock_tracer
+        tracer, _span = mock_tracer
 
         plain_dict = {"data": "value"}
 
@@ -136,7 +136,7 @@ class TestTracedHandler:
 
     async def test_span_ends_even_on_exception(self, mock_event, mock_tracer):
         """Test that span.end() is called in finally block."""
-        tracer, span = mock_tracer
+        _tracer, span = mock_tracer
 
         @traced_handler()
         async def failing_handler(event):
@@ -150,7 +150,7 @@ class TestTracedHandler:
 
     async def test_preserves_function_name_and_docstring(self, mock_tracer):
         """Test that wrapped function preserves metadata."""
-        tracer, span = mock_tracer
+        _tracer, _span = mock_tracer
 
         @traced_handler()
         async def documented_handler(event):

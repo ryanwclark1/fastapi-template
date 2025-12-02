@@ -37,17 +37,17 @@ from .service import EmailService, get_email_service
 from .templates import EmailTemplateRenderer, get_template_renderer
 
 __all__ = [
+    "EmailAttachment",
     # Client
     "EmailClient",
-    "get_email_client",
-    # Service
-    "EmailService",
-    "get_email_service",
-    # Templates
-    "EmailTemplateRenderer",
-    "get_template_renderer",
     # Schemas
     "EmailMessage",
-    "EmailAttachment",
     "EmailResult",
+    # Service
+    "EmailService",
+    # Templates
+    "EmailTemplateRenderer",
+    "get_email_client",
+    "get_email_service",
+    "get_template_renderer",
 ]

@@ -261,8 +261,8 @@ class TestRateLimitMiddleware:
 
     def test_requires_limiter_when_enabled(self):
         """Test that ValueError is raised when limiter not provided but enabled."""
+        app = FastAPI()
         with pytest.raises(ValueError, match="limiter is required"):
-            app = FastAPI()
             app.add_middleware(
                 RateLimitMiddleware,
                 limiter=None,

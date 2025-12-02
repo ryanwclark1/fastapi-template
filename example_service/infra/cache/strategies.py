@@ -402,8 +402,11 @@ class CacheManager:
 
                     # Refresh if below threshold
                     if 0 < remaining_ttl < (ttl * self.config.refresh_threshold):
-                        # Trigger async refresh
-                        asyncio.create_task(self._refresh_cache(key, fetch_func, ttl))
+                        # Trigger async refresh (fire-and-forget)
+                        refresh_task = asyncio.create_task(self._refresh_cache(key, fetch_func, ttl))
+                        # Store reference to prevent garbage collection
+                        # Task errors are handled within _refresh_cache
+                        _ = refresh_task
 
                         return self.config.deserialize(cached)
 

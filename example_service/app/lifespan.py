@@ -101,7 +101,7 @@ async def _initialize_taskiq_and_scheduler(
         return taskiq_module, None
 
     # Import tasks to register them with the broker
-    import example_service.tasks.scheduler  # noqa: F401
+    import example_service.tasks.scheduler
     import example_service.tasks.tasks  # noqa: F401
 
     logger.info("Taskiq broker initialized (use 'taskiq worker' to run tasks)")
@@ -304,8 +304,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                     tracker = RateLimitStateTracker()
                     tracker.mark_disabled()
                     set_rate_limit_tracker(tracker)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to initialize rate limit tracker", exc_info=e)
 
     # Initialize storage service
     if storage_settings.is_configured:

@@ -30,6 +30,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from example_service.core.database.validation import safe_table_reference
+
 if TYPE_CHECKING:
     from alembic.operations import Operations
 
@@ -153,8 +155,10 @@ CREATE TRIGGER {self.trigger_name}
             UPDATE SQL statement
         """
         vector_expr = self._build_vector_expression()
+        # Validate and quote table name for safety
+        safe_table = safe_table_reference(self.table_name)
         return f"""
-UPDATE {self.table_name} SET {self.column_name} = {vector_expr};
+UPDATE {safe_table} SET {self.column_name} = {vector_expr};
 """
 
     def get_drop_trigger_sql(self) -> str:
@@ -232,7 +236,7 @@ UPDATE {self.table_name} SET {self.column_name} = {vector_expr};
         op.execute(self.get_drop_function_sql())
 
         # 3. Drop index
-        op.drop_index(self.index_name, table_name=self.table_name) # type: ignore[arg-type]
+        op.drop_index(self.index_name, table_name=self.table_name)  # type: ignore[arg-type]
 
         # 4. Drop column
         op.drop_column(self.table_name, self.column_name)
@@ -459,10 +463,10 @@ def build_ts_query_sql(
 
 
 __all__ = [
-    "SearchFieldConfig",
     "FTSMigrationHelper",
+    "SearchFieldConfig",
     "TrigramMigrationHelper",
     "UnaccentMigrationHelper",
-    "generate_search_vector_sql",
     "build_ts_query_sql",
+    "generate_search_vector_sql",
 ]

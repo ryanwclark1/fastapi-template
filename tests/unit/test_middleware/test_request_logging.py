@@ -263,7 +263,7 @@ class TestRequestLoggingMiddleware:
         from httpx import ASGITransport
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            with pytest.raises(ValueError):
+            with pytest.raises(ValueError, match=r"Test error"):
                 await client.get("/error")
 
         # Should log error
@@ -873,7 +873,7 @@ class TestEnhancedFeatures:
         from httpx import ASGITransport
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            with pytest.raises(ValueError):
+            with pytest.raises(ValueError, match=r"Test error"):
                 await client.get(
                     "/error",
                     headers={

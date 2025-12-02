@@ -281,14 +281,14 @@ async def stop_taskiq() -> None:
 if broker is not None:
     # Import main task modules
     # Import task submodules
-    import example_service.tasks.backup.tasks  # noqa: F401
-    import example_service.tasks.cache.tasks  # noqa: F401
-    import example_service.tasks.cleanup.tasks  # noqa: F401
-    import example_service.tasks.export.tasks  # noqa: F401
-    import example_service.tasks.files.tasks  # noqa: F401
-    import example_service.tasks.notifications.tasks  # noqa: F401
-    import example_service.tasks.scheduler  # noqa: F401
-    import example_service.tasks.tasks  # noqa: F401
+    import example_service.tasks.backup.tasks
+    import example_service.tasks.cache.tasks
+    import example_service.tasks.cleanup.tasks
+    import example_service.tasks.export.tasks
+    import example_service.tasks.files.tasks
+    import example_service.tasks.notifications.tasks
+    import example_service.tasks.scheduler
+    import example_service.tasks.tasks
     import example_service.tasks.webhooks.tasks  # noqa: F401
 
     logger.debug("All task modules imported and registered with broker")

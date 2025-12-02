@@ -1,5 +1,6 @@
 """Server management commands."""
 
+import re
 import subprocess
 import sys
 
@@ -7,6 +8,14 @@ import click
 
 from example_service.cli.utils import error, info, success, warning
 from example_service.core.settings import get_app_settings
+
+
+def _validate_host(host: str) -> str:
+    """Validate host value to prevent command injection."""
+    # Allow only alphanumeric, dots, hyphens, colons, and brackets (for IPv6)
+    if not re.match(r"^[a-zA-Z0-9.\-:\[\]]+$", host):
+        raise ValueError(f"Invalid host format: {host}")
+    return host
 
 
 @click.group(name="server")
@@ -58,6 +67,9 @@ def dev(
     host = host or settings.app.host  # type: ignore[attr-defined]
     port = port or settings.app.port  # type: ignore[attr-defined]
 
+    # Validate host to prevent command injection
+    host = _validate_host(host)
+
     if reload and workers > 1:
         warning("--reload is incompatible with --workers > 1. Setting workers to 1.")
         workers = 1
@@ -84,7 +96,8 @@ def dev(
             cmd.extend(["--workers", str(workers)])
 
         success("Starting uvicorn...")
-        subprocess.run(cmd)
+        # S603: Safe - using list (not shell=True), host validated, port/log_level/workers validated by Click
+        subprocess.run(cmd)  # noqa: S603
 
     except KeyboardInterrupt:
         info("\nShutting down server...")
@@ -130,6 +143,9 @@ def prod(
     host = host or settings.app.host  # type: ignore[attr-defined]
     port = port or settings.app.port  # type: ignore[attr-defined]
 
+    # Validate host to prevent command injection
+    host = _validate_host(host)
+
     info(f"Server will run at: http://{host}:{port}")
     info(f"Environment: {settings.app.environment}")  # type: ignore[attr-defined]
     info(f"Workers: {workers}")
@@ -153,7 +169,8 @@ def prod(
             cmd.append("--no-access-log")
 
         success("Starting uvicorn in production mode...")
-        subprocess.run(cmd)
+        # S603: Safe - using list (not shell=True), host validated, port/workers validated by Click
+        subprocess.run(cmd)  # noqa: S603
 
     except KeyboardInterrupt:
         info("\nShutting down server...")

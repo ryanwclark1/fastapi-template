@@ -58,5 +58,5 @@ def test_unknown_middleware_order_uses_name_hints() -> None:
 
 def test_rate_limit_validator_runs() -> None:
     app = FastAPI()
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"limiter is required"):
         app.add_middleware(RateLimitMiddleware)

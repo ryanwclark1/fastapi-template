@@ -1,0 +1,16 @@
+{
+    "python.analysis.exclude": [
+        "**/.venv/**",
+        "**/*.tmpl"
+    ],
+    "files.exclude": {
+        "**/.venv": false
+    },
+    "files.watcherExclude": {
+        "**/.venv/**": true
+    },
+    "python.analysis.ignore": [
+        "**/.venv/**",
+        "**/*.tmpl"
+    ]
+}

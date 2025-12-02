@@ -144,4 +144,4 @@ except (ImportError, AttributeError):
     router = None  # type: ignore[assignment]
 
 
-__all__ = ["router", "get_graphql_context", "create_graphql_router"]
+__all__ = ["create_graphql_router", "get_graphql_context", "router"]

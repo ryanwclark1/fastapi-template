@@ -177,8 +177,8 @@ class CursorPage[T](BaseModel):
 
 
 __all__ = [
-    "PageInfo",
-    "Edge",
     "Connection",
     "CursorPage",
+    "Edge",
+    "PageInfo",
 ]

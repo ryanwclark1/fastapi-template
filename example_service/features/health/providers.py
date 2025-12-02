@@ -998,10 +998,10 @@ class DatabasePoolHealthProvider:
 
 
 __all__ = [
+    "DEGRADED_LATENCY_THRESHOLD_MS",
     "ConsulHealthProvider",
     "DatabaseHealthProvider",
     "DatabasePoolHealthProvider",
-    "DEGRADED_LATENCY_THRESHOLD_MS",
     "ExternalServiceHealthProvider",
     "HealthCheckResult",
     "HealthProvider",

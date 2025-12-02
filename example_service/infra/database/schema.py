@@ -261,8 +261,12 @@ async def dump_schema(
 
         # Optionally add row counts (requires separate queries)
         if include_row_counts:
+            from example_service.core.database.validation import safe_table_reference
+
             for table_name in result["tables"]:
-                count_result = await conn.execute(text(f'SELECT COUNT(*) FROM "{table_name}"'))
+                # Table names from inspection are safe, but validate for defense in depth
+                safe_table = safe_table_reference(table_name)
+                count_result = await conn.execute(text(f"SELECT COUNT(*) FROM {safe_table}"))
                 result["tables"][table_name]["row_count"] = count_result.scalar()
 
     return result
@@ -318,21 +322,28 @@ async def truncate_all(
         dialect = conn.dialect.name
 
         if dialect == "postgresql":
-            table_list = ", ".join(f'"{t}"' for t in tables)
+            # Table names from inspection are safe, but validate for defense in depth
+            from example_service.core.database.validation import safe_table_reference
+
+            safe_tables = [safe_table_reference(t) for t in tables]
+            table_list = ", ".join(safe_tables)
             identity_clause = " RESTART IDENTITY" if restart_identity else ""
             await conn.execute(text(f"TRUNCATE TABLE {table_list} CASCADE{identity_clause}"))
             truncated.extend(tables)
         else:
             # For other dialects, truncate one at a time
+            from example_service.core.database.validation import safe_table_reference
+
             for table_name in reversed(tables):  # Reverse to handle FK dependencies
+                # Table names from inspection are safe, but validate for defense in depth
+                safe_table = safe_table_reference(table_name)
                 if dialect == "sqlite":
-                    await conn.execute(text(f'DELETE FROM "{table_name}"'))
+                    await conn.execute(text(f"DELETE FROM {safe_table}"))
                     if restart_identity:
                         # SQLite: Reset autoincrement counter
+                        # table_name is validated via safe_table_reference above
                         await conn.execute(
-                            text(
-                                f"DELETE FROM sqlite_sequence WHERE name='{table_name}'"  # noqa: S608
-                            )
+                            text(f"DELETE FROM sqlite_sequence WHERE name='{table_name}'")
                         )
                 else:
                     await conn.execute(text(f'TRUNCATE TABLE "{table_name}"'))
@@ -605,9 +616,9 @@ async def get_table_stats(
 __all__ = [
     "SchemaDifference",
     "TableStats",
+    "compare_schema",
     "drop_all",
     "dump_schema",
-    "truncate_all",
-    "compare_schema",
     "get_table_stats",
+    "truncate_all",
 ]

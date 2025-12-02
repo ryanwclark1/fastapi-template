@@ -91,7 +91,7 @@ async def run_pg_dump(
             stderr=asyncio.subprocess.PIPE,
         )
 
-    stdout, stderr = await proc.communicate()
+    _stdout, stderr = await proc.communicate()
 
     if proc.returncode != 0:
         error_msg = stderr.decode() if stderr else "Unknown error"

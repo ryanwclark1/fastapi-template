@@ -77,7 +77,7 @@ async def mock_redis() -> AsyncIterator[AsyncMock]:
 
     redis_mock.scan_iter = mock_scan_iter
 
-    yield redis_mock
+    return redis_mock
 
 
 @pytest.fixture

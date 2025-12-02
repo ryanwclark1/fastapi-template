@@ -566,7 +566,7 @@ async def truncate_table(table: str, cascade: bool) -> None:
 
         async with get_async_session() as session:
             cascade_str = " CASCADE" if cascade else ""
-            await session.execute(text(f"TRUNCATE TABLE {table}{cascade_str}"))  # noqa: S608
+            await session.execute(text(f"TRUNCATE TABLE {table}{cascade_str}"))
             await session.commit()
 
             success(f"Table '{table}' has been truncated")

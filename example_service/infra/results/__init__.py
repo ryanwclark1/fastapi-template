@@ -18,8 +18,8 @@ from example_service.infra.results.redis_backend import (
 )
 
 __all__ = [
-    "RedisAsyncResultBackend",
-    "RedisAsyncClusterResultBackend",
-    "RedisAsyncSentinelResultBackend",
     "PostgresAsyncResultBackend",
+    "RedisAsyncClusterResultBackend",
+    "RedisAsyncResultBackend",
+    "RedisAsyncSentinelResultBackend",
 ]

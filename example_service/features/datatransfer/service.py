@@ -34,8 +34,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Export directory
-EXPORT_DIR = Path("/tmp/exports")
+# Export directory (development/testing - use proper temp directory in production)
+EXPORT_DIR = Path("/tmp/exports")  # noqa: S108
 
 
 def ensure_export_dir() -> Path:

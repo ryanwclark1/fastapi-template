@@ -25,7 +25,7 @@ from alembic import context
 
 # Import the models package so Base.metadata is aware of all mapped classes.
 # The package handles recursively loading feature-level models.
-from example_service.core import models  # noqa: F401
+from example_service.core import models
 from example_service.core.database.base import Base
 
 # Import custom types for comparison and rendering

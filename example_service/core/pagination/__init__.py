@@ -36,15 +36,15 @@ from example_service.core.pagination.schemas import (
 )
 
 __all__ = [
+    # GraphQL-style schemas
+    "Connection",
     # Cursor utilities
     "CursorCodec",
     "CursorData",
-    # GraphQL-style schemas
-    "Connection",
-    "Edge",
-    "PageInfo",
-    # REST-style schemas
-    "CursorPage",
     # Filter
     "CursorFilter",
+    # REST-style schemas
+    "CursorPage",
+    "Edge",
+    "PageInfo",
 ]

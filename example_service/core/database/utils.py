@@ -37,10 +37,13 @@ Example:
 from __future__ import annotations
 
 import base64
+import logging
 import os
 import time
 import uuid
 from datetime import UTC, datetime
+
+logger = logging.getLogger(__name__)
 
 
 def generate_uuid7() -> uuid.UUID:
@@ -167,8 +170,9 @@ def parse_uuid(value: str | uuid.UUID | bytes) -> uuid.UUID:
             decoded = base64.urlsafe_b64decode(padded)
             if len(decoded) == 16:
                 return uuid.UUID(bytes=decoded)
-        except Exception:
-            pass
+        except Exception as e:
+            # Log expected parsing errors at debug level, will raise ValueError below
+            logger.debug("Failed to parse UUID from base64 format: %s", e, exc_info=True)
 
     raise ValueError(f"Cannot parse UUID from: {value!r}")
 
@@ -204,7 +208,7 @@ def uuid_to_timestamp(uid: uuid.UUID) -> datetime | None:
 
 __all__ = [
     "generate_uuid7",
-    "short_uuid",
     "parse_uuid",
+    "short_uuid",
     "uuid_to_timestamp",
 ]

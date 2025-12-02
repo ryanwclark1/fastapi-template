@@ -47,26 +47,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = [
-    "pytest>=8.3.0",
-    "pytest-asyncio>=0.24.0",
-    "pytest-cov>=6.0.0",
-    "aiosqlite>=0.20.0",
-    "testcontainers>=4.9.0",
-    "ruff>=0.7.0",
-    "mypy>=1.13.0",
-    "pre-commit>=4.0.0",
-]
-yaml = ["pyyaml>=6.0.0"]
-
-[dependency-groups]
-dev = [
+dev = ["ruff>=0.7.0", "mypy>=1.13.0", "pre-commit>=4.0.0"]
+tests = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.0.0",
     "pytest-benchmark>=4.0.0",
     "aiosqlite>=0.20.0",
     "testcontainers>=4.9.0",
+    "httpx>=0.28.1",
+]
+yaml = ["pyyaml>=6.0.0"]
+excel = ["openpyxl>=3.1.0"]
+
+[dependency-groups]
+dev = [
     "ruff>=0.7.0",
     "mypy>=1.13.0",
     "pre-commit>=4.0.0",
@@ -74,10 +69,16 @@ dev = [
     "types-python-dateutil>=2.9.0.20251115",
     "types-redis>=4.6.0.20241004",
 ]
-tests = ["httpx>=0.28.1"]
-loadtest = [
-    "locust>=2.29.0",
+tests = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "pytest-benchmark>=4.0.0",
+    "aiosqlite>=0.20.0",
+    "testcontainers>=4.9.0",
+    "httpx>=0.28.1",
 ]
+loadtest = ["locust>=2.29.0"]
 
 [project.scripts]
 example-service = "example_service.cli:main"
@@ -196,9 +197,18 @@ select = [
     "ARG", # flake8-unused-arguments
     "SIM", # flake8-simplify
     "TC",  # flake8-type-checking
+    "LOG", # flake8-logging - logging best practices
+    "RUF", # Ruff-specific rules
+    "S",   # flake8-bandit - security checks
+    "PT",  # flake8-pytest-style - test conventions
 ]
 ignore = [
     "E501", # line too long (handled by formatter)
+    "S101", # assert usage - allowed in tests (handled per-file)
+    "S104", # possible binding to all interfaces - intentional for dev
+    "S105", # hardcoded password - false positives with variable names
+    "S106", # hardcoded password in function argument - false positives
+    "S311", # pseudo-random generator - acceptable for non-crypto uses
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -250,12 +260,17 @@ ignore = [
     "ARG002", # Unused method argument - test helpers/mocks
     "ARG005", # Unused lambda argument - test assertions
     "B008",   # Function call in argument defaults - pytest fixtures
+    "F401",   # Unused import - tests may import to verify importability
     "S101",   # Use of assert - standard in pytest
     "S105",   # Possible hardcoded password - test credentials
     "S106",   # Possible hardcoded password - test credentials
+    "S110",   # try-except-pass - intentional in tests for failure path testing
+    "S603",   # subprocess call - safe in test fixtures (e.g., Docker CLI)
+    "S608",   # SQL injection - false positive for test query simulation
     "SIM102", # Use a single if statement instead of nested if - readability in test assertions
     "SIM116", # Use a dictionary instead of consecutive if - readability in test mocks
     "SIM117", # Use single with statement - readability in tests
+    "RUF012", # Mutable ClassVar - false positive for SQLAlchemy __table_args__
     "TC001",  # Move application import into TYPE_CHECKING block
     "TC002",  # Move third-party import into TYPE_CHECKING block
     "TC003",  # Move standard library import into TYPE_CHECKING block
@@ -264,6 +279,20 @@ ignore = [
 "tests/**/conftest.py" = [
     "F401", # Unused import - fixtures imported for pytest registration
     "F811", # Redefinition of unused name - fixture overrides
+]
+# Database utilities: use validated identifiers (safe_table_reference, validate_identifier)
+# SQL identifiers cannot be parameterized, so validated identifiers are used in f-strings
+"example_service/core/database/search/utils.py" = [
+    "S608", # SQL injection - false positive, identifiers validated via safe_table_reference
+]
+"example_service/core/database/search/mixins.py" = [
+    "S608", # SQL injection - false positive, identifiers validated via safe_table_reference/validate_identifier
+]
+"example_service/infra/database/schema.py" = [
+    "S608", # SQL injection - false positive, identifiers validated via safe_table_reference/validate_identifier
+]
+"example_service/cli/commands/search.py" = [
+    "S608", # SQL injection - false positive, identifiers validated via safe_table_reference
 ]
 
 [tool.ruff.lint.flake8-type-checking]
@@ -346,3 +375,7 @@ name = "ruff_fix"
 type = "exec"
 executable = "uv"
 options = "run ruff check --fix REVISION_SCRIPT_FILENAME"
+
+[tool.pyright]
+exclude = ["**/.venv", "**/*.tmpl"]
+ignore = [".venv"]

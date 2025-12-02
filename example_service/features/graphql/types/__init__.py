@@ -27,19 +27,19 @@ from example_service.features.graphql.types.scalars import UUID
 __all__ = [
     # Scalars
     "UUID",
+    "CreateReminderInput",
+    "DeletePayload",
     # Base types
     "PageInfoType",
-    # Reminder types
-    "ReminderType",
-    "ReminderEdge",
     "ReminderConnection",
-    "CreateReminderInput",
-    "UpdateReminderInput",
-    "ReminderSuccess",
+    "ReminderEdge",
     "ReminderError",
-    "ReminderPayload",
-    "DeletePayload",
     # Reminder event types (for subscriptions)
     "ReminderEvent",
     "ReminderEventType",
+    "ReminderPayload",
+    "ReminderSuccess",
+    # Reminder types
+    "ReminderType",
+    "UpdateReminderInput",
 ]

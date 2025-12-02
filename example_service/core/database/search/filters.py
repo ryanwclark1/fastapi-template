@@ -215,7 +215,7 @@ class FullTextSearchFilter(StatementFilter):
             words = self.query.split()
             if words:
                 # Add prefix match to last word
-                modified_query = " ".join(words[:-1] + [words[-1] + ":*"])
+                modified_query = " ".join([*words[:-1], words[-1] + ":*"])
                 return func.to_tsquery(self.config, modified_query)
 
         # Use plainto_tsquery for simple AND matching of words
@@ -834,13 +834,13 @@ class MultiFieldSearchFilter(StatementFilter):
 
 
 __all__ = [
-    "RankNormalization",
-    "RankingOptions",
-    "FullTextSearchFilter",
-    "WebSearchFilter",
-    "FuzzySearchFilter",
-    "PhraseProximityFilter",
     "BoostedSearchFilter",
+    "FullTextSearchFilter",
+    "FuzzySearchFilter",
     "HybridSearchFilter",
     "MultiFieldSearchFilter",
+    "PhraseProximityFilter",
+    "RankNormalization",
+    "RankingOptions",
+    "WebSearchFilter",
 ]

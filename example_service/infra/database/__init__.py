@@ -51,20 +51,20 @@ from .session import (
 )
 
 __all__ = [
-    # Session management
-    "engine",
-    "AsyncSessionLocal",
-    "get_async_session",
-    "init_database",
-    "close_database",
     # Alembic commands
     "AlembicCommandConfig",
     "AlembicCommands",
-    "get_alembic_commands",
+    "AsyncSessionLocal",
     # Schema utilities
     "SchemaDifference",
+    "close_database",
+    "compare_schema",
     "drop_all",
     "dump_schema",
+    # Session management
+    "engine",
+    "get_alembic_commands",
+    "get_async_session",
+    "init_database",
     "truncate_all",
-    "compare_schema",
 ]

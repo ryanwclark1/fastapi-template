@@ -316,7 +316,7 @@ def get_outbox_processor() -> OutboxProcessor | None:
 
 __all__ = [
     "OutboxProcessor",
+    "get_outbox_processor",
     "start_outbox_processor",
     "stop_outbox_processor",
-    "get_outbox_processor",
 ]

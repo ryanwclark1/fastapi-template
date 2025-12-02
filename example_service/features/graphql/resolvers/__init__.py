@@ -12,4 +12,4 @@ from example_service.features.graphql.resolvers.mutations import Mutation
 from example_service.features.graphql.resolvers.queries import Query
 from example_service.features.graphql.resolvers.subscriptions import Subscription
 
-__all__ = ["Query", "Mutation", "Subscription"]
+__all__ = ["Mutation", "Query", "Subscription"]

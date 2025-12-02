@@ -59,7 +59,8 @@ async def test_allows_request_and_sets_headers(client: AsyncClient) -> None:
     assert response.headers["x-ratelimit-remaining"] == "4"
     assert response.headers["x-ratelimit-reset"] == "30"
     limiter: StubLimiter = client._limiter  # type: ignore[attr-defined]
-    assert limiter.calls and limiter.calls[0]["endpoint"] == "/ping"
+    assert limiter.calls
+    assert limiter.calls[0]["endpoint"] == "/ping"
 
 
 @pytest.mark.asyncio

@@ -406,9 +406,9 @@ def get_importer(
 __all__ = [
     "BaseImporter",
     "CSVImporter",
-    "JSONImporter",
     "ExcelImporter",
-    "ParsedRecord",
     "ImportError",
+    "JSONImporter",
+    "ParsedRecord",
     "get_importer",
 ]

@@ -251,8 +251,9 @@ def _extract_defaults_from_settings() -> dict[str, tuple[str, str]]:
                         # Type narrowing: default_factory is Callable[[], Any] when not None
                         factory = cast("Callable[[], object]", field_info.default_factory)
                         default_val = factory()
-                    except Exception:
+                    except Exception as e:
                         # Skip if factory fails
+                        warning(f"Failed to get default value for {field_name}: {e}")
                         continue
                 else:
                     # No default - skip

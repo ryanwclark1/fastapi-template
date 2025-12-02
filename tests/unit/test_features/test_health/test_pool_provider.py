@@ -76,7 +76,7 @@ class TestDatabasePoolHealthProviderInitialization:
 
     def test_invalid_degraded_threshold_too_low(self, mock_engine):
         """Test initialization fails with degraded threshold below 0.0."""
-        with pytest.raises(ValueError, match="degraded_threshold must be between 0.0 and 1.0"):
+        with pytest.raises(ValueError, match=r"degraded_threshold must be between 0.0 and 1.0"):
             DatabasePoolHealthProvider(
                 engine=mock_engine,
                 degraded_threshold=-0.1,
@@ -84,7 +84,7 @@ class TestDatabasePoolHealthProviderInitialization:
 
     def test_invalid_degraded_threshold_too_high(self, mock_engine):
         """Test initialization fails with degraded threshold above 1.0."""
-        with pytest.raises(ValueError, match="degraded_threshold must be between 0.0 and 1.0"):
+        with pytest.raises(ValueError, match=r"degraded_threshold must be between 0.0 and 1.0"):
             DatabasePoolHealthProvider(
                 engine=mock_engine,
                 degraded_threshold=1.5,
@@ -92,7 +92,7 @@ class TestDatabasePoolHealthProviderInitialization:
 
     def test_invalid_unhealthy_threshold_too_low(self, mock_engine):
         """Test initialization fails with unhealthy threshold below 0.0."""
-        with pytest.raises(ValueError, match="unhealthy_threshold must be between 0.0 and 1.0"):
+        with pytest.raises(ValueError, match=r"unhealthy_threshold must be between 0.0 and 1.0"):
             DatabasePoolHealthProvider(
                 engine=mock_engine,
                 unhealthy_threshold=-0.1,
@@ -100,7 +100,7 @@ class TestDatabasePoolHealthProviderInitialization:
 
     def test_invalid_unhealthy_threshold_too_high(self, mock_engine):
         """Test initialization fails with unhealthy threshold above 1.0."""
-        with pytest.raises(ValueError, match="unhealthy_threshold must be between 0.0 and 1.0"):
+        with pytest.raises(ValueError, match=r"unhealthy_threshold must be between 0.0 and 1.0"):
             DatabasePoolHealthProvider(
                 engine=mock_engine,
                 unhealthy_threshold=1.5,
@@ -109,7 +109,7 @@ class TestDatabasePoolHealthProviderInitialization:
     def test_degraded_threshold_not_less_than_unhealthy(self, mock_engine):
         """Test initialization fails when degraded >= unhealthy threshold."""
         with pytest.raises(
-            ValueError, match="degraded_threshold.*must be less than.*unhealthy_threshold"
+            ValueError, match=r"degraded_threshold.*must be less than.*unhealthy_threshold"
         ):
             DatabasePoolHealthProvider(
                 engine=mock_engine,
@@ -120,7 +120,7 @@ class TestDatabasePoolHealthProviderInitialization:
     def test_degraded_threshold_equal_to_unhealthy(self, mock_engine):
         """Test initialization fails when thresholds are equal."""
         with pytest.raises(
-            ValueError, match="degraded_threshold.*must be less than.*unhealthy_threshold"
+            ValueError, match=r"degraded_threshold.*must be less than.*unhealthy_threshold"
         ):
             DatabasePoolHealthProvider(
                 engine=mock_engine,

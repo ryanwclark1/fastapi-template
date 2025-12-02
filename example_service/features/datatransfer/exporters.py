@@ -365,8 +365,8 @@ def get_exporter(
 __all__ = [
     "BaseExporter",
     "CSVExporter",
-    "JSONExporter",
     "ExcelExporter",
+    "JSONExporter",
     "get_exporter",
     "serialize_value",
 ]

@@ -177,7 +177,7 @@ class SMTPClient(BaseEmailClient):
                     )
 
                 # Send the message
-                errors, response = await smtp.send_message(mime_message)
+                errors, _response = await smtp.send_message(mime_message)
 
             # Process response
             message_id = mime_message["Message-ID"]

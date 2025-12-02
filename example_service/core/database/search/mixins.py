@@ -45,6 +45,7 @@ from sqlalchemy import Index, text
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column
 
 from example_service.core.database.search.types import TSVECTOR
+from example_service.core.database.validation import safe_table_reference
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -264,6 +265,9 @@ CREATE TRIGGER {table_name}_search_update
         if not table_name:
             raise ValueError("Table name is required")
 
+        # Validate and quote table name for safety
+        safe_table = safe_table_reference(table_name)
+
         # Build vector expression without prefix
         vector_parts = []
         for field in cls.__search_fields__:
@@ -279,7 +283,7 @@ CREATE TRIGGER {table_name}_search_update
             else f"to_tsvector('{cls.__search_config__}', '')"
         )
 
-        return f"UPDATE {table_name} SET search_vector = {vector_expr};"
+        return f"UPDATE {safe_table} SET search_vector = {vector_expr};"
 
     @classmethod
     def get_trigram_index_sql(cls, table_name: str | None = None) -> list[str]:
@@ -376,6 +380,12 @@ DROP FUNCTION IF EXISTS {table_name}_search_vector_update();
         if not table_name:
             raise ValueError("Table name is required")
 
+        # Validate table name for safety
+        from example_service.core.database.validation import validate_identifier
+
+        validated_table = validate_identifier(table_name, identifier_type="table")
+        # Use parameterized query pattern (though this is a static SQL generation method)
+        # The table name is validated, so the LIKE pattern is safe
         return f"""
 SELECT
     relname AS index_name,
@@ -384,7 +394,7 @@ SELECT
     idx_tup_read AS tuples_read,
     idx_tup_fetch AS tuples_fetched
 FROM pg_stat_user_indexes
-WHERE relname LIKE 'ix_{table_name}%'
+WHERE relname LIKE 'ix_{validated_table}%'
 ORDER BY pg_relation_size(indexrelid) DESC;
 """
 
@@ -487,4 +497,4 @@ CREATE TRIGGER {table_name}_search_update
 """
 
 
-__all__ = ["SearchableMixin", "MultiLanguageSearchMixin"]
+__all__ = ["MultiLanguageSearchMixin", "SearchableMixin"]

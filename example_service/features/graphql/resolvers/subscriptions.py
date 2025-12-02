@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import AsyncGenerator  # noqa: TC001 - Strawberry needs this at runtime
+from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry

@@ -46,7 +46,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from sqlalchemy import func, not_
 
@@ -151,7 +151,7 @@ class SearchQueryParser:
     """
 
     # Regex patterns for tokenization
-    PATTERNS = {
+    PATTERNS: ClassVar[dict[str, re.Pattern[str]]] = {
         # Field with quoted phrase: field:"value" or field:'value'
         "field_phrase": re.compile(r'(\w+):["\']([^"\']+)["\']'),
         # Field with range: field:[min TO max] or field:{min TO max}
@@ -659,10 +659,10 @@ def parse_search_query(
 
 
 __all__ = [
-    "TokenType",
-    "Token",
     "ParsedQuery",
-    "SearchQueryParser",
     "QueryRewriter",
+    "SearchQueryParser",
+    "Token",
+    "TokenType",
     "parse_search_query",
 ]

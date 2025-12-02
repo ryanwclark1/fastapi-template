@@ -341,12 +341,12 @@ class FilterGroup(StatementFilter):
 
 
 __all__ = [
-    "StatementFilter",
-    "SearchFilter",
-    "OrderBy",
-    "LimitOffset",
-    "CollectionFilter",
     "BeforeAfter",
-    "OnBeforeAfter",
+    "CollectionFilter",
     "FilterGroup",
+    "LimitOffset",
+    "OnBeforeAfter",
+    "OrderBy",
+    "SearchFilter",
+    "StatementFilter",
 ]

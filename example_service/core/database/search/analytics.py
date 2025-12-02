@@ -635,9 +635,9 @@ class SearchAnalytics:
 
 
 __all__ = [
-    "SearchQuery",
-    "SearchSuggestionLog",
-    "SearchStats",
-    "SearchInsight",
     "SearchAnalytics",
+    "SearchInsight",
+    "SearchQuery",
+    "SearchStats",
+    "SearchSuggestionLog",
 ]

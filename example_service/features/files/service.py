@@ -746,8 +746,8 @@ class FileService(BaseService):
                         {
                             "file_id": file_id,
                             "filename": None,
-                            "would_delete": None if dry_run else None,
-                            "deleted": None if not dry_run else None,
+                            "would_delete": None,
+                            "deleted": None,
                             "success": False,
                             "error": "File not found",
                         }
@@ -788,8 +788,8 @@ class FileService(BaseService):
                     {
                         "file_id": file_id,
                         "filename": None,
-                        "would_delete": None if dry_run else None,
-                        "deleted": None if not dry_run else None,
+                        "would_delete": None,
+                        "deleted": None,
                         "success": False,
                         "error": str(e),
                     }

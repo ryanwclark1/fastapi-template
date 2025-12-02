@@ -135,6 +135,20 @@ class AppSettings(BaseSettings):
     cors_allow_headers: list[str] = Field(
         default_factory=lambda: ["*"], description="Allowed headers"
     )
+    cors_max_age: int = Field(
+        default=3600,
+        ge=0,
+        le=86400,
+        description="CORS preflight cache max-age in seconds (0-86400)",
+    )
+
+    # Security headers configuration
+    hsts_max_age: int = Field(
+        default=31536000,
+        ge=0,
+        le=63072000,
+        description="HSTS max-age in seconds (default: 1 year, max: 2 years, 0 to disable)",
+    )
 
     # Trusted Host configuration (production only)
     allowed_hosts: list[str] = Field(

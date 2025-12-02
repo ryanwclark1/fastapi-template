@@ -54,24 +54,24 @@ from .service import FeatureFlagService, get_feature_flag_service
 __all__ = [
     # Models
     "FeatureFlag",
-    "FlagOverride",
-    "FlagStatus",
     # Schemas
     "FeatureFlagCreate",
-    "FeatureFlagUpdate",
-    "FeatureFlagResponse",
     "FeatureFlagListResponse",
-    "FlagOverrideCreate",
-    "FlagOverrideResponse",
+    "FeatureFlagResponse",
+    # Service
+    "FeatureFlagService",
+    "FeatureFlagUpdate",
+    # Dependencies
+    "FeatureFlags",
     "FlagEvaluationRequest",
     "FlagEvaluationResponse",
     "FlagEvaluationResult",
+    "FlagOverride",
+    "FlagOverrideCreate",
+    "FlagOverrideResponse",
+    "FlagStatus",
     "TargetingRule",
-    # Service
-    "FeatureFlagService",
     "get_feature_flag_service",
-    # Dependencies
-    "FeatureFlags",
     "get_feature_flags",
     "require_feature",
     # Router

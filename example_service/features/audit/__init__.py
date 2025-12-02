@@ -34,19 +34,19 @@ from .schemas import AuditLogCreate, AuditLogQuery, AuditLogResponse
 from .service import AuditService, get_audit_service
 
 __all__ = [
+    "AuditAction",
     # Models
     "AuditLog",
-    "AuditAction",
     # Schemas
     "AuditLogCreate",
-    "AuditLogResponse",
     "AuditLogQuery",
+    "AuditLogResponse",
     # Service
     "AuditService",
-    "get_audit_service",
+    "audit_action",
     # Decorators
     "audited",
-    "audit_action",
+    "get_audit_service",
     # Router
     "router",
 ]

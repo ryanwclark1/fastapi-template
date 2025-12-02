@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
@@ -23,9 +22,6 @@ from fastapi import FastAPI, Request
 from httpx import ASGITransport, AsyncClient
 
 from example_service.app.middleware.debug import DebugMiddleware
-
-if TYPE_CHECKING:
-    from pytest import LogCaptureFixture
 
 
 @pytest.fixture
@@ -190,7 +186,7 @@ class TestRequestLogging:
     """Test request logging functionality."""
 
     async def test_logs_request_started(
-        self, app: FastAPI, async_client: AsyncClient, caplog: LogCaptureFixture
+        self, app: FastAPI, async_client: AsyncClient, caplog: pytest.LogCaptureFixture
     ) -> None:
         """Test that request start is logged."""
         with caplog.at_level(logging.INFO):
@@ -210,7 +206,7 @@ class TestRequestLogging:
         assert hasattr(record, "query_params")
 
     async def test_logs_request_completed(
-        self, app: FastAPI, async_client: AsyncClient, caplog: LogCaptureFixture
+        self, app: FastAPI, async_client: AsyncClient, caplog: pytest.LogCaptureFixture
     ) -> None:
         """Test that request completion is logged with timing."""
         with caplog.at_level(logging.INFO):
@@ -228,7 +224,7 @@ class TestRequestLogging:
         assert record.duration_ms > 0
 
     async def test_includes_query_params_in_log(
-        self, app: FastAPI, async_client: AsyncClient, caplog: LogCaptureFixture
+        self, app: FastAPI, async_client: AsyncClient, caplog: pytest.LogCaptureFixture
     ) -> None:
         """Test that query parameters are included in logs."""
         with caplog.at_level(logging.INFO):
@@ -247,11 +243,11 @@ class TestExceptionHandling:
     """Test exception handling with trace context."""
 
     async def test_logs_exception_with_trace_context(
-        self, app: FastAPI, async_client: AsyncClient, caplog: LogCaptureFixture
+        self, app: FastAPI, async_client: AsyncClient, caplog: pytest.LogCaptureFixture
     ) -> None:
         """Test that exceptions are logged with full trace context."""
         with caplog.at_level(logging.ERROR):
-            with pytest.raises(ValueError):
+            with pytest.raises(ValueError, match=r"Test error"):
                 await async_client.get("/error")
 
         # Find error log
@@ -266,11 +262,11 @@ class TestExceptionHandling:
         assert hasattr(record, "duration_ms")
 
     async def test_exception_includes_timing(
-        self, app: FastAPI, async_client: AsyncClient, caplog: LogCaptureFixture
+        self, app: FastAPI, async_client: AsyncClient, caplog: pytest.LogCaptureFixture
     ) -> None:
         """Test that failed requests include timing information."""
         with caplog.at_level(logging.ERROR):
-            with pytest.raises(ValueError):
+            with pytest.raises(ValueError, match=r"Test error"):
                 await async_client.get("/error")
 
         error_logs = [r for r in caplog.records if "Request failed" in r.message]
@@ -370,7 +366,7 @@ class TestFeatureFlags:
         assert "X-Trace-Id" not in response.headers
         assert "X-Span-Id" not in response.headers
 
-    async def test_log_requests_flag(self, caplog: LogCaptureFixture) -> None:
+    async def test_log_requests_flag(self, caplog: pytest.LogCaptureFixture) -> None:
         """Test that log_requests flag controls request logging."""
         app = FastAPI()
 
@@ -399,7 +395,7 @@ class TestFeatureFlags:
             completed_logs = [r for r in caplog.records if "Request completed" in r.message]
             assert len(completed_logs) == 1
 
-    async def test_log_responses_flag(self, caplog: LogCaptureFixture) -> None:
+    async def test_log_responses_flag(self, caplog: pytest.LogCaptureFixture) -> None:
         """Test that log_responses flag controls response logging."""
         app = FastAPI()
 
@@ -510,7 +506,7 @@ class TestPerformance:
 class TestEdgeCases:
     """Test edge cases and error conditions."""
 
-    async def test_handles_missing_client(self, caplog: LogCaptureFixture) -> None:
+    async def test_handles_missing_client(self, caplog: pytest.LogCaptureFixture) -> None:
         """Test handling when request.client is None."""
         # This test demonstrates that the middleware handles None client gracefully
         # In practice, HTTP clients always have a client attribute, but we test defensive coding
@@ -538,7 +534,7 @@ class TestEdgeCases:
             assert hasattr(record, "client_host")
 
     async def test_handles_empty_query_params(
-        self, app: FastAPI, async_client: AsyncClient, caplog: LogCaptureFixture
+        self, app: FastAPI, async_client: AsyncClient, caplog: pytest.LogCaptureFixture
     ) -> None:
         """Test handling of requests without query parameters."""
         with caplog.at_level(logging.INFO):
@@ -558,7 +554,7 @@ class TestEdgeCases:
 class TestIntegrationWithLoggingContext:
     """Test integration with logging context system."""
 
-    async def test_context_available_in_endpoint(self, caplog: LogCaptureFixture) -> None:
+    async def test_context_available_in_endpoint(self, caplog: pytest.LogCaptureFixture) -> None:
         """Test that trace context is available in endpoint via logging.
 
         Note: Context injection requires ContextInjectingFilter to be configured

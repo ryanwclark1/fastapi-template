@@ -627,7 +627,7 @@ class CircuitBreaker:
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Any,  # noqa: ANN401
+        exc_tb: Any,
     ) -> None:
         """Exit circuit breaker context.
 

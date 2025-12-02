@@ -42,13 +42,13 @@ from example_service.infra.realtime.manager import (
 __all__ = [
     # Connection manager
     "ConnectionManager",
-    "get_connection_manager",
-    "start_connection_manager",
-    "stop_connection_manager",
     # Event bridge
     "EventBridge",
+    "get_connection_manager",
     "get_event_bridge",
     "publish_to_websocket",
+    "start_connection_manager",
     "start_event_bridge",
+    "stop_connection_manager",
     "stop_event_bridge",
 ]

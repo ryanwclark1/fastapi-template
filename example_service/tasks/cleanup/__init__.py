@@ -23,8 +23,8 @@ except ImportError:
     __all__: list[str] = []
 else:
     __all__ = [
-        "cleanup_temp_files",
+        "cleanup_expired_data",
         "cleanup_old_backups",
         "cleanup_old_exports",
-        "cleanup_expired_data",
+        "cleanup_temp_files",
     ]

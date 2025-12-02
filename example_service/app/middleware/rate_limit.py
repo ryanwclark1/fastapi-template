@@ -203,8 +203,8 @@ class RateLimitMiddleware:
                 tracker = get_rate_limit_tracker()
                 if tracker:
                     tracker.record_success()
-            except Exception:
-                pass  # Don't let tracker errors affect request processing
+            except Exception as e:
+                logger.debug("Failed to record rate limit success", exc_info=e)
 
         except RateLimitException as exc:
             await self._send_rate_limit_response(exc, scope, receive, send)
@@ -221,8 +221,8 @@ class RateLimitMiddleware:
                 tracker = get_rate_limit_tracker()
                 if tracker:
                     tracker.record_failure(str(e))
-            except Exception:
-                pass  # Don't let tracker errors affect request processing
+            except Exception as tracker_error:
+                logger.debug("Failed to record rate limit failure", exc_info=tracker_error)
 
             logger.error(
                 "Rate limit check failed, allowing request (fail-open)",

@@ -108,7 +108,7 @@ class TestMetricsMiddleware:
         from httpx import ASGITransport
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            with pytest.raises(ValueError):
+            with pytest.raises(ValueError, match=r"Test error"):
                 await client.get("/error")
 
         # Should still decrement in-progress counter in finally block
@@ -127,7 +127,7 @@ class TestMetricsMiddleware:
         from httpx import ASGITransport
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            with pytest.raises(ValueError):
+            with pytest.raises(ValueError, match=r"Test error"):
                 await client.get("/error")
 
         # Should record status=500 for unhandled exception

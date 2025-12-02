@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from .consul import ConsulSettings
     from .logs import LoggingSettings
     from .otel import OtelSettings
+    from .pagination import PaginationSettings
     from .postgres import PostgresSettings
     from .rabbit import RabbitSettings
     from .redis import RedisSettings
@@ -123,6 +124,13 @@ def _get_task_settings() -> TaskSettings:
     return TaskSettings()
 
 
+def _get_pagination_settings() -> PaginationSettings:
+    """Lazy import to avoid circular dependencies."""
+    from .pagination import PaginationSettings
+
+    return PaginationSettings()
+
+
 class Settings(BaseSettings):
     """Unified settings composing all domain settings.
 
@@ -155,6 +163,7 @@ class Settings(BaseSettings):
     consul: ConsulSettings = Field(default_factory=_get_consul_settings)
     storage: StorageSettings = Field(default_factory=_get_storage_settings)
     task: TaskSettings = Field(default_factory=_get_task_settings)
+    pagination: PaginationSettings = Field(default_factory=_get_pagination_settings)
 
 
 def _rebuild_model() -> None:
@@ -170,6 +179,7 @@ def _rebuild_model() -> None:
     from .consul import ConsulSettings
     from .logs import LoggingSettings
     from .otel import OtelSettings
+    from .pagination import PaginationSettings
     from .postgres import PostgresSettings
     from .rabbit import RabbitSettings
     from .redis import RedisSettings
@@ -189,6 +199,7 @@ def _rebuild_model() -> None:
             "ConsulSettings": ConsulSettings,
             "StorageSettings": StorageSettings,
             "TaskSettings": TaskSettings,
+            "PaginationSettings": PaginationSettings,
         }
     )
 

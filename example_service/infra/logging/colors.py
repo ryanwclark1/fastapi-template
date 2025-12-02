@@ -8,9 +8,12 @@ Inspired by loguru's colorization but simpler and more maintainable.
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 from typing import TextIO
+
+logger = logging.getLogger(__name__)
 
 
 class ANSIColors:
@@ -107,8 +110,9 @@ def should_colorize(stream: TextIO | None) -> bool:
 
             if getattr(builtins, "__IPYTHON__", False):
                 return True
-        except Exception:
-            pass
+        except Exception as e:
+            # Log expected import errors at debug level, fall through to other checks
+            logger.debug("Failed to check for IPython environment: %s", e, exc_info=True)
 
     # Check for CI environments (most support colors)
     if is_original_standard_stream:

@@ -81,8 +81,8 @@ class ReminderDeletedEvent(DomainEvent):
 
 
 __all__ = [
-    "ReminderCreatedEvent",
-    "ReminderUpdatedEvent",
     "ReminderCompletedEvent",
+    "ReminderCreatedEvent",
     "ReminderDeletedEvent",
+    "ReminderUpdatedEvent",
 ]

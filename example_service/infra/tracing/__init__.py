@@ -25,16 +25,16 @@ from example_service.infra.tracing.opentelemetry import (
 )
 
 __all__ = [
-    # Core setup
-    "setup_tracing",
-    "instrument_app",
-    "get_tracer",
+    "ExporterState",
+    # Observable exporters
+    "ObservableSpanExporter",
     # Span utilities
     "add_span_attributes",
     "add_span_event",
-    "record_exception",
-    # Observable exporters
-    "ObservableSpanExporter",
-    "ExporterState",
     "create_observable_otlp_exporter",
+    "get_tracer",
+    "instrument_app",
+    "record_exception",
+    # Core setup
+    "setup_tracing",
 ]

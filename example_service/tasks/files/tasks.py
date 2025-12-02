@@ -150,7 +150,7 @@ async def download_from_s3(s3_key: str) -> bytes:
         raise FileProcessingError(f"Failed to download {s3_key}: {e}") from e
 
 
-async def upload_to_s3(s3_key: str, content: bytes, content_type: str) -> str:  # noqa: ARG001
+async def upload_to_s3(s3_key: str, content: bytes, content_type: str) -> str:
     """Upload file content to S3.
 
     Args:

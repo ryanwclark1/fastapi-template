@@ -35,6 +35,7 @@ from .health import HealthCheckSettings
 from .i18n import I18nSettings
 from .logs import LoggingSettings
 from .otel import OtelSettings
+from .pagination import PaginationSettings
 from .postgres import PostgresSettings
 from .rabbit import RabbitSettings
 from .redis import RedisSettings
@@ -203,6 +204,16 @@ def get_email_settings() -> EmailSettings:
     return EmailSettings()
 
 
+@lru_cache(maxsize=1)
+def get_pagination_settings() -> PaginationSettings:
+    """Get cached pagination settings.
+
+    Returns:
+        Validated and frozen PaginationSettings instance.
+    """
+    return PaginationSettings()
+
+
 def clear_all_caches() -> None:
     """Clear all settings caches.
 
@@ -225,3 +236,4 @@ def clear_all_caches() -> None:
     get_health_settings.cache_clear()
     get_task_settings.cache_clear()
     get_email_settings.cache_clear()
+    get_pagination_settings.cache_clear()

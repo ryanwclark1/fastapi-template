@@ -752,10 +752,10 @@ def set_global_aggregator(aggregator: HealthAggregator) -> None:
 
 
 __all__ = [
-    "AggregatedHealthResult",
     "DEFAULT_CACHE_TTL_SECONDS",
     "DEFAULT_CHECK_TIMEOUT_SECONDS",
     "DEFAULT_HISTORY_SIZE",
+    "AggregatedHealthResult",
     "HealthAggregator",
     "HealthHistoryEntry",
     "HealthStats",

@@ -607,7 +607,7 @@ async def truncate_cmd(exclude: tuple[str, ...], confirm: bool) -> None:
         from example_service.infra.database import engine
         from example_service.infra.database.schema import truncate_all
 
-        exclude_list = list(exclude) + ["alembic_version"]
+        exclude_list = [*list(exclude), "alembic_version"]
         truncated = await truncate_all(engine, exclude_tables=exclude_list)
 
         success(f"Truncated {len(truncated)} tables:")
@@ -710,7 +710,8 @@ async def shell() -> None:
         env["PGPASSWORD"] = db_settings.password.get_secret_value()
 
         # Run psql interactively
-        subprocess.run(psql_cmd, env=env)
+        # psql_cmd is constructed from validated database settings, not user input
+        subprocess.run(psql_cmd, env=env)  # noqa: S603
 
     except FileNotFoundError:
         error("psql command not found. Please install PostgreSQL client tools.")

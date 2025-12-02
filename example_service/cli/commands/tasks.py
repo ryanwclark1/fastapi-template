@@ -330,7 +330,7 @@ def start_worker(concurrency: int, queue: str | None) -> None:
         cmd.extend(["--queue", queue])
 
     try:
-        subprocess.run(cmd)
+        subprocess.run(cmd)  # noqa: S603
     except KeyboardInterrupt:
         info("Worker stopped")
     except FileNotFoundError:

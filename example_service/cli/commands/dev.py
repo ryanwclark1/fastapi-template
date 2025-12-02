@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -42,7 +43,8 @@ def lint(fix: bool, watch: bool) -> None:
         cmd.append("--watch")
 
     click.echo("🔍 Running linter...")
-    result = subprocess.run(cmd)
+    # cmd is constructed from hardcoded command, not user input
+    result = subprocess.run(cmd)  # noqa: S603
 
     if result.returncode == 0:
         click.echo("✅ No linting issues found!")
@@ -72,7 +74,8 @@ def format(check: bool) -> None:
     cmd.extend(["example_service", "tests"])
 
     click.echo("🎨 Formatting code...")
-    result = subprocess.run(cmd)
+    # cmd is constructed from hardcoded command, not user input
+    result = subprocess.run(cmd)  # noqa: S603
 
     if result.returncode == 0:
         if check:
@@ -103,7 +106,8 @@ def typecheck(strict: bool) -> None:
         cmd.append("--strict")
 
     click.echo("🔬 Running type checker...")
-    result = subprocess.run(cmd)
+    # cmd is constructed from hardcoded command, not user input
+    result = subprocess.run(cmd)  # noqa: S603
 
     if result.returncode == 0:
         click.echo("✅ No type errors found!")
@@ -171,7 +175,8 @@ def test(
         cmd.append("tests/")
 
     click.echo("🧪 Running tests...")
-    result = subprocess.run(cmd)
+    # cmd is constructed from hardcoded command, not user input
+    result = subprocess.run(cmd)  # noqa: S603
 
     if result.returncode == 0:
         click.echo("✅ All tests passed!")
@@ -208,8 +213,13 @@ def quality(fix: bool) -> None:
         click.echo("=" * 60)
 
         # Run dev subcommand
-        result = subprocess.run(
-            ["example-service", "dev"] + cmd,
+        # cmd comes from predefined checks list, not user input
+        executable = shutil.which("example-service")
+        if not executable:
+            click.echo("❌ example-service not found in PATH", err=True)
+            sys.exit(1)
+        result = subprocess.run(  # noqa: S603
+            [executable, "dev", *cmd],
             capture_output=False,
         )
 
@@ -274,7 +284,8 @@ def serve(port: int, host: str, reload: bool, workers: int) -> None:
     click.echo(f"🚀 Starting development server at http://{host}:{port}")
     click.echo("📝 Press Ctrl+C to stop\n")
 
-    subprocess.run(cmd)
+    # cmd is constructed from validated CLI options, not arbitrary user input
+    subprocess.run(cmd)  # noqa: S603
 
 
 @dev.command()
@@ -339,13 +350,15 @@ def deps() -> None:
 
     # Show installed packages
     click.echo("Installed packages:")
-    subprocess.run(["uv", "pip", "list"])
+    # Hardcoded command, not user input
+    subprocess.run(["uv", "pip", "list"])  # noqa: S607
 
     click.echo("\n" + "=" * 60)
 
     # Check for outdated packages
     click.echo("\nOutdated packages:")
-    subprocess.run(["uv", "pip", "list", "--outdated"])
+    # Hardcoded command, not user input
+    subprocess.run(["uv", "pip", "list", "--outdated"])  # noqa: S607
 
 
 @dev.command()
@@ -373,7 +386,8 @@ def info(show_all: bool) -> None:
     if show_all:
         # UV version
         click.echo("\nUV Version:")
-        subprocess.run(["uv", "--version"])
+        # Hardcoded command, not user input
+        subprocess.run(["uv", "--version"])  # noqa: S607
 
         # Environment variables
         import os
@@ -409,9 +423,10 @@ def run(command: tuple[str, ...]) -> None:
 
         example-service dev run pytest -v tests/test_api/
     """
-    cmd = ["uv", "run"] + list(command)
+    cmd = ["uv", "run", *list(command)]
 
     click.echo(f"🏃 Running: {' '.join(command)}\n")
-    result = subprocess.run(cmd)
+    # cmd is constructed from CLI arguments, user should only run trusted commands
+    result = subprocess.run(cmd)  # noqa: S603
 
     sys.exit(result.returncode)

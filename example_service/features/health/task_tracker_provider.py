@@ -144,8 +144,8 @@ class TaskTrackerHealthProvider:
                         "tracking_enabled": False,
                     },
                 )
-        except Exception:
-            pass  # Continue with check
+        except Exception as e:
+            logger.debug("Failed to record task tracker health check", exc_info=e)
 
         # Get tracker
         tracker = self._get_tracker()

@@ -118,75 +118,75 @@ from example_service.infra.logging.sampling import (
 )
 
 __all__ = [
-    # Configuration
-    "configure_logging",
-    "setup_logging",
-    "complete",
-    "shutdown",
-    # Context management (recommended)
-    "set_log_context",
-    "get_log_context",
-    "clear_log_context",
-    "update_log_context",
+    # Colors (loguru-inspired)
+    "ANSIColors",
+    "CatchContext",
+    # Terminal capability detection
+    "ColorMode",
+    "ColoredConsoleFormatter",
     # Context-bound loggers
     "ContextBoundLogger",
-    "get_logger",
+    "ContextInjectingFilter",
+    # Diagnose mode (loguru-inspired)
+    "DiagnoseFormatter",
+    # Formatters and filters
+    "JSONFormatter",
     # Lazy evaluation
     "LazyLoggerAdapter",
     "LazyString",
-    "get_lazy_logger",
-    "lazy",
+    "MinimalColoredFormatter",
+    "OperationContext",
+    # Opt method (loguru-inspired)
+    "OptLoggerAdapter",
+    "RateLimitFilter",
+    # Sampling and rate limiting
+    "SamplingFilter",
     # Exception catching (loguru-inspired)
     "catch",
     "catch_context",
-    "CatchContext",
-    # Opt method (loguru-inspired)
-    "OptLoggerAdapter",
-    "get_opt_logger",
-    # Diagnose mode (loguru-inspired)
-    "DiagnoseFormatter",
-    "create_diagnose_handler",
-    "should_enable_diagnose",
-    # Colors (loguru-inspired)
-    "ANSIColors",
-    "ColoredConsoleFormatter",
-    "MinimalColoredFormatter",
-    "create_colored_handler",
-    "should_colorize",
-    "is_color_enabled",
-    "strip_ansi",
     "clear_color_cache",
-    # Terminal capability detection
-    "ColorMode",
+    "clear_log_context",
+    "color_mode_manager",
+    "complete",
+    # Configuration
+    "configure_logging",
+    "create_colored_handler",
+    "create_diagnose_handler",
+    "create_sampling_config",
     "detect_color_mode",
     "get_color_mode",
-    "supports_color",
-    "color_mode_manager",
-    # RGB/Hex color conversion
-    "hex_to_rgb",
+    "get_lazy_logger",
+    "get_log_context",
+    "get_logger",
+    "get_opt_logger",
     "hex_to_ansi",
     "hex_to_ansi_bg",
+    # RGB/Hex color conversion
+    "hex_to_rgb",
+    "is_color_enabled",
+    "lazy",
+    "log_db_operation",
+    "log_endpoint",
+    # Operation logging decorators and helpers
+    "log_operation",
+    "log_service_op",
+    "operation_context",
+    "operation_context_sync",
     "rgb_to_ansi",
     "rgb_to_ansi_16",
     "rgb_to_ansi_256",
-    "rgb_to_ansi_truecolor",
     "rgb_to_ansi_bg",
     "rgb_to_ansi_bg_16",
     "rgb_to_ansi_bg_256",
     "rgb_to_ansi_bg_truecolor",
-    # Formatters and filters
-    "JSONFormatter",
-    "ContextInjectingFilter",
-    # Sampling and rate limiting
-    "SamplingFilter",
-    "RateLimitFilter",
-    "create_sampling_config",
-    # Operation logging decorators and helpers
-    "log_operation",
-    "log_db_operation",
-    "log_service_op",
-    "log_endpoint",
-    "operation_context",
-    "operation_context_sync",
-    "OperationContext",
+    "rgb_to_ansi_truecolor",
+    # Context management (recommended)
+    "set_log_context",
+    "setup_logging",
+    "should_colorize",
+    "should_enable_diagnose",
+    "shutdown",
+    "strip_ansi",
+    "supports_color",
+    "update_log_context",
 ]

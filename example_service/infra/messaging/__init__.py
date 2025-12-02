@@ -57,25 +57,25 @@ from example_service.infra.messaging.middleware import (
 )
 
 __all__ = [
-    # Broker
-    "broker",
-    "get_broker",
-    "get_router",
-    "check_broker_health",
+    "DLQ_EXCHANGE",
+    "DLQ_EXCHANGE_NAME",
+    "DLQ_QUEUE",
     # Exchanges and Queues
     "DOMAIN_EVENTS_EXCHANGE",
-    "DLQ_EXCHANGE",
-    "DLQ_QUEUE",
-    "EXAMPLE_EVENTS_QUEUE",
-    "create_queue_with_dlq",
     # Conventions
     "DOMAIN_EVENTS_EXCHANGE_NAME",
-    "DLQ_EXCHANGE_NAME",
+    "EXAMPLE_EVENTS_QUEUE",
+    "add_message_span_attributes",
+    "add_message_span_event",
+    # Broker
+    "broker",
+    "check_broker_health",
+    "create_queue_with_dlq",
+    "get_broker",
     "get_queue_name",
+    "get_router",
     "get_routing_key",
     "get_routing_key_pattern",
     # Tracing utilities
     "traced_handler",
-    "add_message_span_attributes",
-    "add_message_span_event",
 ]

@@ -9,14 +9,14 @@ Provides:
 
 from __future__ import annotations
 
-from datetime import datetime  # noqa: TC003 - Strawberry needs this at runtime
+from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
 
 from example_service.features.graphql.types.base import (
-    PageInfoType,  # noqa: TC001 - Strawberry needs this at runtime
+    PageInfoType,
 )
 
 if TYPE_CHECKING:
@@ -197,16 +197,16 @@ class ReminderEvent:
 
 
 __all__ = [
-    "ErrorCode",
-    "ReminderType",
     "CreateReminderInput",
-    "UpdateReminderInput",
-    "ReminderSuccess",
-    "ReminderError",
-    "ReminderPayload",
     "DeletePayload",
-    "ReminderEdge",
+    "ErrorCode",
     "ReminderConnection",
-    "ReminderEventType",
+    "ReminderEdge",
+    "ReminderError",
     "ReminderEvent",
+    "ReminderEventType",
+    "ReminderPayload",
+    "ReminderSuccess",
+    "ReminderType",
+    "UpdateReminderInput",
 ]

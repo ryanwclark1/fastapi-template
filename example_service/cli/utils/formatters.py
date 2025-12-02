@@ -20,7 +20,7 @@ def warning(message: str) -> None:
 
 def info(message: str) -> None:
     """Print an info message in blue."""
-    click.secho(f"ℹ {message}", fg="blue")
+    click.secho(f"i {message}", fg="blue")
 
 
 def header(message: str) -> None:

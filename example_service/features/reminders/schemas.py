@@ -9,12 +9,12 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from example_service.core.pagination import Connection, CursorPage, Edge, PageInfo
+from example_service.core.validators import validate_rrule_optional
 from example_service.features.reminders.recurrence import (
     Frequency,
     RecurrenceRule,
     Weekday,
     describe_rrule,
-    validate_rrule,
 )
 
 if TYPE_CHECKING:
@@ -100,11 +100,7 @@ class ReminderCreate(ReminderBase):
     @classmethod
     def validate_rrule_string(cls, v: str | None) -> str | None:
         """Validate RRULE string if provided."""
-        if v is not None:
-            is_valid, error = validate_rrule(v)
-            if not is_valid:
-                raise ValueError(f"Invalid RRULE: {error}")
-        return v
+        return validate_rrule_optional(v)
 
 
 class ReminderUpdate(BaseModel):
@@ -121,11 +117,7 @@ class ReminderUpdate(BaseModel):
     @classmethod
     def validate_rrule_string(cls, v: str | None) -> str | None:
         """Validate RRULE string if provided."""
-        if v is not None:
-            is_valid, error = validate_rrule(v)
-            if not is_valid:
-                raise ValueError(f"Invalid RRULE: {error}")
-        return v
+        return validate_rrule_optional(v)
 
 
 class RecurrenceInfo(BaseModel):
@@ -238,19 +230,19 @@ ReminderCursorPage = CursorPage[ReminderResponse]
 
 
 __all__ = [
-    "ReminderBase",
-    "ReminderCreate",
-    "ReminderUpdate",
-    "ReminderResponse",
-    "ReminderSearchResult",
-    "RecurrenceRuleCreate",
-    "RecurrenceInfo",
+    "Frequency",
     "OccurrenceResponse",
     "OccurrencesResponse",
-    "ReminderEdge",
-    "ReminderConnection",
-    "ReminderCursorPage",
     "PageInfo",
-    "Frequency",
+    "RecurrenceInfo",
+    "RecurrenceRuleCreate",
+    "ReminderBase",
+    "ReminderConnection",
+    "ReminderCreate",
+    "ReminderCursorPage",
+    "ReminderEdge",
+    "ReminderResponse",
+    "ReminderSearchResult",
+    "ReminderUpdate",
     "Weekday",
 ]

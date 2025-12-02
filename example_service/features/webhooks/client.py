@@ -201,7 +201,7 @@ class WebhookClient:
 
         except httpx.RequestError as e:
             response_time_ms = int((time.time() - start_time) * 1000)
-            error_message = f"Request error: {str(e)}"
+            error_message = f"Request error: {e!s}"
 
             logger.error(
                 "Webhook delivery request error",
@@ -225,7 +225,7 @@ class WebhookClient:
 
         except Exception as e:
             response_time_ms = int((time.time() - start_time) * 1000)
-            error_message = f"Unexpected error: {str(e)}"
+            error_message = f"Unexpected error: {e!s}"
 
             logger.error(
                 "Webhook delivery unexpected error",

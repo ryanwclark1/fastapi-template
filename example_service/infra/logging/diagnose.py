@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Any, Literal
 if TYPE_CHECKING:
     from types import TracebackType
 
+logger = logging.getLogger(__name__)
+
 
 class DiagnoseFormatter(logging.Formatter):
     """Formatter that includes variable values in exception tracebacks.
@@ -135,8 +137,9 @@ class DiagnoseFormatter(logging.Formatter):
                 line = linecache.getline(filename, lineno).strip()
                 if line:
                     lines.append(f"    {line}")
-            except Exception:
-                pass
+            except Exception as e:
+                # Log expected linecache errors at debug level (file may not exist or be inaccessible)
+                logger.debug("Failed to get source line from linecache: %s", e, exc_info=True)
 
             # Add local variables if diagnose enabled
             if self.diagnose:

@@ -9,8 +9,10 @@ Commands for managing and monitoring full-text search functionality:
 import sys
 
 import click
+from sqlalchemy import text
 
 from example_service.cli.utils import coro, error, header, info, section, success, warning
+from example_service.core.database.validation import safe_table_reference
 from example_service.infra.database.session import create_async_engine
 
 
@@ -52,7 +54,6 @@ async def rebuild(entity: tuple[str, ...], batch_size: int, force: bool) -> None
     - Adding new searchable fields
     - Fixing corrupted search vectors
     """
-    from sqlalchemy import text
 
     from example_service.features.search.service import SEARCHABLE_ENTITIES
 
@@ -68,7 +69,7 @@ async def rebuild(entity: tuple[str, ...], batch_size: int, force: bool) -> None
             info("Rebuild cancelled")
             return
 
-    engine = create_async_engine() # type: ignore
+    engine = create_async_engine()  # type: ignore
 
     async with engine.begin() as conn:
         for entity_type in entities_to_rebuild:
@@ -84,6 +85,7 @@ async def rebuild(entity: tuple[str, ...], batch_size: int, force: bool) -> None
             module_path, class_name = parts
 
             import importlib
+
             module = importlib.import_module(module_path)
             model_class = getattr(module, class_name)
             table_name = model_class.__tablename__
@@ -108,10 +110,13 @@ async def rebuild(entity: tuple[str, ...], batch_size: int, force: bool) -> None
                     f"setweight(to_tsvector('{ts_config}', COALESCE({field}, '')), '{weight}')"
                 )
 
-            vector_sql = " || ".join(vector_parts) if vector_parts else f"to_tsvector('{ts_config}', '')"
+            vector_sql = (
+                " || ".join(vector_parts) if vector_parts else f"to_tsvector('{ts_config}', '')"
+            )
 
-            # Count total records
-            count_result = await conn.execute(text(f"SELECT COUNT(*) FROM {table_name}"))
+            # Count total records (table_name from model definition, validated for safety)
+            safe_table = safe_table_reference(table_name)
+            count_result = await conn.execute(text(f"SELECT COUNT(*) FROM {safe_table}"))
             total = count_result.scalar() or 0
             info(f"  Total records: {total}")
 
@@ -123,10 +128,10 @@ async def rebuild(entity: tuple[str, ...], batch_size: int, force: bool) -> None
             processed = 0
             while processed < total:
                 update_sql = f"""
-                    UPDATE {table_name}
+                    UPDATE {safe_table}
                     SET search_vector = {vector_sql}
                     WHERE id IN (
-                        SELECT id FROM {table_name}
+                        SELECT id FROM {safe_table}
                         ORDER BY id
                         LIMIT {batch_size}
                         OFFSET {processed}
@@ -154,13 +159,12 @@ async def stats() -> None:
     - Number of indexed documents
     - Index health metrics
     """
-    from sqlalchemy import text
 
     from example_service.features.search.service import SEARCHABLE_ENTITIES
 
     header("Search Index Statistics")
 
-    engine = create_async_engine() # type: ignore
+    engine = create_async_engine()  # type: ignore
 
     async with engine.begin() as conn:
         # Get overall search-related statistics
@@ -173,23 +177,23 @@ async def stats() -> None:
 
             try:
                 import importlib
+
                 module = importlib.import_module(module_path)
                 model_class = getattr(module, class_name)
                 table_name = model_class.__tablename__
 
                 click.echo(f"\n{entity_type} ({table_name}):")
 
-                # Record count
-                count_result = await conn.execute(
-                    text(f"SELECT COUNT(*) FROM {table_name}")
-                )
+                # Record count (table_name from model definition, validated for safety)
+                safe_table = safe_table_reference(table_name)
+                count_result = await conn.execute(text(f"SELECT COUNT(*) FROM {safe_table}"))
                 total = count_result.scalar() or 0
                 click.echo(f"  Total records: {total:,}")
 
                 # Records with search vector
                 if hasattr(model_class, "search_vector"):
                     vector_count_result = await conn.execute(
-                        text(f"SELECT COUNT(*) FROM {table_name} WHERE search_vector IS NOT NULL")
+                        text(f"SELECT COUNT(*) FROM {safe_table} WHERE search_vector IS NOT NULL")
                     )
                     indexed = vector_count_result.scalar() or 0
                     click.echo(f"  Indexed records: {indexed:,}")
@@ -199,15 +203,21 @@ async def stats() -> None:
                         click.echo(f"  Index coverage: {coverage:.1f}%")
 
                 # Get index sizes for this table
+                # Note: table_name is validated via safe_table_reference above
+                # Extract unquoted table name for pg_stat_user_indexes query
+                from example_service.core.database.validation import validate_identifier
+
+                validated_table = validate_identifier(table_name, identifier_type="table")
                 index_size_result = await conn.execute(
-                    text(f"""
+                    text("""
                         SELECT
                             indexname,
                             pg_size_pretty(pg_relation_size(indexrelid)) as size
                         FROM pg_stat_user_indexes
-                        WHERE relname = '{table_name}'
-                        AND indexname LIKE '%search%' OR indexname LIKE '%trgm%'
-                    """)
+                        WHERE relname = :table_name
+                        AND (indexname LIKE '%search%' OR indexname LIKE '%trgm%')
+                    """),
+                    {"table_name": validated_table},
                 )
                 indexes = index_size_result.fetchall()
 
@@ -289,7 +299,7 @@ async def analyze(days: int, output: str | None) -> None:
     report_lines.append(f"Period: Last {days} days")
     report_lines.append("=" * 60)
 
-    async with async_sessionmaker() as session: # type: ignore
+    async with async_sessionmaker() as session:  # type: ignore
         analytics = SearchAnalytics(session)
 
         # Get statistics
@@ -318,7 +328,7 @@ async def analyze(days: int, output: str | None) -> None:
 
         if stats.top_queries:
             for i, query_data in enumerate(stats.top_queries[:10], 1):
-                line = f"  {i}. \"{query_data['query']}\" ({query_data['count']} searches, avg {query_data['avg_results']:.0f} results)"
+                line = f'  {i}. "{query_data["query"]}" ({query_data["count"]} searches, avg {query_data["avg_results"]:.0f} results)'
                 click.echo(line)
                 report_lines.append(line)
         else:
@@ -332,7 +342,7 @@ async def analyze(days: int, output: str | None) -> None:
         zero_results = await analytics.get_zero_result_queries(days=days, limit=15)
         if zero_results:
             for query_data in zero_results:
-                line = f"  - \"{query_data['query']}\" ({query_data['count']} searches)"
+                line = f'  - "{query_data["query"]}" ({query_data["count"]} searches)'
                 click.echo(line)
                 report_lines.append(line)
         else:
@@ -346,7 +356,7 @@ async def analyze(days: int, output: str | None) -> None:
         slow_queries = await analytics.get_slow_queries(days=days, min_time_ms=500, limit=10)
         if slow_queries:
             for query_data in slow_queries:
-                line = f"  - \"{query_data['query']}\" (avg {query_data['avg_time_ms']:.0f}ms, max {query_data['max_time_ms']}ms)"
+                line = f'  - "{query_data["query"]}" (avg {query_data["avg_time_ms"]:.0f}ms, max {query_data["max_time_ms"]}ms)'
                 click.echo(line)
                 report_lines.append(line)
         else:
@@ -412,7 +422,7 @@ async def test(query: str, entity: str | None, limit: int) -> None:
     from example_service.features.search.service import SEARCHABLE_ENTITIES, SearchService
     from example_service.infra.database.session import async_sessionmaker
 
-    header(f"Testing Search: \"{query}\"")
+    header(f'Testing Search: "{query}"')
 
     # Determine entity type
     if entity and entity not in SEARCHABLE_ENTITIES:
@@ -422,7 +432,7 @@ async def test(query: str, entity: str | None, limit: int) -> None:
 
     entity_types = [entity] if entity else None
 
-    async with async_sessionmaker() as session: # type: ignore
+    async with async_sessionmaker() as session:  # type: ignore
         service = SearchService(session, enable_analytics=False)
 
         # Test with different syntaxes
@@ -443,7 +453,9 @@ async def test(query: str, entity: str | None, limit: int) -> None:
             click.echo(f"  Time: {response.took_ms}ms")
 
             if response.did_you_mean:
-                click.echo(f"  Did you mean: \"{response.did_you_mean.suggested_query}\" ({response.did_you_mean.confidence:.0%} confidence)")
+                click.echo(
+                    f'  Did you mean: "{response.did_you_mean.suggested_query}" ({response.did_you_mean.confidence:.0%} confidence)'
+                )
 
             for result in response.results:
                 if result.hits:
@@ -451,7 +463,9 @@ async def test(query: str, entity: str | None, limit: int) -> None:
                     for hit in result.hits[:limit]:
                         click.echo(f"    - [{hit.rank:.3f}] {hit.title or hit.entity_id}")
                         if hit.snippet:
-                            snippet = hit.snippet[:80] + "..." if len(hit.snippet) > 80 else hit.snippet
+                            snippet = (
+                                hit.snippet[:80] + "..." if len(hit.snippet) > 80 else hit.snippet
+                            )
                             click.echo(f"      {snippet}")
 
     success("\nTest complete!")
@@ -464,11 +478,10 @@ async def triggers() -> None:
 
     Lists all search-related triggers and their status.
     """
-    from sqlalchemy import text
 
     header("Search Triggers Status")
 
-    engine = create_async_engine() # type: ignore
+    engine = create_async_engine()  # type: ignore
 
     async with engine.begin() as conn:
         # Get all search-related triggers

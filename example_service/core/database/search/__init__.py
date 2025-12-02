@@ -132,47 +132,47 @@ from example_service.core.database.search.utils import (
 )
 
 __all__ = [
+    "DEFAULT_PROGRAMMING_SYNONYMS",
     # Types
     "TSVECTOR",
-    # Mixins
-    "SearchableMixin",
-    "MultiLanguageSearchMixin",
+    "BoostedSearchFilter",
+    # Migration utilities
+    "FTSMigrationHelper",
     # Filters
     "FullTextSearchFilter",
-    "WebSearchFilter",
     "FuzzySearchFilter",
-    "PhraseProximityFilter",
-    "BoostedSearchFilter",
     "HybridSearchFilter",
     "MultiFieldSearchFilter",
+    "MultiLanguageSearchMixin",
+    "ParsedQuery",
+    "PhraseProximityFilter",
+    "QueryRewriter",
     # Ranking
     "RankNormalization",
     "RankingOptions",
-    # Parser
-    "SearchQueryParser",
-    "QueryRewriter",
-    "ParsedQuery",
-    "Token",
-    "TokenType",
-    "parse_search_query",
-    # Migration utilities
-    "FTSMigrationHelper",
-    "TrigramMigrationHelper",
-    "UnaccentMigrationHelper",
-    "SearchFieldConfig",
-    "generate_search_vector_sql",
-    "build_ts_query_sql",
     # Analytics
     "SearchAnalytics",
+    "SearchFieldConfig",
     "SearchInsight",
     "SearchQuery",
+    # Parser
+    "SearchQueryParser",
     "SearchStats",
     "SearchSuggestionLog",
+    # Mixins
+    "SearchableMixin",
     # Synonyms
     "SynonymDictionary",
     "SynonymGroup",
-    "DEFAULT_PROGRAMMING_SYNONYMS",
-    "get_default_synonyms",
+    "Token",
+    "TokenType",
+    "TrigramMigrationHelper",
+    "UnaccentMigrationHelper",
+    "WebSearchFilter",
+    "build_ts_query_sql",
     "create_synonym_config_sql",
     "create_synonym_dictionary_sql",
+    "generate_search_vector_sql",
+    "get_default_synonyms",
+    "parse_search_query",
 ]

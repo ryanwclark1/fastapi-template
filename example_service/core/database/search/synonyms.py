@@ -295,7 +295,7 @@ class SynonymDictionary:
         synonyms = cls(name=name)
 
         for canonical, aliases in data.items():
-            synonyms.add_group([canonical] + aliases, canonical=canonical)
+            synonyms.add_group([canonical, *aliases], canonical=canonical)
 
         return synonyms
 
@@ -485,10 +485,10 @@ CREATE TEXT SEARCH DICTIONARY {dict_name} (
 
 
 __all__ = [
-    "SynonymGroup",
-    "SynonymDictionary",
     "DEFAULT_PROGRAMMING_SYNONYMS",
-    "get_default_synonyms",
+    "SynonymDictionary",
+    "SynonymGroup",
     "create_synonym_config_sql",
     "create_synonym_dictionary_sql",
+    "get_default_synonyms",
 ]

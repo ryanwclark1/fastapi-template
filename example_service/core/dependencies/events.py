@@ -94,6 +94,6 @@ EventPublisherDep = Annotated[EventPublisher, Depends(get_event_publisher)]
 
 
 __all__ = [
-    "get_event_publisher",
     "EventPublisherDep",
+    "get_event_publisher",
 ]

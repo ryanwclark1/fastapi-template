@@ -47,4 +47,4 @@ def create_dataloaders(session: AsyncSession) -> DataLoaders:
     )
 
 
-__all__ = ["DataLoaders", "create_dataloaders", "ReminderDataLoader"]
+__all__ = ["DataLoaders", "ReminderDataLoader", "create_dataloaders"]

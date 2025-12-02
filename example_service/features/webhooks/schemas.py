@@ -8,6 +8,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
+from example_service.core.validators import (
+    validate_custom_headers_optional,
+    validate_event_types,
+    validate_event_types_optional,
+)
+
 
 class DeliveryStatus(str, Enum):
     """Webhook delivery status enumeration."""
@@ -38,33 +44,15 @@ class WebhookBase(BaseModel):
 
     @field_validator("event_types")
     @classmethod
-    def validate_event_types(cls, v: list[str]) -> list[str]:
+    def check_event_types(cls, v: list[str]) -> list[str]:
         """Validate event types are non-empty strings."""
-        if not all(event_type.strip() for event_type in v):
-            raise ValueError("Event types cannot be empty strings")
-        return [event_type.strip() for event_type in v]
+        return validate_event_types(v)
 
     @field_validator("custom_headers")
     @classmethod
-    def validate_custom_headers(cls, v: dict[str, str] | None) -> dict[str, str] | None:
+    def check_custom_headers(cls, v: dict[str, str] | None) -> dict[str, str] | None:
         """Validate custom headers don't override system headers."""
-        if v is None:
-            return v
-
-        reserved_headers = {
-            "x-webhook-signature",
-            "x-webhook-timestamp",
-            "x-webhook-event-type",
-            "x-webhook-event-id",
-            "content-type",
-            "user-agent",
-        }
-
-        for header_name in v:
-            if header_name.lower() in reserved_headers:
-                raise ValueError(f"Cannot override reserved header: {header_name}")
-
-        return v
+        return validate_custom_headers_optional(v)
 
 
 class WebhookCreate(WebhookBase):
@@ -93,35 +81,15 @@ class WebhookUpdate(BaseModel):
 
     @field_validator("event_types")
     @classmethod
-    def validate_event_types(cls, v: list[str] | None) -> list[str] | None:
+    def check_event_types(cls, v: list[str] | None) -> list[str] | None:
         """Validate event types are non-empty strings."""
-        if v is None:
-            return v
-        if not all(event_type.strip() for event_type in v):
-            raise ValueError("Event types cannot be empty strings")
-        return [event_type.strip() for event_type in v]
+        return validate_event_types_optional(v)
 
     @field_validator("custom_headers")
     @classmethod
-    def validate_custom_headers(cls, v: dict[str, str] | None) -> dict[str, str] | None:
+    def check_custom_headers(cls, v: dict[str, str] | None) -> dict[str, str] | None:
         """Validate custom headers don't override system headers."""
-        if v is None:
-            return v
-
-        reserved_headers = {
-            "x-webhook-signature",
-            "x-webhook-timestamp",
-            "x-webhook-event-type",
-            "x-webhook-event-id",
-            "content-type",
-            "user-agent",
-        }
-
-        for header_name in v:
-            if header_name.lower() in reserved_headers:
-                raise ValueError(f"Cannot override reserved header: {header_name}")
-
-        return v
+        return validate_custom_headers_optional(v)
 
 
 class WebhookRead(WebhookBase):

@@ -15,6 +15,6 @@ except ImportError:
     __all__: list[str] = []
 else:
     __all__ = [
-        "warm_cache",
         "invalidate_cache_pattern",
+        "warm_cache",
     ]

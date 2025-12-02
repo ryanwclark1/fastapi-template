@@ -1,4 +1,42 @@
-"""API router for the tags feature."""
+"""API router for the tags feature.
+
+This module provides CRUD operations for tags and tag-reminder associations.
+Tags enable flexible categorization and filtering of reminders without
+rigid hierarchical structures.
+
+Endpoints:
+    Tag CRUD:
+        GET    /tags/              - List all tags with optional filtering
+        GET    /tags/{tag_id}      - Get a single tag with reminder count
+        POST   /tags/              - Create a new tag
+        PATCH  /tags/{tag_id}      - Update an existing tag
+        DELETE /tags/{tag_id}      - Delete a tag
+
+    Tag-Reminder Associations:
+        GET    /tags/{tag_id}/reminders           - Get reminders with a specific tag
+        GET    /reminders/{reminder_id}/tags      - Get tags for a reminder
+        PUT    /reminders/{reminder_id}/tags      - Replace all tags on a reminder
+        POST   /reminders/{reminder_id}/tags/add  - Add tags to a reminder
+        POST   /reminders/{reminder_id}/tags/remove - Remove tags from a reminder
+
+Features:
+    - Case-insensitive tag name search
+    - Optional reminder counts per tag
+    - Bulk tag operations (add/remove multiple tags)
+    - Soft delete support (tags are not permanently removed)
+
+Example Usage:
+    # Create a tag
+    POST /tags/
+    {"name": "work", "color": "#FF5733"}
+
+    # Tag a reminder
+    POST /reminders/{id}/tags/add
+    {"tag_ids": ["uuid1", "uuid2"]}
+
+    # Find reminders by tag
+    GET /tags/{tag_id}/reminders
+"""
 
 from __future__ import annotations
 

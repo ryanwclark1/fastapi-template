@@ -34,4 +34,4 @@ def _import_feature_models() -> list[str]:
 
 _IMPORTED_FEATURE_MODELS = _import_feature_models()
 
-__all__ = ["User", "Post"]
+__all__ = ["Post", "User"]

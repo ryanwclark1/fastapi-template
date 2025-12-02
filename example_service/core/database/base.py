@@ -376,18 +376,18 @@ class AuditedBase(Base, IntegerPKMixin, TimestampMixin, AuditColumnsMixin):
 
 
 __all__ = [
+    "NAMING_CONVENTION",
+    "AuditColumnsMixin",
+    "AuditedBase",
     # Core base
     "Base",
-    "NAMING_CONVENTION",
     # Primary key mixins
     "IntegerPKMixin",
-    "UUIDPKMixin",
+    "SoftDeleteMixin",
     # Audit mixins
     "TimestampMixin",
-    "AuditColumnsMixin",
-    "SoftDeleteMixin",
     # Convenience bases
     "TimestampedBase",
+    "UUIDPKMixin",
     "UUIDTimestampedBase",
-    "AuditedBase",
 ]

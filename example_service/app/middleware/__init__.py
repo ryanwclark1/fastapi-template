@@ -79,10 +79,13 @@ __all__ = [
     "CorrelationIDMiddleware",
     "DebugMiddleware",
     "HeaderContextMiddleware",
+    "HeaderTenantStrategy",
     "I18nMiddleware",
+    "JWTClaimTenantStrategy",
     "MetricsMiddleware",
     "NPlusOneDetectionMiddleware",
     "PIIMasker",
+    "PathPrefixTenantStrategy",
     "QueryNormalizer",
     "QueryPattern",
     "RateLimitMiddleware",
@@ -90,20 +93,17 @@ __all__ = [
     "RequestLoggingMiddleware",
     "RequestSizeLimitMiddleware",
     "SecurityHeadersMiddleware",
+    "SubdomainTenantStrategy",
+    "TenantIdentificationStrategy",
     # Tenant middleware
     "TenantMiddleware",
-    "TenantIdentificationStrategy",
-    "HeaderTenantStrategy",
-    "SubdomainTenantStrategy",
-    "JWTClaimTenantStrategy",
-    "PathPrefixTenantStrategy",
-    "get_tenant_context",
-    "set_tenant_context",
     "clear_tenant_context",
-    "require_tenant",
     # Configuration
     "configure_middleware",
     "create_i18n_middleware",
+    "get_tenant_context",
+    "require_tenant",
+    "set_tenant_context",
     "setup_n_plus_one_monitoring",
 ]
 
@@ -282,7 +282,7 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
     app.add_middleware(
         SecurityHeadersMiddleware,
         enable_hsts=not app_settings.debug,  # Disable HSTS in debug mode
-        hsts_max_age=31536000,  # 1 year
+        hsts_max_age=app_settings.hsts_max_age,
         hsts_include_subdomains=True,
         hsts_preload=False,
         enable_csp=True,
@@ -318,7 +318,7 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
             allow_credentials=app_settings.cors_allow_credentials,
             allow_methods=app_settings.cors_allow_methods,
             allow_headers=app_settings.cors_allow_headers,
-            max_age=3600,
+            max_age=app_settings.cors_max_age,
         )
         logger.info(f"CORSMiddleware enabled for development with origins: {cors_origins}")
 

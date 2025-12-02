@@ -30,3 +30,31 @@ repos:
           - sqlalchemy>=2.0.35
           - types-redis
         args: [--ignore-missing-imports]
+
+  # Custom linting hooks for project conventions
+  - repo: local
+    hooks:
+      # Ensure feature routers use AppException instead of HTTPException
+      - id: no-http-exception
+        name: Check for HTTPException in feature routers
+        entry: python tools/linting/no_http_exception.py
+        language: python
+        files: ^example_service/features/.*/router\.py$
+        pass_filenames: true
+
+      # Ensure services follow logging patterns
+      - id: logging-pattern-check
+        name: Check service logging patterns
+        entry: python tools/linting/logging_checks.py
+        language: python
+        files: ^example_service/features/.*/service\.py$
+        pass_filenames: true
+
+      # Check OpenAPI documentation (warnings only, doesn't fail)
+      - id: openapi-docs-check
+        name: Check OpenAPI endpoint documentation
+        entry: python tools/linting/openapi_checks.py
+        language: python
+        files: ^example_service/features/.*/router\.py$
+        pass_filenames: true
+        verbose: true

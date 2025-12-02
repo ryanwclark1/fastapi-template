@@ -116,8 +116,8 @@ class EmailSettings(BaseSettings):
 
     # File Backend Settings (for testing)
     file_path: str = Field(
-        default="/tmp/emails",
-        description="Directory for file backend to write emails",
+        default="/tmp/emails",  # noqa: S108
+        description="Directory for file backend to write emails (development/testing only)",
     )
 
     # Rate Limiting

@@ -348,7 +348,7 @@ async def test_get_download_url_requires_ready_status(
 ) -> None:
     file = await create_file(session, status=FileStatus.PENDING)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"is not ready for download"):
         await file_service.get_download_url(file.id)
 
 

@@ -27,8 +27,15 @@ if TYPE_CHECKING:
 else:
     AioPikaBrokerType = Any
 
-# Re-export task modules for convenient access
-# Import broker/scheduler lazily to avoid hard dependency during test runs
+# Unconditional local imports
+from example_service.tasks.tracking import (
+    TaskExecutionTracker,
+    get_tracker,
+    start_tracker,
+    stop_tracker,
+)
+
+# Conditional imports - broker/scheduler may not be available during test runs
 try:
     from example_service.tasks.broker import broker, get_broker
 except Exception:
@@ -54,11 +61,11 @@ except Exception:
     def get_job_status() -> list[dict[Any, Any]]:
         return []
 
-    def pause_job(job_id: str) -> None:
-        pass
+    def pause_job(job_id: str) -> None:  # noqa: ARG001
+        return None
 
-    def resume_job(job_id: str) -> None:
-        pass
+    def resume_job(job_id: str) -> None:  # noqa: ARG001
+        return None
 
     def setup_scheduled_jobs() -> None:
         return None
@@ -70,28 +77,21 @@ except Exception:
         return None
 
 
-from example_service.tasks.tracking import (
-    TaskExecutionTracker,
-    get_tracker,
-    start_tracker,
-    stop_tracker,
-)
-
 __all__ = [
+    # Tracking
+    "TaskExecutionTracker",
     # Broker
     "broker",
     "get_broker",
+    "get_job_status",
+    "get_tracker",
+    "pause_job",
+    "resume_job",
     # Scheduler
     "scheduler",
     "setup_scheduled_jobs",
     "start_scheduler",
-    "stop_scheduler",
-    "get_job_status",
-    "pause_job",
-    "resume_job",
-    # Tracking
-    "TaskExecutionTracker",
-    "get_tracker",
     "start_tracker",
+    "stop_scheduler",
     "stop_tracker",
 ]

@@ -1,0 +1,9 @@
+{
+    "exclude": [
+        "**/.venv",
+        "**/*.tmpl"
+    ],
+    "ignore": [
+        ".venv"
+    ]
+}

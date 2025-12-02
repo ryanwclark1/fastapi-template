@@ -185,14 +185,14 @@ class FlagEvaluationResponse(BaseModel):
 
 
 __all__ = [
-    "TargetingRule",
     "FeatureFlagCreate",
-    "FeatureFlagUpdate",
-    "FeatureFlagResponse",
     "FeatureFlagListResponse",
+    "FeatureFlagResponse",
+    "FeatureFlagUpdate",
+    "FlagEvaluationRequest",
+    "FlagEvaluationResponse",
+    "FlagEvaluationResult",
     "FlagOverrideCreate",
     "FlagOverrideResponse",
-    "FlagEvaluationRequest",
-    "FlagEvaluationResult",
-    "FlagEvaluationResponse",
+    "TargetingRule",
 ]

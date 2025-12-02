@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from types import ModuleType, SimpleNamespace
 from unittest.mock import MagicMock, call
@@ -46,7 +47,9 @@ except ModuleNotFoundError:  # pragma: no cover - executed in test env without e
 if "example_service.features.graphql.router" not in sys.modules:  # pragma: no cover
     try:
         # Try to import the real router - if this works, no stub needed
-        from example_service.features.graphql.router import router  # noqa: F401
+        importlib.util.find_spec("example_service.features.graphql.router")
+        # Actually import it to verify it works (but don't assign to avoid F401)
+        __import__("example_service.features.graphql.router")
     except (ImportError, ModuleNotFoundError, Exception):
         # Real router can't be imported (missing deps, schema errors, etc.), create minimal stub
         # Only stub the router module, not the entire package

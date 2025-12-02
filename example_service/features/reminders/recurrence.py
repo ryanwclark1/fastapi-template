@@ -385,17 +385,17 @@ YEARLY = "FREQ=YEARLY"  # type: ignore[misc,assignment]
 
 
 __all__ = [
+    "BIWEEKLY",
+    "DAILY",
+    "MONTHLY",
+    "WEEKDAYS",
+    "WEEKLY",
+    "YEARLY",
     "Frequency",
-    "Weekday",
     "RecurrenceRule",
+    "Weekday",
+    "describe_rrule",
     "generate_occurrences",
     "get_next_occurrence",
     "validate_rrule",
-    "describe_rrule",
-    "DAILY",
-    "WEEKDAYS",
-    "WEEKLY",
-    "BIWEEKLY",
-    "MONTHLY",
-    "YEARLY",
 ]

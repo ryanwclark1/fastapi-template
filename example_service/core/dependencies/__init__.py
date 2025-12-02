@@ -44,6 +44,19 @@ Authentication Dependencies:
 from example_service.core.dependencies.database import get_db_session
 from example_service.core.dependencies.events import EventPublisherDep, get_event_publisher
 
+# Re-export pagination dependencies
+from example_service.core.dependencies.pagination import (
+    ExtendedPagination,
+    ExtendedPaginationParams,
+    PaginationParams,
+    SearchPagination,
+    SearchPaginationParams,
+    StandardPagination,
+    get_extended_pagination,
+    get_search_pagination,
+    get_standard_pagination,
+)
+
 # Re-export rate limit dependencies
 from example_service.core.dependencies.ratelimit import (
     RateLimited,
@@ -64,23 +77,33 @@ from example_service.core.dependencies.services import (
 from example_service.infra.cache import get_cache
 
 __all__ = [
+    "EventPublisherDep",
+    "ExtendedPagination",
+    "ExtendedPaginationParams",
+    "HealthService",
+    "HealthServiceDep",
+    "PaginationParams",
+    "RateLimited",
+    "SearchPagination",
+    "SearchPaginationParams",
+    "StandardPagination",
+    "StrictRateLimit",
+    "UserRateLimit",
+    # Cache (infrastructure)
+    "get_cache",
     # Database
     "get_db_session",
     # Events
     "get_event_publisher",
-    "EventPublisherDep",
-    # Cache (infrastructure)
-    "get_cache",
-    # Rate limiting
-    "get_rate_limiter",
-    "rate_limit",
-    "per_user_rate_limit",
-    "per_api_key_rate_limit",
-    "RateLimited",
-    "StrictRateLimit",
-    "UserRateLimit",
+    "get_extended_pagination",
     # Services
     "get_health_service",
-    "HealthService",
-    "HealthServiceDep",
+    # Rate limiting
+    "get_rate_limiter",
+    "get_search_pagination",
+    # Pagination
+    "get_standard_pagination",
+    "per_api_key_rate_limit",
+    "per_user_rate_limit",
+    "rate_limit",
 ]
