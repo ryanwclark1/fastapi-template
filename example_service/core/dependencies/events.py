@@ -25,17 +25,15 @@ The event publisher stages events in the outbox table within the same
 transaction as domain changes. Events are only published after commit.
 """
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 from fastapi import Depends, Request
 
+# NOTE: AsyncSession MUST be imported at runtime for FastAPI to resolve Annotated[..., Depends(...)] metadata
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from example_service.core.dependencies.database import get_db_session
 from example_service.core.events import EventPublisher
-
-if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 def _get_correlation_id(request: Request) -> str | None:
@@ -47,8 +45,8 @@ def _get_correlation_id(request: Request) -> str | None:
 
 
 async def get_event_publisher(
-    session: Annotated[AsyncSession,Depends(get_db_session)],
-    request: Request | None = None,  # FastAPI will inject this automatically
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    request: Request,  # FastAPI will inject this automatically
 ) -> EventPublisher:
     """FastAPI dependency for event publisher.
 
@@ -85,7 +83,7 @@ async def get_event_publisher(
     """
     from example_service.core.events import EventPublisher
 
-    correlation_id = _get_correlation_id(request) if request else None
+    correlation_id = _get_correlation_id(request)
     return EventPublisher(session, correlation_id=correlation_id)
 
 

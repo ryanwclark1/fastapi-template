@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, cast
 
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 
-from example_service.core.database import SearchFilter
+from example_service.core.database import BeforeAfter, LimitOffset, OrderBy, SearchFilter
 from example_service.core.database.repository import BaseRepository, SearchResult
+from example_service.core.database.search import FullTextSearchFilter, WebSearchFilter
 from example_service.features.reminders.models import Reminder
 
 if TYPE_CHECKING:
@@ -346,6 +348,229 @@ class ReminderRepository(BaseRepository[Reminder]):
 
         self._lazy.debug(lambda: f"db.mark_notification_sent({reminder_id}) -> success")
         return reminder
+
+    async def search_sorted(
+        self,
+        session: AsyncSession,
+        *,
+        query: str | None = None,
+        before: datetime | None = None,
+        after: datetime | None = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Sequence[Reminder]:
+        """Search reminders with custom sorting.
+
+        Args:
+            session: Database session
+            query: Search term (searches title and description)
+            before: Filter reminders created before this time
+            after: Filter reminders created after this time
+            sort_by: Field to sort by (created_at, remind_at, updated_at, title)
+            sort_order: Sort direction (asc, desc)
+            limit: Page size
+            offset: Results to skip
+
+        Returns:
+            Sequence of matching reminders with custom sort order
+        """
+        stmt = select(Reminder)
+
+        # Text search
+        if query:
+            stmt = SearchFilter(
+                [Reminder.title, Reminder.description],
+                query,
+                case_insensitive=True,
+            ).apply(stmt)
+
+        # Date range
+        if before or after:
+            stmt = BeforeAfter(Reminder.created_at, before=before, after=after).apply(stmt)
+
+        # Dynamic sorting
+        sort_field = getattr(Reminder, sort_by, Reminder.created_at)
+        # Validate and cast sort_order to literal type
+        if sort_order not in ("asc", "desc"):
+            sort_order = "desc"  # Default to desc if invalid
+        stmt = OrderBy(sort_field, cast("Literal['asc', 'desc']", sort_order)).apply(stmt)
+
+        # Pagination
+        stmt = LimitOffset(limit=limit, offset=offset).apply(stmt)
+
+        result = await session.execute(stmt)
+        items = result.scalars().all()
+
+        self._lazy.debug(
+            lambda: f"db.search_sorted: query={query!r}, sort_by={sort_by}, "
+            f"sort_order={sort_order} -> {len(items)} items"
+        )
+        return items
+
+    async def search_fulltext(
+        self,
+        session: AsyncSession,
+        *,
+        query: str,
+        mode: str = "plain",
+        prefix: bool = False,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[tuple[Reminder, float]]:
+        """Full-text search reminders using PostgreSQL FTS.
+
+        Args:
+            session: Database session
+            query: Search query string
+            mode: Search mode - "plain" (default) or "web" (Google-like syntax)
+            prefix: Enable prefix matching for autocomplete
+            limit: Maximum results
+            offset: Results to skip
+
+        Returns:
+            List of (reminder, relevance_score) tuples, sorted by relevance
+        """
+        if not query.strip():
+            # Empty query returns all reminders with zero relevance
+            stmt = select(Reminder).order_by(Reminder.created_at.desc())
+            stmt = LimitOffset(limit=limit, offset=offset).apply(stmt)
+            result = await session.execute(stmt)
+            reminders = result.scalars().all()
+            return [(r, 0.0) for r in reminders]
+
+        stmt = select(Reminder)
+
+        if mode == "web":
+            # Web-style search with operators: "phrase", -exclude, OR
+            web_filter = WebSearchFilter(
+                Reminder.search_vector,
+                query,
+                config="english",
+                rank_order=True,
+            )
+            stmt = web_filter.apply(stmt)
+            # Add rank column for relevance score
+            ts_query = func.websearch_to_tsquery("english", query)
+            stmt = stmt.add_columns(
+                func.ts_rank(Reminder.search_vector, ts_query).label("search_rank")
+            )
+        else:
+            # Plain text search with optional prefix matching
+            plain_filter = FullTextSearchFilter(
+                Reminder.search_vector,
+                query,
+                config="english",
+                rank_order=True,
+                prefix_match=prefix,
+            )
+            stmt = plain_filter.apply(stmt)
+            stmt = plain_filter.with_rank_column(stmt, "search_rank")
+
+        # Pagination
+        stmt = LimitOffset(limit=limit, offset=offset).apply(stmt)
+
+        result = await session.execute(stmt)
+        rows = result.all()
+
+        # Build results with relevance scores
+        search_results: list[tuple[Reminder, float]] = []
+        for row in rows:
+            reminder = row[0]
+            rank = row.search_rank if hasattr(row, "search_rank") else 0.0
+            search_results.append((reminder, float(rank)))
+
+        self._lazy.debug(
+            lambda: f"db.search_fulltext: query={query!r}, mode={mode}, "
+            f"prefix={prefix} -> {len(search_results)} results"
+        )
+        return search_results
+
+    async def get_with_tags(
+        self,
+        session: AsyncSession,
+        reminder_id: UUID,
+    ) -> Reminder | None:
+        """Get a reminder by ID with tags eager-loaded.
+
+        Args:
+            session: Database session
+            reminder_id: Reminder UUID
+
+        Returns:
+            Reminder with tags loaded, or None if not found
+        """
+        stmt = (
+            select(Reminder).options(selectinload(Reminder.tags)).where(Reminder.id == reminder_id)
+        )
+        result = await session.execute(stmt)
+        reminder = result.scalar_one_or_none()
+
+        self._lazy.debug(
+            lambda: f"db.get_with_tags({reminder_id}) -> {'found' if reminder else 'not found'}"
+        )
+        return reminder
+
+    async def get_with_tags_or_raise(
+        self,
+        session: AsyncSession,
+        reminder_id: UUID,
+    ) -> Reminder:
+        """Get a reminder by ID with tags, raising if not found.
+
+        Args:
+            session: Database session
+            reminder_id: Reminder UUID
+
+        Returns:
+            Reminder with tags loaded
+
+        Raises:
+            NotFoundError: If reminder doesn't exist
+        """
+        from example_service.core.database import NotFoundError
+
+        reminder = await self.get_with_tags(session, reminder_id)
+        if reminder is None:
+            raise NotFoundError("Reminder", {"id": reminder_id})
+        return reminder
+
+    async def find_by_tag_id(
+        self,
+        session: AsyncSession,
+        tag_id: UUID,
+        *,
+        include_completed: bool = True,
+    ) -> Sequence[Reminder]:
+        """Find all reminders with a specific tag.
+
+        Args:
+            session: Database session
+            tag_id: Tag UUID to filter by
+            include_completed: Whether to include completed reminders
+
+        Returns:
+            Sequence of reminders with the specified tag
+        """
+        stmt = (
+            select(Reminder)
+            .join(Reminder.tags)
+            .where(Reminder.tags.any(id=tag_id))
+            .order_by(Reminder.created_at.desc())
+        )
+
+        if not include_completed:
+            stmt = stmt.where(Reminder.is_completed == False)  # noqa: E712
+
+        result = await session.execute(stmt)
+        items = result.scalars().all()
+
+        self._lazy.debug(
+            lambda: f"db.find_by_tag_id({tag_id}, include_completed={include_completed}) "
+            f"-> {len(items)} items"
+        )
+        return items
 
 
 # Factory function for dependency injection

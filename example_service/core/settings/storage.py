@@ -13,6 +13,7 @@ Supports:
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Any
 
 from pydantic import (
@@ -26,6 +27,15 @@ from pydantic import (
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .yaml_sources import create_storage_yaml_source
+
+
+class StorageBackendType(str, Enum):
+    """Supported storage backend types."""
+
+    S3 = "s3"
+    MINIO = "minio"
+    GCS = "gcs"
+    AZURE = "azure"
 
 
 class StorageSettings(BaseSettings):
@@ -47,6 +57,11 @@ class StorageSettings(BaseSettings):
     enabled: bool = Field(
         default=False,
         description="Enable S3-compatible file storage (disabled by default)",
+    )
+
+    backend: StorageBackendType = Field(
+        default=StorageBackendType.S3,
+        description="Storage backend type (s3, minio, gcs, azure)",
     )
 
     # ──────────────────────────────────────────────────────────────
@@ -114,6 +129,44 @@ class StorageSettings(BaseSettings):
     retry_mode: str = Field(
         default="adaptive",
         description="boto3 retry mode: standard, adaptive, or legacy",
+    )
+
+    # ──────────────────────────────────────────────────────────────
+    # ACL and Storage Class Configuration
+    # ──────────────────────────────────────────────────────────────
+
+    default_acl: str | None = Field(
+        default=None,
+        description="Default ACL for uploads (e.g., 'private', 'public-read')",
+    )
+
+    default_storage_class: str | None = Field(
+        default=None,
+        description="Default storage class (e.g., 'STANDARD', 'GLACIER')",
+    )
+
+    # ──────────────────────────────────────────────────────────────
+    # Multi-Tenancy Configuration
+    # ──────────────────────────────────────────────────────────────
+
+    enable_multi_tenancy: bool = Field(
+        default=False,
+        description="Enable per-tenant bucket isolation",
+    )
+
+    bucket_naming_pattern: str = Field(
+        default="{tenant_slug}-uploads",
+        description="Bucket naming pattern for tenants (supports {tenant_uuid} and {tenant_slug})",
+    )
+
+    shared_bucket: str | None = Field(
+        default=None,
+        description="Shared/staging bucket for pre-tenant-assignment data",
+    )
+
+    require_tenant_context: bool = Field(
+        default=False,
+        description="Require tenant context (fail if missing)",
     )
 
     # ──────────────────────────────────────────────────────────────
@@ -359,6 +412,12 @@ class StorageSettings(BaseSettings):
     def max_file_size_bytes(self) -> int:
         """Get max file size in bytes."""
         return self.max_file_size_mb * 1024 * 1024
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def effective_shared_bucket(self) -> str:
+        """Get the effective shared bucket (uses 'bucket' if shared_bucket is None)."""
+        return self.shared_bucket or self.bucket
 
     # ──────────────────────────────────────────────────────────────
     # Helper Methods

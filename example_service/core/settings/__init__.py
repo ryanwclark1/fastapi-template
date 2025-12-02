@@ -29,6 +29,7 @@ Configuration precedence (highest to lowest):
 from __future__ import annotations
 
 from .loader import (
+    get_ai_settings,
     get_app_settings,
     get_auth_settings,
     get_backup_settings,
@@ -53,6 +54,7 @@ __all__ = [
     # Unified settings (convenient for development/testing)
     "Settings",
     # Individual domain loaders (recommended for production)
+    "get_ai_settings",
     "get_app_settings",
     "get_auth_settings",
     "get_backup_settings",

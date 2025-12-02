@@ -12,8 +12,6 @@ Provides Kubernetes-ready health check endpoints for:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from fastapi import APIRouter, Query, Response, status
 
 from example_service.features.health.schemas import (
@@ -33,9 +31,11 @@ from example_service.features.health.schemas import (
 )
 
 # Import dependencies at runtime so FastAPI treats them as Depends()
-
-if TYPE_CHECKING:
-    from example_service.features.health.service import HealthAggregatorDep, HealthServiceDep
+# NOTE: These MUST be outside TYPE_CHECKING for FastAPI to resolve the Annotated[..., Depends(...)] metadata
+from example_service.features.health.service import (  # noqa: TC001
+    HealthAggregatorDep,
+    HealthServiceDep,
+)
 
 router = APIRouter(prefix="/health", tags=["health"])
 

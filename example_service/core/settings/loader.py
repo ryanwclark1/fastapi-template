@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from .ai import AISettings
 from .app import AppSettings
 from .auth import AuthSettings
 from .backup import BackupSettings
@@ -214,6 +215,16 @@ def get_pagination_settings() -> PaginationSettings:
     return PaginationSettings()
 
 
+@lru_cache(maxsize=1)
+def get_ai_settings() -> AISettings:
+    """Get cached AI services settings.
+
+    Returns:
+        Validated and frozen AISettings instance.
+    """
+    return AISettings()
+
+
 def clear_all_caches() -> None:
     """Clear all settings caches.
 
@@ -237,3 +248,4 @@ def clear_all_caches() -> None:
     get_task_settings.cache_clear()
     get_email_settings.cache_clear()
     get_pagination_settings.cache_clear()
+    get_ai_settings.cache_clear()

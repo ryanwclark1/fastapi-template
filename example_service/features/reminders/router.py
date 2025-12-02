@@ -7,17 +7,13 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 
-from example_service.core.database import (
-    BeforeAfter,
-    LimitOffset,
-    NotFoundError,
-    OrderBy,
-    SearchFilter,
-)
-from example_service.core.database.search import FullTextSearchFilter, WebSearchFilter
+# NOTE: These MUST be outside TYPE_CHECKING for FastAPI to resolve Annotated[..., Depends(...)] metadata
+from sqlalchemy.ext.asyncio import AsyncSession  # noqa: TC002
+
 from example_service.core.dependencies.database import get_db_session
+from example_service.core.dependencies.events import EventPublisherDep  # noqa: TC001
 from example_service.core.exceptions import BadRequestException
 from example_service.features.reminders.events import (
     ReminderCompletedEvent,
@@ -48,10 +44,6 @@ from example_service.infra.metrics.tracking import track_feature_usage, track_us
 
 if TYPE_CHECKING:
     from uuid import UUID
-
-    from sqlalchemy.ext.asyncio import AsyncSession
-
-    from example_service.core.dependencies.events import EventPublisherDep
 
 router = APIRouter(prefix="/reminders", tags=["reminders"])
 
@@ -173,6 +165,7 @@ async def list_reminders_paginated(
 )
 async def search_reminders(
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    repo: Annotated[ReminderRepository, Depends(get_reminder_repository)],
     query: str | None = None,
     before: datetime | None = None,
     after: datetime | None = None,
@@ -181,13 +174,11 @@ async def search_reminders(
     sort_by: str = "created_at",
     sort_order: str = "desc",
 ) -> list[ReminderResponse]:
-    """Search reminders using filter utilities.
-
-    Demonstrates the use of SearchFilter, BeforeAfter, OrderBy, and LimitOffset
-    filters working directly with SQLAlchemy statements.
+    """Search reminders using repository pattern.
 
     Args:
         session: Database session
+        repo: Reminder repository
         query: Search term for title/description
         before: Show reminders before this date
         after: Show reminders after this date
@@ -199,37 +190,15 @@ async def search_reminders(
     Returns:
         List of matching reminders
     """
-    stmt = select(Reminder)
-
-    # Text search across title and description using SearchFilter
-    if query:
-        stmt = SearchFilter(
-            fields=[Reminder.title, Reminder.description],
-            value=query,
-            case_insensitive=True,
-        ).apply(stmt)
-
-    # Date range filtering using BeforeAfter
-    if before or after:
-        stmt = BeforeAfter(
-            Reminder.created_at,
-            before=before,
-            after=after,
-        ).apply(stmt)
-
-    # Sorting using OrderBy
-    sort_field = getattr(Reminder, sort_by, Reminder.created_at)
-    stmt = OrderBy(sort_field, sort_order).apply(stmt)  # type: ignore
-
-    # Pagination using LimitOffset
-    stmt = LimitOffset(limit=limit, offset=offset).apply(stmt)
-
-    result = await session.execute(stmt)
-    reminders = result.scalars().all()
-
-    # DEBUG - search context
-    lazy_logger.debug(
-        lambda: f"endpoint.search_reminders: query={query!r}, limit={limit}, offset={offset} -> {len(reminders)} results"
+    reminders = await repo.search_sorted(
+        session,
+        query=query,
+        before=before,
+        after=after,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        limit=limit,
+        offset=offset,
     )
 
     # INFO - empty search results with query (useful for debugging user issues)
@@ -265,6 +234,7 @@ Use `mode=web` for Google-like syntax:
 )
 async def fulltext_search_reminders(
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    repo: Annotated[ReminderRepository, Depends(get_reminder_repository)],
     q: str = "",
     mode: str = "plain",
     prefix: bool = False,
@@ -275,6 +245,7 @@ async def fulltext_search_reminders(
 
     Args:
         session: Database session
+        repo: Reminder repository
         q: Search query string
         mode: Search mode - "plain" (default) or "web" (Google-like syntax)
         prefix: Enable prefix matching for autocomplete (last word matches prefix)
@@ -284,69 +255,23 @@ async def fulltext_search_reminders(
     Returns:
         List of reminders with relevance scores, sorted by relevance
     """
-    if not q.strip():
-        # Empty query returns all reminders
-        stmt = select(Reminder).order_by(Reminder.created_at.desc())
-        stmt = LimitOffset(limit=limit, offset=offset).apply(stmt)
-        result = await session.execute(stmt)
-        reminders = result.scalars().all()
-        return [
-            ReminderSearchResult(
-                **ReminderResponse.from_model(r).model_dump(),
-                relevance=0.0,
-            )
-            for r in reminders
-        ]
-
-    # Build the search filter based on mode
-    stmt = select(Reminder)
-
-    if mode == "web":
-        # Web-style search with operators: "phrase", -exclude, OR
-        web_filter = WebSearchFilter(
-            Reminder.search_vector,
-            q,
-            config="english",
-            rank_order=True,
-        )
-        stmt = web_filter.apply(stmt)
-        # Add rank column for relevance score (web filter does not expose helper)
-        ts_query = func.websearch_to_tsquery("english", q)
-        stmt = stmt.add_columns(func.ts_rank(Reminder.search_vector, ts_query).label("search_rank"))
-    else:
-        # Plain text search with optional prefix matching
-        plain_filter = FullTextSearchFilter(
-            Reminder.search_vector,
-            q,
-            config="english",
-            rank_order=True,
-            prefix_match=prefix,
-        )
-        stmt = plain_filter.apply(stmt)
-        stmt = plain_filter.with_rank_column(stmt, "search_rank")
-
-    # Apply pagination
-    stmt = LimitOffset(limit=limit, offset=offset).apply(stmt)
-
-    result = await session.execute(stmt)
-    rows = result.all()
+    results = await repo.search_fulltext(
+        session,
+        query=q,
+        mode=mode,
+        prefix=prefix,
+        limit=limit,
+        offset=offset,
+    )
 
     # Build response with relevance scores
-    search_results = []
-    for row in rows:
-        reminder = row[0]  # First element is the Reminder object
-        rank = row.search_rank if hasattr(row, "search_rank") else 0.0
-        search_results.append(
-            ReminderSearchResult(
-                **ReminderResponse.from_model(reminder).model_dump(),
-                relevance=float(rank),
-            )
+    search_results = [
+        ReminderSearchResult(
+            **ReminderResponse.from_model(reminder).model_dump(),
+            relevance=rank,
         )
-
-    # Log search metrics
-    lazy_logger.debug(
-        lambda: f"endpoint.fulltext_search: q={q!r}, mode={mode}, prefix={prefix} -> {len(search_results)} results"
-    )
+        for reminder, rank in results
+    ]
 
     if q and len(search_results) == 0:
         logger.info(
@@ -482,14 +407,11 @@ async def update_reminder(
     reminder_id: UUID,
     payload: ReminderUpdate,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    repo: Annotated[ReminderRepository, Depends(get_reminder_repository)],
     publisher: EventPublisherDep,
 ) -> ReminderResponse:
     """Update an existing reminder."""
-    result = await session.execute(select(Reminder).where(Reminder.id == reminder_id))
-    reminder = result.scalar_one_or_none()
-
-    if reminder is None:
-        raise NotFoundError("Reminder", {"id": reminder_id})
+    reminder = await repo.get_or_raise(session, reminder_id)
 
     # Track business metrics
     track_user_action("update", is_authenticated=False)
@@ -556,14 +478,11 @@ async def update_reminder(
 async def complete_reminder(
     reminder_id: UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    repo: Annotated[ReminderRepository, Depends(get_reminder_repository)],
     publisher: EventPublisherDep,
 ) -> ReminderResponse:
     """Mark a reminder as completed."""
-    result = await session.execute(select(Reminder).where(Reminder.id == reminder_id))
-    reminder = result.scalar_one_or_none()
-
-    if reminder is None:
-        raise NotFoundError("Reminder", {"id": reminder_id})
+    reminder = await repo.get_or_raise(session, reminder_id)
 
     # Track business metrics (completion is a significant action)
     track_user_action("complete", is_authenticated=False)
@@ -594,14 +513,11 @@ async def complete_reminder(
 async def delete_reminder(
     reminder_id: UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    repo: Annotated[ReminderRepository, Depends(get_reminder_repository)],
     publisher: EventPublisherDep,
 ) -> None:
     """Delete a reminder permanently."""
-    result = await session.execute(select(Reminder).where(Reminder.id == reminder_id))
-    reminder = result.scalar_one_or_none()
-
-    if reminder is None:
-        raise NotFoundError("Reminder", {"id": reminder_id})
+    reminder = await repo.get_or_raise(session, reminder_id)
 
     # Track business metrics
     track_user_action("delete", is_authenticated=False)

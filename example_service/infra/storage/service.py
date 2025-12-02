@@ -5,7 +5,8 @@ This module provides the main interface for storage operations with:
 - Automatic OpenTelemetry spans and Prometheus metrics
 - Proper lifecycle management (startup/shutdown)
 - Health check integration
-- All operations from StorageClient with added instrumentation
+- Protocol-based backend abstraction (S3, GCS, Azure, etc.)
+- Multi-tenant bucket isolation support
 """
 
 from __future__ import annotations
@@ -14,15 +15,17 @@ import logging
 from typing import TYPE_CHECKING, Any, BinaryIO
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
 
     from example_service.core.settings.storage import StorageSettings
 
 from example_service.core.settings import get_storage_settings
 
-from .client import StorageClient
+from .backends.factory import create_storage_backend
 from .exceptions import StorageNotConfiguredError
 from .instrumentation import track_storage_operation
+
+if TYPE_CHECKING:
+    from .backends.protocol import StorageBackend, TenantContext
 
 logger = logging.getLogger(__name__)
 
@@ -58,13 +61,13 @@ class StorageService:
                      loads from environment via get_storage_settings()
         """
         self._settings = settings or get_storage_settings()
-        self._client: StorageClient | None = None
+        self._backend: StorageBackend | None = None
         self._initialized = False
 
     @property
     def is_ready(self) -> bool:
         """Check if the service is initialized and ready for operations."""
-        return self._initialized and self._client is not None and self._client.is_ready
+        return self._initialized and self._backend is not None and self._backend.is_ready
 
     @property
     def settings(self) -> StorageSettings:
@@ -91,11 +94,14 @@ class StorageService:
             extra={
                 "bucket": self._settings.bucket,
                 "endpoint": self._settings.endpoint,
+                "backend": self._settings.backend.value,
             },
         )
 
-        self._client = StorageClient(self._settings)
-        await self._client.startup()
+        # Create backend using factory
+        self._backend = create_storage_backend(self._settings)
+        await self._backend.startup()
+
         self._initialized = True
 
         # Register health provider if enabled
@@ -110,12 +116,16 @@ class StorageService:
         Called during application lifespan shutdown.
         Closes connections and cleans up resources.
         """
-        if not self._initialized or self._client is None:
+        if not self._initialized:
             logger.debug("Storage service not initialized, nothing to shutdown")
             return
 
         logger.info("Shutting down storage service")
-        await self._client.shutdown()
+
+        # Shutdown backend
+        if self._backend is not None:
+            await self._backend.shutdown()
+
         self._initialized = False
         logger.info("Storage service shutdown complete")
 
@@ -125,9 +135,9 @@ class StorageService:
         Returns:
             True if healthy, False otherwise
         """
-        if not self.is_ready or self._client is None:
+        if not self.is_ready or self._backend is None:
             return False
-        return await self._client.health_check()
+        return await self._backend.health_check()
 
     def _register_health_provider(self) -> None:
         """Register health provider with the health aggregator."""
@@ -146,18 +156,54 @@ class StorageService:
                 extra={"error": str(e)},
             )
 
-    def _ensure_ready(self) -> StorageClient:
-        """Ensure the service is ready and return the client.
+    def _ensure_ready(self) -> StorageBackend:
+        """Ensure the service is ready and return the backend.
 
         Raises:
             StorageNotConfiguredError: If service is not ready
         """
-        if not self.is_ready or self._client is None:
+        if not self.is_ready or self._backend is None:
             raise StorageNotConfiguredError(
                 message="Storage service is not initialized",
                 metadata={"is_configured": self._settings.is_configured},
             )
-        return self._client
+        return self._backend
+
+    def _resolve_bucket(
+        self,
+        tenant_context: TenantContext | None,
+        bucket: str | None = None,
+    ) -> str:
+        """Resolve bucket name based on tenant context.
+
+        Args:
+            tenant_context: Optional tenant context
+            bucket: Explicit bucket override
+
+        Returns:
+            Resolved bucket name
+        """
+        if bucket:
+            return bucket  # Explicit override
+
+        if self._settings.enable_multi_tenancy and tenant_context:
+            # Use tenant bucket
+            return self._settings.bucket_naming_pattern.format(
+                tenant_uuid=tenant_context.tenant_uuid,
+                tenant_slug=tenant_context.tenant_slug,
+            )
+
+        if self._settings.require_tenant_context and not tenant_context:
+            from .exceptions import StorageError
+
+            raise StorageError(
+                message="Tenant context required but not provided",
+                code="TENANT_CONTEXT_REQUIRED",
+                status_code=400,
+            )
+
+        # Fallback to shared/default bucket
+        return self._settings.effective_shared_bucket
 
     # ========== File Operations with Instrumentation ==========
 
@@ -168,6 +214,9 @@ class StorageService:
         content_type: str | None = None,
         metadata: dict[str, str] | None = None,
         bucket: str | None = None,
+        acl: str | None = None,
+        storage_class: str | None = None,
+        tenant_context: TenantContext | None = None,
     ) -> dict[str, Any]:
         """Upload a file with automatic instrumentation.
 
@@ -177,21 +226,50 @@ class StorageService:
             content_type: MIME content type
             metadata: Custom metadata
             bucket: Optional bucket override
+            acl: Access Control List (e.g., 'private', 'public-read')
+            storage_class: Storage class (e.g., 'STANDARD', 'GLACIER')
+            tenant_context: Optional tenant context for multi-tenant storage
 
         Returns:
-            Upload result dict with key, bucket, etag, size_bytes, checksum
+            Upload result dict with key, bucket, etag, size_bytes, checksum, version_id
         """
-        client = self._ensure_ready()
+        backend = self._ensure_ready()
+
+        # Resolve bucket based on tenant context
+        resolved_bucket = self._resolve_bucket(tenant_context, bucket)
+
+        # Apply defaults from settings
+        acl = acl or self._settings.default_acl
+        storage_class = storage_class or self._settings.default_storage_class
 
         async with track_storage_operation(
             "upload",
             key=key,
-            bucket=bucket or self._settings.bucket,
+            bucket=resolved_bucket,
             content_type=content_type,
         ) as ctx:
-            result = await client.upload_file(file_obj, key, content_type, metadata, bucket)
-            ctx["result_size"] = result.get("size_bytes")
-            ctx["checksum"] = result.get("checksum_sha256")
+            upload_result = await backend.upload_object(
+                key=key,
+                data=file_obj,
+                bucket=resolved_bucket,
+                content_type=content_type,
+                metadata=metadata,
+                acl=acl,
+                storage_class=storage_class,
+            )
+
+            # Convert UploadResult to dict for backward compatibility
+            result = {
+                "key": upload_result.key,
+                "bucket": upload_result.bucket,
+                "etag": upload_result.etag,
+                "size_bytes": upload_result.size_bytes,
+                "checksum_sha256": upload_result.checksum_sha256,
+                "version_id": upload_result.version_id,
+            }
+
+            ctx["result_size"] = result["size_bytes"]
+            ctx["checksum"] = result["checksum_sha256"]
             return result
 
     async def download_file(
@@ -208,14 +286,14 @@ class StorageService:
         Returns:
             File contents as bytes
         """
-        client = self._ensure_ready()
+        backend = self._ensure_ready()
 
         async with track_storage_operation(
             "download",
             key=key,
             bucket=bucket or self._settings.bucket,
         ) as ctx:
-            data = await client.download_file(key, bucket)
+            data = await backend.download_object(key, bucket)
             ctx["result_size"] = len(data)
             return data
 
@@ -233,14 +311,14 @@ class StorageService:
         Returns:
             True if deleted successfully
         """
-        client = self._ensure_ready()
+        backend = self._ensure_ready()
 
         async with track_storage_operation(
             "delete",
             key=key,
             bucket=bucket or self._settings.bucket,
         ):
-            return await client.delete_file(key, bucket)
+            return await backend.delete_object(key, bucket)
 
     async def file_exists(
         self,
@@ -256,8 +334,8 @@ class StorageService:
         Returns:
             True if file exists
         """
-        client = self._ensure_ready()
-        return await client.file_exists(key, bucket)
+        backend = self._ensure_ready()
+        return await backend.object_exists(key, bucket)
 
     async def get_file_info(
         self,
@@ -273,8 +351,21 @@ class StorageService:
         Returns:
             File info dict or None if not found
         """
-        client = self._ensure_ready()
-        return await client.get_file_info(key, bucket)
+        backend = self._ensure_ready()
+        metadata = await backend.get_object_metadata(key, bucket)
+        if metadata is None:
+            return None
+        # Convert ObjectMetadata to dict for backward compatibility
+        return {
+            "key": metadata.key,
+            "size_bytes": metadata.size_bytes,
+            "content_type": metadata.content_type,
+            "last_modified": metadata.last_modified,
+            "etag": metadata.etag,
+            "storage_class": metadata.storage_class,
+            "metadata": metadata.custom_metadata,
+            "acl": metadata.acl,
+        }
 
     async def get_presigned_url(
         self,
@@ -292,13 +383,15 @@ class StorageService:
         Returns:
             Presigned URL string
         """
-        client = self._ensure_ready()
+        backend = self._ensure_ready()
 
         from .metrics import storage_presigned_urls_generated
 
         storage_presigned_urls_generated.labels(type="download").inc()
 
-        return await client.get_presigned_url(key, expires_in, bucket)
+        return await backend.generate_presigned_download_url(
+            key, bucket, expires_in or self._settings.presigned_url_expiry_seconds
+        )
 
     async def generate_presigned_upload(
         self,
@@ -318,13 +411,15 @@ class StorageService:
         Returns:
             Dict with url and fields for POST upload
         """
-        client = self._ensure_ready()
+        backend = self._ensure_ready()
 
         from .metrics import storage_presigned_urls_generated
 
         storage_presigned_urls_generated.labels(type="upload").inc()
 
-        return await client.generate_presigned_upload(key, content_type, expires_in, bucket)
+        return await backend.generate_presigned_upload_url(
+            key, bucket, content_type, expires_in or self._settings.presigned_url_expiry_seconds
+        )
 
     async def copy_file(
         self,
@@ -344,7 +439,7 @@ class StorageService:
         Returns:
             True if copied successfully
         """
-        client = self._ensure_ready()
+        backend = self._ensure_ready()
 
         async with track_storage_operation(
             "copy",
@@ -352,7 +447,7 @@ class StorageService:
             bucket=source_bucket or self._settings.bucket,
             metadata={"dest_key": dest_key},
         ):
-            return await client.copy_file(source_key, dest_key, source_bucket, dest_bucket)
+            return await backend.copy_object(source_key, dest_key, source_bucket, dest_bucket)
 
     async def move_file(
         self,
@@ -372,7 +467,7 @@ class StorageService:
         Returns:
             True if moved successfully
         """
-        client = self._ensure_ready()
+        backend = self._ensure_ready()
 
         async with track_storage_operation(
             "move",
@@ -380,7 +475,7 @@ class StorageService:
             bucket=source_bucket or self._settings.bucket,
             metadata={"dest_key": dest_key},
         ):
-            return await client.move_file(source_key, dest_key, source_bucket, dest_bucket)
+            return await backend.move_object(source_key, dest_key, source_bucket, dest_bucket)
 
     async def list_files(
         self,
@@ -398,183 +493,142 @@ class StorageService:
         Returns:
             List of file info dicts
         """
-        client = self._ensure_ready()
+        backend = self._ensure_ready()
 
         async with track_storage_operation(
             "list",
             bucket=self._settings.bucket,
             metadata={"prefix": prefix, "max_keys": max_keys},
         ) as ctx:
-            files = await client.list_files(prefix, pattern, max_keys)
+            objects, _ = await backend.list_objects(prefix=prefix, max_keys=max_keys)
+
+            # Convert ObjectMetadata to dict for backward compatibility
+            files = [
+                {
+                    "key": obj.key,
+                    "size_bytes": obj.size_bytes,
+                    "content_type": obj.content_type,
+                    "last_modified": obj.last_modified,
+                    "etag": obj.etag,
+                    "storage_class": obj.storage_class,
+                    "metadata": obj.custom_metadata,
+                    "acl": obj.acl,
+                }
+                for obj in objects
+            ]
+
+            # Apply pattern matching if specified
+            if pattern:
+                import fnmatch
+
+                files = [f for f in files if fnmatch.fnmatch(str(f["key"]), pattern)]
+
             ctx["result_count"] = len(files)
             return files
 
-    # ========== Batch Operations ==========
+    # ========== Bucket Management ==========
 
-    async def upload_files(
+    async def create_bucket(
         self,
-        files: list[tuple[str, BinaryIO | bytes, str]],
-        max_concurrency: int = 5,
-        on_progress: Callable[[str, bool, str | None], None] | None = None,
-    ) -> list[dict[str, Any]]:
-        """Upload multiple files with instrumentation.
+        bucket: str,
+        region: str | None = None,
+        acl: str | None = None,
+    ) -> bool:
+        """Create a new storage bucket."""
+        backend = self._ensure_ready()
 
-        Args:
-            files: List of (key, file_obj_or_bytes, content_type) tuples
-            max_concurrency: Max concurrent uploads
-            on_progress: Optional progress callback
-
-        Returns:
-            List of upload results
-        """
-        client = self._ensure_ready()
-
-        from opentelemetry.trace import Status, StatusCode
-
-        from .instrumentation import create_storage_span
-        from .metrics import record_batch_operation
-
-        span = create_storage_span(
-            "batch_upload",
-            bucket=self._settings.bucket,
-            batch_size=len(files),
-        )
-
-        try:
-            results = await client.upload_files(files, max_concurrency, on_progress)
-
-            # Calculate success/failure counts
-            success_count = sum(1 for r in results if r.get("success", False))
-            failure_count = len(results) - success_count
-
-            record_batch_operation(
-                operation="batch_upload",
-                total_count=len(files),
-                success_count=success_count,
-                failure_count=failure_count,
+        async with track_storage_operation(
+            "create_bucket",
+            bucket=bucket,
+        ):
+            return await backend.create_bucket(
+                bucket=bucket,
+                region=region or self._settings.region,
+                acl=acl,
             )
 
-            span.set_attribute("batch.success_count", success_count)
-            span.set_attribute("batch.failure_count", failure_count)
-            span.set_status(Status(StatusCode.OK))
-
-            return results
-
-        except Exception as e:
-            span.record_exception(e)
-            span.set_status(Status(StatusCode.ERROR, str(e)))
-            raise
-        finally:
-            span.end()
-
-    async def download_files(
+    async def delete_bucket(
         self,
-        keys: list[str],
-        max_concurrency: int = 5,
-        on_progress: Callable[[str, bool, str | None], None] | None = None,
-    ) -> list[dict[str, Any]]:
-        """Download multiple files with instrumentation.
+        bucket: str,
+        force: bool = False,
+    ) -> bool:
+        """Delete a storage bucket."""
+        backend = self._ensure_ready()
 
-        Args:
-            keys: List of object keys to download
-            max_concurrency: Max concurrent downloads
-            on_progress: Optional progress callback
+        async with track_storage_operation(
+            "delete_bucket",
+            bucket=bucket,
+        ):
+            return await backend.delete_bucket(bucket=bucket, force=force)
 
-        Returns:
-            List of download results
-        """
-        client = self._ensure_ready()
+    async def list_buckets(self) -> list[dict[str, Any]]:
+        """List all accessible storage buckets."""
+        backend = self._ensure_ready()
 
-        from opentelemetry.trace import Status, StatusCode
+        async with track_storage_operation(
+            "list_buckets",
+        ):
+            buckets = await backend.list_buckets()
 
-        from .instrumentation import create_storage_span
-        from .metrics import record_batch_operation
+            # Convert BucketInfo to dict for consistency
+            return [
+                {
+                    "name": b.name,
+                    "region": b.region,
+                    "creation_date": b.creation_date,
+                    "versioning_enabled": b.versioning_enabled,
+                }
+                for b in buckets
+            ]
 
-        span = create_storage_span(
-            "batch_download",
-            bucket=self._settings.bucket,
-            batch_size=len(keys),
-        )
+    async def bucket_exists(self, bucket: str) -> bool:
+        """Check if a bucket exists."""
+        backend = self._ensure_ready()
+        return await backend.bucket_exists(bucket)
 
-        try:
-            results = await client.download_files(keys, max_concurrency, on_progress)
+    # ========== ACL Management ==========
 
-            success_count = sum(1 for r in results if r.get("success", False))
-            failure_count = len(results) - success_count
+    async def set_object_acl(
+        self,
+        key: str,
+        acl: str,
+        bucket: str | None = None,
+        tenant_context: TenantContext | None = None,
+    ) -> bool:
+        """Set ACL on an object."""
+        backend = self._ensure_ready()
+        resolved_bucket = self._resolve_bucket(tenant_context, bucket)
 
-            record_batch_operation(
-                operation="batch_download",
-                total_count=len(keys),
-                success_count=success_count,
-                failure_count=failure_count,
+        async with track_storage_operation(
+            "set_acl",
+            key=key,
+            bucket=resolved_bucket,
+        ):
+            return await backend.set_object_acl(
+                key=key,
+                acl=acl,
+                bucket=resolved_bucket,
             )
 
-            span.set_attribute("batch.success_count", success_count)
-            span.set_attribute("batch.failure_count", failure_count)
-            span.set_status(Status(StatusCode.OK))
-
-            return results
-
-        except Exception as e:
-            span.record_exception(e)
-            span.set_status(Status(StatusCode.ERROR, str(e)))
-            raise
-        finally:
-            span.end()
-
-    async def delete_files(
+    async def get_object_acl(
         self,
-        keys: list[str],
-        dry_run: bool = True,
-        max_concurrency: int = 10,
+        key: str,
+        bucket: str | None = None,
+        tenant_context: TenantContext | None = None,
     ) -> dict[str, Any]:
-        """Delete multiple files with instrumentation.
+        """Get ACL of an object."""
+        backend = self._ensure_ready()
+        resolved_bucket = self._resolve_bucket(tenant_context, bucket)
 
-        Args:
-            keys: List of object keys to delete
-            dry_run: If True, only simulates deletion
-            max_concurrency: Max concurrent deletes
-
-        Returns:
-            Result dict with deleted/failed counts
-        """
-        client = self._ensure_ready()
-
-        from opentelemetry.trace import Status, StatusCode
-
-        from .instrumentation import create_storage_span
-        from .metrics import record_batch_operation
-
-        span = create_storage_span(
-            "batch_delete",
-            bucket=self._settings.bucket,
-            batch_size=len(keys),
-            dry_run=dry_run,
-        )
-
-        try:
-            result = await client.delete_files(keys, dry_run, max_concurrency)
-
-            if not dry_run:
-                record_batch_operation(
-                    operation="batch_delete",
-                    total_count=result.get("total", len(keys)),
-                    success_count=len(result.get("deleted", [])),
-                    failure_count=len(result.get("failed", [])),
-                )
-
-            span.set_attribute("batch.deleted_count", len(result.get("deleted", [])))
-            span.set_attribute("batch.failed_count", len(result.get("failed", [])))
-            span.set_status(Status(StatusCode.OK))
-
-            return result
-
-        except Exception as e:
-            span.record_exception(e)
-            span.set_status(Status(StatusCode.ERROR, str(e)))
-            raise
-        finally:
-            span.end()
+        async with track_storage_operation(
+            "get_acl",
+            key=key,
+            bucket=resolved_bucket,
+        ):
+            return await backend.get_object_acl(
+                key=key,
+                bucket=resolved_bucket,
+            )
 
 
 # ========== Singleton Management ==========

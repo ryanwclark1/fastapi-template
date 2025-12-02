@@ -34,10 +34,19 @@ repos:
   # Custom linting hooks for project conventions
   - repo: local
     hooks:
-      # Ensure feature routers use AppException instead of HTTPException
+      # Ensure all production code uses AppException instead of HTTPException
       - id: no-http-exception
-        name: Check for HTTPException in feature routers
+        name: Check for HTTPException in production code
         entry: python tools/linting/no_http_exception.py
+        language: python
+        files: ^example_service/.*\.py$
+        exclude: ^example_service/.*__init__\.py$
+        pass_filenames: true
+
+      # Ensure routers don't have direct database operations
+      - id: no-db-in-router
+        name: Check for direct DB operations in routers
+        entry: python tools/linting/no_db_in_router.py
         language: python
         files: ^example_service/features/.*/router\.py$
         pass_filenames: true
