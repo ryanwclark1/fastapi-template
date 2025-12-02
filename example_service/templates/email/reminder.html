@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block header_title %}Reminder{% endblock %}
+
+{% block content %}
+<h2>{{ greeting | default('Hello') }}{% if user_name %}, {{ user_name }}{% endif %}!</h2>
+
+<p>This is a reminder about:</p>
+
+<div style="background-color: #f3f4f6; padding: 16px; border-radius: 6px; margin: 16px 0;">
+    <h3 style="margin: 0 0 8px 0; color: #1f2937;">{{ title }}</h3>
+    {% if description %}
+    <p style="margin: 0; color: #4b5563;">{{ description }}</p>
+    {% endif %}
+</div>
+
+{% if due_date %}
+<p><strong>Due:</strong> {{ due_date }}</p>
+{% endif %}
+
+{% if action_url %}
+<div class="text-center">
+    <a href="{{ action_url }}" class="button">{{ action_text | default('View Reminder') }}</a>
+</div>
+{% endif %}
+
+<hr class="divider">
+
+<p class="text-muted">
+    You're receiving this because you have notifications enabled for reminders.
+</p>
+{% endblock %}

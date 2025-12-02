@@ -11,11 +11,15 @@ from example_service.core.settings import (
     get_websocket_settings,
 )
 from example_service.features.admin.router import router as admin_router
+from example_service.features.audit.router import router as audit_router
+from example_service.features.datatransfer.router import router as datatransfer_router
+from example_service.features.featureflags.router import router as featureflags_router
 from example_service.features.files.router import router as files_router
 from example_service.features.health.router import router as health_router
 from example_service.features.metrics.router import router as metrics_router
 from example_service.features.realtime.router import router as realtime_router
 from example_service.features.reminders.router import router as reminders_router
+from example_service.features.search.router import router as search_router
 from example_service.features.tags.router import reminder_tags_router
 from example_service.features.tags.router import router as tags_router
 from example_service.features.tasks.router import router as tasks_router
@@ -49,6 +53,10 @@ def setup_routers(app: FastAPI) -> None:
     app.include_router(files_router, prefix=api_prefix, tags=["files"])
     app.include_router(webhooks_router, prefix=api_prefix, tags=["webhooks"])
     app.include_router(tasks_router, prefix=api_prefix, tags=["tasks"])
+    app.include_router(audit_router, prefix=api_prefix, tags=["audit"])
+    app.include_router(datatransfer_router, prefix=api_prefix, tags=["data-transfer"])
+    app.include_router(featureflags_router, prefix=api_prefix, tags=["feature-flags"])
+    app.include_router(search_router, prefix=api_prefix, tags=["search"])
 
     # Include GraphQL endpoint if enabled (follows same pattern as /docs, /redoc, /asyncapi)
     graphql_settings = get_graphql_settings()

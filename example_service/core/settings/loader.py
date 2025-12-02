@@ -29,6 +29,7 @@ from .app import AppSettings
 from .auth import AuthSettings
 from .backup import BackupSettings
 from .consul import ConsulSettings
+from .email import EmailSettings
 from .graphql import GraphQLSettings
 from .health import HealthCheckSettings
 from .i18n import I18nSettings
@@ -192,6 +193,16 @@ def get_task_settings() -> TaskSettings:
     return TaskSettings()
 
 
+@lru_cache(maxsize=1)
+def get_email_settings() -> EmailSettings:
+    """Get cached email settings.
+
+    Returns:
+        Validated and frozen EmailSettings instance.
+    """
+    return EmailSettings()
+
+
 def clear_all_caches() -> None:
     """Clear all settings caches.
 
@@ -213,3 +224,4 @@ def clear_all_caches() -> None:
     get_i18n_settings.cache_clear()
     get_health_settings.cache_clear()
     get_task_settings.cache_clear()
+    get_email_settings.cache_clear()
