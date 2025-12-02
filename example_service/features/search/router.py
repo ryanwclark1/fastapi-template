@@ -14,12 +14,17 @@ from example_service.core.dependencies.auth import get_current_user
 from example_service.core.dependencies.database import get_session
 
 from .schemas import (
+    RecordClickRequest,
+    SearchAnalyticsRequest,
+    SearchAnalyticsResponse,
     SearchCapabilitiesResponse,
     SearchRequest,
     SearchResponse,
     SearchSuggestionRequest,
     SearchSuggestionsResponse,
     SearchSyntax,
+    SearchTrendsResponse,
+    ZeroResultsResponse,
 )
 from .service import SearchService
 
@@ -157,3 +162,127 @@ async def get_suggestions(
     )
 
     return await service.suggest(request)
+
+
+# ──────────────────────────────────────────────────────────────
+# Analytics Endpoints
+# ──────────────────────────────────────────────────────────────
+
+
+@router.get(
+    "/analytics",
+    response_model=SearchAnalyticsResponse,
+    summary="Get search analytics",
+    description="Get search statistics and insights for monitoring search quality.",
+)
+async def get_search_analytics(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    _user: Annotated[dict, Depends(get_current_user)],
+    days: Annotated[int, Query(ge=1, le=365, description="Number of days to analyze")] = 30,
+) -> SearchAnalyticsResponse:
+    """Get search analytics and statistics.
+
+    Returns metrics including:
+    - Total and unique search counts
+    - Zero-result rate
+    - Average response time
+    - Click-through rate
+    - Popular queries
+    - Queries with no results (content gaps)
+
+    Args:
+        days: Number of days to analyze (default: 30).
+
+    Returns:
+        Analytics summary with actionable insights.
+    """
+    service = SearchService(session)
+    return await service.get_analytics(
+        SearchAnalyticsRequest(days=days)
+    )
+
+
+@router.get(
+    "/analytics/trends",
+    response_model=SearchTrendsResponse,
+    summary="Get search trends",
+    description="View search volume and patterns over time.",
+)
+async def get_search_trends(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    _user: Annotated[dict, Depends(get_current_user)],
+    days: Annotated[int, Query(ge=1, le=365, description="Number of days")] = 30,
+    interval: Annotated[str, Query(description="Grouping interval", regex="^(hour|day|week)$")] = "day",
+) -> SearchTrendsResponse:
+    """Get search volume trends over time.
+
+    Shows search activity patterns grouped by time interval.
+
+    Args:
+        days: Number of days to analyze.
+        interval: Time grouping ("hour", "day", or "week").
+
+    Returns:
+        Time series data of search activity.
+    """
+    service = SearchService(session)
+    return await service.get_trends(days=days, interval=interval)
+
+
+@router.get(
+    "/analytics/zero-results",
+    response_model=ZeroResultsResponse,
+    summary="Find content gaps",
+    description="Get queries that returned no results to identify content gaps.",
+)
+async def get_zero_result_queries(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    _user: Annotated[dict, Depends(get_current_user)],
+    days: Annotated[int, Query(ge=1, le=365, description="Number of days")] = 7,
+    limit: Annotated[int, Query(ge=1, le=100, description="Max results")] = 20,
+) -> ZeroResultsResponse:
+    """Get queries that returned no results.
+
+    These represent potential content gaps or opportunities for:
+    - Adding missing content
+    - Improving search synonyms
+    - Adding spelling corrections
+
+    Args:
+        days: Number of days to analyze.
+        limit: Maximum number of queries to return.
+
+    Returns:
+        List of zero-result queries with occurrence counts.
+    """
+    service = SearchService(session)
+    return await service.get_zero_result_queries(days=days, limit=limit)
+
+
+@router.post(
+    "/analytics/click",
+    summary="Record search result click",
+    description="Track when a user clicks on a search result for CTR analytics.",
+)
+async def record_click(
+    request: RecordClickRequest,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    _user: Annotated[dict, Depends(get_current_user)],
+) -> dict[str, bool]:
+    """Record a click on a search result.
+
+    Used for calculating click-through rate and improving rankings.
+
+    Args:
+        request: Click information including search ID and position.
+
+    Returns:
+        Success indicator.
+    """
+    service = SearchService(session)
+    await service.record_click(
+        search_id=request.search_id,
+        clicked_position=request.clicked_position,
+        clicked_entity_id=request.clicked_entity_id,
+    )
+    return {"success": True}

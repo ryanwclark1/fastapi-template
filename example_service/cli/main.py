@@ -11,6 +11,7 @@ from example_service.cli.commands import (
     generate,
     monitor,
     scheduler,
+    search,
     server,
     storage,
     tasks,
@@ -35,6 +36,7 @@ def cli(ctx: click.Context) -> None:
     Command Groups:
       db         Database migrations and management
       cache      Redis cache operations
+      search     Full-text search management
       storage    S3-compatible object storage management
       server     Development and production servers
       config     Configuration management
@@ -61,6 +63,7 @@ def cli(ctx: click.Context) -> None:
 # Register command groups - Core infrastructure
 cli.add_command(database.db)
 cli.add_command(cache.cache)
+cli.add_command(search.search)
 cli.add_command(storage.storage)
 cli.add_command(server.server)
 cli.add_command(config.config)
