@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Annotated
+from uuid import UUID  # noqa: TC003
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
@@ -39,8 +40,6 @@ from example_service.infra.storage.client import (
 )
 
 if TYPE_CHECKING:
-    from uuid import UUID
-
     from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/files", tags=["files"])

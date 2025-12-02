@@ -13,7 +13,6 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
-from uuid import UUID
 
 from sqlalchemy import DateTime, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -186,12 +185,14 @@ class AuditLog(Base, UUIDv7PKMixin):
         comment="HTTP method",
     )
 
-    # Additional metadata
-    metadata: Mapped[dict[str, Any] | None] = mapped_column(
+    # Additional metadata (column name preserved as 'metadata')
+    context_data: Mapped[dict[str, Any] | None] = mapped_column(
+        "metadata",
         JSONB,
         nullable=True,
         comment="Additional context data",
     )
+
 
     # Result tracking
     success: Mapped[bool] = mapped_column(

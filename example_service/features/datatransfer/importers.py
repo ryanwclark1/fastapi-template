@@ -10,8 +10,10 @@ import io
 import json
 import logging
 from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +55,7 @@ class ParsedRecord:
         return len(self.errors) == 0
 
 
-class BaseImporter(ABC, Generic[T]):
+class BaseImporter[T](ABC):
     """Base class for data importers.
 
     Provides common functionality for importing data from various formats.

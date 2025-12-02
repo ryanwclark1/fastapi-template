@@ -123,8 +123,13 @@ def postgres_container() -> Iterator[str]:
     except Exception as exc:  # pragma: no cover - environment dependent
         pytest.skip(f"PostgreSQL container unavailable: {exc}", allow_module_level=True)
 
-    # Convert to async connection URL
-    url = container.get_connection_url().replace("postgresql://", "postgresql+psycopg://")
+    # Convert to async connection URL for psycopg3
+    # get_connection_url() may return postgresql:// or postgresql+psycopg2://
+    original_url = container.get_connection_url()
+    # Replace any psycopg2 reference with psycopg (psycopg3)
+    url = original_url.replace("postgresql+psycopg2://", "postgresql+psycopg://").replace(
+        "postgresql://", "postgresql+psycopg://"
+    )
     yield url
     container.stop()
 

@@ -17,9 +17,13 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
 
 from example_service.infra.messaging.broker import router
+from example_service.infra.messaging.events import (
+    ExampleCreatedEvent,
+    ExampleDeletedEvent,
+    ExampleUpdatedEvent,
+)
 from example_service.infra.messaging.exchanges import (
     DLQ_EXCHANGE,
     DLQ_QUEUE,
@@ -29,12 +33,12 @@ from example_service.infra.messaging.exchanges import (
 )
 from example_service.utils.retry import retry
 
-if TYPE_CHECKING:
-    from example_service.infra.messaging.events import (
-        ExampleCreatedEvent,
-        ExampleDeletedEvent,
-        ExampleUpdatedEvent,
-    )
+# Ensure all event models are fully rebuilt after import
+# This is critical for FastStream's AsyncAPI schema generation
+# which needs to introspect handler signatures
+ExampleCreatedEvent.model_rebuild()
+ExampleUpdatedEvent.model_rebuild()
+ExampleDeletedEvent.model_rebuild()
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +168,33 @@ if router is not None:
                 extra={"event_id": event.event_id, "error": str(e)},
             )
             raise
+
+    # Resolve forward annotations to concrete types for FastStream schema generation
+    # Pydantic v2 needs real types (not forward-ref strings) when building models
+    # from handler signatures for AsyncAPI docs.
+    from typing import get_type_hints
+
+    def _resolve_annotations(func: object) -> None:
+        target = getattr(func, "_original_call", func)
+        if not hasattr(target, "__annotations__"):
+            return
+        try:
+            hints = get_type_hints(target, globalns=globals(), localns=locals())
+            target.__annotations__.update(hints)
+        except Exception:
+            # Best-effort; schema generation will skip unresolved funcs
+            return
+
+    for _fn in (
+        "handle_example_created",
+        "handle_example_updated",
+        "handle_example_deleted",
+        "handle_echo_request",
+        "handle_echo_response",
+    ):
+        _func = locals().get(_fn)
+        if _func:
+            _resolve_annotations(_func)
 
     # =========================================================================
     # Echo Service Handlers

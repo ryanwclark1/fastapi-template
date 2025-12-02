@@ -20,6 +20,11 @@ _DOCS_STATIC_URL = "/_static/docs"
 _ASYNCAPI_PATCHED = False
 
 
+def ensure_asyncapi_template_patched() -> None:
+    """Guarantee the AsyncAPI template uses local, CSP-safe assets."""
+    _patch_asyncapi_template()
+
+
 def configure_documentation(app: FastAPI) -> None:
     """Configure documentation routes with local assets.
 
@@ -33,7 +38,7 @@ def configure_documentation(app: FastAPI) -> None:
         name="docs-static",
     )
 
-    _patch_asyncapi_template()
+    ensure_asyncapi_template_patched()
 
     settings = get_app_settings()
     if settings.disable_docs:

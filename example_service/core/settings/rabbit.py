@@ -120,6 +120,27 @@ class RabbitSettings(BaseSettings):
     )
 
     # ─────────────────────────────────────────────────────
+    # Connection timeout
+    # ─────────────────────────────────────────────────────
+    connection_timeout: float = Field(
+        default=10.0,
+        ge=1.0,
+        le=300.0,
+        description="Connection timeout in seconds for initial RabbitMQ connection.",
+    )
+
+    # ─────────────────────────────────────────────────────
+    # Startup behavior
+    # ─────────────────────────────────────────────────────
+    startup_require_rabbit: bool = Field(
+        default=False,
+        description=(
+            "If True, application startup fails if RabbitMQ is unavailable. "
+            "If False, application starts in degraded mode without messaging."
+        ),
+    )
+
+    # ─────────────────────────────────────────────────────
     # Exchange configuration
     # ─────────────────────────────────────────────────────
     exchange_name: str = Field(

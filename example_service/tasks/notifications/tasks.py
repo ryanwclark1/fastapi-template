@@ -16,7 +16,7 @@ from sqlalchemy import select, update
 
 from example_service.core.settings import get_email_settings
 from example_service.infra.database.session import get_async_session
-from example_service.infra.email import EmailAttachment, get_email_service
+from example_service.infra.email import get_email_service
 from example_service.infra.email.schemas import EmailPriority
 from example_service.tasks.broker import broker
 

@@ -61,17 +61,23 @@ def setup_routers(app: FastAPI) -> None:
     # Include GraphQL endpoint if enabled (follows same pattern as /docs, /redoc, /asyncapi)
     graphql_settings = get_graphql_settings()
     if graphql_settings.enabled:
+        graphql_prefix = graphql_settings.path or "/graphql"
         try:
+            # Check if strawberry is available before importing
+            import strawberry  # noqa: F401
+
             from example_service.features.graphql.router import router as graphql_router
-        except Exception as exc:  # pragma: no cover - optional dependency
+
+            if graphql_router is not None:
+                app.include_router(graphql_router, prefix=graphql_prefix, tags=["graphql"])
+                playground_status = "enabled" if graphql_settings.playground_enabled else "disabled"
+                logger.info(
+                    f"GraphQL endpoint enabled at {graphql_prefix} (playground: {playground_status})"
+                )
+        except ImportError as exc:  # pragma: no cover - optional dependency
             logger.warning("GraphQL endpoint disabled (strawberry not available): %s", exc)
-        else:
-            app.include_router(graphql_router, prefix=graphql_settings.path, tags=["graphql"])
-            playground_status = "enabled" if graphql_settings.playground_enabled else "disabled"
-            logger.info(
-                f"GraphQL endpoint enabled at {graphql_settings.path} "
-                f"(playground: {playground_status})"
-            )
+        except Exception as exc:  # pragma: no cover - optional dependency
+            logger.warning("GraphQL endpoint disabled: %s", exc)
 
     # Include WebSocket realtime router if enabled
     ws_settings = get_websocket_settings()

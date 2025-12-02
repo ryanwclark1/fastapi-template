@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from .models import Tag, reminder_tags
-from .router import router
 from .schemas import TagCreate, TagResponse, TagUpdate
 
 __all__ = [
@@ -12,5 +11,4 @@ __all__ = [
     "TagResponse",
     "TagUpdate",
     "reminder_tags",
-    "router",
 ]

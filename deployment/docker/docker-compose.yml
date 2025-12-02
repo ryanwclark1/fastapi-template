@@ -34,6 +34,11 @@ services:
       - ./logs:/app/logs
     networks:
       - example-network
+    # Increase file descriptor limits for API service (handles many connections)
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     restart: unless-stopped
 
   db:
@@ -88,8 +93,15 @@ services:
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
       - rabbitmq-logs:/var/log/rabbitmq
+      - ../configs/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
     networks:
       - example-network
+    # Increase file descriptor limits to prevent "out of file descriptors" errors
+    # RabbitMQ needs high limits for handling many connections
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 30s
@@ -103,8 +115,8 @@ services:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # MinIO Console
+      - "9000:9000" # S3 API
+      - "9001:9001" # MinIO Console
     environment:
       - MINIO_ROOT_USER=minioadmin
       - MINIO_ROOT_PASSWORD=minioadmin

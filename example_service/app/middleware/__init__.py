@@ -54,6 +54,18 @@ from example_service.app.middleware.request_logging import (
 )
 from example_service.app.middleware.security_headers import SecurityHeadersMiddleware
 from example_service.app.middleware.size_limit import RequestSizeLimitMiddleware
+from example_service.app.middleware.tenant import (
+    HeaderTenantStrategy,
+    JWTClaimTenantStrategy,
+    PathPrefixTenantStrategy,
+    SubdomainTenantStrategy,
+    TenantIdentificationStrategy,
+    TenantMiddleware,
+    clear_tenant_context,
+    get_tenant_context,
+    require_tenant,
+    set_tenant_context,
+)
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -63,6 +75,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    # Core middleware
     "CorrelationIDMiddleware",
     "DebugMiddleware",
     "HeaderContextMiddleware",
@@ -77,6 +90,18 @@ __all__ = [
     "RequestLoggingMiddleware",
     "RequestSizeLimitMiddleware",
     "SecurityHeadersMiddleware",
+    # Tenant middleware
+    "TenantMiddleware",
+    "TenantIdentificationStrategy",
+    "HeaderTenantStrategy",
+    "SubdomainTenantStrategy",
+    "JWTClaimTenantStrategy",
+    "PathPrefixTenantStrategy",
+    "get_tenant_context",
+    "set_tenant_context",
+    "clear_tenant_context",
+    "require_tenant",
+    # Configuration
     "configure_middleware",
     "create_i18n_middleware",
     "setup_n_plus_one_monitoring",

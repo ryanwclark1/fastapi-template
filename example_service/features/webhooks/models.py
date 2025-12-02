@@ -6,7 +6,17 @@ import json
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, TypeDecorator
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    TypeDecorator,
+    text,
+)
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -68,7 +78,7 @@ class Webhook(TimestampedBase):
     event_types: Mapped[list[str]] = mapped_column(
         StringArray(),
         nullable=False,
-        server_default="[]",
+        server_default=text("ARRAY[]::VARCHAR(100)[]"),
         comment="List of event types this webhook subscribes to",
     )
     is_active: Mapped[bool] = mapped_column(

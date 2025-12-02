@@ -464,7 +464,7 @@ Supported frequencies: DAILY, WEEKLY, MONTHLY, YEARLY
 async def create_reminder(
     payload: ReminderCreate,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    publisher: Annotated[EventPublisherDep, Depends()],
+    publisher: EventPublisherDep,
 ) -> ReminderResponse:
     """Create a new reminder with optional recurrence."""
     # Track business metrics
@@ -515,7 +515,7 @@ async def update_reminder(
     reminder_id: UUID,
     payload: ReminderUpdate,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    publisher: Annotated[EventPublisherDep, Depends()],
+    publisher: EventPublisherDep,
 ) -> ReminderResponse:
     """Update an existing reminder."""
     result = await session.execute(select(Reminder).where(Reminder.id == reminder_id))
@@ -589,7 +589,7 @@ async def update_reminder(
 async def complete_reminder(
     reminder_id: UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    publisher: Annotated[EventPublisherDep, Depends()],
+    publisher: EventPublisherDep,
 ) -> ReminderResponse:
     """Mark a reminder as completed."""
     result = await session.execute(select(Reminder).where(Reminder.id == reminder_id))
@@ -627,7 +627,7 @@ async def complete_reminder(
 async def delete_reminder(
     reminder_id: UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    publisher: Annotated[EventPublisherDep, Depends()],
+    publisher: EventPublisherDep,
 ) -> None:
     """Delete a reminder permanently."""
     result = await session.execute(select(Reminder).where(Reminder.id == reminder_id))
@@ -786,7 +786,7 @@ async def break_out_occurrence(
     reminder_id: UUID,
     occurrence_date: datetime,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    publisher: Annotated[EventPublisherDep, Depends()],
+    publisher: EventPublisherDep,
 ) -> ReminderResponse:
     """Break out a single occurrence from a recurring series.
 

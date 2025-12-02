@@ -5,14 +5,16 @@ Provides injectable dependencies for feature flag evaluation.
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import Depends, HTTPException, Request, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from example_service.core.dependencies.database import get_session
+from example_service.core.dependencies.database import get_db_session
 
 from .service import FeatureFlagService
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class FeatureFlags:
@@ -90,7 +92,7 @@ class FeatureFlags:
 
 async def get_feature_flags(
     request: Request,
-    session: Annotated[AsyncSession, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> FeatureFlags:
     """Get feature flags evaluator for the current request.
 

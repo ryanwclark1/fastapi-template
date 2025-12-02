@@ -9,12 +9,11 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, Index, String, Text, func
+from sqlalchemy import Boolean, DateTime, Index, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from example_service.infra.database.models import Base
-from example_service.infra.database.models.mixins import TimestampMixin, UUIDv7PKMixin
+from example_service.core.database.base import Base, TimestampMixin, UUIDv7PKMixin
 
 
 class FlagStatus(StrEnum):
@@ -95,8 +94,9 @@ class FeatureFlag(Base, UUIDv7PKMixin, TimestampMixin):
         comment="Targeting rules for selective rollout",
     )
 
-    # Metadata
-    metadata: Mapped[dict[str, Any] | None] = mapped_column(
+    # Metadata (column name preserved as 'metadata')
+    context_data: Mapped[dict[str, Any] | None] = mapped_column(
+        "metadata",
         JSONB,
         nullable=True,
         comment="Additional flag metadata",
@@ -133,9 +133,7 @@ class FeatureFlag(Base, UUIDv7PKMixin, TimestampMixin):
 
         if self.starts_at and now < self.starts_at:
             return False
-        if self.ends_at and now > self.ends_at:
-            return False
-        return True
+        return not (self.ends_at and now > self.ends_at)
 
 
 class FlagOverride(Base, UUIDv7PKMixin, TimestampMixin):

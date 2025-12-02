@@ -6,8 +6,12 @@ and executed asynchronously using Taskiq.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
+
+from taskiq import TaskiqDepends
+from taskiq.depends.progress_tracker import ProgressTracker  # noqa: TC002
 
 from example_service.tasks.broker import broker
 
@@ -158,3 +162,113 @@ if broker is not None:
                 extra={"file_path": file_path, "error": str(e)},
             )
             raise
+
+    @broker.task()
+    async def batch_process_task(
+        items: list[dict[str, Any]],
+        delay_per_item: float = 0.1,
+        progress: ProgressTracker[dict[str, Any]] = TaskiqDepends(),  # noqa: B008
+    ) -> dict[str, Any]:
+        """Example task demonstrating progress tracking.
+
+        This task processes items in a batch and reports progress after
+        each item is processed. Progress can be monitored via:
+
+        - REST API: GET /api/v1/tasks/{task_id}
+        - Result backend: await result.get_progress()
+
+        The progress tracker stores:
+        - state: Current state (STARTED, SUCCESS, FAILURE, RETRY, or custom string)
+        - meta: Custom metadata dict with progress details
+
+        Args:
+            items: List of items to process.
+            delay_per_item: Simulated processing delay per item (seconds).
+            progress: TaskIQ progress tracker (injected automatically).
+
+        Returns:
+            Processing summary with counts and status.
+
+        Example:
+                # Schedule the task with progress tracking
+            task = await batch_process_task.kiq(
+                items=[{"id": 1}, {"id": 2}, {"id": 3}],
+                delay_per_item=0.5,
+            )
+
+            # Poll for progress while task is running
+            while True:
+                progress_data = await task.get_progress()
+                if progress_data:
+                    print(f"State: {progress_data.state}, Meta: {progress_data.meta}")
+                if await task.is_ready():
+                    break
+                await asyncio.sleep(0.5)
+
+            # Get final result
+            result = await task.wait_result()
+        """
+        total = len(items)
+        processed = 0
+        failed = 0
+
+        logger.info(
+            "Starting batch processing",
+            extra={"total_items": total, "delay_per_item": delay_per_item},
+        )
+
+        # Report initial progress
+        await progress.set_progress(
+            state="STARTED",
+            meta={
+                "current": 0,
+                "total": total,
+                "status": "initializing",
+            },
+        )
+
+        for item in items:
+            item_id = item.get("id", "unknown")
+
+            try:
+                # Simulate processing work
+                await asyncio.sleep(delay_per_item)
+
+                processed += 1
+
+                # Report progress to result backend
+                # State can be a TaskState enum or custom string
+                await progress.set_progress(
+                    state="processing",
+                    meta={
+                        "current": processed,
+                        "total": total,
+                        "last_item_id": item_id,
+                        "failed_count": failed,
+                    },
+                )
+
+                logger.debug(
+                    "Item processed",
+                    extra={"item_id": item_id, "progress": f"{processed}/{total}"},
+                )
+
+            except Exception as e:
+                failed += 1
+                logger.warning(
+                    "Item processing failed",
+                    extra={"item_id": item_id, "error": str(e)},
+                )
+                # Continue processing other items
+
+        logger.info(
+            "Batch processing completed",
+            extra={"processed": processed, "failed": failed, "total": total},
+        )
+
+        return {
+            "status": "completed",
+            "processed": processed,
+            "failed": failed,
+            "total": total,
+        }

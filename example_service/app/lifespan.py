@@ -385,9 +385,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             )
 
     # Initialize RabbitMQ/FastStream broker for event-driven messaging
+    # Note: RabbitRouter automatically connects when included in FastAPI app.
+    # We call start_broker() here with timeout protection to ensure connection
+    # is established (or fails fast) before continuing with startup.
     if rabbit_settings.is_configured:
-        await start_broker()
-        logger.info("RabbitMQ/FastStream broker initialized")
+        try:
+            await start_broker()
+            logger.info("RabbitMQ/FastStream broker initialized")
+        except Exception as e:
+            if rabbit_settings.startup_require_rabbit:
+                logger.error(
+                    "RabbitMQ required but unavailable, failing startup",
+                    extra={"error": str(e), "startup_require_rabbit": True},
+                )
+                raise
+            else:
+                logger.warning(
+                    "RabbitMQ unavailable, continuing in degraded mode",
+                    extra={"error": str(e), "startup_require_rabbit": False},
+                )
 
     # Initialize outbox processor for reliable event publishing
     # Requires both database and RabbitMQ to be available

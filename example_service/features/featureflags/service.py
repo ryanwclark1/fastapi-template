@@ -7,13 +7,10 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from datetime import datetime, UTC
-from functools import lru_cache
-from typing import Any
-from uuid import UUID
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import delete, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import FeatureFlag, FlagOverride, FlagStatus
 from .schemas import (
@@ -25,8 +22,12 @@ from .schemas import (
     FlagEvaluationResponse,
     FlagEvaluationResult,
     FlagOverrideCreate,
-    FlagOverrideResponse,
 )
+
+if TYPE_CHECKING:
+    from uuid import UUID
+
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +89,7 @@ class FeatureFlagService:
             targeting_rules=[r.model_dump() for r in data.targeting_rules]
             if data.targeting_rules
             else None,
-            metadata=data.metadata,
+            context_data=data.metadata,
             starts_at=data.starts_at,
             ends_at=data.ends_at,
         )

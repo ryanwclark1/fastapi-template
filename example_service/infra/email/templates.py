@@ -14,13 +14,14 @@ import re
 from functools import lru_cache
 from html import unescape
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound, select_autoescape
 
-from example_service.core.settings.email import EmailSettings
-
 from .client import get_email_settings
+
+if TYPE_CHECKING:
+    from example_service.core.settings.email import EmailSettings
 
 logger = logging.getLogger(__name__)
 

@@ -15,6 +15,8 @@ from example_service.features.graphql.types.reminders import (
     ReminderConnection,
     ReminderEdge,
     ReminderError,
+    ReminderEvent,
+    ReminderEventType,
     ReminderPayload,
     ReminderSuccess,
     ReminderType,
@@ -37,4 +39,7 @@ __all__ = [
     "ReminderError",
     "ReminderPayload",
     "DeletePayload",
+    # Reminder event types (for subscriptions)
+    "ReminderEvent",
+    "ReminderEventType",
 ]

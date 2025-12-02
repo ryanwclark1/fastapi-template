@@ -32,11 +32,10 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import Depends, Request
 
 from example_service.core.dependencies.database import get_db_session
+from example_service.core.events import EventPublisher
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
-
-    from example_service.core.events import EventPublisher
 
 
 def _get_correlation_id(request: Request) -> str | None:
@@ -48,8 +47,8 @@ def _get_correlation_id(request: Request) -> str | None:
 
 
 async def get_event_publisher(
-    session: Annotated[AsyncSession, Depends(get_db_session)],
-    request: Request,
+    session: AsyncSession = Depends(get_db_session),  # type: ignore[assignment]
+    request: Request = None,  # FastAPI will inject this automatically
 ) -> EventPublisher:
     """FastAPI dependency for event publisher.
 
@@ -91,7 +90,7 @@ async def get_event_publisher(
 
 
 # Type alias for cleaner dependency injection
-EventPublisherDep = Annotated["EventPublisher", Depends(get_event_publisher)]
+EventPublisherDep = Annotated[EventPublisher, Depends(get_event_publisher)]
 
 
 __all__ = [

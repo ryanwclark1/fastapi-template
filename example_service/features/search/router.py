@@ -5,13 +5,12 @@ Provides unified search across multiple entity types.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from example_service.core.dependencies.auth import get_current_user
-from example_service.core.dependencies.database import get_session
+from example_service.core.dependencies.database import get_db_session
 
 from .schemas import (
     RecordClickRequest,
@@ -28,6 +27,9 @@ from .schemas import (
 )
 from .service import SearchService
 
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
 router = APIRouter(prefix="/search", tags=["search"])
 
 
@@ -38,7 +40,7 @@ router = APIRouter(prefix="/search", tags=["search"])
     description="Get information about searchable entities and supported features.",
 )
 async def get_search_capabilities(
-    session: Annotated[AsyncSession, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     _user: Annotated[dict, Depends(get_current_user)],
 ) -> SearchCapabilitiesResponse:
     """Get search capabilities.
@@ -60,7 +62,7 @@ async def get_search_capabilities(
 )
 async def search(
     request: SearchRequest,
-    session: Annotated[AsyncSession, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     _user: Annotated[dict, Depends(get_current_user)],
 ) -> SearchResponse:
     """Execute a full-text search.
@@ -90,7 +92,7 @@ async def search(
     description="Search using query parameters instead of request body.",
 )
 async def search_get(
-    session: Annotated[AsyncSession, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     _user: Annotated[dict, Depends(get_current_user)],
     q: Annotated[str, Query(min_length=1, max_length=500, description="Search query")],
     entities: Annotated[list[str] | None, Query(description="Entity types")] = None,
@@ -135,7 +137,7 @@ async def search_get(
     description="Get autocomplete suggestions based on search prefix.",
 )
 async def get_suggestions(
-    session: Annotated[AsyncSession, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     _user: Annotated[dict, Depends(get_current_user)],
     prefix: Annotated[str, Query(min_length=2, max_length=100, description="Search prefix")],
     entity_type: Annotated[str | None, Query(description="Limit to entity type")] = None,

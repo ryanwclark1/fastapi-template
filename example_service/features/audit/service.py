@@ -6,13 +6,9 @@ Provides the main interface for recording and querying audit logs.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
-from functools import lru_cache
 from typing import TYPE_CHECKING, Any
-from uuid import UUID
 
 from sqlalchemy import desc, func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from example_service.infra.database.session import get_async_session
 
@@ -27,6 +23,10 @@ from .schemas import (
 )
 
 if TYPE_CHECKING:
+    from datetime import datetime
+    from uuid import UUID
+
+    from sqlalchemy.ext.asyncio import AsyncSession
     pass
 
 logger = logging.getLogger(__name__)
@@ -126,7 +126,7 @@ class AuditService:
             request_id=request_id,
             endpoint=endpoint,
             method=method,
-            metadata=metadata,
+            context_data=metadata,
             success=success,
             error_message=error_message,
             duration_ms=duration_ms,

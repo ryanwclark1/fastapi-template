@@ -39,9 +39,9 @@ Trigram indexing for fuzzy search:
 
 from __future__ import annotations
 
-from typing import Any, ClassVar, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, ClassVar
 
-from sqlalchemy import Index, event, text
+from sqlalchemy import Index, text
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column
 
 from example_service.core.database.search.types import TSVECTOR
@@ -328,7 +328,7 @@ DROP FUNCTION IF EXISTS {table_name}_search_vector_update();
     @classmethod
     async def rebuild_search_vectors(
         cls,
-        session: "AsyncSession",
+        session: AsyncSession,
         batch_size: int = 1000,
     ) -> int:
         """Rebuild all search vectors for existing rows.

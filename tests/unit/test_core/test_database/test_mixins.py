@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 import pytest
-from sqlalchemy import String, select
+from sqlalchemy import String, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -126,16 +126,43 @@ async def async_engine(postgres_container: str):
 
 @pytest.fixture
 async def session(async_engine) -> AsyncGenerator[AsyncSession]:
-    """Create async database session for testing.
+    """Create async database session for testing with automatic cleanup.
 
     Args:
         async_engine: SQLAlchemy async engine fixture.
 
     Yields:
         Async database session for test operations.
+
+    Note:
+        After each test, all tables are truncated to ensure test isolation.
     """
     async with AsyncSession(async_engine, expire_on_commit=False) as session:
-        yield session
+        try:
+            yield session
+        finally:
+            # Rollback any pending transactions
+            await session.rollback()
+            # Truncate all tables to ensure test isolation
+            async with async_engine.begin() as conn:
+                # Get all table names
+                result = await conn.execute(
+                    text(
+                        """
+                        SELECT tablename FROM pg_tables
+                        WHERE schemaname = 'public'
+                        AND tablename NOT LIKE 'pg_%'
+                        AND tablename NOT LIKE 'sql_%'
+                        """
+                    )
+                )
+                tables = [row[0] for row in result]
+                if tables:
+                    # Disable foreign key checks temporarily and truncate
+                    await conn.execute(text("SET session_replication_role = 'replica'"))
+                    for table in tables:
+                        await conn.execute(text(f'TRUNCATE TABLE "{table}" CASCADE'))
+                    await conn.execute(text("SET session_replication_role = 'origin'"))
 
 
 # ============================================================================

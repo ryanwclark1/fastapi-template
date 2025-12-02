@@ -13,66 +13,88 @@ import logging
 from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response
-from sqlalchemy.ext.asyncio import AsyncSession
-from strawberry.fastapi import GraphQLRouter
+
+try:
+    from strawberry.fastapi import GraphQLRouter
+except ImportError:
+    GraphQLRouter = None  # type: ignore[assignment, misc]
 
 from example_service.core.dependencies.auth import get_current_user_optional
 from example_service.core.dependencies.database import get_db_session
-from example_service.core.schemas.auth import AuthUser
 from example_service.core.settings import get_app_settings, get_graphql_settings
-from example_service.features.graphql.context import GraphQLContext
-from example_service.features.graphql.dataloaders import create_dataloaders
-from example_service.features.graphql.playground import register_playground_routes
-from example_service.features.graphql.schema import schema
+
+# Only import GraphQL-specific modules if GraphQLRouter is available
+if GraphQLRouter is not None:
+    from example_service.features.graphql.context import GraphQLContext
+    from example_service.features.graphql.dataloaders import create_dataloaders
+    from example_service.features.graphql.playground import register_playground_routes
+    from example_service.features.graphql.schema import schema
+else:
+    # Dummy imports to avoid NameError, but these won't be used
+    GraphQLContext = None  # type: ignore[assignment, misc]
+    create_dataloaders = None  # type: ignore[assignment, misc]
+    register_playground_routes = None  # type: ignore[assignment, misc]
+    schema = None  # type: ignore[assignment, misc]
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from example_service.core.schemas.auth import AuthUser
+
 logger = logging.getLogger(__name__)
 
-# Type aliases for dependency injection (avoids B008 linting errors)
-SessionDep = Annotated[AsyncSession, Depends(get_db_session)]
-UserDep = Annotated[AuthUser | None, Depends(get_current_user_optional)]
+# Only define these if GraphQLRouter is available to avoid FastAPI processing them
+# when GraphQL is not enabled
+if GraphQLRouter is not None:
 
+    async def get_graphql_context(
+        request: Request,
+        response: Response,
+        background_tasks: BackgroundTasks,
+        session: Annotated[AsyncSession, Depends(get_db_session)],
+        user: Annotated[AuthUser | None, Depends(get_current_user_optional)],
+    ) -> GraphQLContext:
+        """Create GraphQL context from FastAPI dependencies.
 
-async def get_graphql_context(
-    request: Request,
-    response: Response,
-    background_tasks: BackgroundTasks,
-    session: SessionDep,
-    user: UserDep,
-) -> GraphQLContext:
-    """Create GraphQL context from FastAPI dependencies.
+        Following Strawberry's FastAPI integration pattern, this provides
+        the standard context fields (request, response, background_tasks)
+        plus application-specific dependencies.
 
-    Following Strawberry's FastAPI integration pattern, this provides
-    the standard context fields (request, response, background_tasks)
-    plus application-specific dependencies.
+        Args:
+            request: FastAPI request
+            response: FastAPI response (for setting headers/cookies)
+            background_tasks: FastAPI background tasks
+            session: Database session from dependency
+            user: Authenticated user (or None)
 
-    Args:
-        request: FastAPI request
-        response: FastAPI response (for setting headers/cookies)
-        background_tasks: FastAPI background tasks
-        session: Database session from dependency
-        user: Authenticated user (or None)
+        Returns:
+            GraphQLContext for use in resolvers
+        """
+        correlation_id = getattr(request.state, "correlation_id", None)
 
-    Returns:
-        GraphQLContext for use in resolvers
-    """
-    correlation_id = getattr(request.state, "correlation_id", None)
-
-    return GraphQLContext(
-        request=request,
-        response=response,
-        background_tasks=background_tasks,
-        session=session,
-        loaders=create_dataloaders(session),
-        user=user,
-        correlation_id=correlation_id,
-    )
+        return GraphQLContext(
+            request=request,
+            response=response,
+            background_tasks=background_tasks,
+            session=session,
+            loaders=create_dataloaders(session),
+            user=user,
+            correlation_id=correlation_id,
+        )
+else:
+    # Dummy function to avoid NameError, but it won't be used
+    async def get_graphql_context(*args: Any, **kwargs: Any) -> Any:  # type: ignore[misc]
+        """Dummy function when GraphQL is not available."""
+        raise ImportError("strawberry is required for GraphQL support")
 
 
 def create_graphql_router() -> APIRouter:
     """Create GraphQL router with settings-based configuration."""
+    if GraphQLRouter is None:
+        raise ImportError("strawberry is required for GraphQL support")
+
     settings = get_graphql_settings()
 
     # Build subscription protocols list if subscriptions are enabled
@@ -96,10 +118,11 @@ def create_graphql_router() -> APIRouter:
         context_getter=cast("Any", get_graphql_context),
         subscription_protocols=subscription_protocols or (),
         graphql_ide=selected_ide,
+        path="/",  # use root here; mounted prefix adds the actual path
     )
 
     router = APIRouter()
-    router.include_router(graphql_app)
+    router.include_router(graphql_app, prefix="")
 
     if use_local_playground and settings.playground_enabled:
         app_settings = get_app_settings()
@@ -113,8 +136,12 @@ def create_graphql_router() -> APIRouter:
     return router
 
 
-# Create the router instance using settings
-router = create_graphql_router()
+# Create the router instance using settings (only if GraphQL is enabled)
+# This will raise ImportError if strawberry is not available, which is caught in app/router.py
+try:
+    router = create_graphql_router()
+except (ImportError, AttributeError):
+    router = None  # type: ignore[assignment]
 
 
 __all__ = ["router", "get_graphql_context", "create_graphql_router"]

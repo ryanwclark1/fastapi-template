@@ -17,15 +17,16 @@ from __future__ import annotations
 import importlib
 import logging
 import time
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import func, literal, or_, select, text
 
 from example_service.core.database.search import (
+    RankNormalization,
     SearchAnalytics,
     SearchQueryParser,
-    RankNormalization,
 )
+
 from .cache import SearchCache, get_search_cache
 from .schemas import (
     DidYouMeanSuggestion,
@@ -124,7 +125,7 @@ class SearchService:
 
     def __init__(
         self,
-        session: "AsyncSession",
+        session: AsyncSession,
         *,
         enable_analytics: bool = True,
         enable_fuzzy_fallback: bool = True,
@@ -482,10 +483,7 @@ class SearchService:
             return []
 
         # Get max similarity across fields
-        if len(similarities) == 1:
-            max_sim = similarities[0]
-        else:
-            max_sim = func.greatest(*similarities)
+        max_sim = similarities[0] if len(similarities) == 1 else func.greatest(*similarities)
 
         stmt = (
             select(model_class, max_sim.label("rank"))
@@ -961,7 +959,7 @@ class SearchService:
 
 
 async def get_search_service(
-    session: "AsyncSession",
+    session: AsyncSession,
     enable_analytics: bool = True,
 ) -> SearchService:
     """Get a search service instance.

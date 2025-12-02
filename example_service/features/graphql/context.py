@@ -15,7 +15,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from strawberry.fastapi import BaseContext
+try:
+    from strawberry.fastapi import BaseContext
+except ImportError:
+    # Fallback when strawberry is not available
+    BaseContext = object  # type: ignore[assignment, misc]
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession

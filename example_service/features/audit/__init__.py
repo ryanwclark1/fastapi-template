@@ -27,11 +27,11 @@ Usage:
 
 from __future__ import annotations
 
+from .decorators import audit_action, audited
 from .models import AuditAction, AuditLog
-from .schemas import AuditLogCreate, AuditLogResponse, AuditLogQuery
-from .service import AuditService, get_audit_service
-from .decorators import audited, audit_action
 from .router import router
+from .schemas import AuditLogCreate, AuditLogQuery, AuditLogResponse
+from .service import AuditService, get_audit_service
 
 __all__ = [
     # Models

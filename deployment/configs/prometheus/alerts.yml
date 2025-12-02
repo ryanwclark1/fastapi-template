@@ -501,3 +501,112 @@ groups:
         annotations:
           summary: "High validation error rate on {{ $labels.endpoint }}"
           description: "{{ $value | humanizePercentage }} of requests have validation errors on {{ $labels.endpoint }}"
+
+  # ============================================================================
+  # OpenTelemetry Exporter Alerts
+  # ============================================================================
+  - name: otel_exporter
+    interval: 30s
+    rules:
+      - alert: OtelExporterDegraded
+        expr: |
+          otel_exporter_state == 2
+        for: 5m
+        labels:
+          severity: warning
+          component: tracing
+        annotations:
+          summary: "OTLP exporter {{ $labels.exporter_type }} is degraded"
+          description: "Export success rate has dropped below 95% for exporter {{ $labels.exporter_type }}"
+
+      - alert: OtelExporterFailing
+        expr: |
+          otel_exporter_state == 3
+        for: 2m
+        labels:
+          severity: critical
+          component: tracing
+        annotations:
+          summary: "OTLP exporter {{ $labels.exporter_type }} is failing"
+          description: "Export success rate has dropped below 50% for exporter {{ $labels.exporter_type }}. Traces may be lost."
+
+      - alert: OtelExportStale
+        expr: |
+          (time() - otel_last_successful_export_timestamp) > 300
+        for: 2m
+        labels:
+          severity: critical
+          component: tracing
+        annotations:
+          summary: "No successful OTLP exports for {{ $labels.exporter_type }}"
+          description: "No spans have been successfully exported in the last 5 minutes. Check collector connectivity."
+
+      - alert: OtelSpansDropped
+        expr: |
+          rate(otel_spans_dropped_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: tracing
+        annotations:
+          summary: "Spans are being dropped for {{ $labels.exporter_type }}"
+          description: "{{ $value }} spans/second are being dropped due to queue overflow. Traces are being permanently lost."
+
+      - alert: HighOtelExportLatency
+        expr: |
+          histogram_quantile(0.95, rate(otel_export_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: tracing
+        annotations:
+          summary: "High OTLP export latency for {{ $labels.exporter_type }}"
+          description: "P95 export latency is {{ $value }}s. May cause queue buildup and span drops."
+
+      - alert: CriticalOtelExportLatency
+        expr: |
+          histogram_quantile(0.95, rate(otel_export_duration_seconds_bucket[5m])) > 10
+        for: 2m
+        labels:
+          severity: critical
+          component: tracing
+        annotations:
+          summary: "Critical OTLP export latency for {{ $labels.exporter_type }}"
+          description: "P95 export latency is {{ $value }}s. Collector may be unreachable or overloaded."
+
+      - alert: HighOtelExportFailureRate
+        expr: |
+          (
+            sum(rate(otel_spans_failed_total[5m])) by (exporter_type)
+            /
+            (sum(rate(otel_spans_exported_total[5m])) by (exporter_type) + sum(rate(otel_spans_failed_total[5m])) by (exporter_type) + 0.0001)
+          ) > 0.10
+        for: 5m
+        labels:
+          severity: warning
+          component: tracing
+        annotations:
+          summary: "High OTLP export failure rate for {{ $labels.exporter_type }}"
+          description: "{{ $value | humanizePercentage }} of span exports are failing."
+
+      - alert: OtelExporterConnectionErrors
+        expr: |
+          rate(otel_spans_failed_total{error_type="connection_error"}[5m]) > 1
+        for: 3m
+        labels:
+          severity: warning
+          component: tracing
+        annotations:
+          summary: "OTLP exporter connection errors for {{ $labels.exporter_type }}"
+          description: "{{ $value }} connection errors per second. Check network connectivity to collector."
+
+      - alert: OtelExporterTimeouts
+        expr: |
+          rate(otel_spans_failed_total{error_type="timeout"}[5m]) > 1
+        for: 3m
+        labels:
+          severity: warning
+          component: tracing
+        annotations:
+          summary: "OTLP exporter timeouts for {{ $labels.exporter_type }}"
+          description: "{{ $value }} timeouts per second. Collector may be overloaded."

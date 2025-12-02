@@ -46,9 +46,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import func, and_, or_, not_
+from sqlalchemy import func, not_
 
 if TYPE_CHECKING:
     from sqlalchemy import ColumnElement

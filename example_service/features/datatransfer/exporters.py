@@ -11,9 +11,11 @@ import json
 import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +46,7 @@ def serialize_value(value: Any) -> Any:
     return value
 
 
-class BaseExporter(ABC, Generic[T]):
+class BaseExporter[T](ABC):
     """Base class for data exporters.
 
     Provides common functionality for exporting data to various formats.

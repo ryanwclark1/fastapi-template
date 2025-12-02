@@ -119,6 +119,21 @@ prometheus.scrape "api" {
   forward_to = [prometheus.remote_write.prometheus.receiver]
 }
 
+prometheus.scrape "rabbitmq" {
+  scrape_interval = "15s"
+  scrape_timeout  = "10s"
+
+  targets = [{
+    "__address__"      = "rabbitmq:15692",
+    "__scheme__"       = "http",
+    "__metrics_path__" = "/metrics",
+    "service"          = "rabbitmq",
+    "job"              = "rabbitmq",
+  }]
+
+  forward_to = [prometheus.remote_write.prometheus.receiver]
+}
+
 prometheus.remote_write "prometheus" {
   endpoint {
     url = "http://prometheus:9090/api/v1/write"

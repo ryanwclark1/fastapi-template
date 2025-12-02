@@ -213,7 +213,8 @@ class SecurityHeadersMiddleware:
             # Stricter policy for production
             return {
                 "default-src": "'self'",
-                "script-src": "'self'",
+                # Allow AsyncAPI/Swagger bundles that rely on AJV's eval-based validators
+                "script-src": "'self' 'unsafe-eval'",
                 "style-src": "'self' 'unsafe-inline'",  # 'unsafe-inline' for dynamic styles
                 "img-src": "'self' data: https:",
                 "font-src": "'self' data:",
@@ -304,39 +305,20 @@ class SecurityHeadersMiddleware:
     def _default_permissions_policy() -> dict[str, list[str]]:
         """Get default Permissions-Policy directives.
 
-        Denies most browser features by default for enhanced security.
-        Override with custom permissions_policy parameter if needed.
-
-        Returns:
-            Dictionary of permissions policy directives.
-            Keys are feature names, values are lists of allowed origins (empty = deny).
+        Denies most browser features by default for enhanced security while
+        avoiding user agent warnings from unsupported directives.
         """
         return {
-            "accelerometer": [],  # Deny accelerometer
-            "ambient-light-sensor": [],  # Deny ambient light sensor
-            "autoplay": [],  # Deny autoplay
-            "battery": [],  # Deny battery status
             "camera": [],  # Deny camera
             "display-capture": [],  # Deny display capture
-            "document-domain": [],  # Deny document.domain
-            "encrypted-media": [],  # Deny encrypted media
-            "execution-while-not-rendered": [],  # Deny execution when not rendered
-            "execution-while-out-of-viewport": [],  # Deny execution out of viewport
             "fullscreen": ["self"],  # Allow fullscreen for same origin
             "geolocation": [],  # Deny geolocation
-            "gyroscope": [],  # Deny gyroscope
-            "magnetometer": [],  # Deny magnetometer
             "microphone": [],  # Deny microphone
-            "midi": [],  # Deny MIDI
-            "navigation-override": [],  # Deny navigation override
             "payment": [],  # Deny payment
             "picture-in-picture": [],  # Deny picture-in-picture
             "publickey-credentials-get": [],  # Deny WebAuthn
             "screen-wake-lock": [],  # Deny screen wake lock
-            "sync-xhr": [],  # Deny synchronous XHR
             "usb": [],  # Deny USB
-            "web-share": [],  # Deny Web Share API
-            "xr-spatial-tracking": [],  # Deny XR spatial tracking
         }
 
     def _build_hsts_header(self) -> str:

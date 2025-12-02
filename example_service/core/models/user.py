@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from sqlalchemy import Boolean, Index, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -15,7 +15,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from example_service.core.database import TimestampedBase
 from example_service.core.database.search import TSVECTOR
 
-from .post import Post
+if TYPE_CHECKING:
+    from .post import Post  # noqa: TC004
 
 
 class User(TimestampedBase):

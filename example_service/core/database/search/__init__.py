@@ -83,6 +83,13 @@ Usage:
     parsed = parser.parse('title:python author:"John Doe" -draft')
 """
 
+from example_service.core.database.search.analytics import (
+    SearchAnalytics,
+    SearchInsight,
+    SearchQuery,
+    SearchStats,
+    SearchSuggestionLog,
+)
 from example_service.core.database.search.filters import (
     BoostedSearchFilter,
     FullTextSearchFilter,
@@ -108,19 +115,12 @@ from example_service.core.database.search.parser import (
 )
 from example_service.core.database.search.types import TSVECTOR
 from example_service.core.database.search.utils import (
-    build_ts_query_sql,
     FTSMigrationHelper,
-    generate_search_vector_sql,
     SearchFieldConfig,
     TrigramMigrationHelper,
     UnaccentMigrationHelper,
-)
-from example_service.core.database.search.analytics import (
-    SearchAnalytics,
-    SearchInsight,
-    SearchQuery,
-    SearchStats,
-    SearchSuggestionLog,
+    build_ts_query_sql,
+    generate_search_vector_sql,
 )
 from example_service.core.database.search.synonyms import (
     SynonymDictionary,

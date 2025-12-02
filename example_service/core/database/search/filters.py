@@ -49,7 +49,7 @@ from dataclasses import dataclass
 from enum import IntFlag
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Select, case, func, literal, or_, and_, text
+from sqlalchemy import Select, and_, case, func, literal, or_, text
 
 from example_service.core.database.filters import StatementFilter
 
@@ -518,10 +518,7 @@ class PhraseProximityFilter(StatementFilter):
 
         # Create the proximity pattern
         # Format: 'word1' <-> 'word2' for adjacent, 'word1' <N> 'word2' for distance N
-        if self.max_distance == 1:
-            operator = " <-> "
-        else:
-            operator = f" <{self.max_distance}> "
+        operator = " <-> " if self.max_distance == 1 else f" <{self.max_distance}> "
 
         proximity_query = operator.join(f"'{w}'" for w in query_parts)
 

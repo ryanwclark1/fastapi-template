@@ -6,15 +6,13 @@ Provides endpoints for data export and import operations.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from fastapi.responses import Response, StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi.responses import StreamingResponse
 
 from example_service.core.dependencies.auth import get_current_user
-from example_service.core.dependencies.database import get_session
+from example_service.core.dependencies.database import get_db_session
 
 from .schemas import (
     ExportFormat,
@@ -25,6 +23,9 @@ from .schemas import (
     SupportedEntitiesResponse,
 )
 from .service import DataTransferService
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ router = APIRouter(prefix="/data-transfer", tags=["data-transfer"])
     description="Get list of entities that can be exported or imported.",
 )
 async def list_supported_entities(
-    session: Annotated[AsyncSession, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     _user: Annotated[dict, Depends(get_current_user)],
 ) -> SupportedEntitiesResponse:
     """Get list of entities supported for data transfer.
@@ -59,7 +60,7 @@ async def list_supported_entities(
 )
 async def export_data(
     request: ExportRequest,
-    session: Annotated[AsyncSession, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     _user: Annotated[dict, Depends(get_current_user)],
 ) -> ExportResult:
     """Export data to a file.
@@ -82,7 +83,7 @@ async def export_data(
     description="Export and stream download directly without saving to server.",
 )
 async def download_export(
-    session: Annotated[AsyncSession, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     _user: Annotated[dict, Depends(get_current_user)],
     entity_type: Annotated[str, Query(description="Entity type to export")],
     format: Annotated[ExportFormat, Query(description="Export format")] = ExportFormat.CSV,
@@ -128,7 +129,7 @@ async def download_export(
     description="Import entity data from CSV, JSON, or Excel file.",
 )
 async def import_data(
-    session: Annotated[AsyncSession, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     _user: Annotated[dict, Depends(get_current_user)],
     file: Annotated[UploadFile, File(description="File to import")],
     entity_type: Annotated[str, Query(description="Entity type to import")],
@@ -186,7 +187,7 @@ async def import_data(
     description="Validate an import file without actually importing.",
 )
 async def validate_import(
-    session: Annotated[AsyncSession, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     _user: Annotated[dict, Depends(get_current_user)],
     file: Annotated[UploadFile, File(description="File to validate")],
     entity_type: Annotated[str, Query(description="Entity type")],

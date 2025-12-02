@@ -31,16 +31,13 @@ from __future__ import annotations
 import hashlib
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Any, TYPE_CHECKING
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     Boolean,
-    DateTime,
-    Float,
     Integer,
     String,
-    Text,
     func,
     select,
     text,
@@ -77,7 +74,11 @@ class SearchQuery(TimestampedBase):
     clicked_position: Mapped[int | None] = mapped_column(Integer, nullable=True)
     clicked_entity_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     search_syntax: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    metadata: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    context_data: Mapped[dict[str, Any] | None] = mapped_column(
+        "metadata",
+        JSONB,
+        nullable=True,
+    )
 
 
 class SearchSuggestionLog(TimestampedBase):
@@ -147,7 +148,7 @@ class SearchAnalytics:
             print(f"{insight.type}: {insight.title}")
     """
 
-    def __init__(self, session: "AsyncSession") -> None:
+    def __init__(self, session: AsyncSession) -> None:
         """Initialize analytics service.
 
         Args:
@@ -216,7 +217,7 @@ class SearchAnalytics:
             user_id=user_id,
             session_id=session_id,
             search_syntax=search_syntax,
-            metadata=metadata,
+            context_data=metadata,
         )
 
         self.session.add(search)
@@ -259,7 +260,7 @@ class SearchAnalytics:
         Returns:
             SearchStats with aggregate metrics
         """
-        since = datetime.now(timezone.utc) - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
 
         # Total searches
         total_stmt = select(func.count()).select_from(SearchQuery).where(
@@ -375,7 +376,7 @@ class SearchAnalytics:
         Returns:
             List of popular queries with counts
         """
-        since = datetime.now(timezone.utc) - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
 
         stmt = (
             select(
@@ -421,7 +422,7 @@ class SearchAnalytics:
         Returns:
             List of zero-result queries with counts
         """
-        since = datetime.now(timezone.utc) - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
 
         stmt = (
             select(
@@ -456,7 +457,7 @@ class SearchAnalytics:
         Returns:
             List of slow queries with timing info
         """
-        since = datetime.now(timezone.utc) - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
 
         stmt = (
             select(
@@ -598,7 +599,7 @@ class SearchAnalytics:
         Returns:
             List of time periods with search counts
         """
-        since = datetime.now(timezone.utc) - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
 
         if interval == "hour":
             trunc_func = func.date_trunc("hour", SearchQuery.created_at)

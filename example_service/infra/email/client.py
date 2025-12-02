@@ -19,15 +19,11 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from example_service.core.settings.email import EmailSettings
 from example_service.utils.retry import retry
 
 from .schemas import EmailMessage, EmailResult, EmailStatus
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 

@@ -12,6 +12,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from example_service.core.database import TimestampedBase
 from example_service.core.database.search import TSVECTOR
 
+# Import reminder_tags table for the many-to-many relationship
+# This import must be at module level (not in TYPE_CHECKING) because
+# SQLAlchemy needs the actual Table object at runtime to resolve the relationship
+from example_service.features.tags.models import reminder_tags
+
 if TYPE_CHECKING:
     from example_service.features.tags.models import Tag
 
@@ -79,7 +84,7 @@ class Reminder(TimestampedBase):
     # Many-to-many relationship with tags
     tags: Mapped[list["Tag"]] = relationship(
         "Tag",
-        secondary="reminder_tags",
+        secondary=reminder_tags,
         back_populates="reminders",
         lazy="selectin",
     )

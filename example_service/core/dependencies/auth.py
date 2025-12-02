@@ -18,14 +18,12 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from example_service.core.schemas.auth import AuthUser, TokenPayload
 from example_service.core.settings import get_auth_settings
-from example_service.infra.cache.redis import get_cache
+from example_service.infra.cache.redis import RedisCache, get_cache
 from example_service.infra.logging.context import set_log_context
 from example_service.utils.retry import retry
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
-
-    from example_service.infra.cache.redis import RedisCache
 
 logger = logging.getLogger(__name__)
 

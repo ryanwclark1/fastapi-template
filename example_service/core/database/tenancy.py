@@ -16,7 +16,7 @@ from sqlalchemy import Column, Index, String, event, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import declarative_mixin, declared_attr
 
-from example_service.core.middleware.tenant import get_tenant_context
+from example_service.app.middleware.tenant import get_tenant_context
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence

@@ -74,6 +74,8 @@ class AuditLogCreate(BaseModel):
     metadata: dict[str, Any] | None = Field(
         default=None,
         description="Additional context data",
+        validation_alias="context_data",
+        serialization_alias="metadata",
     )
     success: bool = Field(
         default=True,
@@ -88,6 +90,8 @@ class AuditLogCreate(BaseModel):
         ge=0,
         description="Action duration in milliseconds",
     )
+
+    model_config = {"populate_by_name": True}
 
 
 class AuditLogResponse(BaseModel):
@@ -108,12 +112,16 @@ class AuditLogResponse(BaseModel):
     request_id: str | None = Field(description="Request correlation ID")
     endpoint: str | None = Field(description="API endpoint path")
     method: str | None = Field(description="HTTP method")
-    metadata: dict[str, Any] | None = Field(description="Additional context")
+    metadata: dict[str, Any] | None = Field(
+        description="Additional context",
+        validation_alias="context_data",
+        serialization_alias="metadata",
+    )
     success: bool = Field(description="Whether the action succeeded")
     error_message: str | None = Field(description="Error details if failed")
     duration_ms: int | None = Field(description="Action duration in milliseconds")
 
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "populate_by_name": True}
 
 
 class AuditLogQuery(BaseModel):

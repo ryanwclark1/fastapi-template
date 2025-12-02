@@ -84,3 +84,11 @@ class ExampleDeletedEvent(BaseEvent):
         default="example.deleted", description="Event type"
     )
     data: dict[str, Any] = Field(description="Entity identifier")
+
+
+# Rebuild all models to ensure they're fully defined before use in handlers
+# This is required for FastStream's AsyncAPI schema generation
+BaseEvent.model_rebuild()
+ExampleCreatedEvent.model_rebuild()
+ExampleUpdatedEvent.model_rebuild()
+ExampleDeletedEvent.model_rebuild()

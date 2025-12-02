@@ -15,6 +15,8 @@ from .models import AuditAction
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
+    from fastapi import Request
+
 logger = logging.getLogger(__name__)
 
 P = ParamSpec("P")
@@ -232,7 +234,6 @@ def audit_action(
     def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
         @wraps(func)
         async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-            from fastapi import Request
 
             from example_service.infra.database.session import get_async_session
 

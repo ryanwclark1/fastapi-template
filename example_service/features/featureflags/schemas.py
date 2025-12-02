@@ -43,7 +43,12 @@ class FeatureFlagCreate(BaseModel):
     targeting_rules: list[TargetingRule] | None = Field(
         default=None, description="Targeting rules"
     )
-    metadata: dict[str, Any] | None = Field(default=None, description="Additional metadata")
+    metadata: dict[str, Any] | None = Field(
+        default=None,
+        description="Additional metadata",
+        validation_alias="context_data",
+        serialization_alias="metadata",
+    )
     starts_at: datetime | None = Field(default=None, description="Activation start time")
     ends_at: datetime | None = Field(default=None, description="Activation end time")
 
@@ -54,6 +59,7 @@ class FeatureFlagCreate(BaseModel):
         return v.lower()
 
     model_config = {
+        "populate_by_name": True,
         "json_schema_extra": {
             "example": {
                 "key": "new_dashboard",
@@ -75,9 +81,15 @@ class FeatureFlagUpdate(BaseModel):
     enabled: bool | None = Field(default=None)
     percentage: int | None = Field(default=None, ge=0, le=100)
     targeting_rules: list[TargetingRule] | None = Field(default=None)
-    metadata: dict[str, Any] | None = Field(default=None)
+    metadata: dict[str, Any] | None = Field(
+        default=None,
+        validation_alias="context_data",
+        serialization_alias="metadata",
+    )
     starts_at: datetime | None = Field(default=None)
     ends_at: datetime | None = Field(default=None)
+
+    model_config = {"populate_by_name": True}
 
 
 class FeatureFlagResponse(BaseModel):
@@ -91,13 +103,17 @@ class FeatureFlagResponse(BaseModel):
     enabled: bool
     percentage: int
     targeting_rules: list[TargetingRule] | None
-    metadata: dict[str, Any] | None
+    metadata: dict[str, Any] | None = Field(
+        description="Additional metadata",
+        validation_alias="context_data",
+        serialization_alias="metadata",
+    )
     starts_at: datetime | None
     ends_at: datetime | None
     created_at: datetime
     updated_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "populate_by_name": True}
 
 
 class FeatureFlagListResponse(BaseModel):

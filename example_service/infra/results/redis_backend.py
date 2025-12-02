@@ -130,6 +130,14 @@ class RedisAsyncResultBackend(AsyncResultBackend[_ReturnType]):
             return task_id
         return f"{self.prefix_str}:{task_id}"
 
+    async def startup(self) -> None:
+        """Initialize Redis backend.
+
+        Connection pool is already created in __init__, so this is a no-op
+        that exists for consistency with AsyncResultBackend interface.
+        """
+        pass
+
     async def shutdown(self) -> None:
         """Closes Redis connection pool."""
         await self.redis_pool.disconnect()
@@ -324,6 +332,14 @@ class RedisAsyncClusterResultBackend(AsyncResultBackend[_ReturnType]):
             return task_id
         return f"{self.prefix_str}:{task_id}"
 
+    async def startup(self) -> None:
+        """Initialize Redis Cluster backend.
+
+        Connection is already created in __init__, so this is a no-op
+        that exists for consistency with AsyncResultBackend interface.
+        """
+        pass
+
     async def shutdown(self) -> None:
         """Closes Redis cluster connection."""
         await self.redis.close()
@@ -479,6 +495,14 @@ class RedisAsyncSentinelResultBackend(AsyncResultBackend[_ReturnType]):
         if self.prefix_str is None:
             return task_id
         return f"{self.prefix_str}:{task_id}"
+
+    async def startup(self) -> None:
+        """Initialize Redis Sentinel backend.
+
+        Sentinel connection is already created in __init__, so this is a no-op
+        that exists for consistency with AsyncResultBackend interface.
+        """
+        pass
 
     @asynccontextmanager
     async def _acquire_master_conn(self) -> AsyncIterator[_Redis]:

@@ -20,11 +20,13 @@ Usage Patterns:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
+from example_service.app.docs import ensure_asyncapi_template_patched
 from example_service.core.settings import get_otel_settings, get_rabbit_settings
 
 if TYPE_CHECKING:
@@ -65,8 +67,24 @@ rabbit_settings = get_rabbit_settings()
 # RabbitRouter wraps RabbitBroker and provides FastAPI integration
 router: RabbitRouterType | None = None
 broker: RabbitBroker | None = None
+_not_configured_logged = False
 
-if rabbit_settings.is_configured:
+
+def _ensure_router_initialized() -> RabbitRouterType | None:
+    """Create the RabbitRouter on first use so AsyncAPI template patches apply."""
+    global router, broker, _not_configured_logged
+
+    if router is not None:
+        return router
+
+    if not rabbit_settings.is_configured:
+        if not _not_configured_logged:
+            logger.warning("RabbitMQ not configured - messaging features disabled")
+            _not_configured_logged = True
+        return None
+
+    ensure_asyncapi_template_patched()
+
     from faststream.rabbit.fastapi import RabbitRouter
 
     # Build middleware list - conditionally add TelemetryMiddleware if OTel is enabled
@@ -93,10 +111,8 @@ if rabbit_settings.is_configured:
         include_in_schema=True,
         description="Event-driven messaging API for the Example Service",
     )
-    # Access the underlying broker for direct operations
     broker = router.broker
-else:
-    logger.warning("RabbitMQ not configured - messaging features disabled")
+    return router
 
 
 async def get_broker() -> AsyncIterator[RabbitBroker | None]:
@@ -118,6 +134,7 @@ async def get_broker() -> AsyncIterator[RabbitBroker | None]:
                 queue="user-events"
             )
     """
+    _ensure_router_initialized()
     yield broker
 
 
@@ -127,7 +144,7 @@ def get_router() -> RabbitRouterType | None:
     Returns:
         RabbitRouter instance or None if not configured.
     """
-    return router
+    return _ensure_router_initialized()
 
 
 # Legacy functions for backward compatibility
@@ -140,16 +157,48 @@ async def start_broker() -> None:
     Note: When using RabbitRouter with FastAPI, the broker lifecycle
     is managed automatically. This function is kept for backward
     compatibility and manual startup scenarios.
+
+    The connection is wrapped with a timeout to prevent indefinite blocking
+    if RabbitMQ is unavailable. If the broker is already running (from
+    RabbitRouter auto-connection), this function will return immediately.
     """
+    _ensure_router_initialized()
+
     if not rabbit_settings.is_configured or broker is None:
         logger.warning("RabbitMQ not configured, skipping broker startup")
         return
 
-    logger.info("Starting RabbitMQ broker", extra={"url": rabbit_settings.get_url()})
+    # Check if broker is already running (from RabbitRouter auto-connection)
+    if hasattr(broker, "running") and broker.running:
+        logger.debug("RabbitMQ broker already running (connected via RabbitRouter)")
+        return
+
+    logger.info(
+        "Starting RabbitMQ broker",
+        extra={
+            "url": rabbit_settings.get_url(),
+            "connection_timeout": rabbit_settings.connection_timeout,
+        },
+    )
 
     try:
-        await broker.start()
+        # Wrap connection with timeout to prevent indefinite blocking
+        # Use wait_for instead of timeout context for better compatibility
+        await asyncio.wait_for(
+            broker.start(),
+            timeout=rabbit_settings.connection_timeout,
+        )
         logger.info("RabbitMQ broker started successfully")
+    except TimeoutError:
+        error_msg = f"RabbitMQ connection timeout after {rabbit_settings.connection_timeout}s"
+        logger.error(
+            error_msg,
+            extra={
+                "url": rabbit_settings.get_url(),
+                "connection_timeout": rabbit_settings.connection_timeout,
+            },
+        )
+        raise ConnectionError(error_msg) from None
     except Exception as e:
         logger.exception("Failed to start RabbitMQ broker", extra={"error": str(e)})
         raise
@@ -162,6 +211,8 @@ async def stop_broker() -> None:
     is managed automatically. This function is kept for backward
     compatibility and manual shutdown scenarios.
     """
+    _ensure_router_initialized()
+
     if not rabbit_settings.is_configured or broker is None:
         logger.debug("RabbitMQ not configured, skipping broker shutdown")
         return
@@ -183,6 +234,11 @@ async def broker_context() -> AsyncIterator[RabbitBroker | None]:
     outside of FastAPI's lifespan (e.g., Taskiq worker tasks). It ensures
     the broker is connected before use and properly closed afterward.
 
+    IMPORTANT: This context manager only closes the broker if it was
+    started by this context. If the broker is already running (e.g., from
+    FastAPI lifespan), it will NOT close it to avoid disconnecting shared
+    connections.
+
     Yields:
         RabbitBroker instance or None if not configured.
 
@@ -202,25 +258,54 @@ async def broker_context() -> AsyncIterator[RabbitBroker | None]:
         - In FastAPI endpoints, use `Depends(get_broker)` instead
         - The context manager is idempotent - safe to use even if
           broker is already connected (e.g., in tests)
+        - Only closes the broker if it was started by this context
     """
+    _ensure_router_initialized()
+
     if not rabbit_settings.is_configured or broker is None:
         logger.warning("RabbitMQ not configured, broker_context yielding None")
         yield None
         return
 
+    # Check if broker is already running (e.g., from FastAPI lifespan)
+    was_running = hasattr(broker, "running") and broker.running
+    connection_started = False
+
     try:
-        await broker.start()
-        logger.debug("Broker connected via context manager")
+        # Only start if not already running to avoid connection leaks
+        if not was_running:
+            # Wrap connection with timeout to prevent indefinite blocking
+            # Use wait_for instead of timeout context for better compatibility
+            await asyncio.wait_for(
+                broker.start(),
+                timeout=rabbit_settings.connection_timeout,
+            )
+            connection_started = True
+            logger.debug("Broker connected via context manager")
+        else:
+            logger.debug("Broker already running, reusing existing connection")
         yield broker
+    except TimeoutError:
+        error_msg = f"RabbitMQ connection timeout after {rabbit_settings.connection_timeout}s"
+        logger.error(
+            error_msg,
+            extra={"connection_timeout": rabbit_settings.connection_timeout},
+        )
+        raise ConnectionError(error_msg) from None
     except Exception as e:
         logger.exception("Failed to connect broker", extra={"error": str(e)})
         raise
     finally:
-        try:
-            await broker.close()
-            logger.debug("Broker disconnected via context manager")
-        except Exception as e:
-            logger.warning("Error closing broker in context manager", extra={"error": str(e)})
+        # Only close if we started the connection (not if it was already running)
+        # This prevents disconnecting shared connections from FastAPI lifespan
+        if connection_started and not was_running:
+            try:
+                await broker.close()
+                logger.debug("Broker disconnected via context manager")
+            except Exception as e:
+                logger.warning("Error closing broker in context manager", extra={"error": str(e)})
+        elif was_running:
+            logger.debug("Broker was already running, not closing to preserve shared connection")
 
 
 async def check_broker_health() -> dict[str, Any]:
@@ -242,6 +327,8 @@ async def check_broker_health() -> dict[str, Any]:
         >>> if health["status"] == "healthy":
         ...     print("Broker is operational")
     """
+    _ensure_router_initialized()
+
     if broker is None:
         return {
             "status": "unavailable",
