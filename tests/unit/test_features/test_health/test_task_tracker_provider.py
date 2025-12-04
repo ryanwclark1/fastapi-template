@@ -70,7 +70,7 @@ def settings(monkeypatch):
 
 def _patch_get_tracker(monkeypatch, tracker):
     monkeypatch.setattr(
-        "example_service.tasks.tracking.get_tracker",
+        "example_service.infra.tasks.tracking.get_tracker",
         lambda: tracker,
         raising=False,
     )

@@ -1,6 +1,21 @@
 """FastAPI dependencies for route handlers.
 
 This module re-exports commonly used dependencies for cleaner imports.
+It acts as the central Dependency Injection (DI) registry for the application.
+
+Architecture Note:
+    This module intentionally imports from `infra/` (e.g., get_cache) despite
+    the typical layering where core should not depend on infra. This is a
+    pragmatic design choice for DI:
+
+    - `core/dependencies/` serves as the DI registry, the composition root
+    - Features import dependencies from here, not directly from infra
+    - This provides a stable API for features while allowing infra changes
+    - The tradeoff: core has awareness of infra, but only for DI wiring
+
+    Alternative patterns considered but rejected:
+    - Protocols in core with infra implementations: More complex, less ergonomic
+    - Direct infra imports in features: Tighter coupling, harder to mock
 
 Usage:
     from example_service.core.dependencies import (

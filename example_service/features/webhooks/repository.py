@@ -1,4 +1,9 @@
-"""Repository for the webhooks feature."""
+"""Repository for the webhooks feature.
+
+Supports optional multi-tenancy: when tenant_id is provided, all queries
+are automatically scoped to that tenant. When tenant_id is None, operates
+in single-tenant mode with no tenant filtering.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +12,11 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 
-from example_service.core.database.repository import BaseRepository, SearchResult
+from example_service.core.database.repository import (
+    BaseRepository,
+    SearchResult,
+    TenantAwareRepository,
+)
 from example_service.features.webhooks.models import Webhook, WebhookDelivery
 
 if TYPE_CHECKING:
@@ -17,10 +26,10 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
-class WebhookRepository(BaseRepository[Webhook]):
-    """Repository for Webhook model.
+class WebhookRepository(TenantAwareRepository[Webhook]):
+    """Repository for Webhook model with optional multi-tenancy support.
 
-    Inherits from BaseRepository:
+    Inherits from TenantAwareRepository (which extends BaseRepository):
         - get(session, id) -> Webhook | None
         - get_or_raise(session, id) -> Webhook
         - get_by(session, attr, value) -> Webhook | None
@@ -29,6 +38,11 @@ class WebhookRepository(BaseRepository[Webhook]):
         - create(session, instance) -> Webhook
         - create_many(session, instances) -> Sequence[Webhook]
         - delete(session, instance) -> None
+
+    Tenant-aware methods (add tenant_id=None for optional filtering):
+        - get_for_tenant(session, id, tenant_id) -> Webhook | None
+        - list_for_tenant(session, tenant_id, limit, offset) -> Sequence[Webhook]
+        - search_for_tenant(session, statement, tenant_id) -> SearchResult[Webhook]
 
     Feature-specific methods below.
     """
@@ -41,6 +55,7 @@ class WebhookRepository(BaseRepository[Webhook]):
         self,
         session: AsyncSession,
         *,
+        tenant_id: str | None = None,
         limit: int = 100,
         offset: int = 0,
     ) -> Sequence[Webhook]:
@@ -48,6 +63,8 @@ class WebhookRepository(BaseRepository[Webhook]):
 
         Args:
             session: Database session
+            tenant_id: Optional tenant ID for multi-tenant filtering.
+                      If None, no tenant filtering is applied (single-tenant mode).
             limit: Maximum results
             offset: Results to skip
 
@@ -61,11 +78,12 @@ class WebhookRepository(BaseRepository[Webhook]):
             .limit(limit)
             .offset(offset)
         )
+        stmt = self._apply_tenant_filter(stmt, tenant_id)
         result = await session.execute(stmt)
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.find_active: Webhook(limit={limit}, offset={offset}) -> {len(items)} items"
+            lambda: f"db.find_active: Webhook(tenant={tenant_id}, limit={limit}, offset={offset}) -> {len(items)} items"
         )
         return items
 
@@ -74,6 +92,7 @@ class WebhookRepository(BaseRepository[Webhook]):
         session: AsyncSession,
         event_type: str,
         *,
+        tenant_id: str | None = None,
         active_only: bool = True,
     ) -> Sequence[Webhook]:
         """Find webhooks subscribed to a specific event type.
@@ -81,12 +100,17 @@ class WebhookRepository(BaseRepository[Webhook]):
         Args:
             session: Database session
             event_type: Event type to filter by
+            tenant_id: Optional tenant ID for multi-tenant filtering.
+                      If None, no tenant filtering is applied (single-tenant mode).
             active_only: Only return active webhooks
 
         Returns:
             Sequence of webhooks subscribed to the event type
         """
         stmt = select(Webhook).where(Webhook.event_types.contains([event_type]))
+
+        # Apply tenant filter
+        stmt = self._apply_tenant_filter(stmt, tenant_id)
 
         if active_only:
             stmt = stmt.where(Webhook.is_active == True)  # noqa: E712
@@ -97,7 +121,7 @@ class WebhookRepository(BaseRepository[Webhook]):
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.find_by_event_type: event_type={event_type!r}, active_only={active_only} -> {len(items)} items"
+            lambda: f"db.find_by_event_type: event_type={event_type!r}, tenant={tenant_id}, active_only={active_only} -> {len(items)} items"
         )
         return items
 
@@ -105,6 +129,7 @@ class WebhookRepository(BaseRepository[Webhook]):
         self,
         session: AsyncSession,
         *,
+        tenant_id: str | None = None,
         is_active: bool | None = None,
         limit: int = 50,
         offset: int = 0,
@@ -113,6 +138,8 @@ class WebhookRepository(BaseRepository[Webhook]):
 
         Args:
             session: Database session
+            tenant_id: Optional tenant ID for multi-tenant filtering.
+                      If None, no tenant filtering is applied (single-tenant mode).
             is_active: Filter by active status
             limit: Page size
             offset: Results to skip
@@ -121,6 +148,9 @@ class WebhookRepository(BaseRepository[Webhook]):
             SearchResult with webhooks and pagination info
         """
         stmt = select(Webhook)
+
+        # Apply tenant filter
+        stmt = self._apply_tenant_filter(stmt, tenant_id)
 
         # Status filter
         if is_active is not None:
@@ -132,7 +162,7 @@ class WebhookRepository(BaseRepository[Webhook]):
         search_result = await self.search(session, stmt, limit=limit, offset=offset)
 
         self._lazy.debug(
-            lambda: f"db.search_webhooks: is_active={is_active} -> {len(search_result.items)}/{search_result.total}"
+            lambda: f"db.search_webhooks: tenant={tenant_id}, is_active={is_active} -> {len(search_result.items)}/{search_result.total}"
         )
         return search_result
 

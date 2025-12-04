@@ -1,4 +1,9 @@
-"""Repository for the files feature."""
+"""Repository for the files feature.
+
+Supports optional multi-tenancy: when tenant_id is provided, all queries
+are automatically scoped to that tenant. When tenant_id is None, operates
+in single-tenant mode with no tenant filtering.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +13,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import select
 
 from example_service.core.database import SearchFilter
-from example_service.core.database.repository import BaseRepository, SearchResult
+from example_service.core.database.repository import SearchResult, TenantAwareRepository
 from example_service.features.files.models import File, FileStatus
 
 if TYPE_CHECKING:
@@ -18,10 +23,10 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
-class FileRepository(BaseRepository[File]):
-    """Repository for File model.
+class FileRepository(TenantAwareRepository[File]):
+    """Repository for File model with optional multi-tenancy support.
 
-    Inherits from BaseRepository:
+    Inherits from TenantAwareRepository (which extends BaseRepository):
         - get(session, id) -> File | None
         - get_or_raise(session, id) -> File
         - get_by(session, attr, value) -> File | None
@@ -30,6 +35,11 @@ class FileRepository(BaseRepository[File]):
         - create(session, instance) -> File
         - create_many(session, instances) -> Sequence[File]
         - delete(session, instance) -> None
+
+    Tenant-aware methods (add tenant_id=None for optional filtering):
+        - get_for_tenant(session, id, tenant_id) -> File | None
+        - list_for_tenant(session, tenant_id, limit, offset) -> Sequence[File]
+        - search_for_tenant(session, statement, tenant_id) -> SearchResult[File]
 
     Feature-specific methods below.
     """
@@ -42,22 +52,27 @@ class FileRepository(BaseRepository[File]):
         self,
         session: AsyncSession,
         storage_key: str,
+        *,
+        tenant_id: str | None = None,
     ) -> File | None:
         """Get file by its storage key.
 
         Args:
             session: Database session
             storage_key: S3 storage key
+            tenant_id: Optional tenant ID for multi-tenant filtering.
+                      If None, no tenant filtering is applied (single-tenant mode).
 
         Returns:
             File if found, None otherwise
         """
         stmt = select(File).where(File.storage_key == storage_key)
+        stmt = self._apply_tenant_filter(stmt, tenant_id)
         result = await session.execute(stmt)
         file = result.scalar_one_or_none()
 
         self._lazy.debug(
-            lambda: f"db.get_by_storage_key({storage_key}) -> {'found' if file else 'not found'}"
+            lambda: f"db.get_by_storage_key({storage_key}, tenant={tenant_id}) -> {'found' if file else 'not found'}"
         )
         return file
 
@@ -66,6 +81,7 @@ class FileRepository(BaseRepository[File]):
         session: AsyncSession,
         owner_id: str,
         *,
+        tenant_id: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> Sequence[File]:
@@ -74,6 +90,8 @@ class FileRepository(BaseRepository[File]):
         Args:
             session: Database session
             owner_id: Owner identifier
+            tenant_id: Optional tenant ID for multi-tenant filtering.
+                      If None, no tenant filtering is applied (single-tenant mode).
             limit: Maximum results
             offset: Results to skip
 
@@ -88,11 +106,12 @@ class FileRepository(BaseRepository[File]):
             .limit(limit)
             .offset(offset)
         )
+        stmt = self._apply_tenant_filter(stmt, tenant_id)
         result = await session.execute(stmt)
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.list_by_owner: owner_id={owner_id}, limit={limit}, offset={offset} -> {len(items)} items"
+            lambda: f"db.list_by_owner: owner_id={owner_id}, tenant={tenant_id}, limit={limit}, offset={offset} -> {len(items)} items"
         )
         return items
 
@@ -101,6 +120,7 @@ class FileRepository(BaseRepository[File]):
         session: AsyncSession,
         status: FileStatus,
         *,
+        tenant_id: str | None = None,
         limit: int = 100,
         offset: int = 0,
     ) -> Sequence[File]:
@@ -109,6 +129,8 @@ class FileRepository(BaseRepository[File]):
         Args:
             session: Database session
             status: File status to filter by
+            tenant_id: Optional tenant ID for multi-tenant filtering.
+                      If None, no tenant filtering is applied (single-tenant mode).
             limit: Maximum results
             offset: Results to skip
 
@@ -122,11 +144,12 @@ class FileRepository(BaseRepository[File]):
             .limit(limit)
             .offset(offset)
         )
+        stmt = self._apply_tenant_filter(stmt, tenant_id)
         result = await session.execute(stmt)
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.list_by_status: status={status.value}, limit={limit}, offset={offset} -> {len(items)} items"
+            lambda: f"db.list_by_status: status={status.value}, tenant={tenant_id}, limit={limit}, offset={offset} -> {len(items)} items"
         )
         return items
 
@@ -134,6 +157,7 @@ class FileRepository(BaseRepository[File]):
         self,
         session: AsyncSession,
         *,
+        tenant_id: str | None = None,
         as_of: datetime | None = None,
         limit: int = 100,
     ) -> Sequence[File]:
@@ -141,6 +165,8 @@ class FileRepository(BaseRepository[File]):
 
         Args:
             session: Database session
+            tenant_id: Optional tenant ID for multi-tenant filtering.
+                      If None, no tenant filtering is applied (single-tenant mode).
             as_of: Reference time (defaults to now)
             limit: Maximum results
 
@@ -158,6 +184,7 @@ class FileRepository(BaseRepository[File]):
             .order_by(File.expires_at.asc())
             .limit(limit)
         )
+        stmt = self._apply_tenant_filter(stmt, tenant_id)
         result = await session.execute(stmt)
         items = result.scalars().all()
 
@@ -167,11 +194,12 @@ class FileRepository(BaseRepository[File]):
                 extra={
                     "count": len(items),
                     "as_of": now.isoformat(),
+                    "tenant_id": tenant_id,
                     "operation": "db.list_expired",
                 },
             )
         else:
-            self._lazy.debug(lambda: f"db.list_expired: no expired files as of {now}")
+            self._lazy.debug(lambda: f"db.list_expired: no expired files as of {now} (tenant={tenant_id})")
 
         return items
 
@@ -179,6 +207,7 @@ class FileRepository(BaseRepository[File]):
         self,
         session: AsyncSession,
         *,
+        tenant_id: str | None = None,
         query: str | None = None,
         owner_id: str | None = None,
         content_type: str | None = None,
@@ -191,6 +220,8 @@ class FileRepository(BaseRepository[File]):
 
         Args:
             session: Database session
+            tenant_id: Optional tenant ID for multi-tenant filtering.
+                      If None, no tenant filtering is applied (single-tenant mode).
             query: Search term (searches filename)
             owner_id: Filter by owner
             content_type: Filter by MIME type (prefix match)
@@ -206,6 +237,9 @@ class FileRepository(BaseRepository[File]):
 
         # Exclude deleted files by default
         stmt = stmt.where(File.status != FileStatus.DELETED)
+
+        # Apply tenant filter
+        stmt = self._apply_tenant_filter(stmt, tenant_id)
 
         # Text search
         if query:
@@ -237,7 +271,7 @@ class FileRepository(BaseRepository[File]):
         search_result = await self.search(session, stmt, limit=limit, offset=offset)
 
         self._lazy.debug(
-            lambda: f"db.search_files: query={query!r}, owner_id={owner_id}, content_type={content_type} "
+            lambda: f"db.search_files: query={query!r}, owner_id={owner_id}, tenant={tenant_id}, content_type={content_type} "
             f"-> {len(search_result.items)}/{search_result.total}"
         )
         return search_result
@@ -247,6 +281,8 @@ class FileRepository(BaseRepository[File]):
         session: AsyncSession,
         file_id: UUID,
         status: FileStatus,
+        *,
+        tenant_id: str | None = None,
     ) -> File | None:
         """Update file status.
 
@@ -254,37 +290,44 @@ class FileRepository(BaseRepository[File]):
             session: Database session
             file_id: File UUID
             status: New status
+            tenant_id: Optional tenant ID for multi-tenant verification.
+                      If provided, ensures the file belongs to this tenant.
+                      If None, no tenant verification is performed.
 
         Returns:
-            Updated file or None if not found
+            Updated file or None if not found (or tenant mismatch)
         """
-        file = await self.get(session, file_id)
+        file = await self.get_for_tenant(session, file_id, tenant_id)
         if file is None:
-            self._lazy.debug(lambda: f"db.update_status({file_id}) -> not found")
+            self._lazy.debug(lambda: f"db.update_status({file_id}, tenant={tenant_id}) -> not found")
             return None
 
         file.status = status
         await session.flush()
         await session.refresh(file)
 
-        self._lazy.debug(lambda: f"db.update_status({file_id}, {status.value}) -> success")
+        self._lazy.debug(lambda: f"db.update_status({file_id}, {status.value}, tenant={tenant_id}) -> success")
         return file
 
     async def soft_delete(
         self,
         session: AsyncSession,
         file_id: UUID,
+        *,
+        tenant_id: str | None = None,
     ) -> File | None:
         """Soft delete a file by marking it as deleted.
 
         Args:
             session: Database session
             file_id: File UUID
+            tenant_id: Optional tenant ID for multi-tenant verification.
+                      If provided, ensures the file belongs to this tenant.
 
         Returns:
-            Updated file or None if not found
+            Updated file or None if not found (or tenant mismatch)
         """
-        return await self.update_status(session, file_id, FileStatus.DELETED)
+        return await self.update_status(session, file_id, FileStatus.DELETED, tenant_id=tenant_id)
 
 
 # Factory function for dependency injection

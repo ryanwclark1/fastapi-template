@@ -88,6 +88,9 @@ class ConfDYamlConfigSettingsSource(YamlConfigSettingsSource):
                 for f in sorted(confd_path.glob("*.json")):
                     yaml_files.append(f)
 
+        # Store files list for __repr__
+        self._yaml_files = yaml_files
+
         # Initialize parent with all files and deep_merge enabled
         # deep_merge=True ensures nested dicts are merged, not replaced
         super().__init__(
@@ -97,7 +100,10 @@ class ConfDYamlConfigSettingsSource(YamlConfigSettingsSource):
         )
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(yaml_file={self.yaml_file_path})"
+        if self._yaml_files:
+            files_str = ", ".join(str(f) for f in self._yaml_files)
+            return f"{self.__class__.__name__}(yaml_files=[{files_str}])"
+        return f"{self.__class__.__name__}(yaml_files=[])"
 
 
 # ============================================================================
@@ -289,4 +295,21 @@ def create_i18n_yaml_source(settings_cls: type[BaseSettings]) -> ConfDYamlConfig
         yaml_file="i18n.yaml",
         confd_dir="i18n.d",
         config_dir_env="I18N_CONFIG_DIR",
+    )
+
+
+def create_ai_yaml_source(settings_cls: type[BaseSettings]) -> ConfDYamlConfigSettingsSource:
+    """Create YAML source for AISettings.
+
+    Loads from:
+    - conf/ai.yaml (base)
+    - conf/ai.d/*.yaml (overrides)
+
+    Override directory with: AI_CONFIG_DIR=/custom/path
+    """
+    return ConfDYamlConfigSettingsSource(
+        settings_cls,
+        yaml_file="ai.yaml",
+        confd_dir="ai.d",
+        config_dir_env="AI_CONFIG_DIR",
     )

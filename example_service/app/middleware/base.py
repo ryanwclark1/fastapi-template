@@ -196,3 +196,7 @@ def generate_uuid() -> str:
         String representation of a UUID v4.
     """
     return str(uuid.uuid4())
+
+
+# Export clear_log_context for use in other modules
+__all__ = ["HeaderContextMiddleware", "clear_log_context"]

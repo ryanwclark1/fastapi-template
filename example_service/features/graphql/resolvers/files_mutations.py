@@ -32,7 +32,7 @@ from example_service.features.graphql.types.files import (
     PresignedUploadResponse,
 )
 from example_service.infra.storage.exceptions import (
-    StorageClientError,
+    StorageError,
     StorageNotConfiguredError,
 )
 
@@ -206,7 +206,7 @@ async def confirm_file_upload_mutation(
             code=FileErrorCode.INVALID_STATUS,
             message=str(e),
         )
-    except StorageClientError as e:
+    except StorageError as e:
         # File not found in storage
         logger.exception(f"Storage error confirming upload: {e}")
         await ctx.session.rollback()

@@ -6,10 +6,11 @@ import enum
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from example_service.core.database import TimestampedBase
+from example_service.core.database import TenantMixin, TimestampedBase
+from example_service.core.database.enums import FileStatus as FileStatusEnum
 
 
 class FileStatus(str, enum.Enum):
@@ -22,10 +23,14 @@ class FileStatus(str, enum.Enum):
     DELETED = "deleted"  # Soft deleted
 
 
-class File(TimestampedBase):
+class File(TimestampedBase, TenantMixin):
     """File metadata stored in the database.
 
     Tracks uploaded files with their storage location, metadata, and processing status.
+    Supports multi-tenancy via tenant_id for data isolation.
+
+    Files are initially uploaded to a universal bucket, then relocated to
+    tenant-specific buckets. The bucket field tracks the current location.
     """
 
     __tablename__ = "files"
@@ -38,10 +43,10 @@ class File(TimestampedBase):
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
     checksum_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     etag: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    status: Mapped[FileStatus] = mapped_column(
-        Enum(FileStatus, name="file_status"),
+    status: Mapped[str] = mapped_column(
+        FileStatusEnum,
         nullable=False,
-        default=FileStatus.PENDING,
+        default="pending",
         index=True,
     )
     owner_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)

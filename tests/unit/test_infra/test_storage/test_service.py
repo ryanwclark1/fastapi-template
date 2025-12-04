@@ -128,7 +128,7 @@ class TestBucketResolution:
             service._resolve_bucket(tenant_context=None, bucket=None)
 
         assert "Tenant context required" in str(exc_info.value)
-        assert exc_info.value.code == "STORAGE_TENANT_REQUIRED"
+        assert exc_info.value.code == "TENANT_CONTEXT_REQUIRED"
 
     def test_require_tenant_context_allows_explicit_bucket(self):
         """Test that explicit bucket works even with require_tenant_context=True."""

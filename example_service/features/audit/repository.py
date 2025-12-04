@@ -171,33 +171,38 @@ class AuditRepository(BaseRepository[AuditLog]):
 
         # Action counts
         action_result = await session.execute(
-            select(AuditLog.action, func.count()).select_from(subquery).group_by(AuditLog.action)
+            select(subquery.c.action, func.count())
+            .select_from(subquery)
+            .group_by(subquery.c.action)
         )
-        actions_count: dict[str, int] = dict(action_result.all())  # type: ignore[arg-type]
+        # Convert enum keys to their values for dictionary
+        actions_count: dict[Any, int] = dict(action_result.all())  # type: ignore[arg-type]
 
         # Entity type counts
         entity_result = await session.execute(
-            select(AuditLog.entity_type, func.count())
+            select(subquery.c.entity_type, func.count())
             .select_from(subquery)
-            .group_by(AuditLog.entity_type)
+            .group_by(subquery.c.entity_type)
         )
         entity_types_count: dict[str, int] = dict(entity_result.all())  # type: ignore[arg-type]
 
         # Success count
         success_result = await session.execute(
-            select(func.count()).select_from(subquery).where(AuditLog.success == True)  # noqa: E712
+            select(func.count()).select_from(subquery).where(subquery.c.success == True)  # noqa: E712
         )
         success_count = success_result.scalar() or 0
 
         # Unique users
         users_result = await session.execute(
-            select(func.count(func.distinct(AuditLog.user_id))).select_from(subquery)
+            select(func.count(func.distinct(subquery.c.user_id))).select_from(subquery)
         )
         unique_users = users_result.scalar() or 0
 
         # Time range
         time_result = await session.execute(
-            select(func.min(AuditLog.timestamp), func.max(AuditLog.timestamp)).select_from(subquery)
+            select(func.min(subquery.c.timestamp), func.max(subquery.c.timestamp)).select_from(
+                subquery
+            )
         )
         time_row = time_result.one_or_none()
         time_range = (time_row[0], time_row[1]) if time_row else (None, None)

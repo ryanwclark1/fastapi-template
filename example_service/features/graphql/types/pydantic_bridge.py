@@ -61,7 +61,9 @@ Example:
 pydantic_interface = pydantic.interface
 """Decorator to create Strawberry interface from Pydantic model."""
 
-pydantic_field = pydantic.field
+# Note: strawberry.experimental.pydantic doesn't have a .field attribute
+# Use strawberry.field directly for field overrides
+pydantic_field = strawberry.field
 """Field configuration for Pydantic-generated Strawberry types.
 
 Example:

@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from example_service.infra.results.models import TaskExecution
-from example_service.tasks.tracking.postgres_tracker import PostgresTaskTracker
+from example_service.infra.tasks.tracking.postgres_tracker import PostgresTaskTracker
 
 
 class FakeScalarResult:
@@ -101,11 +101,11 @@ def tracker(monkeypatch):
         return session
 
     monkeypatch.setattr(
-        "example_service.tasks.tracking.postgres_tracker.create_async_engine",
+        "example_service.infra.tasks.tracking.postgres_tracker.create_async_engine",
         lambda *args, **kwargs: engine,
     )
     monkeypatch.setattr(
-        "example_service.tasks.tracking.postgres_tracker.async_sessionmaker",
+        "example_service.infra.tasks.tracking.postgres_tracker.async_sessionmaker",
         lambda *args, **kwargs: session_factory,
     )
 
@@ -126,11 +126,11 @@ async def test_connect_and_disconnect(monkeypatch):
         return session
 
     monkeypatch.setattr(
-        "example_service.tasks.tracking.postgres_tracker.create_async_engine",
+        "example_service.infra.tasks.tracking.postgres_tracker.create_async_engine",
         lambda *args, **kwargs: engine,
     )
     monkeypatch.setattr(
-        "example_service.tasks.tracking.postgres_tracker.async_sessionmaker",
+        "example_service.infra.tasks.tracking.postgres_tracker.async_sessionmaker",
         lambda *args, **kwargs: session_factory,
     )
 

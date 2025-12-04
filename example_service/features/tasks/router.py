@@ -241,7 +241,7 @@ async def trigger_task(
     """Trigger a background task on-demand.
 
     The task will be queued for execution by a Taskiq worker.
-    Make sure a worker is running: `taskiq worker example_service.tasks.broker:broker`
+    Make sure a worker is running: `taskiq worker example_service.infra.tasks.broker:broker`
 
     Available tasks:
     - **backup_database**: Create a database backup

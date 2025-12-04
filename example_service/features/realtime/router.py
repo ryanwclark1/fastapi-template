@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import JSONResponse
@@ -51,8 +51,10 @@ def _get_manager_safe() -> ConnectionManager | None:
 @router.websocket("")
 async def websocket_endpoint(
     websocket: WebSocket,
-    channels: str = Query(default="", description="Comma-separated list of channels to subscribe"),
-    user_id: str | None = Query(default=None, description="User identifier"),
+    channels: Annotated[
+        str, Query(description="Comma-separated list of channels to subscribe")
+    ] = "",
+    user_id: Annotated[str | None, Query(description="User identifier")] = None,
 ) -> None:
     """WebSocket connection endpoint.
 

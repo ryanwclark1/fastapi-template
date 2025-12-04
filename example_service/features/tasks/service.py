@@ -20,16 +20,16 @@ from example_service.features.tasks.schemas import (
     TaskStatsResponse,
     TriggerTaskResponse,
 )
-from example_service.tasks.tracking import get_tracker
+from example_service.infra.tasks.tracking import get_tracker
 
 # Optional references for patching/testing; actual imports may fail if infra not set up
 try:
-    from example_service.tasks.broker import broker
+    from example_service.infra.tasks.broker import broker
 except Exception:  # pragma: no cover - best effort
     broker = None
 
 try:
-    from example_service.tasks.scheduler import scheduler
+    from example_service.infra.tasks.scheduler import scheduler
 except Exception:  # pragma: no cover - best effort
     scheduler = None
 
@@ -60,7 +60,7 @@ class TrackerNotAvailableError(TaskServiceError):
 if TYPE_CHECKING:
     from apscheduler.schedulers.asyncio import AsyncIOScheduler  # type: ignore[import-untyped]
 
-    from example_service.tasks.tracking.base import BaseTaskTracker
+    from example_service.infra.tasks.tracking.base import BaseTaskTracker
 
 logger = logging.getLogger(__name__)
 
@@ -395,7 +395,7 @@ class TaskManagementService:
         """Trigger a background task for immediate execution.
 
         The task will be queued for execution by a Taskiq worker.
-        Requires a worker to be running: `taskiq worker example_service.tasks.broker:broker`
+        Requires a worker to be running: `taskiq worker example_service.infra.tasks.broker:broker`
 
         Args:
             task_name: The predefined task to trigger.
@@ -460,38 +460,38 @@ class TaskManagementService:
         match task_name:
             # Backup tasks
             case TaskName.backup_database:
-                from example_service.tasks.backup.tasks import backup_database
+                from example_service.workers.backup.tasks import backup_database
 
                 return await backup_database.kiq()
 
             # Notification tasks
             case TaskName.check_due_reminders:
-                from example_service.tasks.notifications.tasks import check_due_reminders
+                from example_service.workers.notifications.tasks import check_due_reminders
 
                 return await check_due_reminders.kiq()
 
             # Cache tasks
             case TaskName.warm_cache:
-                from example_service.tasks.cache.tasks import warm_cache
+                from example_service.workers.cache.tasks import warm_cache
 
                 return await warm_cache.kiq()
 
             case TaskName.invalidate_cache:
-                from example_service.tasks.cache.tasks import invalidate_cache_pattern
+                from example_service.workers.cache.tasks import invalidate_cache_pattern
 
                 pattern = params.get("pattern", "*")
                 return await invalidate_cache_pattern.kiq(pattern=pattern)
 
             # Export tasks
             case TaskName.export_csv:
-                from example_service.tasks.export.tasks import export_data_csv
+                from example_service.workers.export.tasks import export_data_csv
 
                 model_name = params.get("model", "reminders")
                 filters = params.get("filters")
                 return await export_data_csv.kiq(model_name=model_name, filters=filters)
 
             case TaskName.export_json:
-                from example_service.tasks.export.tasks import export_data_json
+                from example_service.workers.export.tasks import export_data_json
 
                 model_name = params.get("model", "reminders")
                 filters = params.get("filters")
@@ -499,30 +499,30 @@ class TaskManagementService:
 
             # Cleanup tasks
             case TaskName.cleanup_temp_files:
-                from example_service.tasks.cleanup.tasks import cleanup_temp_files
+                from example_service.workers.cleanup.tasks import cleanup_temp_files
 
                 max_age = params.get("max_age_hours", 24)
                 return await cleanup_temp_files.kiq(max_age_hours=max_age)
 
             case TaskName.cleanup_old_backups:
-                from example_service.tasks.cleanup.tasks import cleanup_old_backups
+                from example_service.workers.cleanup.tasks import cleanup_old_backups
 
                 return await cleanup_old_backups.kiq()
 
             case TaskName.cleanup_old_exports:
-                from example_service.tasks.cleanup.tasks import cleanup_old_exports
+                from example_service.workers.cleanup.tasks import cleanup_old_exports
 
                 max_age = params.get("max_age_hours", 48)
                 return await cleanup_old_exports.kiq(max_age_hours=max_age)
 
             case TaskName.cleanup_expired_data:
-                from example_service.tasks.cleanup.tasks import cleanup_expired_data
+                from example_service.workers.cleanup.tasks import cleanup_expired_data
 
                 retention = params.get("retention_days", 30)
                 return await cleanup_expired_data.kiq(retention_days=retention)
 
             case TaskName.run_all_cleanup:
-                from example_service.tasks.cleanup.tasks import run_all_cleanup
+                from example_service.workers.cleanup.tasks import run_all_cleanup
 
                 return await run_all_cleanup.kiq()
 
@@ -661,7 +661,7 @@ def get_task_service(
         scheduler = globals().get("scheduler")
         if scheduler is None:
             try:
-                from example_service.tasks.scheduler import scheduler as app_scheduler
+                from example_service.infra.tasks.scheduler import scheduler as app_scheduler
 
                 scheduler = app_scheduler
                 globals()["scheduler"] = app_scheduler

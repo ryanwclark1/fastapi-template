@@ -11,8 +11,11 @@ Auto-generated from Pydantic schemas:
 
 from __future__ import annotations
 
+from enum import Enum
+
 import strawberry
 
+from example_service.features.featureflags.models import FlagStatus as ModelFlagStatus
 from example_service.features.featureflags.schemas import (
     FeatureFlagCreate,
     FeatureFlagResponse,
@@ -35,15 +38,8 @@ from example_service.features.graphql.types.pydantic_bridge import (
 # Enums
 # ============================================================================
 
-
-@strawberry.enum(description="Feature flag status")
-class FlagStatus:
-    """Feature flag status types."""
-
-    ENABLED = "enabled"
-    DISABLED = "disabled"
-    PERCENTAGE = "percentage"  # Gradual rollout
-    TARGETED = "targeted"  # Specific users/tenants
+# Use the model's FlagStatus StrEnum directly
+FlagStatus = strawberry.enum(ModelFlagStatus, description="Feature flag status")
 
 
 # ============================================================================
@@ -214,7 +210,7 @@ class FeatureFlagSuccess:
 
 
 @strawberry.enum(description="Feature flag error codes")
-class FeatureFlagErrorCode(strawberry.enum.EnumMeta):
+class FeatureFlagErrorCode(str, Enum):
     """Error codes for feature flag operations."""
 
     VALIDATION_ERROR = "VALIDATION_ERROR"
@@ -271,7 +267,7 @@ class FeatureFlagConnection:
 
 
 @strawberry.enum(description="Types of feature flag events for subscriptions")
-class FeatureFlagEventType(strawberry.enum.Enum):
+class FeatureFlagEventType(str, Enum):
     """Event types for feature flag subscriptions.
 
     Clients can subscribe to specific event types or all events.

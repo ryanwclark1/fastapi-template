@@ -25,7 +25,7 @@ from example_service.infra.cache.redis import RedisCache, get_cache
 from example_service.infra.logging.context import set_log_context
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
+    from collections.abc import Callable, Coroutine
 
 logger = logging.getLogger(__name__)
 
@@ -189,15 +189,20 @@ async def get_current_user_optional(
         return None
 
 
-def require_acl(required_acl: str) -> Callable[[AuthUser], Awaitable[AuthUser]]:
+def require_acl(required_acl: str) -> Callable[[Request, AuthUser], Coroutine[Any, Any, AuthUser]]:
     """Dependency factory to require specific ACL permission.
 
     Uses Accent-Auth ACL format with dot-notation:
     - service.resource.action (e.g., "confd.users.read")
     - Wildcards supported: * (single level), # (multi-level)
+    - Negation: ! prefix for explicit deny
+    - Reserved words: me (current user), my_session (current session)
+
+    The pattern can include path parameter placeholders like {user_id}
+    that will be formatted with actual request values.
 
     Args:
-        required_acl: Required ACL permission
+        required_acl: Required ACL permission (may include placeholders)
 
     Returns:
         Dependency function that checks for the ACL
@@ -209,24 +214,50 @@ def require_acl(required_acl: str) -> Callable[[AuthUser], Awaitable[AuthUser]]:
         ):
             # Only users with confd.users.delete ACL can access
             pass
+
+        # With path parameter substitution:
+        @router.get("/users/{user_id}/profile")
+        async def get_profile(
+            user: Annotated[AuthUser, Depends(require_acl("users.{user_id}.read"))]
+        ):
+            # Checks against actual user_id from path
+            pass
     """
 
-    async def acl_checker(user: Annotated[AuthUser, Depends(get_current_user)]) -> AuthUser:
-        # Create ACL checker
-        acl = AccentAuthACL(user.permissions)
+    async def acl_checker(
+        request: Request,
+        user: Annotated[AuthUser, Depends(get_current_user)],
+    ) -> AuthUser:
+        # Format ACL pattern with path parameters if any
+        formatted_acl = required_acl.format(**request.path_params)
 
-        if not acl.has_permission(required_acl):
+        # Get session ID from metadata if available
+        session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
+
+        # Create ACL checker with user context for reserved word substitution
+        acl = AccentAuthACL(
+            user.permissions,
+            auth_id=user.user_id,
+            session_id=session_id,
+        )
+
+        if not acl.has_permission(formatted_acl):
             logger.warning(
                 "User lacks required ACL",
                 extra={
                     "user_uuid": user.user_id,
-                    "required_acl": required_acl,
+                    "required_acl": formatted_acl,
+                    "original_pattern": required_acl,
                     "user_acls": user.permissions,
                 },
             )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Missing required ACL: {required_acl}",
+                detail={
+                    "error": "insufficient_permissions",
+                    "message": f"Missing required ACL: {formatted_acl}",
+                    "required_acl": formatted_acl,
+                },
             )
 
         return user
@@ -234,7 +265,7 @@ def require_acl(required_acl: str) -> Callable[[AuthUser], Awaitable[AuthUser]]:
     return acl_checker
 
 
-def require_any_acl(*required_acls: str) -> Callable[[AuthUser], Awaitable[AuthUser]]:
+def require_any_acl(*required_acls: str) -> Callable[[Request, AuthUser], Coroutine[Any, Any, AuthUser]]:
     """Dependency factory to require any of the specified ACLs.
 
     Args:
@@ -255,23 +286,39 @@ def require_any_acl(*required_acls: str) -> Callable[[AuthUser], Awaitable[AuthU
             pass
     """
 
-    async def acl_checker(user: Annotated[AuthUser, Depends(get_current_user)]) -> AuthUser:
-        acl = AccentAuthACL(user.permissions)
+    async def acl_checker(
+        request: Request,
+        user: Annotated[AuthUser, Depends(get_current_user)],
+    ) -> AuthUser:
+        # Format ACL patterns with path parameters
+        formatted_acls = [acl.format(**request.path_params) for acl in required_acls]
 
-        has_any = any(acl.has_permission(required) for required in required_acls)
+        # Get session ID from metadata if available
+        session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
 
-        if not has_any:
+        # Create ACL checker with user context
+        acl = AccentAuthACL(
+            user.permissions,
+            auth_id=user.user_id,
+            session_id=session_id,
+        )
+
+        if not acl.has_any_permission(*formatted_acls):
             logger.warning(
                 "User lacks required ACLs",
                 extra={
                     "user_uuid": user.user_id,
-                    "required_acls": list(required_acls),
+                    "required_acls": formatted_acls,
                     "user_acls": user.permissions,
                 },
             )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Missing required ACLs: {', '.join(required_acls)}",
+                detail={
+                    "error": "insufficient_permissions",
+                    "message": f"Missing required ACLs (need any): {', '.join(formatted_acls)}",
+                    "required_acls": formatted_acls,
+                },
             )
 
         return user
@@ -279,7 +326,7 @@ def require_any_acl(*required_acls: str) -> Callable[[AuthUser], Awaitable[AuthU
     return acl_checker
 
 
-def require_all_acls(*required_acls: str) -> Callable[[AuthUser], Awaitable[AuthUser]]:
+def require_all_acls(*required_acls: str) -> Callable[[Request, AuthUser], Coroutine[Any, Any, AuthUser]]:
     """Dependency factory to require all of the specified ACLs.
 
     Args:
@@ -300,10 +347,24 @@ def require_all_acls(*required_acls: str) -> Callable[[AuthUser], Awaitable[Auth
             pass
     """
 
-    async def acl_checker(user: Annotated[AuthUser, Depends(get_current_user)]) -> AuthUser:
-        acl = AccentAuthACL(user.permissions)
+    async def acl_checker(
+        request: Request,
+        user: Annotated[AuthUser, Depends(get_current_user)],
+    ) -> AuthUser:
+        # Format ACL patterns with path parameters
+        formatted_acls = [acl.format(**request.path_params) for acl in required_acls]
 
-        missing_acls = [required for required in required_acls if not acl.has_permission(required)]
+        # Get session ID from metadata if available
+        session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
+
+        # Create ACL checker with user context
+        acl = AccentAuthACL(
+            user.permissions,
+            auth_id=user.user_id,
+            session_id=session_id,
+        )
+
+        missing_acls = [required for required in formatted_acls if not acl.has_permission(required)]
 
         if missing_acls:
             logger.warning(
@@ -311,17 +372,41 @@ def require_all_acls(*required_acls: str) -> Callable[[AuthUser], Awaitable[Auth
                 extra={
                     "user_uuid": user.user_id,
                     "missing_acls": missing_acls,
-                    "required_acls": list(required_acls),
+                    "required_acls": formatted_acls,
                 },
             )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Missing required ACLs: {', '.join(missing_acls)}",
+                detail={
+                    "error": "insufficient_permissions",
+                    "message": f"Missing required ACLs: {', '.join(missing_acls)}",
+                    "required_acls": formatted_acls,
+                    "missing_acls": missing_acls,
+                },
             )
 
         return user
 
     return acl_checker
+
+
+def require_superuser() -> Callable[[Request, AuthUser], Coroutine[Any, Any, AuthUser]]:
+    """Dependency factory to require superuser access (# wildcard ACL).
+
+    This is a convenience dependency for operations requiring full system access.
+
+    Returns:
+        Dependency function that checks for # ACL
+
+    Example:
+        @router.post("/system/reset")
+        async def reset_system(
+            user: Annotated[AuthUser, Depends(require_superuser())]
+        ):
+            # Only users with # ACL can access
+            pass
+    """
+    return require_acl("#")
 
 
 def get_tenant_uuid() -> str | None:

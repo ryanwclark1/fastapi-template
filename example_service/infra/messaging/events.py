@@ -2,55 +2,57 @@
 
 This module defines the data structures for events published to
 and consumed from the message broker.
+
+These events inherit from the core DomainEvent class to ensure consistency
+across the codebase while providing simplified constructors for common
+messaging patterns.
 """
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from typing import Any, Literal
-from uuid import uuid4
+from typing import Any, ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
+
+from example_service.core.events.base import DomainEvent
 
 
-class BaseEvent(BaseModel):
-    """Base class for all domain events.
+class BaseEvent(DomainEvent):
+    """Base class for messaging domain events.
 
-    All events should inherit from this class to ensure they have
-    common fields like event_id, timestamp, and event_type.
+    Inherits from the core DomainEvent to provide:
+    - Event versioning for schema evolution
+    - Causation tracking (which event caused this event)
+    - Correlation IDs for distributed tracing
+    - Automatic timestamp and ID generation
+    - Message headers generation for RabbitMQ publishing
+
+    This class provides a simpler interface for common messaging patterns
+    while maintaining full compatibility with the core event infrastructure.
+
+    Note:
+        For new events, prefer inheriting directly from DomainEvent
+        unless you need the simplified interface provided here.
     """
 
-    event_id: str = Field(default_factory=lambda: str(uuid4()), description="Unique event ID")
-    event_type: str = Field(min_length=1, max_length=100, description="Type of the event")
-    timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(UTC), description="Event timestamp"
-    )
-    service: str = Field(
-        default="example-service",
-        min_length=1,
-        max_length=100,
-        description="Service that generated the event",
-    )
-    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional event metadata")
-
-    model_config = ConfigDict(
-        str_strip_whitespace=True,
-    )
+    # Override to allow mutable events for messaging flexibility
+    model_config = DomainEvent.model_config.copy()
+    model_config["frozen"] = False
 
 
 class ExampleCreatedEvent(BaseEvent):
     """Event published when an example entity is created.
 
     Example:
-            event = ExampleCreatedEvent(
+        event = ExampleCreatedEvent(
             data={"id": "123", "name": "Example"}
         )
         await broker.publish(event, queue="example-events")
     """
 
-    event_type: Literal["example.created"] = Field(
-        default="example.created", description="Event type"
-    )
+    event_type: ClassVar[str] = "example.created"
+    event_version: ClassVar[int] = 1
+
     data: dict[str, Any] = Field(description="Entity data")
 
 
@@ -58,15 +60,15 @@ class ExampleUpdatedEvent(BaseEvent):
     """Event published when an example entity is updated.
 
     Example:
-            event = ExampleUpdatedEvent(
+        event = ExampleUpdatedEvent(
             data={"id": "123", "changes": {"name": "New Name"}}
         )
         await broker.publish(event, queue="example-events")
     """
 
-    event_type: Literal["example.updated"] = Field(
-        default="example.updated", description="Event type"
-    )
+    event_type: ClassVar[str] = "example.updated"
+    event_version: ClassVar[int] = 1
+
     data: dict[str, Any] = Field(description="Entity data with changes")
 
 
@@ -74,15 +76,15 @@ class ExampleDeletedEvent(BaseEvent):
     """Event published when an example entity is deleted.
 
     Example:
-            event = ExampleDeletedEvent(
+        event = ExampleDeletedEvent(
             data={"id": "123"}
         )
         await broker.publish(event, queue="example-events")
     """
 
-    event_type: Literal["example.deleted"] = Field(
-        default="example.deleted", description="Event type"
-    )
+    event_type: ClassVar[str] = "example.deleted"
+    event_version: ClassVar[int] = 1
+
     data: dict[str, Any] = Field(description="Entity identifier")
 
 

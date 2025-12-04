@@ -224,9 +224,9 @@ class JSONExporter(BaseExporter[T]):
             "records": rows,
         }
 
-        return json.dumps(
-            export_data, indent=self.indent, ensure_ascii=False, default=str
-        ).encode("utf-8")
+        return json.dumps(export_data, indent=self.indent, ensure_ascii=False, default=str).encode(
+            "utf-8"
+        )
 
 
 class ExcelExporter(BaseExporter[T]):
@@ -246,8 +246,8 @@ class ExcelExporter(BaseExporter[T]):
     def export(self, records: list[T], output_path: Path) -> int:
         """Export records to Excel file."""
         try:
-            from openpyxl import Workbook  # type: ignore[import-untyped]
-            from openpyxl.utils import get_column_letter  # type: ignore[import-untyped]
+            from openpyxl import Workbook
+            from openpyxl.utils import get_column_letter
         except ImportError as err:
             raise ImportError(
                 "openpyxl is required for Excel export. Install with: pip install openpyxl",
@@ -255,6 +255,8 @@ class ExcelExporter(BaseExporter[T]):
 
         wb = Workbook()
         ws = wb.active
+        if ws is None:
+            raise RuntimeError("Workbook has no active worksheet")
         ws.title = "Export"
 
         if not records:
@@ -298,6 +300,8 @@ class ExcelExporter(BaseExporter[T]):
 
         wb = Workbook()
         ws = wb.active
+        if ws is None:
+            raise RuntimeError("Workbook has no active worksheet")
         ws.title = "Export"
 
         if not records:

@@ -21,41 +21,8 @@ from example_service.features.graphql.types.pydantic_bridge import pydantic_fiel
 # ============================================================================
 
 
-@strawberry.enum(description="Audit action types")
-class AuditAction:
-    """Audit action types."""
-
-    # CRUD operations
-    CREATE = "create"
-    READ = "read"
-    UPDATE = "update"
-    DELETE = "delete"
-
-    # Bulk operations
-    BULK_CREATE = "bulk_create"
-    BULK_UPDATE = "bulk_update"
-    BULK_DELETE = "bulk_delete"
-
-    # Export/Import
-    EXPORT = "export"
-    IMPORT = "import"
-
-    # Authentication
-    LOGIN = "login"
-    LOGOUT = "logout"
-    LOGIN_FAILED = "login_failed"
-    PASSWORD_CHANGE = "password_change"
-    TOKEN_REFRESH = "token_refresh"
-
-    # Authorization
-    PERMISSION_DENIED = "permission_denied"
-    ACL_CHECK = "acl_check"
-
-    # System operations
-    ARCHIVE = "archive"
-    RESTORE = "restore"
-    PURGE = "purge"
-
+# Use the model's AuditAction enum directly
+AuditAction = strawberry.enum(ModelAuditAction, description="Audit action types")
 
 # ============================================================================
 # Audit Log Type (Output)

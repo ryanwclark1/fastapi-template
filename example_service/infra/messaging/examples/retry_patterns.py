@@ -249,8 +249,15 @@ else:
                 },
             )
 
-            # TODO: Send alert, update metrics, perform cleanup
-            # The message will still go to DLQ after this
+            # Send alert and update metrics before message goes to DLQ
+            from example_service.infra.messaging.dlq.alerting import get_dlq_alerter
+            alerter = get_dlq_alerter()
+            await alerter.alert_dlq_message(
+                original_queue="example-events",
+                error_type=type(e.last_exception).__name__ if e.last_exception else "RetryExhausted",
+                error_message=str(e.last_exception) if e.last_exception else "Max retries exceeded",
+                retry_count=e.attempts,
+            )
 
             # Re-raise to ensure message goes to DLQ
             raise

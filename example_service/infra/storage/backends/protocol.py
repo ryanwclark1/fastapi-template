@@ -11,6 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, BinaryIO, Protocol
 
+from frozendict import frozendict
+
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
     from datetime import datetime
@@ -32,7 +34,12 @@ class TenantContext:
 
     tenant_uuid: str
     tenant_slug: str
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: frozendict[str, Any] = field(default_factory=frozendict)
+
+    def __post_init__(self) -> None:
+        """Convert metadata dict to frozendict if needed."""
+        if isinstance(self.metadata, dict) and not isinstance(self.metadata, frozendict):
+            object.__setattr__(self, "metadata", frozendict(self.metadata))
 
 
 # ============================================================================

@@ -14,6 +14,31 @@ from pydantic import BaseModel, ConfigDict, Field
 from example_service.core.schemas.common import HealthStatus
 
 
+class StatusResponse(BaseModel):
+    """Simple status response for load balancer health checks.
+
+    Minimal response for legacy load balancers and simple uptime monitoring.
+    Use /health/ for comprehensive health checks with dependency status.
+
+    Example:
+        ```json
+        {
+            "status": "ok"
+        }
+        ```
+    """
+
+    status: str = Field(default="ok", description="Simple status indicator")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "ok",
+            }
+        },
+    )
+
+
 class HealthResponse(BaseModel):
     """Comprehensive health check response.
 
@@ -576,4 +601,5 @@ __all__ = [
     "ProvidersResponse",
     "ReadinessResponse",
     "StartupResponse",
+    "StatusResponse",
 ]

@@ -325,6 +325,49 @@ class SoftDeleteMixin:
         return self.deleted_at is not None
 
 
+class TenantMixin:
+    """Multi-tenancy support for tenant-scoped data isolation.
+
+    Provides tenant association for models that need to be isolated
+    per tenant. All queries should include tenant_id filtering to
+    prevent data leakage between tenants.
+
+    Provides:
+        tenant_id: String column (indexed for performance)
+
+    Usage:
+        class File(TimestampedBase, TenantMixin):
+            __tablename__ = "files"
+            name: Mapped[str] = mapped_column(String(255))
+
+        # Query with tenant scope:
+        stmt = select(File).where(File.tenant_id == current_tenant_id)
+
+        # Create with tenant:
+        file = File(name="doc.pdf", tenant_id=current_tenant_id)
+
+    Note: Repositories and services should enforce tenant filtering.
+    Consider using a TenantAwareRepository base class for automatic
+    tenant scoping in queries.
+
+    Design Notes:
+        - No foreign key constraint: tenant_id can be any identifier
+          (database ID, OIDC claim, external auth service ID, etc.)
+        - Nullable: supports single-tenant mode (None = no tenant filtering)
+        - Indexed: ensures efficient queries when filtering by tenant
+        - Application-level validation: enforce tenant ownership in services
+    """
+
+    __allow_unmapped__ = True
+
+    tenant_id: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        index=True,
+        comment="Tenant ID for multi-tenant isolation",
+    )
+
+
 # ============================================================================
 # Convenience Base Classes (Common Combinations)
 # ============================================================================
@@ -384,6 +427,8 @@ __all__ = [
     # Primary key mixins
     "IntegerPKMixin",
     "SoftDeleteMixin",
+    # Multi-tenancy
+    "TenantMixin",
     # Audit mixins
     "TimestampMixin",
     # Convenience bases

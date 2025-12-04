@@ -27,7 +27,7 @@ from example_service.features.health.providers import (
 )
 
 if TYPE_CHECKING:
-    from example_service.tasks.tracking.base import BaseTaskTracker
+    from example_service.infra.tasks.tracking.base import BaseTaskTracker
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +96,7 @@ class TaskTrackerHealthProvider:
         if self._tracker is not None:
             return self._tracker
 
-        from example_service.tasks.tracking import get_tracker
+        from example_service.infra.tasks.tracking import get_tracker
 
         return get_tracker()
 

@@ -948,6 +948,42 @@ class {model_class}(TimestampedBase):
         return f"<{model_class}(id={{self.id}}, name={{self.name!r}})>"
 '''
 
+FEATURE_MODEL_MULTITENANT_TEMPLATE = '''"""SQLAlchemy models for the {feature_name} feature."""
+
+from __future__ import annotations
+
+from uuid import UUID, uuid4
+
+from sqlalchemy import String, Text
+from sqlalchemy.orm import Mapped, mapped_column
+
+from example_service.core.database import TenantMixin, TimestampedBase
+
+
+class {model_class}(TimestampedBase, TenantMixin):
+    """{model_class} entity persisted in the database.
+
+    Represents a {feature_description}.
+
+    Multi-tenancy is supported via tenant_id for data isolation.
+    When tenant_id is None, the record is accessible system-wide.
+    """
+
+    __tablename__ = "{table_name}"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(
+        String(200), nullable=False, comment="{model_class} name"
+    )
+    description: Mapped[str | None] = mapped_column(
+        Text(), nullable=True, comment="{model_class} description"
+    )
+
+    def __repr__(self) -> str:
+        """String representation."""
+        return f"<{model_class}(id={{self.id}}, name={{self.name!r}}, tenant={{self.tenant_id}})>"
+'''
+
 FEATURE_SCHEMA_TEMPLATE = '''"""Pydantic schemas for the {feature_name} feature."""
 
 from __future__ import annotations
@@ -1071,6 +1107,118 @@ class {model_class}Repository(BaseRepository[{model_class}]):
 
         self._lazy.debug(
             lambda: f"db.search_{model_plural}: name_contains={{name_contains!r}} -> {{len(search_result.items)}}/{{search_result.total}}"
+        )
+        return search_result
+
+
+# Factory function for dependency injection
+_{model_var}_repository: {model_class}Repository | None = None
+
+
+def get_{model_var}_repository() -> {model_class}Repository:
+    """Get {model_class}Repository instance.
+
+    Usage in FastAPI routes:
+        from example_service.features.{feature_snake}.repository import (
+            {model_class}Repository,
+            get_{model_var}_repository,
+        )
+
+        @router.get("/{{id}}")
+        async def get_{model_var}(
+            id: UUID,
+            session: AsyncSession = Depends(get_db_session),
+            repo: {model_class}Repository = Depends(get_{model_var}_repository),
+        ):
+            return await repo.get_or_raise(session, id)
+    """
+    global _{model_var}_repository
+    if _{model_var}_repository is None:
+        _{model_var}_repository = {model_class}Repository()
+    return _{model_var}_repository
+'''
+
+FEATURE_REPOSITORY_MULTITENANT_TEMPLATE = '''"""Repository for the {feature_name} feature.
+
+Supports optional multi-tenancy: when tenant_id is provided, all queries
+are automatically scoped to that tenant. When tenant_id is None, operates
+in single-tenant mode with no tenant filtering.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from sqlalchemy import select
+
+from example_service.core.database.repository import SearchResult, TenantAwareRepository
+from example_service.features.{feature_snake}.models import {model_class}
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+
+class {model_class}Repository(TenantAwareRepository[{model_class}]):
+    """Repository for {model_class} model with optional multi-tenancy support.
+
+    Inherits from TenantAwareRepository (which extends BaseRepository):
+        - get(session, id) -> {model_class} | None
+        - get_or_raise(session, id) -> {model_class}
+        - get_by(session, attr, value) -> {model_class} | None
+        - list(session, limit, offset) -> Sequence[{model_class}]
+        - search(session, statement, limit, offset) -> SearchResult[{model_class}]
+        - create(session, instance) -> {model_class}
+        - create_many(session, instances) -> Sequence[{model_class}]
+        - delete(session, instance) -> None
+
+    Tenant-aware methods (add tenant_id=None for optional filtering):
+        - get_for_tenant(session, id, tenant_id) -> {model_class} | None
+        - list_for_tenant(session, tenant_id, limit, offset) -> Sequence[{model_class}]
+        - search_for_tenant(session, statement, tenant_id) -> SearchResult[{model_class}]
+
+    Feature-specific methods below.
+    """
+
+    def __init__(self) -> None:
+        """Initialize with {model_class} model."""
+        super().__init__({model_class})
+
+    async def search_{model_plural}(
+        self,
+        session: AsyncSession,
+        *,
+        tenant_id: str | None = None,
+        name_contains: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> SearchResult[{model_class}]:
+        """Search {model_plural} with optional filters.
+
+        Args:
+            session: Database session
+            tenant_id: Optional tenant ID for multi-tenant filtering.
+                      If None, no tenant filtering is applied (single-tenant mode).
+            name_contains: Filter by name substring (case-insensitive)
+            limit: Maximum results
+            offset: Results to skip
+
+        Returns:
+            SearchResult with {model_plural} and pagination info
+        """
+        stmt = select({model_class})
+
+        # Apply tenant filter
+        stmt = self._apply_tenant_filter(stmt, tenant_id)
+
+        if name_contains:
+            stmt = stmt.where({model_class}.name.ilike(f"%{{name_contains}}%"))
+
+        stmt = stmt.order_by({model_class}.created_at.desc())
+
+        search_result = await self.search(session, stmt, limit=limit, offset=offset)
+
+        self._lazy.debug(
+            lambda: f"db.search_{model_plural}: tenant={{tenant_id}}, name_contains={{name_contains!r}} -> {{len(search_result.items)}}/{{search_result.total}}"
         )
         return search_result
 
@@ -1573,6 +1721,11 @@ def get_feature_context(name: str, description: str | None = None) -> dict[str, 
 @click.option("--service", is_flag=True, help="Generate service layer")
 @click.option("--router", is_flag=True, help="Generate API router")
 @click.option("--tests", is_flag=True, help="Generate test file")
+@click.option(
+    "--multitenant",
+    is_flag=True,
+    help="Include multi-tenancy support (TenantMixin in model, TenantAwareRepository)",
+)
 @click.option("--force", is_flag=True, help="Overwrite existing files")
 def feature(
     name: str,
@@ -1584,6 +1737,7 @@ def feature(
     service: bool,
     router: bool,
     tests: bool,
+    multitenant: bool,
     force: bool,
 ) -> None:
     """Generate a complete feature module.
@@ -1608,6 +1762,9 @@ def feature(
 
         # With custom description
         example-service generate feature user_profiles -d "User profile management" --all
+
+        # With multi-tenancy support
+        example-service generate feature invoices --all --multitenant
 
     Args:
         name: Feature name (e.g., 'products', 'orders', 'user_profiles')
@@ -1641,25 +1798,31 @@ def feature(
             generated_files.append(str(path))
             click.echo(f"✅ Generated {label}: {path}")
 
+    # Log multi-tenancy mode
+    if multitenant:
+        click.echo("🏢 Multi-tenancy support enabled (using TenantMixin and TenantAwareRepository)")
+
     # Generate __init__.py
     if any([model, schema, repository, service, router]):
         init_path = feature_dir / "__init__.py"
         write_file(init_path, FEATURE_INIT_TEMPLATE.format(**ctx), "__init__")
 
-    # Generate model
+    # Generate model (use multitenant template if flag is set)
     if model:
         model_path = feature_dir / "models.py"
-        write_file(model_path, FEATURE_MODEL_TEMPLATE.format(**ctx), "model")
+        model_template = FEATURE_MODEL_MULTITENANT_TEMPLATE if multitenant else FEATURE_MODEL_TEMPLATE
+        write_file(model_path, model_template.format(**ctx), "model")
 
     # Generate schema
     if schema:
         schema_path = feature_dir / "schemas.py"
         write_file(schema_path, FEATURE_SCHEMA_TEMPLATE.format(**ctx), "schema")
 
-    # Generate repository
+    # Generate repository (use multitenant template if flag is set)
     if repository:
         repo_path = feature_dir / "repository.py"
-        write_file(repo_path, FEATURE_REPOSITORY_TEMPLATE.format(**ctx), "repository")
+        repo_template = FEATURE_REPOSITORY_MULTITENANT_TEMPLATE if multitenant else FEATURE_REPOSITORY_TEMPLATE
+        write_file(repo_path, repo_template.format(**ctx), "repository")
 
     # Generate service
     if service:

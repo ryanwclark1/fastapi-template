@@ -9,6 +9,7 @@ from importlib import import_module
 from typing import TYPE_CHECKING
 
 from example_service.core.settings import (
+    get_ai_settings,
     get_app_settings,
     get_auth_settings,
     get_consul_settings,
@@ -41,8 +42,8 @@ from example_service.infra.realtime import (
     stop_connection_manager,
     stop_event_bridge,
 )
+from example_service.infra.tasks.tracking import start_tracker, stop_tracker
 from example_service.infra.tracing.opentelemetry import setup_tracing
-from example_service.tasks.tracking import start_tracker, stop_tracker
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -59,7 +60,7 @@ logger = logging.getLogger(__name__)
 def _load_taskiq_module() -> ModuleType | None:
     """Import Taskiq broker module lazily to avoid partial initialization."""
     try:
-        return import_module("example_service.tasks.broker")
+        return import_module("example_service.infra.tasks.broker")
     except ImportError:
         logger.warning("Taskiq optional dependencies missing, skipping Taskiq startup")
         return None
@@ -68,7 +69,7 @@ def _load_taskiq_module() -> ModuleType | None:
 def _load_scheduler_module() -> ModuleType | None:
     """Import APScheduler scheduler module lazily."""
     try:
-        return import_module("example_service.tasks.scheduler")
+        return import_module("example_service.infra.tasks.scheduler")
     except ImportError:
         logger.warning("APScheduler dependencies missing, skipping scheduler startup")
         return None
@@ -100,9 +101,9 @@ async def _initialize_taskiq_and_scheduler(
         logger.warning("Taskiq broker unavailable, skipping task registration")
         return taskiq_module, None
 
-    # Import tasks to register them with the broker
-    import example_service.tasks.scheduler
-    import example_service.tasks.tasks  # noqa: F401
+    # Import workers to register them with the broker
+    # Note: scheduler is imported by broker.py and loaded via _load_scheduler_module() below
+    import example_service.workers.tasks  # noqa: F401
 
     logger.info("Taskiq broker initialized (use 'taskiq worker' to run tasks)")
 
@@ -448,6 +449,29 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         initialization = (None, None)
     taskiq_module, scheduler_module = initialization
 
+    # Initialize AI pipeline infrastructure (capability registry, observability, budget)
+    ai_settings = get_ai_settings()
+    ai_infrastructure_started = False
+    if ai_settings.enable_pipeline_api:
+        try:
+            from example_service.infra.ai import start_ai_infrastructure
+
+            ai_infrastructure_started = await start_ai_infrastructure(ai_settings)
+            if ai_infrastructure_started:
+                logger.info(
+                    "AI pipeline infrastructure started",
+                    extra={
+                        "tracing": ai_settings.enable_pipeline_tracing,
+                        "metrics": ai_settings.enable_pipeline_metrics,
+                        "budget_enforcement": ai_settings.enable_budget_enforcement,
+                    },
+                )
+        except Exception as e:
+            logger.warning(
+                "Failed to start AI pipeline infrastructure",
+                extra={"error": str(e)},
+            )
+
     logger.info(
         "Application startup complete - listening on %s:%s",
         app_settings.host,
@@ -524,6 +548,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if consul_settings.is_configured:
         await stop_discovery()
         logger.info("Consul service discovery stopped")
+
+    # Stop AI pipeline infrastructure first (has no external dependencies)
+    if ai_infrastructure_started:
+        try:
+            from example_service.infra.ai import stop_ai_infrastructure
+
+            await stop_ai_infrastructure()
+            logger.info("AI pipeline infrastructure stopped")
+        except Exception as e:
+            logger.warning(
+                "Error stopping AI pipeline infrastructure",
+                extra={"error": str(e)},
+            )
 
     # Stop APScheduler first (depends on Taskiq for task execution)
     if scheduler_module is not None:

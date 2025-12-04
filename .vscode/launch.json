@@ -99,7 +99,7 @@
       "module": "taskiq",
       "args": [
         "worker",
-        "example_service.tasks.broker:broker"
+        "example_service.infra.tasks.broker:broker"
       ],
       "console": "integratedTerminal",
       "justMyCode": false,

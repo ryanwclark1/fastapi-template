@@ -87,7 +87,10 @@ def _prepare_base(monkeypatch: pytest.MonkeyPatch, settings: SimpleNamespace) ->
     monkeypatch.setattr(router_module, "health_router", object())
     monkeypatch.setattr(router_module, "files_router", object())
     monkeypatch.setattr(router_module, "webhooks_router", object())
-    monkeypatch.setattr(router_module, "admin_router", object())
+    monkeypatch.setattr(router_module, "storage_router", object())
+    monkeypatch.setattr(router_module, "email_router", object())
+    monkeypatch.setattr(router_module, "admin_email_router", object())
+    monkeypatch.setattr(router_module, "ai_pipeline_router", object())
 
 
 def test_setup_routers_without_rabbit(
@@ -107,7 +110,6 @@ def test_setup_routers_without_rabbit(
         call(router_module.tags_router, prefix="/api", tags=["tags"]),
         call(router_module.reminder_tags_router, prefix="/api", tags=["reminders", "tags"]),
         call(router_module.health_router, prefix="/api", tags=["health"]),
-        call(router_module.admin_router, prefix="/api", tags=["Admin"]),
         call(router_module.files_router, prefix="/api", tags=["files"]),
         call(router_module.webhooks_router, prefix="/api", tags=["webhooks"]),
         call(router_module.tasks_router, prefix="/api", tags=["tasks"]),
@@ -115,6 +117,10 @@ def test_setup_routers_without_rabbit(
         call(router_module.datatransfer_router, prefix="/api", tags=["data-transfer"]),
         call(router_module.featureflags_router, prefix="/api", tags=["feature-flags"]),
         call(router_module.search_router, prefix="/api", tags=["search"]),
+        call(router_module.storage_router, prefix="/api", tags=["storage"]),
+        call(router_module.email_router, prefix="/api", tags=["email-configuration"]),
+        call(router_module.admin_email_router, prefix="/api", tags=["admin-email"]),
+        call(router_module.ai_pipeline_router, prefix="/api", tags=["AI Pipelines"]),
     ]
 
 

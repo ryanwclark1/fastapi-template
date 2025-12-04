@@ -8,7 +8,9 @@ from __future__ import annotations
 import importlib
 from pathlib import Path
 
+from .email_config import EmailAuditLog, EmailConfig, EmailProviderType, EmailUsageLog
 from .post import Post
+from .tenant import Tenant
 from .user import User
 
 
@@ -34,4 +36,12 @@ def _import_feature_models() -> list[str]:
 
 _IMPORTED_FEATURE_MODELS = _import_feature_models()
 
-__all__ = ["Post", "User"]
+__all__ = [
+    "EmailAuditLog",
+    "EmailConfig",
+    "EmailProviderType",
+    "EmailUsageLog",
+    "Post",
+    "Tenant",
+    "User",
+]

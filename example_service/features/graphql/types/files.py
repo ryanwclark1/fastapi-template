@@ -11,6 +11,8 @@ Auto-generated from Pydantic schemas:
 
 from __future__ import annotations
 
+from enum import Enum
+
 import strawberry
 
 from example_service.features.files.models import FileStatus as ModelFileStatus
@@ -30,16 +32,8 @@ from example_service.features.graphql.types.pydantic_bridge import (
 # Enums
 # ============================================================================
 
-
-@strawberry.enum(description="File processing status")
-class FileStatus:
-    """File processing status types."""
-
-    PENDING = "pending"  # Upload initiated but not confirmed
-    PROCESSING = "processing"  # File being processed
-    READY = "ready"  # File ready for use
-    FAILED = "failed"  # Processing failed
-    DELETED = "deleted"  # Soft deleted
+# Use the model's FileStatus enum directly
+FileStatus = strawberry.enum(ModelFileStatus, description="File processing status")
 
 
 # ============================================================================
@@ -224,7 +218,7 @@ class FileSuccess:
 
 
 @strawberry.enum(description="File error codes")
-class FileErrorCode(strawberry.enum.EnumMeta):
+class FileErrorCode(str, Enum):
     """Error codes for file operations."""
 
     VALIDATION_ERROR = "VALIDATION_ERROR"
@@ -282,7 +276,7 @@ class FileConnection:
 
 
 @strawberry.enum(description="Types of file events for subscriptions")
-class FileEventType(strawberry.enum.Enum):
+class FileEventType(str, Enum):
     """Event types for file subscriptions.
 
     Clients can subscribe to specific event types or all events.

@@ -167,6 +167,78 @@ def get_tenant_routing_key_pattern(event_type_prefix: str, tenant_id: str) -> st
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Tenant-Aware Routing Helpers (for multi-tenant events)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def get_tenant_routing_key(
+    event_type: str,
+    tenant_uuid: str,
+) -> str:
+    """Generate routing key for tenant-scoped events.
+
+    Creates a routing key that includes the tenant UUID for
+    tenant-specific message routing.
+
+    Args:
+        event_type: Event type identifier (e.g., "order.created").
+        tenant_uuid: Tenant UUID for scoping.
+
+    Returns:
+        Tenant-scoped routing key (e.g., "order.created.tenant-123").
+
+    Example:
+        >>> key = get_tenant_routing_key("order.created", "tenant-abc")
+        >>> # Returns: "order.created.tenant-abc"
+    """
+    return f"{event_type}.{tenant_uuid}"
+
+
+def get_user_routing_key(
+    event_type: str,
+    tenant_uuid: str,
+    user_uuid: str,
+) -> str:
+    """Generate routing key for user-scoped events.
+
+    Creates a routing key that includes both tenant and user UUIDs
+    for user-specific message routing.
+
+    Args:
+        event_type: Event type identifier (e.g., "notification.sent").
+        tenant_uuid: Tenant UUID for scoping.
+        user_uuid: User UUID for targeting.
+
+    Returns:
+        User-scoped routing key (e.g., "notification.sent.tenant-123.user-456").
+
+    Example:
+        >>> key = get_user_routing_key("notification.sent", "tenant-123", "user-456")
+        >>> # Returns: "notification.sent.tenant-123.user-456"
+    """
+    return f"{event_type}.{tenant_uuid}.{user_uuid}"
+
+
+def get_multi_tenant_binding_pattern(event_type_prefix: str) -> str:
+    """Generate binding pattern for all tenant events.
+
+    Creates a wildcard pattern that matches events from any tenant.
+
+    Args:
+        event_type_prefix: Event type prefix (e.g., "order").
+
+    Returns:
+        Pattern matching all tenant events (e.g., "order.*.#").
+
+    Example:
+        >>> pattern = get_multi_tenant_binding_pattern("order")
+        >>> # Returns: "order.*.#"
+        >>> # Matches: "order.created.tenant-1", "order.updated.tenant-2", etc.
+    """
+    return f"{event_type_prefix}.*.#"
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Common Queue Names
 # ──────────────────────────────────────────────────────────────────────────────
 

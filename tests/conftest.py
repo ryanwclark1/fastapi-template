@@ -19,6 +19,7 @@ When adding new features:
 
 from __future__ import annotations
 
+import contextlib
 import os
 from collections.abc import AsyncGenerator, Iterator
 from datetime import UTC, datetime
@@ -97,6 +98,71 @@ async def client(app) -> AsyncGenerator[AsyncClient]:
 # ============================================================================
 # Database Fixtures
 # ============================================================================
+
+
+@pytest.fixture(autouse=True)
+def reset_search_listeners():
+    """Reset search event listeners between tests.
+
+    This fixture ensures that make_searchable() listeners don't leak
+    between tests, preventing duplicate trigger creation or other issues.
+
+    The fixture runs automatically for all tests (autouse=True).
+    """
+    yield
+
+    # Cleanup after test
+    try:
+        from example_service.core.database.search import remove_searchable_listeners
+
+        remove_searchable_listeners()
+    except ImportError:
+        pass  # Search module not available
+
+
+@pytest.fixture
+def searchable_metadata():
+    """Configure make_searchable() for a test's metadata.
+
+    Use this fixture when testing FTS trigger auto-creation.
+    The fixture returns a function that configures make_searchable()
+    for a given SQLAlchemy metadata object.
+
+    Returns:
+        Function to configure make_searchable() with options.
+
+    Example:
+        def test_auto_triggers(db_engine, searchable_metadata):
+            from sqlalchemy.orm import declarative_base
+            from example_service.core.database.search import SearchableMixin
+
+            Base = declarative_base()
+            searchable_metadata(Base.metadata)
+
+            class Article(Base, SearchableMixin):
+                __tablename__ = "articles"
+                __search_fields__ = ["title"]
+                # ... triggers created automatically!
+    """
+    from example_service.core.database.search import make_searchable, remove_searchable_listeners
+
+    managers = []
+
+    def configure(metadata, **options):
+        """Configure make_searchable for the given metadata."""
+        manager = make_searchable(metadata, options=options)
+        managers.append(manager)
+        return manager
+
+    yield configure
+
+    # Cleanup all managers
+    for manager in managers:
+        with contextlib.suppress(Exception):
+            manager.remove_listeners()
+
+    # Also call global cleanup
+    remove_searchable_listeners()
 
 
 @pytest.fixture(scope="session")
@@ -187,10 +253,95 @@ async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
             await db_session.commit()
             assert user.id is not None
     """
+    import sqlalchemy as sa
+
     from example_service.core.database.base import Base
 
-    # Create all tables
+    # Create enum types before creating tables
     async with db_engine.begin() as conn:
+        # Create all enum types that are used by models
+        # These must be created before tables that reference them
+        enum_definitions = [
+            (["pending", "processing", "ready", "failed", "deleted"], "filestatus"),
+            (["smtp", "aws_ses", "sendgrid", "mailgun", "console", "file"], "emailprovidertype"),
+            (["pending", "delivered", "failed", "retrying"], "deliverystatus"),
+            (["LLM", "TRANSCRIPTION", "EMBEDDING", "IMAGE", "PII_REDACTION"], "aiprovidertype"),
+            (
+                [
+                    "TRANSCRIPTION",
+                    "PII_REDACTION",
+                    "SUMMARY",
+                    "SENTIMENT",
+                    "COACHING",
+                    "FULL_ANALYSIS",
+                ],
+                "aijobtype",
+            ),
+            (["PENDING", "PROCESSING", "COMPLETED", "FAILED", "CANCELLED"], "aijobstatus"),
+            (
+                [
+                    "pending",
+                    "queued",
+                    "running",
+                    "completed",
+                    "failed",
+                    "cancelled",
+                    "retrying",
+                    "paused",
+                ],
+                "jobstatus",
+            ),
+            (["1", "2", "3", "4"], "jobpriority"),
+            (["enabled", "disabled", "percentage", "targeted"], "flagstatus"),
+            (
+                [
+                    "create",
+                    "read",
+                    "update",
+                    "delete",
+                    "bulk_create",
+                    "bulk_update",
+                    "bulk_delete",
+                    "export",
+                    "import",
+                    "login",
+                    "logout",
+                    "login_failed",
+                    "password_change",
+                    "token_refresh",
+                    "permission_denied",
+                    "acl_check",
+                    "archive",
+                    "restore",
+                    "purge",
+                ],
+                "auditaction",
+            ),
+        ]
+
+        # Create each enum type if it doesn't exist
+        for enum_values, enum_name in enum_definitions:
+            result = await conn.execute(
+                sa.text(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1 FROM pg_type WHERE typname = :enum_name
+                    )
+                    """
+                ),
+                {"enum_name": enum_name},
+            )
+            exists = result.scalar()
+
+            if not exists:
+                # Create the enum type using SQLAlchemy's Enum.create
+                # Capture enum in default argument to avoid closure issue
+                sa_enum = sa.Enum(*enum_values, name=enum_name)
+                await conn.run_sync(
+                    lambda sync_conn, e=sa_enum: e.create(sync_conn, checkfirst=False)
+                )
+
+        # Now create all tables
         await conn.run_sync(Base.metadata.create_all)
 
     # Create session factory

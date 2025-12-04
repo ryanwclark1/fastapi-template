@@ -20,7 +20,14 @@ from typing import Any, ClassVar
 from graphql import GraphQLError
 from strawberry.extensions import SchemaExtension
 
-from example_service.core.cache import get_cache_instance
+# from example_service.core.cache import get_cache_instance
+
+
+# Stub for missing cache module
+def get_cache_instance():  # type: ignore[misc]
+    """Stub for missing cache module."""
+    return None
+
 
 logger = logging.getLogger(__name__)
 

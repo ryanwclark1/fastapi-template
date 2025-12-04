@@ -233,6 +233,10 @@ class EmailResult(BaseModel):
         default="smtp",
         description="Backend used for sending",
     )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional metadata (provider info, timing, tenant context)",
+    )
 
     @classmethod
     def success_result(

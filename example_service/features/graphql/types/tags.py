@@ -11,6 +11,8 @@ Auto-generated from Pydantic schemas:
 
 from __future__ import annotations
 
+from enum import Enum
+
 import strawberry
 
 from example_service.features.graphql.types.base import PageInfoType
@@ -104,7 +106,7 @@ class TagSuccess:
 
 
 @strawberry.enum(description="Tag error codes")
-class TagErrorCode(strawberry.enum.EnumMeta):
+class TagErrorCode(str, Enum):
     """Error codes for tag operations."""
 
     VALIDATION_ERROR = "VALIDATION_ERROR"
@@ -214,7 +216,7 @@ Computed Fields:
 
 
 @strawberry.enum(description="Types of tag events for subscriptions")
-class TagEventType(strawberry.enum.Enum):
+class TagEventType(str, Enum):
     """Event types for tag subscriptions.
 
     Clients can subscribe to specific event types or all events.

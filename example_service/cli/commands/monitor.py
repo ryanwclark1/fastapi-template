@@ -170,7 +170,7 @@ async def _check_rabbitmq() -> dict:
 def _check_scheduler() -> dict:
     """Check APScheduler status."""
     try:
-        from example_service.tasks.scheduler import scheduler
+        from example_service.infra.tasks.scheduler import scheduler
 
         if scheduler.running:
             job_count = len(scheduler.get_jobs())

@@ -246,7 +246,7 @@ class EmailService:
         Returns:
             Task ID for tracking.
         """
-        from example_service.tasks.notifications.tasks import send_email_task
+        from example_service.workers.notifications.tasks import send_email_task
 
         # Normalize recipients
         recipients = [to] if isinstance(to, str) else list(to)
@@ -291,7 +291,7 @@ class EmailService:
         Returns:
             Task ID for tracking.
         """
-        from example_service.tasks.notifications.tasks import send_template_email_task
+        from example_service.workers.notifications.tasks import send_template_email_task
 
         # Normalize recipients
         recipients = [to] if isinstance(to, str) else list(to)

@@ -19,6 +19,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from example_service.core.database.base import Base, UUIDv7PKMixin
+from example_service.core.database.enums import AuditAction as AuditActionEnum
 
 
 class AuditAction(StrEnum):
@@ -106,7 +107,7 @@ class AuditLog(Base, UUIDv7PKMixin):
 
     # Action type
     action: Mapped[str] = mapped_column(
-        String(50),
+        AuditActionEnum,
         nullable=False,
         index=True,
         comment="Type of action performed",

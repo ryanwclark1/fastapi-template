@@ -48,7 +48,7 @@ SECURITY_PATTERNS = {
 
 _tracking: Any
 try:
-    from example_service.tasks import tracking as _task_tracking
+    from example_service.infra.tasks import tracking as _task_tracking
 
     _tracking = _task_tracking
 except Exception:  # pragma: no cover - optional dependency

@@ -39,8 +39,8 @@ async def list_jobs(output_format: str) -> None:
     header("Scheduled Jobs")
 
     try:
-        from example_service.tasks.scheduler import get_job_status
-        from example_service.tasks.scheduler import scheduler as apscheduler
+        from example_service.infra.tasks.scheduler import get_job_status
+        from example_service.infra.tasks.scheduler import scheduler as apscheduler
 
         if not apscheduler.running:
             warning("Scheduler is not running")
@@ -141,7 +141,7 @@ async def run_job(job_id: str, wait: bool) -> None:
     info(f"Triggering job: {job_id}")
 
     try:
-        from example_service.tasks.scheduler import scheduler as apscheduler
+        from example_service.infra.tasks.scheduler import scheduler as apscheduler
 
         job = apscheduler.get_job(job_id)
 
@@ -162,7 +162,7 @@ async def run_job(job_id: str, wait: bool) -> None:
 
         try:
             # Initialize broker if needed for Taskiq tasks
-            from example_service.tasks.broker import broker
+            from example_service.infra.tasks.broker import broker
 
             if broker is not None:
                 await broker.startup()
@@ -212,8 +212,8 @@ async def pause_job(job_id: str) -> None:
     The job will not run until it is resumed.
     """
     try:
-        from example_service.tasks.scheduler import pause_job as do_pause
-        from example_service.tasks.scheduler import scheduler as apscheduler
+        from example_service.infra.tasks.scheduler import pause_job as do_pause
+        from example_service.infra.tasks.scheduler import scheduler as apscheduler
 
         job = apscheduler.get_job(job_id)
         if job is None:
@@ -242,8 +242,8 @@ async def resume_job(job_id: str) -> None:
     JOB_ID is the ID of the scheduled job to resume.
     """
     try:
-        from example_service.tasks.scheduler import resume_job as do_resume
-        from example_service.tasks.scheduler import scheduler as apscheduler
+        from example_service.infra.tasks.scheduler import resume_job as do_resume
+        from example_service.infra.tasks.scheduler import scheduler as apscheduler
 
         job = apscheduler.get_job(job_id)
         if job is None:
@@ -274,7 +274,7 @@ async def scheduler_status() -> None:
     header("Scheduler Status")
 
     try:
-        from example_service.tasks.scheduler import scheduler as apscheduler
+        from example_service.infra.tasks.scheduler import scheduler as apscheduler
 
         click.echo()
         click.echo(f"  Running:    {'Yes' if apscheduler.running else 'No'}")
@@ -340,7 +340,7 @@ async def show_jobs_by_category(category: str | None) -> None:
     }
 
     try:
-        from example_service.tasks.scheduler import scheduler as apscheduler
+        from example_service.infra.tasks.scheduler import scheduler as apscheduler
 
         jobs = apscheduler.get_jobs()
 

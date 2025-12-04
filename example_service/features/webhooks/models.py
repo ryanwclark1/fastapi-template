@@ -15,12 +15,12 @@ from sqlalchemy import (
     String,
     Text,
     TypeDecorator,
-    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from example_service.core.database import TimestampedBase
+from example_service.core.database import TenantMixin, TimestampedBase
+from example_service.core.database.enums import DeliveryStatus as DeliveryStatusEnum
 
 
 class StringArray(TypeDecorator):
@@ -53,11 +53,15 @@ class StringArray(TypeDecorator):
         return json.loads(value) if value else []
 
 
-class Webhook(TimestampedBase):
+class Webhook(TimestampedBase, TenantMixin):
     """Webhook configuration persisted in the database.
 
     Represents a webhook endpoint that will receive HTTP POST notifications
     when subscribed events occur in the system.
+
+    Multi-tenancy is supported via tenant_id to ensure webhook configurations
+    and deliveries are isolated per tenant. Webhooks from one tenant should
+    never trigger for events in another tenant's data.
     """
 
     __tablename__ = "webhooks"
@@ -78,7 +82,7 @@ class Webhook(TimestampedBase):
     event_types: Mapped[list[str]] = mapped_column(
         StringArray(),
         nullable=False,
-        server_default=text("ARRAY[]::VARCHAR(100)[]"),
+        default=list,
         comment="List of event types this webhook subscribes to",
     )
     is_active: Mapped[bool] = mapped_column(
@@ -131,7 +135,7 @@ class WebhookDelivery(TimestampedBase):
         JSONB().with_variant(JSON(), "sqlite"), nullable=False, comment="Event payload data"
     )
     status: Mapped[str] = mapped_column(
-        String(50),
+        DeliveryStatusEnum,
         nullable=False,
         default="pending",
         index=True,

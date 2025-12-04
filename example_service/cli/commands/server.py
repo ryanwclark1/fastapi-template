@@ -198,7 +198,7 @@ def worker(queue: str, concurrency: int) -> None:
 
     warning("⚠ Worker command needs to be configured for your specific Taskiq setup")
     info("To implement: Configure your Taskiq broker and worker startup")
-    info("Example: taskiq worker example_service.workers.broker:broker")
+    info("Example: taskiq worker example_service.infra.tasks.broker:broker")
 
     # Example implementation:
     # try:

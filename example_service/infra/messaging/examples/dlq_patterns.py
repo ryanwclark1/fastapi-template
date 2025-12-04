@@ -86,7 +86,7 @@ async def process_dlq_message(message: dict[str, Any]) -> None:
         },
     )
 
-    # Example: Send alert for high retry count
+    # Send alert for high retry count using the alerting system
     if metadata["retry_count"] >= 5:
         logger.critical(
             "High retry count in DLQ",
@@ -95,7 +95,16 @@ async def process_dlq_message(message: dict[str, Any]) -> None:
                 "original_queue": metadata["original_queue"],
             },
         )
-        # TODO: Send alert (email, Slack, PagerDuty, etc.)
+        # Use the DLQ alerter for multi-channel alerting
+        from example_service.infra.messaging.dlq.alerting import get_dlq_alerter
+        alerter = get_dlq_alerter()
+        await alerter.alert_dlq_message(
+            original_queue=metadata["original_queue"],
+            error_type=metadata["final_error_type"],
+            error_message=metadata["final_error"],
+            retry_count=metadata["retry_count"],
+            message_body=message,
+        )
 
     # Example: Store in database for analysis
     # await store_dlq_message(metadata, message)
@@ -383,4 +392,12 @@ if broker is not None:
                 "Critical DLQ condition: high retry count",
                 extra={"retry_count": metadata["retry_count"]},
             )
-            # TODO: Send alert via email, Slack, PagerDuty, etc.
+            # Send alert via configured channels (email, Slack, webhook)
+            from example_service.infra.messaging.dlq.alerting import get_dlq_alerter
+            alerter = get_dlq_alerter()
+            await alerter.alert_dlq_message(
+                original_queue=metadata["original_queue"],
+                error_type=metadata["final_error_type"],
+                error_message=metadata["final_error"],
+                retry_count=metadata["retry_count"],
+            )

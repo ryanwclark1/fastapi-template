@@ -1,29 +1,59 @@
 """Accent-Auth integration for authentication and authorization.
 
-This module provides integration with the Accent-Auth service, supporting:
-- Token validation via accent-auth API
+This module provides integration with the Accent-Auth service via the
+official accent-auth-client library. It supports:
+- Token validation and retrieval
 - ACL-based authorization with dot-notation
 - Multi-tenant support via Accent-Tenant header
 - Session management
-- Policy-based access control
+
+Requirements:
+    pip install accent-auth-client
+
+    Or add to pyproject.toml:
+    [project.dependencies]
+    accent-auth-client = "..."
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from typing import TYPE_CHECKING
+from functools import lru_cache
+from typing import TYPE_CHECKING, Any
 
-import httpx
 from pydantic import BaseModel, Field
 
+from example_service.core.acl import get_cached_access_check
 from example_service.core.schemas.auth import AuthUser
 from example_service.core.settings import get_auth_settings
-from example_service.utils.retry import retry
 
 if TYPE_CHECKING:
     from types import TracebackType
 
 logger = logging.getLogger(__name__)
+
+# Import the accent-auth-client library (required)
+try:
+    from accent_auth_client import Client as AccentAuthClientLib  # type: ignore[import-not-found]
+    from accent_auth_client.exceptions import (  # type: ignore[import-not-found]
+        InvalidTokenException,
+        MissingPermissionsTokenException,
+    )
+    from accent_auth_client.types import TokenDict  # type: ignore[import-not-found]
+
+    ACCENT_AUTH_CLIENT_AVAILABLE = True
+    logger.debug("accent-auth-client library loaded")
+except ImportError:
+    ACCENT_AUTH_CLIENT_AVAILABLE = False
+    AccentAuthClientLib = None
+    InvalidTokenException = Exception
+    MissingPermissionsTokenException = Exception
+    TokenDict = dict
+    logger.warning(
+        "accent-auth-client library not installed. "
+        "Install with: pip install accent-auth-client"
+    )
 
 
 class AccentAuthMetadata(BaseModel):
@@ -33,6 +63,7 @@ class AccentAuthMetadata(BaseModel):
     tenant_uuid: str = Field(description="Tenant UUID")
     auth_id: str | None = Field(default=None, description="Auth backend ID")
     pbx_user_uuid: str | None = Field(default=None, description="PBX user UUID")
+    accent_uuid: str | None = Field(default=None, description="Accent UUID")
 
 
 class AccentAuthToken(BaseModel):
@@ -40,64 +71,124 @@ class AccentAuthToken(BaseModel):
 
     token: str = Field(description="Token value")
     auth_id: str = Field(description="Authentication ID")
+    session_uuid: str | None = Field(default=None, description="Session UUID")
     accent_uuid: str | None = Field(default=None, description="Accent UUID")
     issued_at: str = Field(description="Token issue timestamp")
     expires_at: str = Field(description="Token expiration timestamp")
     utc_issued_at: str = Field(description="UTC issue timestamp")
     utc_expires_at: str = Field(description="UTC expiration timestamp")
     metadata: AccentAuthMetadata = Field(description="Token metadata")
-    acls: list[str] = Field(default_factory=list, description="Access Control List")
+    acl: list[str] = Field(default_factory=list, description="Access Control List")
+    user_agent: str | None = Field(default=None, description="User agent")
+    remote_addr: str | None = Field(default=None, description="Remote address")
 
-
-class AccentAuthSession(BaseModel):
-    """Accent-Auth session information."""
-
-    uuid: str = Field(description="Session UUID")
-    tenant_uuid: str = Field(description="Tenant UUID")
-    mobile: bool = Field(default=False, description="Mobile session flag")
+    @classmethod
+    def from_token_dict(cls, data: dict[str, Any]) -> AccentAuthToken:
+        """Create from accent-auth-client TokenDict."""
+        metadata = AccentAuthMetadata(
+            uuid=data.get("metadata", {}).get("uuid", ""),
+            tenant_uuid=data.get("metadata", {}).get("tenant_uuid", ""),
+            auth_id=data.get("metadata", {}).get("auth_id"),
+            pbx_user_uuid=data.get("metadata", {}).get("pbx_user_uuid"),
+            accent_uuid=data.get("metadata", {}).get("accent_uuid"),
+        )
+        return cls(
+            token=data.get("token", ""),
+            auth_id=data.get("auth_id", ""),
+            session_uuid=data.get("session_uuid"),
+            accent_uuid=data.get("accent_uuid"),
+            issued_at=data.get("issued_at", ""),
+            expires_at=data.get("expires_at", ""),
+            utc_issued_at=data.get("utc_issued_at", ""),
+            utc_expires_at=data.get("utc_expires_at", ""),
+            metadata=metadata,
+            acl=data.get("acl", []),
+            user_agent=data.get("user_agent"),
+            remote_addr=data.get("remote_addr"),
+        )
 
 
 class AccentAuthClient:
-    """Client for Accent-Auth API integration.
+    """Async wrapper for Accent-Auth client.
 
-    This client provides methods for:
-    - Token validation (HEAD, GET, check)
-    - ACL verification
-    - Session management
-    - Multi-tenant context handling
+    This client wraps the official accent-auth-client library to provide
+    async support for FastAPI applications.
 
     Example:
-        client = AccentAuthClient(base_url="http://accent-auth:9497")
-        token_info = await client.validate_token(token)
-        has_access = await client.check_acl(token, "confd.users.read")
+        async with AccentAuthClient() as client:
+            token_info = await client.validate_token(token)
+            has_access = await client.check_token(token, "confd.users.read")
     """
 
     def __init__(
         self,
-        base_url: str,
+        host: str | None = None,
+        port: int | None = None,
+        https: bool = True,
+        verify_certificate: bool = True,
         timeout: float = 5.0,
-        max_retries: int = 3,
+        token: str | None = None,
     ):
         """Initialize Accent-Auth client.
 
         Args:
-            base_url: Base URL of accent-auth service
+            host: Accent-Auth service hostname (default from settings)
+            port: Accent-Auth service port (default 443 for https, 80 for http)
+            https: Use HTTPS (default True)
+            verify_certificate: Verify SSL certificate (default True)
             timeout: Request timeout in seconds
-            max_retries: Maximum retry attempts
+            token: Service token for authentication
+
+        Raises:
+            RuntimeError: If accent-auth-client is not installed
         """
-        self.base_url = base_url.rstrip("/")
+        if not ACCENT_AUTH_CLIENT_AVAILABLE:
+            raise RuntimeError(
+                "accent-auth-client library is required but not installed. "
+                "Install with: pip install accent-auth-client"
+            )
+
+        settings = get_auth_settings()
+
+        # Parse host/port from settings if not provided
+        if host is None and settings.service_url:
+            from urllib.parse import urlparse
+
+            parsed = urlparse(str(settings.service_url))
+            host = parsed.hostname or "localhost"
+            port = parsed.port or (443 if parsed.scheme == "https" else 80)
+            https = parsed.scheme == "https"
+
+        self.host = host or "localhost"
+        self.port = port or (443 if https else 80)
+        self.https = https
+        self.verify_certificate = verify_certificate
         self.timeout = timeout
-        self.max_retries = max_retries
-        self._client: httpx.AsyncClient | None = None
+        self.token = token or (
+            settings.service_token.get_secret_value() if settings.service_token else None
+        )
+
+        self._client: Any = None
 
         logger.info(
             "Accent-Auth client initialized",
-            extra={"base_url": base_url, "timeout": timeout},
+            extra={
+                "host": self.host,
+                "port": self.port,
+                "https": self.https,
+            },
         )
 
     async def __aenter__(self) -> AccentAuthClient:
         """Async context manager entry."""
-        self._client = httpx.AsyncClient(timeout=self.timeout)
+        self._client = AccentAuthClientLib(
+            host=self.host,
+            port=self.port,
+            https=self.https,
+            verify_certificate=self.verify_certificate,
+            timeout=self.timeout,
+            token=self.token,
+        )
         return self
 
     async def __aexit__(
@@ -107,172 +198,124 @@ class AccentAuthClient:
         exc_tb: TracebackType | None,
     ) -> None:
         """Async context manager exit."""
-        if self._client:
-            await self._client.aclose()
+        # accent-auth-client doesn't require explicit cleanup
+        pass
 
-    def _get_client(self) -> httpx.AsyncClient:
-        """Get HTTP client instance."""
-        if not self._client:
-            self._client = httpx.AsyncClient(timeout=self.timeout)
-        return self._client
+    @property
+    def base_url(self) -> str:
+        """Get the base URL for the Accent-Auth service."""
+        protocol = "https" if self.https else "http"
+        return f"{protocol}://{self.host}:{self.port}"
 
-    @retry(
-        max_attempts=3,
-        initial_delay=0.5,
-        max_delay=5.0,
-        retry_if=lambda e: isinstance(e, (httpx.TimeoutException, httpx.NetworkError)),
-    )
-    async def validate_token_simple(
-        self,
-        token: str,
-        tenant_uuid: str | None = None,
-    ) -> bool:
-        """Validate token using HEAD request (simple validation).
-
-        Args:
-            token: Bearer token to validate
-            tenant_uuid: Optional tenant UUID for validation
-
-        Returns:
-            True if token is valid, False otherwise
-        """
-        headers = {"X-Auth-Token": token}
-        if tenant_uuid:
-            headers["Accent-Tenant"] = tenant_uuid
-
-        client = self._get_client()
-        response = await client.head(
-            f"{self.base_url}/api/auth/0.1/token/{token}",
-            headers=headers,
-        )
-
-        is_valid = response.status_code == 204
-        logger.debug(
-            f"Token validation (simple): {'valid' if is_valid else 'invalid'}",
-            extra={"status_code": response.status_code},
-        )
-
-        return is_valid
-
-    @retry(
-        max_attempts=3,
-        initial_delay=0.5,
-        max_delay=5.0,
-        retry_if=lambda e: isinstance(e, (httpx.TimeoutException, httpx.NetworkError)),
-    )
     async def validate_token(
         self,
         token: str,
         tenant_uuid: str | None = None,
-        scopes: list[str] | None = None,
+        required_acl: str | None = None,
     ) -> AccentAuthToken:
         """Validate token and retrieve full token information.
 
         Args:
             token: Bearer token to validate
             tenant_uuid: Optional tenant UUID for validation
-            scopes: Optional ACL scopes to check
+            required_acl: Optional ACL to check during validation
 
         Returns:
             Token information with ACLs and metadata
 
         Raises:
-            httpx.HTTPStatusError: If token is invalid or lacks required ACLs
+            InvalidTokenException: If token is invalid
+            MissingPermissionsTokenException: If token lacks required ACL
         """
-        headers = {"X-Auth-Token": token}
-        if tenant_uuid:
-            headers["Accent-Tenant"] = tenant_uuid
+        if not self._client:
+            raise RuntimeError("Client not initialized. Use 'async with' context manager.")
 
-        # Build URL with scopes if provided
-        url = f"{self.base_url}/api/auth/0.1/token/{token}"
-        # Use scopes parameter for ACL checking if provided
-        params = {"scope": scopes} if scopes else {}
-
-        client = self._get_client()
-        response = await client.get(url, headers=headers, params=params)
-
-        if response.status_code == 404:
-            logger.warning("Token not found or invalid")
-            raise httpx.HTTPStatusError(
-                "Token not found",
-                request=response.request,
-                response=response,
-            )
-
-        if response.status_code == 403:
-            logger.warning(
-                "Token lacks required ACLs",
-                extra={"required_scopes": scopes},
-            )
-            raise httpx.HTTPStatusError(
-                "Insufficient permissions",
-                request=response.request,
-                response=response,
-            )
-
-        response.raise_for_status()
-
-        data = response.json()
-        token_info = AccentAuthToken(**data["data"])
+        # Use official client in thread pool (it's synchronous)
+        token_dict = await asyncio.to_thread(
+            self._client.token.get,
+            token,
+            required_acl,
+            tenant_uuid,
+        )
+        token_info = AccentAuthToken.from_token_dict(token_dict)
 
         logger.info(
             "Token validated successfully",
             extra={
                 "user_uuid": token_info.metadata.uuid,
                 "tenant_uuid": token_info.metadata.tenant_uuid,
-                "acl_count": len(token_info.acls),
+                "acl_count": len(token_info.acl),
             },
         )
 
         return token_info
 
-    async def check_acl(
+    async def check_token(
         self,
         token: str,
-        required_acl: str,
+        required_acl: str | None = None,
         tenant_uuid: str | None = None,
     ) -> bool:
-        """Check if token has specific ACL permission.
+        """Check if token is valid (lightweight HEAD request).
 
         Args:
-            token: Bearer token
-            required_acl: Required ACL (e.g., "confd.users.read")
+            token: Bearer token to check
+            required_acl: Optional ACL to check
             tenant_uuid: Optional tenant UUID
 
         Returns:
-            True if ACL is granted, False otherwise
-        """
-        try:
-            await self.validate_token(token, tenant_uuid, scopes=[required_acl])
-            return True
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 403:
-                return False
-            raise
+            True if token is valid (and has required ACL if specified)
 
-    async def check_multiple_acls(
+        Raises:
+            InvalidTokenException: If token is invalid
+            MissingPermissionsTokenException: If token lacks required ACL
+        """
+        if not self._client:
+            raise RuntimeError("Client not initialized. Use 'async with' context manager.")
+
+        return await asyncio.to_thread(
+            self._client.token.check,
+            token,
+            required_acl,
+            tenant_uuid,
+        )
+
+    async def is_token_valid(
         self,
         token: str,
-        required_acls: list[str],
+        required_acl: str | None = None,
         tenant_uuid: str | None = None,
     ) -> bool:
-        """Check if token has all required ACLs.
+        """Check if token is valid without raising exceptions.
 
         Args:
-            token: Bearer token
-            required_acls: List of required ACLs
+            token: Bearer token to check
+            required_acl: Optional ACL to check
             tenant_uuid: Optional tenant UUID
 
         Returns:
-            True if all ACLs are granted, False otherwise
+            True if token is valid, False otherwise
         """
-        try:
-            await self.validate_token(token, tenant_uuid, scopes=required_acls)
-            return True
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 403:
-                return False
-            raise
+        if not self._client:
+            return False
+
+        return await asyncio.to_thread(
+            self._client.token.is_valid,
+            token,
+            required_acl,
+            tenant_uuid,
+        )
+
+    async def revoke_token(self, token: str) -> None:
+        """Revoke a token.
+
+        Args:
+            token: Token to revoke
+        """
+        if not self._client:
+            raise RuntimeError("Client not initialized. Use 'async with' context manager.")
+
+        await asyncio.to_thread(self._client.token.revoke, token)
 
     def to_auth_user(self, token_info: AccentAuthToken) -> AuthUser:
         """Convert Accent-Auth token to AuthUser model.
@@ -283,54 +326,50 @@ class AccentAuthClient:
         Returns:
             AuthUser model for use in FastAPI dependencies
         """
-        # Convert ACL list to structured permissions
-        # Accent uses dot-notation: service.resource.action
-        permissions = token_info.acls
-
-        # Build ACL dict grouped by resource
-        acl_dict: dict[str, list[str]] = {}
-        for permission in permissions:
-            parts = permission.split(".")
-            if len(parts) >= 2:
-                resource = ".".join(parts[:-1])  # e.g., "confd.users"
-                action = parts[-1]  # e.g., "read"
-
-                if resource not in acl_dict:
-                    acl_dict[resource] = []
-                acl_dict[resource].append(action)
-
         return AuthUser(
             user_id=token_info.metadata.uuid,
-            service_id=None,  # Accent-Auth doesn't use service_id
-            email=None,  # Not provided in token info
-            roles=[],  # Accent uses ACLs, not roles
-            permissions=permissions,
-            acl=acl_dict,
+            service_id=None,
+            email=None,
+            roles=[],
+            permissions=token_info.acl,
+            acl={},  # ACL dict built from permissions in can_access_resource
             metadata={
                 "tenant_uuid": token_info.metadata.tenant_uuid,
-                "auth_id": token_info.metadata.auth_id,
+                "auth_id": token_info.metadata.auth_id or token_info.auth_id,
+                "session_uuid": token_info.session_uuid,
                 "token": token_info.token,
                 "expires_at": token_info.expires_at,
+                "accent_uuid": token_info.accent_uuid,
             },
         )
 
 
+@lru_cache(maxsize=1)
 def get_accent_auth_client() -> AccentAuthClient:
     """Get configured Accent-Auth client instance.
 
     Returns:
         Configured AccentAuthClient
+
+    Raises:
+        ValueError: If AUTH_SERVICE_URL is not configured
+        RuntimeError: If accent-auth-client is not installed
     """
+    if not ACCENT_AUTH_CLIENT_AVAILABLE:
+        raise RuntimeError(
+            "accent-auth-client library is required but not installed. "
+            "Install with: pip install accent-auth-client"
+        )
+
     settings = get_auth_settings()
 
     if not settings.service_url:
-        raise ValueError("AUTH_SERVICE_URL must be configured for Accent-Auth")
+        raise ValueError(
+            "AUTH_SERVICE_URL must be configured for Accent-Auth. "
+            "Set AUTH_SERVICE_URL environment variable or configure in settings."
+        )
 
-    return AccentAuthClient(
-        base_url=str(settings.service_url),
-        timeout=settings.request_timeout,
-        max_retries=settings.max_retries,
-    )
+    return AccentAuthClient()
 
 
 class AccentAuthACL:
@@ -342,22 +381,49 @@ class AccentAuthACL:
     - Negation: ! prefix (e.g., "!confd.users.delete")
     - Reserved: me, my_session (dynamic substitution)
 
+    This class delegates to the core ACL module which provides:
+    - Full regex-based pattern matching
+    - LRU caching at multiple levels for performance
+    - Proper reserved word substitution
+
     Example:
         acl = AccentAuthACL(["confd.users.*", "webhookd.#"])
         acl.has_permission("confd.users.read")  # True
         acl.has_permission("confd.users.delete")  # True
         acl.has_permission("webhookd.subscriptions.read")  # True
+
+        # With user context (enables 'me' and 'my_session' substitution)
+        acl = AccentAuthACL(
+            ["users.me.read", "sessions.my_session.delete"],
+            auth_id="user-123",
+            session_id="sess-456",
+        )
+        acl.has_permission("users.user-123.read")  # True
     """
 
-    def __init__(self, acls: list[str]):
+    def __init__(
+        self,
+        acls: list[str],
+        auth_id: str | None = None,
+        session_id: str | None = None,
+    ):
         """Initialize with list of ACL patterns.
 
         Args:
             acls: List of ACL patterns
+            auth_id: User auth ID for 'me' reserved word substitution
+            session_id: Session ID for 'my_session' reserved word substitution
         """
         self.acls = acls
-        self.positive_acls = [acl for acl in acls if not acl.startswith("!")]
-        self.negative_acls = [acl[1:] for acl in acls if acl.startswith("!")]
+        self.auth_id = auth_id
+        self.session_id = session_id
+
+        # Use the full ACL implementation with caching
+        self._checker = get_cached_access_check(
+            auth_id=auth_id,
+            session_id=session_id,
+            acl=acls,
+        )
 
     def has_permission(self, required: str) -> bool:
         """Check if ACL grants permission.
@@ -368,50 +434,34 @@ class AccentAuthACL:
         Returns:
             True if permission is granted
         """
-        # Check negative ACLs first (explicit deny)
-        for negative_pattern in self.negative_acls:
-            if self._matches_pattern(required, negative_pattern):
-                return False
+        return self._checker.matches_required_access(required)
 
-        # Check positive ACLs
-        for positive_pattern in self.positive_acls:
-            if self._matches_pattern(required, positive_pattern):
-                return True
-
-        return False
-
-    def _matches_pattern(self, permission: str, pattern: str) -> bool:
-        """Check if permission matches ACL pattern.
+    def has_any_permission(self, *required: str) -> bool:
+        """Check if ACL grants any of the specified permissions.
 
         Args:
-            permission: Permission to check
-            pattern: ACL pattern with wildcards
+            *required: Required permissions to check
 
         Returns:
-            True if matches
+            True if any permission is granted
         """
-        # Exact match
-        if permission == pattern:
-            return True
+        return any(self.has_permission(r) for r in required)
 
-        # Multi-level wildcard (#)
-        if "#" in pattern:
-            prefix = pattern.split("#")[0]
-            if permission.startswith(prefix):
-                return True
+    def has_all_permissions(self, *required: str) -> bool:
+        """Check if ACL grants all of the specified permissions.
 
-        # Single-level wildcard (*)
-        if "*" in pattern:
-            perm_parts = permission.split(".")
-            pattern_parts = pattern.split(".")
+        Args:
+            *required: Required permissions to check
 
-            if len(perm_parts) != len(pattern_parts):
-                return False
+        Returns:
+            True if all permissions are granted
+        """
+        return all(self.has_permission(r) for r in required)
 
-            for perm_part, pattern_part in zip(perm_parts, pattern_parts, strict=False):
-                if pattern_part != "*" and perm_part != pattern_part:
-                    return False
+    def is_superuser(self) -> bool:
+        """Check if ACL grants superuser access (# wildcard).
 
-            return True
-
-        return False
+        Returns:
+            True if user has # ACL
+        """
+        return self.has_permission("#")

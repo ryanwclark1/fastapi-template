@@ -68,7 +68,7 @@ class FileService(BaseService):
             return False
 
         try:
-            from example_service.tasks.files import generate_thumbnails
+            from example_service.workers.files import generate_thumbnails
         except Exception as e:  # pragma: no cover - import errors are non-fatal
             self.logger.warning(
                 "Thumbnail task import failed; skipping thumbnail generation",
@@ -353,8 +353,8 @@ class FileService(BaseService):
         """
         file = await self._repository.get_or_raise(self._session, file_id)
 
-        if file.status != FileStatus.PENDING:
-            raise ValueError(f"File {file_id} is not pending upload (status: {file.status.value})")
+        if file.status != FileStatus.PENDING.value:
+            raise ValueError(f"File {file_id} is not pending upload (status: {file.status})")
 
         # Verify file exists in storage
         storage = self._ensure_storage()
@@ -459,10 +459,8 @@ class FileService(BaseService):
         """
         file = await self._repository.get_or_raise(self._session, file_id)
 
-        if file.status != FileStatus.READY:
-            raise ValueError(
-                f"File {file_id} is not ready for download (status: {file.status.value})"
-            )
+        if file.status != FileStatus.READY.value:
+            raise ValueError(f"File {file_id} is not ready for download (status: {file.status})")
 
         # Generate presigned download URL
         storage = self._ensure_storage()
@@ -665,7 +663,7 @@ class FileService(BaseService):
                             "content_type": file.content_type,
                             "size_bytes": file.size_bytes,
                             "success": False,
-                            "error": f"File not ready (status: {file.status.value})",
+                            "error": f"File not ready (status: {file.status})",
                         }
                     )
                     failed += 1
@@ -837,9 +835,9 @@ class FileService(BaseService):
         """
         source_file = await self._repository.get_or_raise(self._session, file_id)
 
-        if source_file.status != FileStatus.READY:
+        if source_file.status != FileStatus.READY.value:
             raise ValueError(
-                f"Cannot copy file {file_id} - not ready (status: {source_file.status.value})"
+                f"Cannot copy file {file_id} - not ready (status: {source_file.status})"
             )
 
         # Generate new filename

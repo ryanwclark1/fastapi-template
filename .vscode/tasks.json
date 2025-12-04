@@ -63,6 +63,26 @@
       "problemMatcher": []
     },
     {
+      "label": "Infra: Docker Compose Stop",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "compose",
+        "--env-file",
+        ".env",
+        "-f",
+        "deployment/docker/docker-compose.yml",
+        "stop"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "infra"
+      },
+      "detail": "Stop all infrastructure services (pause containers, keep them on disk)",
+      "problemMatcher": []
+    },
+    {
       "label": "Infra: Docker Compose Down",
       "type": "shell",
       "command": "docker",
@@ -79,7 +99,7 @@
         "panel": "dedicated",
         "group": "infra"
       },
-      "detail": "Stop all infrastructure services",
+      "detail": "Stop and remove all infrastructure containers",
       "problemMatcher": []
     },
     {
@@ -188,7 +208,7 @@
         "run",
         "taskiq",
         "worker",
-        "example_service.tasks.broker:broker"
+        "example_service.infra.tasks.broker:broker"
       ],
       "isBackground": true,
       "presentation": {

@@ -18,6 +18,8 @@ import asyncio
 from logging.config import fileConfig
 from typing import TYPE_CHECKING, Any
 
+# Import alembic-postgresql-enum to enable automatic enum autogeneration
+import alembic_postgresql_enum
 from sqlalchemy import Column, pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -31,6 +33,10 @@ from example_service.core.database.base import Base
 # Import custom types for comparison and rendering
 from example_service.core.database.types import EncryptedString, EncryptedText
 from example_service.core.settings import get_db_settings
+
+# Import job system models for Alembic auto-generation
+# These are in infra/tasks/jobs/ not features/, so need explicit import
+from example_service.infra.tasks.jobs import models as job_models
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -216,6 +222,112 @@ def render_item(type_: str, obj: Any, autogen_context: AutogenContext) -> str | 
 # =============================================================================
 
 
+def _collect_fts_models() -> list[dict[str, Any]]:
+    """Collect all models with FTS configuration.
+
+    Scans Base.metadata for models with __search_fields__ attribute
+    and extracts their FTS configuration.
+
+    Returns:
+        List of dicts with FTS configuration per model
+    """
+    fts_models = []
+
+    for table in target_metadata.sorted_tables:
+        # Get the model class from the table
+        # In SQLAlchemy 2.0, we need to check the table's metadata
+        for mapper in target_metadata.tables[table.name]._extra_dependencies:  # type: ignore[attr-defined]
+            if hasattr(mapper, "class_"):
+                model_class = mapper.class_
+                if hasattr(model_class, "__search_fields__"):
+                    config_data = {
+                        "table_name": table.name,
+                        "search_fields": model_class.__search_fields__,
+                        "config": getattr(model_class, "__search_config__", "english"),
+                        "weights": getattr(model_class, "__search_weights__", None),
+                    }
+                    fts_models.append(config_data)
+                    break
+
+    return fts_models
+
+
+def _generate_fts_upgrade_code(fts_models: list[dict[str, Any]]) -> str:
+    """Generate FTS setup code for upgrade function.
+
+    Args:
+        fts_models: List of FTS model configurations
+
+    Returns:
+        Python code string to add to upgrade()
+    """
+    if not fts_models:
+        return ""
+
+    lines = [
+        "",
+        "    # Add Full-Text Search triggers for automatic search_vector updates",
+    ]
+
+    for model in fts_models:
+        table_name = model["table_name"]
+        search_fields = model["search_fields"]
+        config = model["config"]
+        weights = model["weights"]
+
+        lines.append(f"    # {table_name.capitalize()} FTS")
+        lines.append("    FTSMigrationHelper(")
+        lines.append(f'        table_name="{table_name}",')
+        lines.append(f"        search_fields={search_fields!r},")
+
+        if weights:
+            lines.append(f"        weights={weights!r},")
+
+        lines.append(f'        config="{config}",')
+        lines.append("    ).add_fts(op)")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def _generate_fts_downgrade_code(fts_models: list[dict[str, Any]]) -> str:
+    """Generate FTS removal code for downgrade function.
+
+    Args:
+        fts_models: List of FTS model configurations
+
+    Returns:
+        Python code string to add to downgrade()
+    """
+    if not fts_models:
+        return ""
+
+    lines = [
+        "",
+        "    # Remove Full-Text Search triggers",
+    ]
+
+    # Reverse order for downgrade
+    for model in reversed(fts_models):
+        table_name = model["table_name"]
+        search_fields = model["search_fields"]
+        config = model["config"]
+        weights = model["weights"]
+
+        lines.append("    FTSMigrationHelper(")
+        lines.append(f'        table_name="{table_name}",')
+        lines.append(f"        search_fields={search_fields!r},")
+
+        if weights:
+            lines.append(f"        weights={weights!r},")
+
+        lines.append(f'        config="{config}",')
+        lines.append("    ).remove_fts(op)")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 def process_revision_directives(
     context: MigrationContext,
     revision: str | tuple[str, ...] | Iterable[str | None] | Iterable[str],
@@ -223,7 +335,9 @@ def process_revision_directives(
 ) -> None:
     """Hook to modify revision before writing.
 
-    Used to skip empty migrations when autogenerate detects no changes.
+    Enhanced to:
+    1. Skip empty migrations when no changes detected
+    2. Auto-inject FTSMigrationHelper calls for models with __search_fields__
 
     Args:
         context: Migration context
@@ -231,12 +345,37 @@ def process_revision_directives(
         directives: List of migration scripts to process
     """
     _ = context, revision
-    if getattr(config.cmd_opts, "autogenerate", False) and directives:
-        script = directives[0]
-        if script.upgrade_ops is not None and script.upgrade_ops.is_empty():
-            # Skip creating empty migration
-            directives[:] = []
-            print("No changes detected, skipping migration creation")
+
+    if not getattr(config.cmd_opts, "autogenerate", False) or not directives:
+        return
+
+    script = directives[0]
+
+    # Check for empty migrations
+    if script.upgrade_ops is not None and script.upgrade_ops.is_empty():
+        directives[:] = []
+        print("No changes detected, skipping migration creation")
+        return
+
+    # Inject FTS trigger management code
+    fts_models = _collect_fts_models()
+
+    if fts_models:
+        print(f"\nDetected {len(fts_models)} FTS-enabled models:")
+        for model in fts_models:
+            print(f"  - {model['table_name']}: {model['search_fields']}")
+
+        # Add FTSMigrationHelper import to the migration
+        if script.imports:
+            script.imports.add("from example_service.core.database.search.utils import FTSMigrationHelper")
+
+        # Store FTS models in script for template access
+        # This will be used by a custom migration template
+        script.fts_models = fts_models  # type: ignore[attr-defined]
+        script._fts_upgrade_code = _generate_fts_upgrade_code(fts_models)  # type: ignore[attr-defined]
+        script._fts_downgrade_code = _generate_fts_downgrade_code(fts_models)  # type: ignore[attr-defined]
+
+        print("FTS trigger management code will be auto-generated in migration.")
 
 
 # =============================================================================

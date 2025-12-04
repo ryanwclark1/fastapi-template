@@ -138,6 +138,19 @@ async def publish_file_event(
     await publish_event("graphql:files", event_type, file_data)
 
 
+async def publish_webhook_event(
+    event_type: str,
+    webhook_data: dict[str, Any],
+) -> None:
+    """Publish a webhook event.
+
+    Args:
+        event_type: CREATED, UPDATED, or DELETED
+        webhook_data: Serialized webhook dictionary
+    """
+    await publish_event("graphql:webhooks", event_type, webhook_data)
+
+
 async def publish_webhook_delivery_event(
     event_type: str,
     delivery_data: dict[str, Any],
@@ -191,5 +204,6 @@ __all__ = [
     "publish_reminder_event",
     "publish_tag_event",
     "publish_webhook_delivery_event",
+    "publish_webhook_event",
     "serialize_model_for_event",
 ]

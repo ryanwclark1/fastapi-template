@@ -152,8 +152,16 @@ def mock_sqlalchemy_engine() -> MagicMock:
     Returns:
         Mock engine with sync_engine attribute for event listeners.
     """
+    from unittest.mock import Mock
+
     engine = MagicMock()
-    engine.sync_engine = MagicMock()
+    sync_engine = Mock(spec=["dispatch", "_has_events"])
+    # Make sync_engine support SQLAlchemy events
+    sync_engine.dispatch = Mock()
+    sync_engine._has_events = True
+    # Add event listener support
+    sync_engine._event_registry = {}
+    engine.sync_engine = sync_engine
     return engine
 
 

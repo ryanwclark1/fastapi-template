@@ -95,7 +95,6 @@ class SecurityHeadersMiddleware:
         enable_permissions_policy: bool = True,
         permissions_policy: dict[str, list[str]] | None = None,
         server_header: str | None | bool = False,
-        is_production: bool | None = None,
         environment: str | None = None,
     ) -> None:
         """Initialize security headers middleware.
@@ -120,23 +119,17 @@ class SecurityHeadersMiddleware:
             permissions_policy: Custom permissions policy directives.
             server_header: Custom Server header value. None removes it, False keeps default,
                 string sets custom value (default: False for backward compat).
-            is_production: Whether running in production (deprecated, use environment).
             environment: Environment name ('development'|'staging'|'production'|'test').
-                Used for automatic strictness adjustment.
+                Used for automatic strictness adjustment. Defaults to 'development' if not provided.
 
         Note:
-            Environment detection priority:
-            1. Explicit environment parameter
-            2. Explicit is_production parameter (deprecated)
-            3. Defaults to non-production mode
-
             For environment-aware security, pass environment='production'.
         """
         self.app = app
 
         # Determine if we're in production for environment-aware defaults
-        self._is_production = self._determine_production_mode(is_production, environment)
-        self._environment = environment or ("production" if self._is_production else "development")
+        self._is_production = self._determine_production_mode(environment)
+        self._environment = environment or "development"
 
         # HSTS configuration - auto-enable in production if not explicitly set
         self.enable_hsts = enable_hsts if enable_hsts is not None else (self._is_production or True)
@@ -181,11 +174,10 @@ class SecurityHeadersMiddleware:
         )
 
     @staticmethod
-    def _determine_production_mode(is_production: bool | None, environment: str | None) -> bool:
+    def _determine_production_mode(environment: str | None) -> bool:
         """Determine if running in production mode.
 
         Args:
-            is_production: Explicit production flag (deprecated).
             environment: Environment name.
 
         Returns:
@@ -193,8 +185,6 @@ class SecurityHeadersMiddleware:
         """
         if environment is not None:
             return environment.lower() == "production"
-        if is_production is not None:
-            return is_production
         return False
 
     def _get_default_csp(self) -> dict[str, str]:

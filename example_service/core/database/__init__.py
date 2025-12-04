@@ -10,6 +10,7 @@ Base Classes and Mixins:
     - TimestampMixin: created_at, updated_at tracking
     - AuditColumnsMixin: created_by, updated_by tracking
     - SoftDeleteMixin: Soft delete support with deleted_at
+    - HierarchicalMixin: Tree navigation for models with ltree paths
 
 Convenience Bases:
     - TimestampedBase: Integer PK + timestamps (backward compatible)
@@ -18,6 +19,7 @@ Convenience Bases:
 
 Repository:
     - BaseRepository[T]: Generic CRUD with explicit session passing
+    - TenantAwareRepository[T]: BaseRepository with optional multi-tenancy support
     - SearchResult[T]: Paginated result container
 
 Query Filters:
@@ -35,13 +37,39 @@ UUID Utilities:
     - parse_uuid: Parse UUID from various formats
     - uuid_to_timestamp: Extract timestamp from UUID v7
 
+Change Tracking:
+    - has_changes: Check if ORM instance has pending changes
+    - is_loaded: Check if relationship is loaded without triggering load
+    - get_changed_attributes: Get dict of changed attrs with old/new values
+    - get_instance_state: Get human-readable state (pending, persistent, etc.)
+
 Validation:
     - validate_identifier: Validate SQL identifiers against injection
     - safe_table_reference: Create safely quoted table references
 
-Custom Types:
+Custom Types - Encryption:
     - EncryptedString: Transparent encryption for sensitive data
     - EncryptedText: Encrypted Text type for larger content
+
+Custom Types - Validated:
+    - EmailType: Validated email addresses with normalization
+    - URLType: Validated URLs with scheme enforcement
+    - PhoneNumberType: International phone numbers in E.164 format
+
+Custom Types - Hierarchical:
+    - LtreeType: PostgreSQL ltree for hierarchical paths
+    - LtreePath: Python wrapper for path manipulation
+
+Custom Types - Ranges:
+    - Range: Python representation of PostgreSQL ranges
+    - DateRangeType, DateTimeRangeType: Date/datetime ranges
+    - IntRangeType, NumericRangeType: Numeric ranges
+    - range_contains, range_overlaps, etc.: Query helpers
+
+Custom Types - Choices:
+    - ChoiceType: SQLAlchemy type for labeled enums
+    - LabeledStrEnum, LabeledIntEnum: Enums with human-readable labels
+    - create_choices: Dynamic enum creation
 
 Exceptions:
     - DatabaseError: Base exception for database operations
@@ -83,11 +111,20 @@ from example_service.core.database.base import (
     Base,
     IntegerPKMixin,
     SoftDeleteMixin,
+    TenantMixin,
     TimestampedBase,
     TimestampMixin,
     UUIDPKMixin,
     UUIDTimestampedBase,
     UUIDv7PKMixin,
+)
+from example_service.core.database.choices import (
+    ChoiceType,
+    LabeledChoiceMixin,
+    LabeledIntEnum,
+    LabeledStrEnum,
+    create_choices,
+    with_labels,
 )
 from example_service.core.database.exceptions import (
     DatabaseError,
@@ -103,13 +140,55 @@ from example_service.core.database.filters import (
     SearchFilter,
     StatementFilter,
 )
+from example_service.core.database.hierarchy import (
+    HierarchicalMixin,
+    LtreePath,
+)
+from example_service.core.database.inspection import (
+    get_changed_attributes,
+    get_identity_key,
+    get_instance_state,
+    get_original_values,
+    get_primary_key,
+    has_changes,
+    is_deleted,
+    is_detached,
+    is_loaded,
+    is_modified,
+    is_new,
+    is_persistent,
+)
+from example_service.core.database.ranges import (
+    DateRange,
+    DateRangeType,
+    DateTimeRangeType,
+    DecimalRange,
+    IntRange,
+    IntRangeType,
+    NumericRangeType,
+    Range,
+    TimestampRange,
+    range_adjacent,
+    range_contained_by,
+    range_contains,
+    range_left_of,
+    range_overlaps,
+    range_right_of,
+)
 from example_service.core.database.repository import (
     BaseRepository,
     SearchResult,
+    TenantAwareRepository,
 )
 from example_service.core.database.types import (
+    EmailType,
     EncryptedString,
     EncryptedText,
+    LtreeType,
+    PhoneNumberType,
+    URLType,
+    format_phone_international,
+    format_phone_national,
 )
 from example_service.core.database.utils import (
     generate_uuid7,
@@ -122,48 +201,122 @@ from example_service.core.database.validation import (
     safe_table_reference,
     validate_identifier,
 )
+from example_service.core.database.migration_helpers import (
+    create_exclusion_constraint,
+    create_extension,
+    create_gist_index,
+    create_gist_index_multi,
+    create_ltree_indexes,
+    create_no_overlap_constraint,
+    drop_exclusion_constraint,
+    drop_extension,
+    drop_gist_index,
+    drop_ltree_indexes,
+    ensure_btree_gist,
+)
 
 __all__ = [
     "NAMING_CONVENTION",
+    # Audit mixins
     "AuditColumnsMixin",
     "AuditedBase",
     # Base and metadata
     "Base",
     # Repository
     "BaseRepository",
+    # Filters
     "BeforeAfter",
+    # Custom types - Choices
+    "ChoiceType",
     "CollectionFilter",
     # Exceptions
     "DatabaseError",
-    # Custom types
+    # Custom types - Ranges
+    "DateRange",
+    "DateRangeType",
+    "DateTimeRangeType",
+    "DecimalRange",
+    # Custom types - Validated
+    "EmailType",
+    # Custom types - Encryption
     "EncryptedString",
     "EncryptedText",
     "FilterGroup",
+    # Custom types - Hierarchical
+    "HierarchicalMixin",
     "IdentifierValidationError",
+    "IntRange",
+    "IntRangeType",
     # Primary key mixins
     "IntegerPKMixin",
+    "LabeledChoiceMixin",
+    "LabeledIntEnum",
+    "LabeledStrEnum",
     "LimitOffset",
+    "LtreePath",
+    "LtreeType",
     "NotFoundError",
+    "NumericRangeType",
     "OnBeforeAfter",
     "OrderBy",
+    "PhoneNumberType",
+    "Range",
     "SearchFilter",
     "SearchResult",
     "SoftDeleteMixin",
-    # Filters
     "StatementFilter",
-    # Audit mixins
+    # Multi-tenancy
+    "TenantAwareRepository",
+    "TenantMixin",
     "TimestampMixin",
+    "TimestampRange",
     # Convenience bases
     "TimestampedBase",
+    "URLType",
     "UUIDPKMixin",
     "UUIDTimestampedBase",
     "UUIDv7PKMixin",
+    "create_choices",
+    "format_phone_international",
+    "format_phone_national",
     # UUID utilities
     "generate_uuid7",
+    # Change tracking / Inspection
+    "get_changed_attributes",
+    "get_identity_key",
+    "get_instance_state",
+    "get_original_values",
+    "get_primary_key",
+    "has_changes",
+    "is_deleted",
+    "is_detached",
+    "is_loaded",
+    "is_modified",
+    "is_new",
+    "is_persistent",
     "parse_uuid",
+    "range_adjacent",
+    "range_contained_by",
+    "range_contains",
+    "range_left_of",
+    "range_overlaps",
+    "range_right_of",
+    # Validation
     "safe_table_reference",
     "short_uuid",
     "uuid_to_timestamp",
-    # Validation
     "validate_identifier",
+    "with_labels",
+    # Migration helpers
+    "create_exclusion_constraint",
+    "create_extension",
+    "create_gist_index",
+    "create_gist_index_multi",
+    "create_ltree_indexes",
+    "create_no_overlap_constraint",
+    "drop_exclusion_constraint",
+    "drop_extension",
+    "drop_gist_index",
+    "drop_ltree_indexes",
+    "ensure_btree_gist",
 ]

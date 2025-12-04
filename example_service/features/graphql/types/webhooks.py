@@ -12,6 +12,7 @@ Auto-generated from Pydantic schemas:
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import TYPE_CHECKING
 
 import strawberry
@@ -23,7 +24,7 @@ from example_service.features.graphql.types.pydantic_bridge import (
     pydantic_type,
 )
 from example_service.features.webhooks.schemas import (
-    DeliveryStatus as PydanticDeliveryStatus,
+    DeliveryStatus as ModelDeliveryStatus,
 )
 from example_service.features.webhooks.schemas import (
     WebhookCreate,
@@ -32,6 +33,9 @@ from example_service.features.webhooks.schemas import (
     WebhookUpdate,
 )
 
+# Keep PydanticDeliveryStatus alias for backward compatibility with existing code
+PydanticDeliveryStatus = ModelDeliveryStatus
+
 if TYPE_CHECKING:
     from strawberry.types import Info
 
@@ -39,15 +43,8 @@ if TYPE_CHECKING:
 # Enums
 # ============================================================================
 
-
-@strawberry.enum(description="Webhook delivery status")
-class DeliveryStatus:
-    """Webhook delivery status types."""
-
-    PENDING = "pending"  # Waiting for delivery
-    DELIVERED = "delivered"  # Successfully delivered
-    FAILED = "failed"  # Delivery failed after all retries
-    RETRYING = "retrying"  # Retrying after failure
+# Use the schema's DeliveryStatus enum directly
+DeliveryStatus = strawberry.enum(ModelDeliveryStatus, description="Webhook delivery status")
 
 
 # ============================================================================
@@ -181,7 +178,6 @@ class WebhookType:
         "is_active",
         "max_retries",
         "timeout_seconds",
-        "custom_headers",
     ],
     description="Input for creating a webhook",
 )
@@ -197,6 +193,12 @@ class CreateWebhookInput:
     - timeout_seconds: 1-300
     """
 
+    # Override custom_headers with JSON type (dict not supported in GraphQL)
+    custom_headers: strawberry.scalars.JSON | None = strawberry.field(
+        default=None,
+        description="Custom HTTP headers as JSON object"
+    )
+
 
 @pydantic_input(
     model=WebhookUpdate,
@@ -208,7 +210,6 @@ class CreateWebhookInput:
         "is_active",
         "max_retries",
         "timeout_seconds",
-        "custom_headers",
     ],
     description="Input for updating a webhook",
 )
@@ -218,6 +219,12 @@ class UpdateWebhookInput:
     All fields are optional - only provided fields are updated.
     Auto-generated from WebhookUpdate Pydantic schema.
     """
+
+    # Override custom_headers with JSON type (dict not supported in GraphQL)
+    custom_headers: strawberry.scalars.JSON | None = strawberry.field(
+        default=None,
+        description="Custom HTTP headers as JSON object"
+    )
 
 
 @strawberry.input(description="Input for testing a webhook")
@@ -270,7 +277,7 @@ class WebhookSuccess:
 
 
 @strawberry.enum(description="Webhook error codes")
-class WebhookErrorCode(strawberry.enum.EnumMeta):
+class WebhookErrorCode(str, Enum):
     """Error codes for webhook operations."""
 
     VALIDATION_ERROR = "VALIDATION_ERROR"
@@ -343,7 +350,7 @@ class WebhookDeliveryConnection:
 
 
 @strawberry.enum(description="Types of webhook delivery events for subscriptions")
-class WebhookDeliveryEventType(strawberry.enum.Enum):
+class WebhookDeliveryEventType(str, Enum):
     """Event types for webhook delivery subscriptions.
 
     Clients can subscribe to specific event types or all events.

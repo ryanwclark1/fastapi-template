@@ -538,7 +538,7 @@ class TestGetTaskService:
 
     def test_handles_missing_scheduler(self):
         """Should handle missing scheduler module."""
-        with patch.dict("sys.modules", {"example_service.tasks.scheduler": None}):
+        with patch.dict("sys.modules", {"example_service.workers.scheduler": None}):
             # Force ImportError by patching the import
             def raise_import_error(*args, **kwargs):
                 raise ImportError("No module")

@@ -6,11 +6,14 @@ Provides Kubernetes-ready health check endpoints for:
 - Startup probes: /health/startup - Has the service finished initializing?
 - Comprehensive health: /health/ - Full health status with dependency checks
 - Detailed health: /health/detailed - Extended metrics with latency info
+- Status: /health/status - Simple status for load balancers (GET and HEAD)
 - History: /health/history - Recent health check history
 - Statistics: /health/stats - Aggregated health statistics
 """
 
 from __future__ import annotations
+
+from typing import Annotated
 
 from fastapi import APIRouter, Query, Response, status
 
@@ -28,6 +31,7 @@ from example_service.features.health.schemas import (
     ProviderStatsDetail,
     ReadinessResponse,
     StartupResponse,
+    StatusResponse,
 )
 
 # Import dependencies at runtime so FastAPI treats them as Depends()
@@ -73,10 +77,7 @@ async def health_check(service: HealthServiceDep) -> HealthResponse:
 )
 async def health_check_detailed(
     service: HealthServiceDep,
-    force_refresh: bool = Query(
-        default=False,
-        description="Bypass cache and run fresh checks",
-    ),
+    force_refresh: Annotated[bool, Query(description="Bypass cache and run fresh checks")] = False,
 ) -> DetailedHealthResponse:
     """Detailed health check endpoint with latency metrics.
 
@@ -180,6 +181,75 @@ async def startup_check(service: HealthServiceDep) -> StartupResponse:
 
 
 # =============================================================================
+# Legacy Status Endpoint (Load Balancer Compatibility)
+# =============================================================================
+
+
+@router.get(
+    "/status",
+    response_model=StatusResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Simple status check",
+    description="Returns basic service status for load balancer health checks",
+)
+async def status_check() -> StatusResponse:
+    """Simple status check endpoint for load balancers.
+
+    Returns a minimal response indicating the service is running.
+    Use /health/ for comprehensive health checks with dependency status.
+
+    This endpoint does NOT check dependencies - it only confirms
+    the HTTP server is responding. For dependency-aware checks,
+    use /health/ready instead.
+
+    Returns:
+        StatusResponse with simple "ok" status.
+
+    Example:
+        GET /health/status
+        Response: {"status": "ok"}
+    """
+    return StatusResponse(status="ok")
+
+
+@router.head(
+    "/status",
+    status_code=status.HTTP_200_OK,
+    responses={
+        503: {"description": "Service not ready to accept traffic"},
+    },
+    summary="Status check (HEAD)",
+    description="HEAD method for load balancers - returns 200 if ready, 503 if not",
+)
+async def status_head(
+    response: Response,
+    service: HealthServiceDep,
+) -> None:
+    """Legacy status check endpoint (HEAD method).
+
+    Returns 200 OK if service is ready to accept traffic, 503 if not.
+    Used by legacy load balancers and monitoring systems that expect
+    HEAD requests for health checks.
+
+    Unlike GET /status, this endpoint DOES check critical dependencies
+    to determine readiness, matching the behavior of /health/ready.
+
+    Returns:
+        Empty response with status code:
+        - 200 OK: Service is ready
+        - 503 Service Unavailable: Service not ready
+
+    Example:
+        HEAD /health/status
+        Response: 200 OK (empty body)
+    """
+    result = await service.readiness()
+
+    if not result["ready"]:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
+
+# =============================================================================
 # Security Protection Endpoint
 # =============================================================================
 
@@ -253,8 +323,8 @@ async def protection_status(aggregator: HealthAggregatorDep) -> ProtectionHealth
 )
 async def health_history(
     aggregator: HealthAggregatorDep,
-    limit: int = Query(default=50, ge=1, le=500, description="Maximum entries to return"),
-    provider: str | None = Query(default=None, description="Filter by provider name"),
+    limit: Annotated[int, Query(ge=1, le=500, description="Maximum entries to return")] = 50,
+    provider: Annotated[str | None, Query(description="Filter by provider name")] = None,
 ) -> HealthHistoryResponse:
     """Get health check history.
 

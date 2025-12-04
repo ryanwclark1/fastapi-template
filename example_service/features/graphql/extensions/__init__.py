@@ -32,6 +32,21 @@ from example_service.features.graphql.extensions.tracing import (
     trace_resolver,
 )
 
+
+def get_extensions() -> list:
+    """Get list of GraphQL schema extensions.
+
+    Returns:
+        List of Strawberry extension instances
+    """
+    return [
+        ComplexityLimiter(),
+        GraphQLRateLimiter(),
+        GraphQLMetricsExtension(),
+        GraphQLTracingExtension(),
+    ]
+
+
 __all__ = [
     "GRAPHQL_METRICS",
     "ComplexityConfig",
@@ -42,6 +57,7 @@ __all__ = [
     "GraphQLRateLimiter",
     # Observability
     "GraphQLTracingExtension",
+    "get_extensions",
     "get_graphql_tracer",
     "record_cache_hit",
     "record_cache_miss",

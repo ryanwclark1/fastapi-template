@@ -6,8 +6,15 @@ PostgreSQL's native tsvector/tsquery functionality:
 Core Components:
 - TSVECTOR: SQLAlchemy type for PostgreSQL TSVECTOR columns
 - SearchableMixin: Add to models for automatic search vector management
+- make_searchable: Auto-configure FTS triggers on table creation (dev mode)
 
-Search Filters:
+Search Functions (Simple API):
+- search: Add FTS to any select statement
+- search_fuzzy: Add fuzzy/trigram search
+- search_hybrid: Combined FTS + fuzzy search
+- searchable: Chainable search query builder
+
+Search Filters (Explicit API):
 - FullTextSearchFilter: Standard FTS with ranking and prefix matching
 - WebSearchFilter: Google-like query syntax support
 - FuzzySearchFilter: Trigram-based similarity search (typo-tolerant)
@@ -15,6 +22,10 @@ Search Filters:
 - BoostedSearchFilter: Term and field boosting for relevance tuning
 - HybridSearchFilter: Combined FTS and fuzzy search
 - MultiFieldSearchFilter: Search across multiple TSVECTOR columns
+
+Vector Utilities:
+- combine_vectors: Combine multiple tsvector columns for cross-table search
+- weighted_vector: Create weighted tsvector from text at query time
 
 Query Parsing:
 - SearchQueryParser: Advanced query syntax parser (field:value, ranges, etc.)
@@ -39,29 +50,46 @@ Features:
 - Phrase proximity search
 - Field-specific searching
 - Query expansion and synonyms
+- Cross-table combined search
 
 Usage:
-    # Add to model
+    # Simple API (recommended for most cases)
+    from example_service.core.database.search import search, searchable
+
+    stmt = search(select(Article), "python tutorial")
+    results = await session.scalars(stmt)
+
+    # Chainable API
+    stmt = (
+        searchable(select(Article))
+        .search("python tutorial")
+        .exclude("draft")
+        .statement
+    )
+
+    # Cross-table search
+    from example_service.core.database.search import combine_vectors
+
+    stmt = select(Article).join(Category, isouter=True)
+    combined = combine_vectors(Article.search_vector, Category.search_vector)
+    stmt = search(stmt, "python", vector=combined)
+
+    # Development mode - auto-create triggers
+    from example_service.core.database.search import make_searchable
+
+    Base = declarative_base()
+    make_searchable(Base.metadata)
+
     class Article(Base, SearchableMixin):
         __tablename__ = "articles"
         __search_fields__ = ["title", "content"]
-        __search_config__ = "english"
         __search_weights__ = {"title": "A", "content": "B"}
+        # Triggers auto-created on table creation!
 
-        title: Mapped[str] = mapped_column(String(255))
-        content: Mapped[str] = mapped_column(Text)
-
-    # Basic search with ranking
-    stmt = select(Article)
+    # Explicit filters (for complex queries)
     stmt = FullTextSearchFilter(
         Article.search_vector,
         query="python programming",
-    ).apply(stmt)
-
-    # Web-style search with operators
-    stmt = WebSearchFilter(
-        Article.search_vector,
-        query='"exact phrase" -exclude OR alternative',
     ).apply(stmt)
 
     # Fuzzy search (typo-tolerant)
@@ -69,13 +97,6 @@ Usage:
         Article.title,
         query="pythn",  # typo
         threshold=0.3,
-    ).apply(stmt)
-
-    # Hybrid search (FTS + fuzzy fallback)
-    stmt = HybridSearchFilter(
-        search_column=Article.search_vector,
-        fuzzy_column=Article.title,
-        query="python tutorial",
     ).apply(stmt)
 
     # Parse advanced queries
@@ -89,6 +110,13 @@ from example_service.core.database.search.analytics import (
     SearchQuery,
     SearchStats,
     SearchSuggestionLog,
+)
+from example_service.core.database.search.automation import (
+    SearchableConfig,
+    SearchManager,
+    get_search_manager,
+    make_searchable,
+    remove_searchable_listeners,
 )
 from example_service.core.database.search.filters import (
     BoostedSearchFilter,
@@ -113,6 +141,13 @@ from example_service.core.database.search.parser import (
     TokenType,
     parse_search_query,
 )
+from example_service.core.database.search.query import (
+    SearchableSelect,
+    search,
+    search_fuzzy,
+    search_hybrid,
+    searchable,
+)
 from example_service.core.database.search.synonyms import (
     DEFAULT_PROGRAMMING_SYNONYMS,
     SynonymDictionary,
@@ -121,7 +156,11 @@ from example_service.core.database.search.synonyms import (
     create_synonym_dictionary_sql,
     get_default_synonyms,
 )
-from example_service.core.database.search.types import TSVECTOR
+from example_service.core.database.search.types import (
+    TSVECTOR,
+    combine_vectors,
+    weighted_vector,
+)
 from example_service.core.database.search.utils import (
     FTSMigrationHelper,
     SearchFieldConfig,
@@ -132,18 +171,21 @@ from example_service.core.database.search.utils import (
 )
 
 __all__ = [
+    # Synonyms
     "DEFAULT_PROGRAMMING_SYNONYMS",
     # Types
     "TSVECTOR",
+    # Filters (explicit API)
     "BoostedSearchFilter",
     # Migration utilities
     "FTSMigrationHelper",
-    # Filters
     "FullTextSearchFilter",
     "FuzzySearchFilter",
     "HybridSearchFilter",
     "MultiFieldSearchFilter",
+    # Mixins
     "MultiLanguageSearchMixin",
+    # Parser
     "ParsedQuery",
     "PhraseProximityFilter",
     "QueryRewriter",
@@ -154,14 +196,16 @@ __all__ = [
     "SearchAnalytics",
     "SearchFieldConfig",
     "SearchInsight",
+    # Automation (dev mode)
+    "SearchManager",
     "SearchQuery",
-    # Parser
     "SearchQueryParser",
     "SearchStats",
     "SearchSuggestionLog",
-    # Mixins
+    "SearchableConfig",
     "SearchableMixin",
-    # Synonyms
+    # Simple search API
+    "SearchableSelect",
     "SynonymDictionary",
     "SynonymGroup",
     "Token",
@@ -170,9 +214,19 @@ __all__ = [
     "UnaccentMigrationHelper",
     "WebSearchFilter",
     "build_ts_query_sql",
+    # Vector utilities
+    "combine_vectors",
     "create_synonym_config_sql",
     "create_synonym_dictionary_sql",
     "generate_search_vector_sql",
     "get_default_synonyms",
+    "get_search_manager",
+    "make_searchable",
     "parse_search_query",
+    "remove_searchable_listeners",
+    "search",
+    "search_fuzzy",
+    "search_hybrid",
+    "searchable",
+    "weighted_vector",
 ]

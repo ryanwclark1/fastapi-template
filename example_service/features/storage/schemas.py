@@ -1,6 +1,7 @@
 """Pydantic schemas for storage management API."""
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -165,8 +166,8 @@ class ACLSetRequest(BaseModel):
 class ACLResponse(BaseModel):
     """Response schema for ACL information."""
 
-    owner: dict[str, str] = Field(..., description="Owner information")
-    grants: list[dict[str, str]] = Field(..., description="Access grants")
+    owner: dict[str, Any] = Field(..., description="Owner information")
+    grants: list[dict[str, Any]] = Field(..., description="Access grants")
 
     model_config = {
         "json_schema_extra": {

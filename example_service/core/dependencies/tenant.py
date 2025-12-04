@@ -13,15 +13,24 @@ import logging
 from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends, Header
+from frozendict import frozendict
 
 from example_service.infra.storage.backends import TenantContext
 
 from .auth import get_current_user
+from .database import get_db_session
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
     from example_service.core.schemas.auth import AuthUser
 
 logger = logging.getLogger(__name__)
+
+# In-memory cache for tenant lookups (simple TTL-based)
+# Key: tenant_id (UUID or slug), Value: (tenant_uuid, tenant_slug, expiry_time)
+_tenant_cache: dict[str, tuple[str, str, float]] = {}
+_CACHE_TTL_SECONDS = 300  # 5 minutes
 
 
 def get_tenant_context_from_user(
@@ -72,12 +81,94 @@ def get_tenant_context_from_user(
     return TenantContext(
         tenant_uuid=tenant_uuid,
         tenant_slug=tenant_slug,
-        metadata=user.metadata,
+        metadata=frozendict(user.metadata),
     )
 
 
-def get_tenant_context_from_header(
+async def _lookup_tenant(
+    session: AsyncSession,
+    tenant_id: str,
+) -> tuple[str, str] | None:
+    """Look up tenant UUID and slug from database with caching.
+
+    Uses a simple TTL cache to avoid repeated database queries for
+    the same tenant during a request burst.
+
+    Args:
+        session: Database session
+        tenant_id: Tenant ID (can be UUID or slug)
+
+    Returns:
+        Tuple of (tenant_uuid, tenant_slug) if found, None otherwise
+    """
+    import time
+
+    from sqlalchemy import select
+
+    from example_service.core.models.tenant import Tenant
+
+    # Check cache first
+    now = time.time()
+    if tenant_id in _tenant_cache:
+        uuid, slug, expiry = _tenant_cache[tenant_id]
+        if now < expiry:
+            logger.debug(
+                "Tenant cache hit",
+                extra={"tenant_id": tenant_id, "uuid": uuid, "slug": slug},
+            )
+            return (uuid, slug)
+        else:
+            # Expired entry
+            del _tenant_cache[tenant_id]
+
+    # Query database - try by ID first (most common case)
+    stmt = select(Tenant).where(
+        (Tenant.id == tenant_id) & (Tenant.is_active == True)  # noqa: E712
+    )
+    result = await session.execute(stmt)
+    tenant = result.scalar_one_or_none()
+
+    if tenant is None:
+        logger.debug(
+            "Tenant not found by ID, skipping lookup",
+            extra={"tenant_id": tenant_id},
+        )
+        return None
+
+    # Extract slug from tenant name (create URL-friendly version)
+    # In a real system, you might have a dedicated slug column
+    tenant_slug = tenant.name.lower().replace(" ", "-")[:20] if tenant.name else tenant.id[:20]
+
+    # Cache the result
+    _tenant_cache[tenant_id] = (tenant.id, tenant_slug, now + _CACHE_TTL_SECONDS)
+
+    logger.debug(
+        "Tenant looked up from database",
+        extra={"tenant_id": tenant_id, "uuid": tenant.id, "slug": tenant_slug},
+    )
+
+    return (tenant.id, tenant_slug)
+
+
+def invalidate_tenant_cache(tenant_id: str | None = None) -> None:
+    """Invalidate tenant cache entries.
+
+    Call this after tenant updates to ensure fresh data.
+
+    Args:
+        tenant_id: Specific tenant to invalidate, or None for all
+    """
+    if tenant_id is None:
+        _tenant_cache.clear()
+        logger.debug("Tenant cache cleared")
+    elif tenant_id in _tenant_cache:
+        del _tenant_cache[tenant_id]
+        logger.debug("Tenant cache invalidated", extra={"tenant_id": tenant_id})
+
+
+async def get_tenant_context_from_header(
     x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-ID")] = None,
+    session: Annotated[AsyncSession, Depends(get_db_session)] = ...,  # type: ignore[assignment]
 ) -> TenantContext | None:
     """Extract tenant context from custom header (fallback for service-to-service calls).
 
@@ -86,46 +177,55 @@ def get_tenant_context_from_header(
     - CLI operations with explicit tenant flag
     - Admin operations
 
+    The tenant is looked up in the database to validate it exists and
+    is active, and to retrieve the proper UUID and slug.
+
     Args:
         x_tenant_id: Tenant UUID or slug from X-Tenant-ID header
+        session: Database session for tenant lookup
 
     Returns:
-        TenantContext if header present, None otherwise
+        TenantContext if tenant found and active, None otherwise
 
     Example:
         # HTTP request with header
         curl -H "X-Tenant-ID: acme-123" https://api.example.com/upload
-
-    Note:
-        In production, you should validate that the tenant exists and
-        the caller has permission to act on behalf of that tenant.
-        This validation is not implemented here for simplicity.
     """
     if not x_tenant_id:
         return None
 
     logger.debug(
-        "Extracted tenant context from X-Tenant-ID header",
+        "Looking up tenant from X-Tenant-ID header",
         extra={"tenant_id": x_tenant_id},
     )
 
-    # For now, use the provided ID as both UUID and slug
-    # In production, you would look up the tenant in the database
-    # to get the proper UUID and slug
+    # Look up tenant in database to get proper UUID and slug
+    lookup_result = await _lookup_tenant(session, x_tenant_id)
+
+    if lookup_result is None:
+        logger.warning(
+            "Tenant not found or inactive",
+            extra={"tenant_id": x_tenant_id},
+        )
+        return None
+
+    tenant_uuid, tenant_slug = lookup_result
+
+    logger.debug(
+        "Extracted tenant context from X-Tenant-ID header",
+        extra={"tenant_uuid": tenant_uuid, "tenant_slug": tenant_slug},
+    )
+
     return TenantContext(
-        tenant_uuid=x_tenant_id,
-        tenant_slug=x_tenant_id,  # TODO: Look up slug from database
-        metadata={"source": "header"},
+        tenant_uuid=tenant_uuid,
+        tenant_slug=tenant_slug,
+        metadata=frozendict({"source": "header"}),
     )
 
 
 def get_tenant_context(
-    user_context: Annotated[
-        TenantContext | None, Depends(get_tenant_context_from_user)
-    ] = None,
-    header_context: Annotated[
-        TenantContext | None, Depends(get_tenant_context_from_header)
-    ] = None,
+    user_context: Annotated[TenantContext | None, Depends(get_tenant_context_from_user)] = None,
+    header_context: Annotated[TenantContext | None, Depends(get_tenant_context_from_header)] = None,
 ) -> TenantContext | None:
     """Get tenant context with priority: JWT > Header.
 

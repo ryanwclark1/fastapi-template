@@ -9,7 +9,9 @@ from typing import TYPE_CHECKING, Any, cast
 
 from opentelemetry import trace
 from sqlalchemy import event, text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import async_sessionmaker as _async_sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine as _create_async_engine
 
 from example_service.core.settings import get_app_settings, get_db_settings
 from example_service.infra.metrics.prometheus import (
@@ -35,7 +37,7 @@ db_settings = get_db_settings()
 app_settings = get_app_settings()
 
 # Create async engine with psycopg3
-engine = create_async_engine(
+engine = _create_async_engine(
     db_settings.get_sqlalchemy_url()
     if db_settings.is_configured
     else "sqlite+aiosqlite:///./test.db",
@@ -51,7 +53,7 @@ engine = create_async_engine(
 )
 
 # Create session factory
-AsyncSessionLocal = async_sessionmaker(
+AsyncSessionLocal = _async_sessionmaker(
     engine,
     class_=AsyncSession,
     expire_on_commit=False,
@@ -309,6 +311,21 @@ async def get_async_session() -> AsyncGenerator[AsyncSession]:
             yield session
         finally:
             await session.close()
+
+
+__all__ = [
+    "AsyncSessionLocal",
+    "async_sessionmaker",
+    "close_database",
+    "create_async_engine",
+    "engine",
+    "get_async_session",
+    "init_database",
+]
+
+# Re-export for convenience
+create_async_engine = _create_async_engine
+async_sessionmaker = _async_sessionmaker
 
 
 @retry(

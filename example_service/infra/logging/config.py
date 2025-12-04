@@ -347,6 +347,13 @@ def _configure_with_dictconfig(
         "filters": filters_config,
         # Note: handlers_config is NOT used in dictConfig
         # Handlers are created manually and attached to QueueListener
+        "loggers": {
+            # Suppress verbose DEBUG logs from messaging libraries
+            "aiormq": {"level": "INFO"},
+            "aiormq.connection": {"level": "INFO"},
+            "aio_pika": {"level": "INFO"},
+            "aio_pika.robust_connection": {"level": "INFO"},
+        },
         "root": {
             "level": log_level.upper(),
             "handlers": [],  # Will add QueueHandler after setup

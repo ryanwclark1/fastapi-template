@@ -10,12 +10,11 @@ This directory contains RabbitMQ configuration files for the Docker deployment.
 
 ### Deprecated Features
 
-The configuration explicitly permits deprecated features to avoid warnings:
+**Note**: Deprecated features have been removed from the configuration. The application now uses:
+- Management plugin's built-in metrics (no deprecated `management_metrics_collection` needed)
+- Standard queue types (durable/exclusive) instead of transient non-exclusive queues
 
-1. **management_metrics_collection**: Used by the management plugin for metrics collection
-2. **transient_nonexcl_queues**: Allows creating transient non-exclusive queues
-
-These features are deprecated and will be removed in future RabbitMQ versions. The application should be migrated away from these features before they are removed.
+If you encounter issues after this change, ensure your application code uses modern RabbitMQ patterns.
 
 ### HTTP GET Request on AMQP Port
 

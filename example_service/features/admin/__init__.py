@@ -1,20 +1,16 @@
 """Admin feature for system operations.
 
+This module provides:
+- Email administration endpoints (email_admin.py)
+
 Note: Task management has been migrated to the dedicated tasks feature.
 See: example_service.features.tasks
-
-For task management functionality, import from:
-    from example_service.features.tasks import (
-        TaskManagementService,
-        TaskName,
-        get_task_service,
-    )
 """
 
 from __future__ import annotations
 
-from .router import router
+from .email_admin import router as email_admin_router
 
 __all__ = [
-    "router",
+    "email_admin_router",
 ]

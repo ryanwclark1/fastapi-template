@@ -14,6 +14,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from example_service.core.database.base import Base, TimestampMixin, UUIDv7PKMixin
+from example_service.core.database.enums import FlagStatus as FlagStatusEnum
 
 
 class FlagStatus(StrEnum):
@@ -70,9 +71,9 @@ class FeatureFlag(Base, UUIDv7PKMixin, TimestampMixin):
 
     # Flag state
     status: Mapped[str] = mapped_column(
-        String(20),
+        FlagStatusEnum,
         nullable=False,
-        default=FlagStatus.DISABLED.value,
+        default="disabled",
         comment="Flag status",
     )
     enabled: Mapped[bool] = mapped_column(

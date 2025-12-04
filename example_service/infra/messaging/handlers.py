@@ -83,11 +83,43 @@ if router is not None:
         )
 
         try:
-            # TODO: Implement your business logic here
+            # Extract and validate entity data
+            entity_id = event.data.get("id")
+            entity_name = event.data.get("name")
+
+            if not entity_id:
+                raise ValueError("Missing required field 'id' in event data")
+
+            # Example: Persist to cache or trigger downstream processing
+            # In a real application, you might:
+            # - Update a read model/projection
+            # - Invalidate relevant caches
+            # - Trigger notifications
+            # - Sync with external systems
+            logger.info(
+                "Entity created - updating projections",
+                extra={
+                    "event_id": event.event_id,
+                    "entity_id": entity_id,
+                    "entity_name": entity_name,
+                },
+            )
+
+            # Emit metrics for observability
+            # from example_service.infra.metrics.prometheus import REGISTRY
+            # entity_created_counter.labels(entity_type="example").inc()
+
             logger.info(
                 "Successfully processed example.created event",
-                extra={"event_id": event.event_id},
+                extra={"event_id": event.event_id, "entity_id": entity_id},
             )
+        except ValueError as e:
+            # Validation errors are permanent failures - don't retry
+            logger.error(
+                "Validation failed for example.created event",
+                extra={"event_id": event.event_id, "error": str(e)},
+            )
+            raise
         except Exception as e:
             logger.exception(
                 "Failed to process example.created event",
@@ -121,10 +153,38 @@ if router is not None:
         )
 
         try:
+            # Extract update information
+            entity_id = event.data.get("id")
+            changes = event.data.get("changes", {})
+
+            if not entity_id:
+                raise ValueError("Missing required field 'id' in event data")
+
+            # Example: Apply changes to read model
+            # In a real application, you might:
+            # - Update cached projections
+            # - Propagate changes to search index
+            # - Notify subscribers of changes
+            changed_fields = list(changes.keys()) if isinstance(changes, dict) else []
+            logger.info(
+                "Entity updated - applying changes to projections",
+                extra={
+                    "event_id": event.event_id,
+                    "entity_id": entity_id,
+                    "changed_fields": changed_fields,
+                },
+            )
+
             logger.info(
                 "Successfully processed example.updated event",
-                extra={"event_id": event.event_id},
+                extra={"event_id": event.event_id, "entity_id": entity_id},
             )
+        except ValueError as e:
+            logger.error(
+                "Validation failed for example.updated event",
+                extra={"event_id": event.event_id, "error": str(e)},
+            )
+            raise
         except Exception as e:
             logger.exception(
                 "Failed to process example.updated event",
@@ -158,10 +218,36 @@ if router is not None:
         )
 
         try:
+            # Extract entity identifier
+            entity_id = event.data.get("id")
+
+            if not entity_id:
+                raise ValueError("Missing required field 'id' in event data")
+
+            # Example: Clean up related resources
+            # In a real application, you might:
+            # - Remove from search index
+            # - Invalidate caches
+            # - Clean up related storage (files, etc.)
+            # - Archive audit trail
+            logger.info(
+                "Entity deleted - cleaning up projections and related resources",
+                extra={
+                    "event_id": event.event_id,
+                    "entity_id": entity_id,
+                },
+            )
+
             logger.info(
                 "Successfully processed example.deleted event",
-                extra={"event_id": event.event_id},
+                extra={"event_id": event.event_id, "entity_id": entity_id},
             )
+        except ValueError as e:
+            logger.error(
+                "Validation failed for example.deleted event",
+                extra={"event_id": event.event_id, "error": str(e)},
+            )
+            raise
         except Exception as e:
             logger.exception(
                 "Failed to process example.deleted event",
@@ -270,6 +356,8 @@ if router is not None:
     # =========================================================================
     # Handler for monitoring and processing Dead Letter Queue messages
 
+    from example_service.infra.messaging.dlq.alerting import get_dlq_alerter
+
     @router.subscriber(
         DLQ_QUEUE,
         exchange=DLQ_EXCHANGE,
@@ -278,11 +366,11 @@ if router is not None:
         """Handle messages from the Dead Letter Queue.
 
         This handler processes messages that have failed processing after
-        all retry attempts. Use this for:
-        - Monitoring DLQ message counts
-        - Alerting on DLQ conditions
-        - Logging failure reasons
-        - Manual message inspection
+        all retry attempts. It provides:
+        - Structured logging of failure details
+        - Alerting via configured channels (email, webhook, log)
+        - Prometheus metrics for monitoring
+        - Message inspection for debugging
 
         Args:
             message: DLQ message with failure metadata in headers.
@@ -293,33 +381,63 @@ if router is not None:
             - x-original-routing-key: Original routing key
             - x-retry-count: Number of retry attempts
             - x-final-error: Final error message
+            - x-final-error-type: Exception class name
             - x-traceback: Error traceback (if available)
 
         Example:
             This handler is automatically registered and will receive all
             messages that fail processing after max retries. Configure
-            alerting based on DLQ message volume.
+            alerting via environment variables or settings:
+            - DLQ_ALERTS_ENABLED=true
+            - DLQ_ALERT_EMAIL=ops@example.com
+            - DLQ_WEBHOOK_URL=https://hooks.slack.com/...
         """
         # Extract DLQ metadata from headers
-        # Note: In FastStream, message headers are available via the message object
-        # For dict messages, headers may be in the message itself or passed separately
         headers = message.get("headers", {})
         original_queue = headers.get("x-original-queue", "unknown")
+        original_routing_key = headers.get("x-original-routing-key", "")
         retry_count = headers.get("x-retry-count", 0)
         final_error = headers.get("x-final-error", "unknown")
+        final_error_type = headers.get("x-final-error-type", "Exception")
+        traceback_str = headers.get("x-traceback", "")
 
+        # Structured logging for observability
         logger.error(
-            "DLQ message received",
+            "DLQ message received - message failed after max retries",
             extra={
                 "original_queue": original_queue,
+                "original_routing_key": original_routing_key,
                 "retry_count": retry_count,
                 "final_error": final_error,
+                "final_error_type": final_error_type,
                 "message_body": message,
+                "has_traceback": bool(traceback_str),
             },
         )
 
-        # TODO: Implement DLQ processing logic:
-        # - Send alerts (email, Slack, PagerDuty)
-        # - Log to external monitoring system
-        # - Store in database for analysis
-        # - Trigger manual review workflow
+        # Send alert via configured channels
+        alerter = get_dlq_alerter()
+        await alerter.alert_dlq_message(
+            original_queue=original_queue,
+            error_type=final_error_type,
+            error_message=final_error,
+            retry_count=retry_count if isinstance(retry_count, int) else 0,
+            message_body=message,
+            metadata={
+                "original_routing_key": original_routing_key,
+                "has_traceback": bool(traceback_str),
+            },
+        )
+
+        # Record metrics for monitoring dashboards
+        try:
+            from example_service.infra.messaging.dlq.metrics import record_dlq_routing
+
+            record_dlq_routing(
+                queue=original_queue,
+                reason=final_error_type,
+            )
+        except Exception as e:
+            logger.debug(
+                "Failed to record DLQ routing metrics: %s", str(e)
+            )  # Metrics are best-effort

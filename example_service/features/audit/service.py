@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from uuid import UUID
 
     from sqlalchemy.ext.asyncio import AsyncSession
+
     pass
 
 logger = logging.getLogger(__name__)
@@ -334,43 +335,41 @@ class AuditService:
         subquery = base_stmt.subquery()
 
         # Total entries
-        total_result = await self.session.execute(
-            select(func.count()).select_from(subquery)
-        )
+        total_result = await self.session.execute(select(func.count()).select_from(subquery))
         total_entries = total_result.scalar() or 0
 
         # Action counts
         action_result = await self.session.execute(
-            select(AuditLog.action, func.count())
+            select(subquery.c.action, func.count())
             .select_from(subquery)
-            .group_by(AuditLog.action)
+            .group_by(subquery.c.action)
         )
-        actions_count: dict[str, int] = dict(action_result.all()) # type: ignore
+        actions_count: dict[str, int] = {str(k): v for k, v in action_result.all()}
 
         # Entity type counts
         entity_result = await self.session.execute(
-            select(AuditLog.entity_type, func.count())
+            select(subquery.c.entity_type, func.count())
             .select_from(subquery)
-            .group_by(AuditLog.entity_type)
+            .group_by(subquery.c.entity_type)
         )
-        entity_types_count: dict[str, int] = dict(entity_result.all()) # type: ignore
+        entity_types_count: dict[str, int] = dict(entity_result.all())  # type: ignore
 
         # Success rate
         success_result = await self.session.execute(
-            select(func.count()).select_from(subquery).where(AuditLog.success == True)  # noqa: E712
+            select(func.count()).select_from(subquery).where(subquery.c.success == True)  # noqa: E712
         )
         success_count = success_result.scalar() or 0
         success_rate = (success_count / total_entries * 100) if total_entries > 0 else 100.0
 
         # Unique users
         users_result = await self.session.execute(
-            select(func.count(func.distinct(AuditLog.user_id))).select_from(subquery)
+            select(func.count(func.distinct(subquery.c.user_id))).select_from(subquery)
         )
         unique_users = users_result.scalar() or 0
 
         # Time range
         time_result = await self.session.execute(
-            select(func.min(AuditLog.timestamp), func.max(AuditLog.timestamp)).select_from(
+            select(func.min(subquery.c.timestamp), func.max(subquery.c.timestamp)).select_from(
                 subquery
             )
         )
@@ -417,7 +416,7 @@ class AuditService:
             extra={"before": before.isoformat(), "tenant_id": tenant_id},
         )
 
-        return deleted_count # type: ignore
+        return deleted_count  # type: ignore
 
 
 async def get_audit_service() -> AuditService:

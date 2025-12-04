@@ -27,7 +27,7 @@ async def list_tasks() -> None:
     header("Registered Background Tasks")
 
     try:
-        from example_service.tasks.broker import broker
+        from example_service.infra.tasks.broker import broker
 
         if broker is None:
             warning("Taskiq broker is not configured")
@@ -108,7 +108,7 @@ async def run_task(task_name: str, arg: tuple, wait: bool, timeout: int) -> None
     info(f"Triggering task: {task_name}")
 
     try:
-        from example_service.tasks.broker import broker
+        from example_service.infra.tasks.broker import broker
 
         if broker is None:
             error("Taskiq broker is not configured")
@@ -200,7 +200,7 @@ async def task_status(task_id: str) -> None:
     info(f"Checking status for task: {task_id}")
 
     try:
-        from example_service.tasks.broker import broker
+        from example_service.infra.tasks.broker import broker
 
         if broker is None:
             error("Taskiq broker is not configured")
@@ -252,7 +252,7 @@ async def task_result(task_id: str, output_format: str) -> None:
     TASK_ID is the UUID of the task returned when it was triggered.
     """
     try:
-        from example_service.tasks.broker import broker
+        from example_service.infra.tasks.broker import broker
 
         if broker is None:
             error("Taskiq broker is not configured")
@@ -321,7 +321,7 @@ def start_worker(concurrency: int, queue: str | None) -> None:
     cmd = [
         "taskiq",
         "worker",
-        "example_service.tasks.broker:broker",
+        "example_service.infra.tasks.broker:broker",
         "-w",
         str(concurrency),
     ]

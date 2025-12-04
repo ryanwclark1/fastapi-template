@@ -146,8 +146,30 @@ def postgres_dsn():
 @pytest.fixture
 async def session(postgres_dsn) -> AsyncGenerator[AsyncSession]:
     """Provide an isolated PostgreSQL-backed session with file tables."""
+    import sqlalchemy as sa
+
     engine = create_async_engine(postgres_dsn)
     async with engine.begin() as conn:
+        # Create filestatus enum before creating File table
+        result = await conn.execute(
+            sa.text(
+                """
+                SELECT EXISTS (
+                    SELECT 1 FROM pg_type WHERE typname = 'filestatus'
+                )
+                """
+            )
+        )
+        exists = result.scalar()
+
+        if not exists:
+            # Create the filestatus enum type
+            sa_enum = sa.Enum(
+                "pending", "processing", "ready", "failed", "deleted", name="filestatus"
+            )
+            await conn.run_sync(lambda sync_conn, e=sa_enum: e.create(sync_conn, checkfirst=False))
+
+        # Now create the file tables
         await conn.run_sync(
             lambda sync_conn: File.metadata.create_all(
                 sync_conn,

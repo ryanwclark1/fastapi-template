@@ -89,7 +89,7 @@ class TestRequestIDMiddleware:
         assert call_args is not None
         assert call_args[1].get("request_id") == custom_id
 
-    @patch("example_service.app.middleware.base.clear_log_context")
+    @patch("example_service.app.middleware.request_id.clear_log_context")
     async def test_clears_logging_context_after_request(
         self, mock_clear_context: MagicMock, client: AsyncClient
     ):
@@ -99,7 +99,7 @@ class TestRequestIDMiddleware:
         # Verify clear_log_context was called
         mock_clear_context.assert_called_once()
 
-    @patch("example_service.app.middleware.base.clear_log_context")
+    @patch("example_service.app.middleware.request_id.clear_log_context")
     async def test_clears_context_on_error(self, mock_clear_context: MagicMock):
         """Test that middleware clears context even when handler raises exception."""
         app = FastAPI()

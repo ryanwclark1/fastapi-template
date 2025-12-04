@@ -17,7 +17,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import example_service.app.middleware.base as middleware_base
 from example_service.app.middleware.base import HeaderContextMiddleware, generate_uuid
 
 if TYPE_CHECKING:
@@ -25,8 +24,9 @@ if TYPE_CHECKING:
 
 
 def clear_log_context() -> None:
-    """Proxy to base middleware's clear_log_context for easy patching."""
-    return middleware_base.clear_log_context()
+    """Proxy to logging context's clear_log_context for easy patching."""
+    from example_service.infra.logging.context import clear_log_context as _clear_log_context
+    _clear_log_context()
 
 
 class RequestIDMiddleware(HeaderContextMiddleware):

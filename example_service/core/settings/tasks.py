@@ -39,7 +39,7 @@ class TaskSettings(BaseSettings):
     # ──────────────────────────────────────────────────────────────
 
     result_backend: TaskResultBackend = Field(
-        default="redis",
+        default="postgres",
         description="Task result storage backend: 'redis' (fast, ephemeral) or 'postgres' (persistent)",
     )
 

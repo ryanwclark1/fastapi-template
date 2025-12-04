@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from example_service.core.database import TimestampedBase
+from example_service.core.database import TenantMixin, TimestampedBase
 from example_service.core.database.search import TSVECTOR
 
 # Import reminder_tags table for the many-to-many relationship
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from example_service.features.tags.models import Tag
 
 
-class Reminder(TimestampedBase):
+class Reminder(TimestampedBase, TenantMixin):
     """Reminder item persisted in the database.
 
     Includes full-text search capability via the search_vector column.
@@ -30,6 +30,9 @@ class Reminder(TimestampedBase):
 
     Supports recurring reminders via the recurrence_rule field, which stores
     an iCalendar RRULE string (e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR").
+
+    Multi-tenancy is supported via tenant_id to ensure reminders are
+    isolated per tenant and never leak to other organizations.
     """
 
     __tablename__ = "reminders"

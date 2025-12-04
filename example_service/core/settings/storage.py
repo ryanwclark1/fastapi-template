@@ -34,8 +34,6 @@ class StorageBackendType(str, Enum):
 
     S3 = "s3"
     MINIO = "minio"
-    GCS = "gcs"
-    AZURE = "azure"
 
 
 class StorageSettings(BaseSettings):
@@ -61,7 +59,7 @@ class StorageSettings(BaseSettings):
 
     backend: StorageBackendType = Field(
         default=StorageBackendType.S3,
-        description="Storage backend type (s3, minio, gcs, azure)",
+        description="Storage backend type (s3, minio)",
     )
 
     # ──────────────────────────────────────────────────────────────

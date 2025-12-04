@@ -4,7 +4,7 @@ import logging
 from io import BytesIO
 from typing import Annotated
 
-from fastapi import APIRouter, File, Query, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from example_service.infra.storage.exceptions import (
@@ -69,9 +69,17 @@ async def create_bucket(
             tenant_uuid=request.tenant_uuid,
         )
 
+    except StorageFileNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
     except StorageError as e:
         logger.error(f"Failed to create bucket: {e}")
-        raise
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=str(e),
+        ) from e
 
 
 @router.delete(
@@ -98,9 +106,17 @@ async def delete_bucket(
             message=f"Bucket '{bucket_name}' deleted successfully",
         )
 
+    except StorageFileNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
     except StorageError as e:
         logger.error(f"Failed to delete bucket: {e}")
-        raise
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=str(e),
+        ) from e
 
 
 @router.get(
@@ -138,7 +154,10 @@ async def list_buckets(
 
     except StorageError as e:
         logger.error(f"Failed to list buckets: {e}")
-        raise
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=str(e),
+        ) from e
 
 
 @router.get(
@@ -184,11 +203,17 @@ async def get_bucket_info(
             tenant_uuid=None,
         )
 
-    except StorageFileNotFoundError:
-        raise
+    except StorageFileNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
     except StorageError as e:
         logger.error(f"Failed to get bucket info: {e}")
-        raise
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=str(e),
+        ) from e
 
 
 # ============================================================================
@@ -205,13 +230,13 @@ async def get_bucket_info(
 async def list_objects(
     storage: StorageServiceDep,
     _user: AdminUser,
+    _tenant: TenantContextDep,
     prefix: Annotated[str, Query(description="Filter by key prefix")] = "",
     bucket: Annotated[
         str | None, Query(description="Bucket name (uses default if not specified)")
     ] = None,
     max_keys: Annotated[int, Query(ge=1, le=10000, description="Maximum keys to return")] = 1000,
     continuation_token: Annotated[str | None, Query(description="Token for next page")] = None,
-    _tenant: TenantContextDep = None,
 ) -> ObjectListResponse:
     """List objects in a bucket.
 
@@ -228,7 +253,7 @@ async def list_objects(
         resolved_bucket = storage._resolve_bucket(_tenant, bucket)
 
         objects, next_token = await backend.list_objects(
-            prefix=prefix,
+            prefix=prefix or "",
             bucket=resolved_bucket,
             max_keys=max_keys,
             continuation_token=continuation_token,
@@ -256,7 +281,10 @@ async def list_objects(
 
     except StorageError as e:
         logger.error(f"Failed to list objects: {e}")
-        raise
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=str(e),
+        ) from e
 
 
 @router.post(
@@ -270,6 +298,7 @@ async def upload_object(
     key: str,
     storage: StorageServiceDep,
     _user: AdminUser,
+    _tenant: TenantContextDep,
     file: Annotated[UploadFile, File(description="File to upload")],
     bucket: Annotated[
         str | None, Query(description="Bucket name (uses default if not specified)")
@@ -277,7 +306,6 @@ async def upload_object(
     content_type: Annotated[str | None, Query(description="Content type override")] = None,
     acl: Annotated[str | None, Query(description="ACL setting")] = None,
     storage_class: Annotated[str | None, Query(description="Storage class")] = None,
-    _tenant: TenantContextDep = None,
 ) -> ObjectUploadResponse:
     """Upload an object to storage.
 
@@ -308,87 +336,14 @@ async def upload_object(
 
     except StorageError as e:
         logger.error(f"Failed to upload object: {e}")
-        raise
-
-
-@router.get(
-    "/objects/{key:path}",
-    summary="Download an object",
-    description="Download an object from storage. Admin only.",
-)
-async def download_object(
-    key: str,
-    storage: StorageServiceDep,
-    _user: AdminUser,
-    bucket: Annotated[
-        str | None, Query(description="Bucket name (uses default if not specified)")
-    ] = None,
-    _tenant: TenantContextDep = None,
-) -> StreamingResponse:
-    """Download an object from storage.
-
-    Requires admin role.
-    """
-    try:
-        data = await storage.download_file(key=key, bucket=bucket)
-
-        # Get file info for content type
-        info = await storage.get_file_info(key=key, bucket=bucket)
-        content_type = (
-            info.get("content_type", "application/octet-stream")
-            if info
-            else "application/octet-stream"
-        )
-
-        return StreamingResponse(
-            BytesIO(data),
-            media_type=content_type,
-            headers={
-                "Content-Disposition": f'attachment; filename="{key.split("/")[-1]}"',
-            },
-        )
-
-    except StorageFileNotFoundError:
-        raise
-    except StorageError as e:
-        logger.error(f"Failed to download object: {e}")
-        raise
-
-
-@router.delete(
-    "/objects/{key:path}",
-    response_model=ObjectDeleteResponse,
-    summary="Delete an object",
-    description="Delete an object from storage. Admin only.",
-)
-async def delete_object(
-    key: str,
-    storage: StorageServiceDep,
-    _user: AdminUser,
-    bucket: Annotated[
-        str | None, Query(description="Bucket name (uses default if not specified)")
-    ] = None,
-    _tenant: TenantContextDep = None,
-) -> ObjectDeleteResponse:
-    """Delete an object from storage.
-
-    Requires admin role.
-    """
-    try:
-        deleted = await storage.delete_file(key=key, bucket=bucket)
-
-        return ObjectDeleteResponse(
-            deleted=deleted,
-            key=key,
-        )
-
-    except StorageError as e:
-        logger.error(f"Failed to delete object: {e}")
-        raise
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=str(e),
+        ) from e
 
 
 # ============================================================================
-# ACL Management Endpoints
+# ACL Management Endpoints (must be before /objects/{key:path} route)
 # ============================================================================
 
 
@@ -403,10 +358,10 @@ async def set_object_acl(
     request: ACLSetRequest,
     storage: StorageServiceDep,
     _user: AdminUser,
+    _tenant: TenantContextDep,
     bucket: Annotated[
         str | None, Query(description="Bucket name (uses default if not specified)")
     ] = None,
-    _tenant: TenantContextDep = None,
 ) -> SuccessResponse:
     """Set ACL on an object.
 
@@ -425,9 +380,17 @@ async def set_object_acl(
             message=f"ACL set to '{request.acl}' for object '{key}'",
         )
 
+    except StorageFileNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
     except StorageError as e:
         logger.error(f"Failed to set object ACL: {e}")
-        raise
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=str(e),
+        ) from e
 
 
 @router.get(
@@ -440,10 +403,10 @@ async def get_object_acl(
     key: str,
     storage: StorageServiceDep,
     _user: AdminUser,
+    _tenant: TenantContextDep,
     bucket: Annotated[
         str | None, Query(description="Bucket name (uses default if not specified)")
     ] = None,
-    _tenant: TenantContextDep = None,
 ) -> ACLResponse:
     """Get ACL of an object.
 
@@ -461,6 +424,108 @@ async def get_object_acl(
             grants=acl_data.get("grants", []),
         )
 
+    except StorageFileNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
     except StorageError as e:
         logger.error(f"Failed to get object ACL: {e}")
-        raise
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=str(e),
+        ) from e
+
+
+@router.get(
+    "/objects/{key:path}",
+    summary="Download an object",
+    description="Download an object from storage. Admin only.",
+)
+async def download_object(
+    key: str,
+    storage: StorageServiceDep,
+    _user: AdminUser,
+    _tenant: TenantContextDep,
+    bucket: Annotated[
+        str | None, Query(description="Bucket name (uses default if not specified)")
+    ] = None,
+) -> StreamingResponse:
+    """Download an object from storage.
+
+    Requires admin role.
+    """
+    try:
+        data = await storage.download_file(key=key, bucket=bucket)
+
+        # Get file info for content type
+        info = await storage.get_file_info(key=key, bucket=bucket)
+        content_type = (
+            info.get("content_type", "application/octet-stream")
+            if info
+            else "application/octet-stream"
+        )
+
+        # Ensure data is bytes
+        if not isinstance(data, bytes):
+            data = bytes(data) if hasattr(data, "__bytes__") else str(data).encode("utf-8")
+
+        return StreamingResponse(
+            BytesIO(data),
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{key.split("/")[-1]}"',
+            },
+        )
+
+    except StorageFileNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+    except StorageError as e:
+        logger.error(f"Failed to download object: {e}")
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=str(e),
+        ) from e
+
+
+@router.delete(
+    "/objects/{key:path}",
+    response_model=ObjectDeleteResponse,
+    summary="Delete an object",
+    description="Delete an object from storage. Admin only.",
+)
+async def delete_object(
+    key: str,
+    storage: StorageServiceDep,
+    _user: AdminUser,
+    _tenant: TenantContextDep,
+    bucket: Annotated[
+        str | None, Query(description="Bucket name (uses default if not specified)")
+    ] = None,
+) -> ObjectDeleteResponse:
+    """Delete an object from storage.
+
+    Requires admin role.
+    """
+    try:
+        deleted = await storage.delete_file(key=key, bucket=bucket)
+
+        return ObjectDeleteResponse(
+            deleted=deleted,
+            key=key,
+        )
+
+    except StorageFileNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+    except StorageError as e:
+        logger.error(f"Failed to delete object: {e}")
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=str(e),
+        ) from e

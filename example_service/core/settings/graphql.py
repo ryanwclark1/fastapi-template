@@ -94,6 +94,37 @@ class GraphQLSettings(BaseSettings):
         description="Enable GraphQL schema introspection (disable in production for security)",
     )
 
+    # Feature Toggles
+    # Enable/disable specific GraphQL features without code changes
+    feature_reminders: bool = Field(
+        default=True,
+        description="Enable reminder queries/mutations/subscriptions",
+    )
+    feature_tags: bool = Field(
+        default=True,
+        description="Enable tag queries/mutations",
+    )
+    feature_flags: bool = Field(
+        default=True,
+        description="Enable feature flag management queries/mutations",
+    )
+    feature_files: bool = Field(
+        default=True,
+        description="Enable file upload/management queries/mutations",
+    )
+    feature_webhooks: bool = Field(
+        default=True,
+        description="Enable webhook management queries/mutations",
+    )
+    feature_audit_logs: bool = Field(
+        default=True,
+        description="Enable audit log queries (read-only)",
+    )
+    feature_ai: bool = Field(
+        default=False,
+        description="Enable AI/ML features (experimental, not yet implemented)",
+    )
+
     model_config = SettingsConfigDict(
         env_prefix="GRAPHQL_",
         env_file=".env",

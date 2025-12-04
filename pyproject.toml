@@ -6,14 +6,46 @@ authors = [{ name = "Your Name", email = "your.email@example.com" }]
 readme = "README.md"
 requires-python = ">=3.13"
 license = { text = "MIT" }
+keywords = [
+    "fastapi",
+    "async",
+    "microservice",
+    "graphql",
+    "sqlalchemy",
+    "opentelemetry",
+    "taskiq",
+    "strawberry",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Framework :: FastAPI",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Typing :: Typed",
+]
+# Uncomment and update these URLs if you have a repository
+# [project.urls]
+# Homepage = "https://github.com/yourusername/example-service"
+# Documentation = "https://github.com/yourusername/example-service#readme"
+# Repository = "https://github.com/yourusername/example-service"
+# Issues = "https://github.com/yourusername/example-service/issues"
 
 dependencies = [
+    # Core FastAPI framework
     "fastapi>=0.122.0",
     "uvicorn[standard]>=0.34.0",
+    # Data validation and settings
     "pydantic[email]>=2.9.0",
     "pydantic-settings>=2.5.0",
+    # Database and ORM
     "sqlalchemy[asyncio]>=2.0.44",
     "alembic>=1.17.2",
+    "alembic-postgresql-enum>=1.8.0",
     "psycopg[binary,pool]>=3.2.0",
     "redis[hiredis]>=5.1.0",
     "httpx>=0.28.1",
@@ -21,15 +53,15 @@ dependencies = [
     "python-multipart>=0.0.12",
     "click>=8.1.0",
     # OpenTelemetry
-    "opentelemetry-api>=1.27.0",
-    "opentelemetry-sdk>=1.27.0",
-    "opentelemetry-instrumentation-fastapi>=0.48b0",
-    "opentelemetry-instrumentation-httpx>=0.48b0",
-    "opentelemetry-instrumentation-sqlalchemy>=0.48b0",
-    "opentelemetry-instrumentation-psycopg>=0.48b0",
-    "opentelemetry-exporter-otlp>=1.27.0",
+    "opentelemetry-api>=1.28.0",
+    "opentelemetry-sdk>=1.28.0",
+    "opentelemetry-instrumentation-fastapi>=0.49b0",
+    "opentelemetry-instrumentation-httpx>=0.49b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.49b0",
+    "opentelemetry-instrumentation-psycopg>=0.49b0",
+    "opentelemetry-exporter-otlp>=1.28.0",
     # Messaging and Tasks
-    "faststream[otel,prometheus,rabbit]>=0.5.0",
+    "faststream[otel,prometheus,rabbit]>=0.6.0",
     "taskiq>=0.11.0",
     "taskiq-faststream>=0.3.0",
     "apscheduler>=3.10.0",
@@ -44,38 +76,57 @@ dependencies = [
     "jinja2>=3.1.0",
     "taskiq-redis>=1.1.2",
     "taskiq-postgresql>=0.4.0",
+    "frozendict>=2.4.0",
+    "phonenumbers>=9.0.19",
+    "instructor>=1.13.0",
 ]
 
 [project.optional-dependencies]
+# Development dependencies (for local development)
 dev = ["ruff>=0.7.0", "mypy>=1.13.0", "pre-commit>=4.0.0"]
+# Testing dependencies
 tests = [
-    "pytest>=8.3.0",
-    "pytest-asyncio>=0.24.0",
-    "pytest-cov>=6.0.0",
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.26.0",
+    "pytest-cov>=6.1.1",
     "pytest-benchmark>=4.0.0",
     "aiosqlite>=0.20.0",
-    "testcontainers>=4.9.0",
+    "testcontainers[postgres,redis,rabbitmq]>=4.9.0",
     "httpx>=0.28.1",
 ]
+# YAML support
 yaml = ["pyyaml>=6.0.0"]
+# Excel support
 excel = ["openpyxl>=3.1.0"]
+# AI/ML dependencies
+ai = ["openai>=1.50.0", "anthropic>=0.39.0", "deepgram-sdk>=3.7.0"]
+# Cryptographic support for EncryptedString/EncryptedText types
+crypto = ["cryptography>=41.0.0"]
+# Load testing
+loadtest = ["locust>=2.29.0"]
 
+# Dependency groups (uv-specific, more flexible than optional-dependencies)
+# These can include type stubs and development tools
 [dependency-groups]
 dev = [
     "ruff>=0.7.0",
     "mypy>=1.13.0",
     "pre-commit>=4.0.0",
+    # Type stubs for better type checking
     "types-pyyaml>=6.0.12.20250915",
     "types-python-dateutil>=2.9.0.20251115",
     "types-redis>=4.6.0.20241004",
+    "types-openpyxl>=3.1.0",
+    "types-requests>=2.32.0.20241016",
+    "types-phonenumbers>=8.13.0.20241016",
 ]
 tests = [
-    "pytest>=8.3.0",
-    "pytest-asyncio>=0.24.0",
-    "pytest-cov>=6.0.0",
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.26.0",
+    "pytest-cov>=6.1.1",
     "pytest-benchmark>=4.0.0",
     "aiosqlite>=0.20.0",
-    "testcontainers>=4.9.0",
+    "testcontainers[postgres,redis,rabbitmq]>=4.9.0",
     "httpx>=0.28.1",
 ]
 loadtest = ["locust>=2.29.0"]
@@ -85,10 +136,11 @@ example-service = "example_service.cli:main"
 example-service-main = "example_service.main:main"
 
 [project.entry-points.taskiq_cli]
-track = "example_service.tasks.cli:TrackingCommand"
+track = "example_service.infra.tasks.cli:TrackingCommand"
 
 [build-system]
-requires = ["hatchling"]
+# Using hatchling as the build backend (modern, PEP 517 compliant)
+requires = ["hatchling>=1.18.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build]
@@ -168,7 +220,13 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
     "@abstractmethod",
+    "@overload",
+    "if typing.TYPE_CHECKING:",
 ]
+precision = 2
+show_missing = true
+skip_covered = false
+skip_empty = true
 
 [tool.ruff]
 line-length = 100
@@ -187,28 +245,33 @@ exclude = [
 
 [tool.ruff.lint]
 select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # pyflakes
-    "I",   # isort
-    "B",   # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "UP",  # pyupgrade
-    "ARG", # flake8-unused-arguments
-    "SIM", # flake8-simplify
-    "TC",  # flake8-type-checking
-    "LOG", # flake8-logging - logging best practices
-    "RUF", # Ruff-specific rules
-    "S",   # flake8-bandit - security checks
-    "PT",  # flake8-pytest-style - test conventions
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "ARG",  # flake8-unused-arguments
+    "SIM",  # flake8-simplify
+    "TC",   # flake8-type-checking
+    "LOG",  # flake8-logging - logging best practices
+    "RUF",  # Ruff-specific rules
+    "S",    # flake8-bandit - security checks
+    "PT",   # flake8-pytest-style - test conventions
+    "PIE",  # flake8-pie - miscellaneous lints
+    "PERF", # perflint - performance anti-patterns
+    "ERA",  # eradicate - commented-out code
 ]
 ignore = [
-    "E501", # line too long (handled by formatter)
-    "S101", # assert usage - allowed in tests (handled per-file)
-    "S104", # possible binding to all interfaces - intentional for dev
-    "S105", # hardcoded password - false positives with variable names
-    "S106", # hardcoded password in function argument - false positives
-    "S311", # pseudo-random generator - acceptable for non-crypto uses
+    "E501",    # line too long (handled by formatter)
+    "S101",    # assert usage - allowed in tests (handled per-file)
+    "S104",    # possible binding to all interfaces - intentional for dev
+    "S105",    # hardcoded password - false positives with variable names
+    "S106",    # hardcoded password in function argument - false positives
+    "S311",    # pseudo-random generator - acceptable for non-crypto uses
+    "PERF401", # Using a list comprehension to unpack - readability preference
+    "ERA001",  # Commented-out code - may be intentional for documentation
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -308,9 +371,14 @@ runtime-evaluated-base-classes = [
 quote-style = "double"
 indent-style = "space"
 line-ending = "auto"
+skip-magic-trailing-comma = false
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
 
 [tool.ruff.lint.isort]
 known-first-party = ["example_service"]
+split-on-trailing-comma = true
+force-sort-within-sections = true
 
 [tool.mypy]
 python_version = "3.13"
@@ -325,9 +393,15 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 warn_no_return = true
 strict_equality = true
-# Note: strawberry.ext.mypy_plugin requires strawberry-graphql to be installed
-# If not available, GraphQL types/resolvers have relaxed checking via overrides below
-plugins = ["pydantic.mypy"]
+# Strawberry GraphQL plugin for proper type checking of @strawberry decorators
+# Pydantic plugin for proper type checking of Pydantic models
+plugins = ["strawberry.ext.mypy_plugin", "pydantic.mypy"]
+# Settings inspired by Strawberry's own mypy configuration
+implicit_reexport = false
+strict_optional = true
+show_error_codes = true
+install_types = false
+show_traceback = true
 exclude = ["^alembic/env\\.py$", ".*/examples/.*", "^scripts/"]
 
 [[tool.mypy.overrides]]
@@ -336,20 +410,36 @@ disallow_untyped_defs = false
 ignore_errors = true
 
 [[tool.mypy.overrides]]
-# Strawberry GraphQL decorators add fields/methods at runtime that mypy can't detect without the plugin
-# Since the plugin requires strawberry to be installed (which may not be available in all envs),
-# we relax type checking for GraphQL types and resolvers
+# Strawberry GraphQL decorators add fields/methods at runtime
+# The strawberry.ext.mypy_plugin helps, but some patterns still need relaxed checking
+# These overrides can potentially be reduced as the plugin improves
 module = "example_service.features.graphql.types.*"
 disable_error_code = [
-    "call-arg", "attr-defined", "misc", "import-not-found", "no-any-return",
-    "no-untyped-def", "type-var", "valid-type", "name-defined"
+    "call-arg",
+    "attr-defined",
+    "misc",
+    "import-not-found",
+    "no-any-return",
+    "no-untyped-def",
+    "type-var",
+    "valid-type",
+    "name-defined",
 ]
 
 [[tool.mypy.overrides]]
+# GraphQL resolvers may need relaxed checking for dynamic schema composition
+# The strawberry.ext.mypy_plugin helps with standard patterns
 module = "example_service.features.graphql.resolvers.*"
 disable_error_code = [
-    "call-arg", "attr-defined", "import-not-found", "no-any-return",
-    "assignment", "arg-type", "valid-type", "comparison-overlap", "name-defined"
+    "call-arg",
+    "attr-defined",
+    "import-not-found",
+    "no-any-return",
+    "assignment",
+    "arg-type",
+    "valid-type",
+    "comparison-overlap",
+    "name-defined",
 ]
 
 [[tool.mypy.overrides]]
@@ -369,12 +459,23 @@ module = [
     "example_service.features.graphql.permissions",
     "example_service.features.graphql.router",
     "example_service.features.graphql.schema",
-    "example_service.features.graphql.context"
+    "example_service.features.graphql.context",
 ]
 disable_error_code = [
-    "no-untyped-def", "import-untyped", "unused-ignore", "no-any-return",
-    "arg-type", "attr-defined", "assignment", "operator", "valid-type", "misc",
-    "override", "call-overload", "comparison-overlap", "typeddict-item"
+    "no-untyped-def",
+    "import-untyped",
+    "unused-ignore",
+    "no-any-return",
+    "arg-type",
+    "attr-defined",
+    "assignment",
+    "operator",
+    "valid-type",
+    "misc",
+    "override",
+    "call-overload",
+    "comparison-overlap",
+    "typeddict-item",
 ]
 
 [[tool.mypy.overrides]]
@@ -400,6 +501,36 @@ module = [
     "IPython",
 ]
 ignore_missing_imports = true
+
+# Package-specific ignores inspired by Strawberry's mypy configuration
+# These packages either lack type stubs or have known type checking issues
+[[tool.mypy.overrides]]
+module = [
+    "graphql.*",            # graphql-core lacks comprehensive type stubs
+    "pydantic_core.*",      # Internal Pydantic implementation details
+    "rich.*",               # Rich has some type checking gaps
+    "libcst.*",             # Code transformation library with type issues
+    "email_validator.*",    # Has type checking issues
+    "dotenv.*",             # python-dotenv type stubs incomplete
+    "cached_property.*",    # Type checking issues with decorators
+    "importlib_metadata.*", # Type checking issues
+    "anyio.*",              # Async library with some type gaps
+    "dns.*",                # DNS library type issues
+    "h11.*",                # HTTP/1.1 library type issues
+    "httpcore.*",           # HTTP core library type issues
+    "idna.*",               # IDNA library type issues
+    "markdown_it.*",        # Markdown parser type issues
+]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = [
+    "pygments.*", # Syntax highlighting library
+]
+ignore_missing_imports = true
+
+# Note: We keep pydantic.*, httpx.*, and click.* with full type checking
+# as they have good type stubs and the plugins handle them properly
 
 [tool.alembic]
 script_location = "alembic"

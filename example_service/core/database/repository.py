@@ -765,7 +765,229 @@ class BaseRepository[T]:
         return cast("InstrumentedAttribute[Any]", attr)
 
 
+class TenantAwareRepository[T](BaseRepository[T]):
+    """Repository with optional multi-tenancy support.
+
+    Extends BaseRepository with tenant-scoped operations. Multi-tenancy is
+    OPTIONAL - when tenant_id is None, operations work in single-tenant mode
+    (no filtering). When tenant_id is provided, strict tenant filtering is applied.
+
+    SECURITY: Never default to a "top tenant" or "system tenant" - that would be
+    a security risk. If tenant_id is required for an operation but not provided,
+    the caller should handle this explicitly.
+
+    The model MUST have a tenant_id column (use TenantMixin).
+
+    Example:
+        class FileRepository(TenantAwareRepository[File]):
+            def __init__(self) -> None:
+                super().__init__(File)
+
+        # Single-tenant mode (no filtering)
+        files = await repo.list_for_tenant(session, tenant_id=None, limit=50)
+
+        # Multi-tenant mode (strict filtering)
+        files = await repo.list_for_tenant(session, tenant_id="tenant-123", limit=50)
+    """
+
+    def _apply_tenant_filter(
+        self,
+        stmt: Select[tuple[T]],
+        tenant_id: str | None,
+    ) -> Select[tuple[T]]:
+        """Apply tenant filter to statement if tenant_id is provided.
+
+        Args:
+            stmt: SQLAlchemy select statement
+            tenant_id: Tenant ID to filter by, or None for no filtering
+
+        Returns:
+            Statement with optional tenant filter applied
+        """
+        if tenant_id is not None:
+            # Access the tenant_id column via the model
+            tenant_col = getattr(self.model, "tenant_id", None)
+            if tenant_col is not None:
+                stmt = stmt.where(tenant_col == tenant_id)
+            else:
+                self._logger.warning(
+                    "Model does not have tenant_id column, skipping tenant filter",
+                    extra={"model": self.model.__name__, "tenant_id": tenant_id},
+                )
+        return stmt
+
+    async def get_for_tenant(
+        self,
+        session: AsyncSession,
+        id: Any,
+        tenant_id: str | None = None,
+        *,
+        options: Iterable[Any] | None = None,
+    ) -> T | None:
+        """Get entity by ID with optional tenant filtering.
+
+        Args:
+            session: Database session
+            id: Primary key value
+            tenant_id: Tenant ID to filter by, or None for no tenant filtering
+            options: SQLAlchemy loader options
+
+        Returns:
+            Entity if found (and belongs to tenant if specified), None otherwise
+        """
+        stmt = select(self.model).where(self._pk_attr() == id)
+        stmt = self._apply_tenant_filter(stmt, tenant_id)
+
+        if options:
+            stmt = stmt.options(*options)
+
+        result = await session.execute(stmt)
+        instance = result.scalar_one_or_none()
+
+        self._lazy.debug(
+            lambda: f"db.get_for_tenant: {self.model.__name__}({id}, tenant={tenant_id}) -> {'found' if instance else 'not found'}"
+        )
+        return instance
+
+    async def get_for_tenant_or_raise(
+        self,
+        session: AsyncSession,
+        id: Any,
+        tenant_id: str | None = None,
+        *,
+        options: Iterable[Any] | None = None,
+    ) -> T:
+        """Get entity by ID with optional tenant filtering, or raise NotFoundError.
+
+        Args:
+            session: Database session
+            id: Primary key value
+            tenant_id: Tenant ID to filter by, or None for no tenant filtering
+            options: SQLAlchemy loader options
+
+        Returns:
+            Entity instance
+
+        Raises:
+            NotFoundError: If entity doesn't exist or doesn't belong to tenant
+        """
+        instance = await self.get_for_tenant(session, id, tenant_id, options=options)
+        if instance is None:
+            self._logger.info(
+                "Entity not found for tenant",
+                extra={
+                    "entity": self.model.__name__,
+                    "id": str(id),
+                    "tenant_id": tenant_id,
+                    "operation": "db.get_for_tenant_or_raise",
+                },
+            )
+            raise NotFoundError(self.model.__name__, {"id": id, "tenant_id": tenant_id})
+        return instance
+
+    async def list_for_tenant(
+        self,
+        session: AsyncSession,
+        tenant_id: str | None = None,
+        *,
+        limit: int = 100,
+        offset: int = 0,
+        options: Iterable[Any] | None = None,
+    ) -> Sequence[T]:
+        """List entities with optional tenant filtering.
+
+        Args:
+            session: Database session
+            tenant_id: Tenant ID to filter by, or None for no tenant filtering
+            limit: Maximum results
+            offset: Results to skip
+            options: SQLAlchemy loader options
+
+        Returns:
+            Sequence of entities
+        """
+        stmt = select(self.model)
+        stmt = self._apply_tenant_filter(stmt, tenant_id)
+        stmt = stmt.limit(limit).offset(offset)
+
+        if options:
+            stmt = stmt.options(*options)
+
+        result = await session.execute(stmt)
+        items = result.scalars().all()
+
+        self._lazy.debug(
+            lambda: f"db.list_for_tenant: {self.model.__name__}(tenant={tenant_id}, limit={limit}, offset={offset}) -> {len(items)} items"
+        )
+        return items
+
+    async def search_for_tenant(
+        self,
+        session: AsyncSession,
+        statement: Select[tuple[T]],
+        tenant_id: str | None = None,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> SearchResult[T]:
+        """Execute paginated search with optional tenant filtering.
+
+        Args:
+            session: Database session
+            statement: SQLAlchemy select statement (filters pre-applied)
+            tenant_id: Tenant ID to filter by, or None for no tenant filtering
+            limit: Page size
+            offset: Results to skip
+
+        Returns:
+            SearchResult with items, total count, and pagination info
+        """
+        # Apply tenant filter
+        statement = self._apply_tenant_filter(statement, tenant_id)
+
+        # Delegate to parent search method
+        return await self.search(session, statement, limit=limit, offset=offset)
+
+    async def delete_for_tenant(
+        self,
+        session: AsyncSession,
+        id: Any,
+        tenant_id: str | None = None,
+    ) -> bool:
+        """Delete entity by ID with optional tenant verification.
+
+        Args:
+            session: Database session
+            id: Primary key value
+            tenant_id: Tenant ID to verify, or None for no verification
+
+        Returns:
+            True if deleted, False if not found or wrong tenant
+        """
+        instance = await self.get_for_tenant(session, id, tenant_id)
+        if instance is None:
+            self._lazy.debug(
+                lambda: f"db.delete_for_tenant({id}, tenant={tenant_id}) -> not found"
+            )
+            return False
+
+        await session.delete(instance)
+        await session.flush()
+
+        self._logger.info(
+            "Entity deleted for tenant",
+            extra={
+                "entity": self.model.__name__,
+                "id": str(id),
+                "tenant_id": tenant_id,
+                "operation": "db.delete_for_tenant",
+            },
+        )
+        return True
+
+
 __all__ = [
     "BaseRepository",
     "SearchResult",
+    "TenantAwareRepository",
 ]

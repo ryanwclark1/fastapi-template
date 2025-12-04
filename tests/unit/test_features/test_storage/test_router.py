@@ -1,19 +1,20 @@
 """Unit tests for storage API router endpoints."""
 
+from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from io import BytesIO
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
-from fastapi import status
-from httpx import AsyncClient
+from fastapi import Depends, FastAPI, status
+from httpx import ASGITransport, AsyncClient
 
+from example_service.core.dependencies.auth import get_current_user, require_role
+from example_service.core.dependencies.tenant import get_tenant_context
 from example_service.core.schemas.auth import AuthUser
+from example_service.features.storage.dependencies import get_storage_service
 from example_service.infra.storage.backends import TenantContext
-from example_service.infra.storage.exceptions import (
-    StorageError,
-    StorageFileNotFoundError,
-)
+from example_service.infra.storage.exceptions import StorageError, StorageFileNotFoundError
 
 
 @pytest.fixture
@@ -48,428 +49,340 @@ def mock_tenant_context():
     )
 
 
+@pytest.fixture
+async def storage_client(
+    mock_storage_service, mock_admin_user, mock_tenant_context
+) -> AsyncGenerator[AsyncClient]:
+    """Create HTTP client with storage router and mocked dependencies."""
+    from example_service.features.storage.router import router
+
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1")
+
+    # Override dependencies
+    async def override_get_current_user() -> AuthUser:
+        return mock_admin_user
+
+    async def override_require_admin(
+        user: AuthUser = Depends(override_get_current_user),
+    ) -> AuthUser:
+        return user
+
+    async def override_get_storage_service():
+        return mock_storage_service
+
+    async def override_get_tenant_context():
+        return mock_tenant_context
+
+    app.dependency_overrides[get_current_user] = override_get_current_user
+    # Override require_role("admin") by creating a dependency override
+    app.dependency_overrides[require_role("admin")] = override_require_admin
+    app.dependency_overrides[get_storage_service] = override_get_storage_service
+    app.dependency_overrides[get_tenant_context] = override_get_tenant_context
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        yield client
+
+    # Cleanup
+    app.dependency_overrides.clear()
+
+
 class TestBucketEndpoints:
     """Test bucket management endpoints."""
 
     @pytest.mark.asyncio
-    async def test_create_bucket_success(
-        self, client: AsyncClient, mock_storage_service, mock_admin_user
-    ):
+    async def test_create_bucket_success(self, storage_client: AsyncClient, mock_storage_service):
         """Test successful bucket creation."""
-        with patch(
-            "example_service.features.storage.dependencies.get_storage_service",
-            return_value=mock_storage_service,
-        ), patch(
-            "example_service.features.storage.dependencies.require_role",
-            return_value=lambda: mock_admin_user,
-        ):
-            mock_storage_service.create_bucket.return_value = True
+        mock_storage_service.create_bucket.return_value = True
 
-            response = await client.post(
-                "/api/v1/storage/buckets",
-                json={
-                    "name": "test-bucket",
-                    "region": "us-west-2",
-                    "acl": "private",
-                },
-            )
+        response = await storage_client.post(
+            "/api/v1/storage/buckets",
+            json={
+                "name": "test-bucket",
+                "region": "us-west-2",
+                "acl": "private",
+            },
+        )
 
-            assert response.status_code == status.HTTP_201_CREATED
-            data = response.json()
-            assert data["name"] == "test-bucket"
-            assert data["region"] == "us-west-2"
-            mock_storage_service.create_bucket.assert_awaited_once()
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert data["name"] == "test-bucket"
+        assert data["region"] == "us-west-2"
+        mock_storage_service.create_bucket.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_delete_bucket_success(
-        self, client: AsyncClient, mock_storage_service, mock_admin_user
-    ):
+    async def test_delete_bucket_success(self, storage_client: AsyncClient, mock_storage_service):
         """Test successful bucket deletion."""
-        with patch(
-            "example_service.features.storage.dependencies.get_storage_service",
-            return_value=mock_storage_service,
-        ), patch(
-            "example_service.features.storage.dependencies.require_role",
-            return_value=lambda: mock_admin_user,
-        ):
-            mock_storage_service.delete_bucket.return_value = True
+        mock_storage_service.delete_bucket.return_value = True
 
-            response = await client.delete("/api/v1/storage/buckets/test-bucket")
+        response = await storage_client.delete("/api/v1/storage/buckets/test-bucket")
 
-            assert response.status_code == status.HTTP_200_OK
-            data = response.json()
-            assert data["success"] is True
-            assert "deleted successfully" in data["message"]
-            mock_storage_service.delete_bucket.assert_awaited_once_with(
-                bucket="test-bucket", force=False
-            )
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["success"] is True
+        assert "deleted successfully" in data["message"]
+        mock_storage_service.delete_bucket.assert_awaited_once_with(
+            bucket="test-bucket", force=False
+        )
 
     @pytest.mark.asyncio
     async def test_delete_bucket_with_force(
-        self, client: AsyncClient, mock_storage_service, mock_admin_user
+        self, storage_client: AsyncClient, mock_storage_service
     ):
         """Test bucket deletion with force flag."""
-        with patch(
-            "example_service.features.storage.dependencies.get_storage_service",
-            return_value=mock_storage_service,
-        ), patch(
-            "example_service.features.storage.dependencies.require_role",
-            return_value=lambda: mock_admin_user,
-        ):
-            mock_storage_service.delete_bucket.return_value = True
+        mock_storage_service.delete_bucket.return_value = True
 
-            response = await client.delete(
-                "/api/v1/storage/buckets/test-bucket?force=true"
-            )
+        response = await storage_client.delete("/api/v1/storage/buckets/test-bucket?force=true")
 
-            assert response.status_code == status.HTTP_200_OK
-            mock_storage_service.delete_bucket.assert_awaited_once_with(
-                bucket="test-bucket", force=True
-            )
+        assert response.status_code == status.HTTP_200_OK
+        mock_storage_service.delete_bucket.assert_awaited_once_with(
+            bucket="test-bucket", force=True
+        )
 
     @pytest.mark.asyncio
-    async def test_list_buckets_success(
-        self, client: AsyncClient, mock_storage_service, mock_admin_user
-    ):
+    async def test_list_buckets_success(self, storage_client: AsyncClient, mock_storage_service):
         """Test successful bucket listing."""
-        with patch(
-            "example_service.features.storage.dependencies.get_storage_service",
-            return_value=mock_storage_service,
-        ), patch(
-            "example_service.features.storage.dependencies.require_role",
-            return_value=lambda: mock_admin_user,
-        ):
-            mock_storage_service.list_buckets.return_value = [
-                {
-                    "name": "bucket-1",
-                    "region": "us-west-2",
-                    "creation_date": datetime.now(UTC),
-                    "versioning_enabled": False,
-                },
-                {
-                    "name": "bucket-2",
-                    "region": "us-east-1",
-                    "creation_date": datetime.now(UTC),
-                    "versioning_enabled": True,
-                },
-            ]
+        mock_storage_service.list_buckets.return_value = [
+            {
+                "name": "bucket-1",
+                "region": "us-west-2",
+                "creation_date": datetime.now(UTC),
+                "versioning_enabled": False,
+            },
+            {
+                "name": "bucket-2",
+                "region": "us-east-1",
+                "creation_date": datetime.now(UTC),
+                "versioning_enabled": True,
+            },
+        ]
 
-            response = await client.get("/api/v1/storage/buckets")
+        response = await storage_client.get("/api/v1/storage/buckets")
 
-            assert response.status_code == status.HTTP_200_OK
-            data = response.json()
-            assert len(data["buckets"]) == 2
-            assert data["total"] == 2
-            assert data["buckets"][0]["name"] == "bucket-1"
-            assert data["buckets"][1]["versioning_enabled"] is True
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data["buckets"]) == 2
+        assert data["total"] == 2
+        assert data["buckets"][0]["name"] == "bucket-1"
+        assert data["buckets"][1]["versioning_enabled"] is True
 
     @pytest.mark.asyncio
-    async def test_get_bucket_info_success(
-        self, client: AsyncClient, mock_storage_service, mock_admin_user
-    ):
+    async def test_get_bucket_info_success(self, storage_client: AsyncClient, mock_storage_service):
         """Test getting bucket information."""
-        with patch(
-            "example_service.features.storage.dependencies.get_storage_service",
-            return_value=mock_storage_service,
-        ), patch(
-            "example_service.features.storage.dependencies.require_role",
-            return_value=lambda: mock_admin_user,
-        ):
-            mock_storage_service.bucket_exists.return_value = True
-            mock_storage_service.list_buckets.return_value = [
-                {
-                    "name": "test-bucket",
-                    "region": "us-west-2",
-                    "creation_date": datetime.now(UTC),
-                    "versioning_enabled": False,
-                }
-            ]
+        mock_storage_service.bucket_exists.return_value = True
+        mock_storage_service.list_buckets.return_value = [
+            {
+                "name": "test-bucket",
+                "region": "us-west-2",
+                "creation_date": datetime.now(UTC),
+                "versioning_enabled": False,
+            }
+        ]
 
-            response = await client.get("/api/v1/storage/buckets/test-bucket")
+        response = await storage_client.get("/api/v1/storage/buckets/test-bucket")
 
-            assert response.status_code == status.HTTP_200_OK
-            data = response.json()
-            assert data["name"] == "test-bucket"
-            assert data["region"] == "us-west-2"
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["name"] == "test-bucket"
+        assert data["region"] == "us-west-2"
 
     @pytest.mark.asyncio
     async def test_get_bucket_info_not_found(
-        self, client: AsyncClient, mock_storage_service, mock_admin_user
+        self, storage_client: AsyncClient, mock_storage_service
     ):
         """Test getting info for non-existent bucket."""
-        with patch(
-            "example_service.features.storage.dependencies.get_storage_service",
-            return_value=mock_storage_service,
-        ), patch(
-            "example_service.features.storage.dependencies.require_role",
-            return_value=lambda: mock_admin_user,
-        ):
-            mock_storage_service.bucket_exists.return_value = False
+        mock_storage_service.bucket_exists.return_value = False
 
-            response = await client.get("/api/v1/storage/buckets/nonexistent")
+        response = await storage_client.get("/api/v1/storage/buckets/nonexistent")
 
-            assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 class TestObjectEndpoints:
     """Test object management endpoints."""
 
     @pytest.mark.asyncio
-    async def test_list_objects_success(
-        self, client: AsyncClient, mock_storage_service, mock_admin_user
-    ):
+    async def test_list_objects_success(self, storage_client: AsyncClient, mock_storage_service):
         """Test successful object listing."""
         from example_service.infra.storage.backends import ObjectMetadata
 
-        with patch(
-            "example_service.features.storage.dependencies.get_storage_service",
-            return_value=mock_storage_service,
-        ), patch(
-            "example_service.features.storage.dependencies.require_role",
-            return_value=lambda: mock_admin_user,
-        ):
-            mock_storage_service._resolve_bucket.return_value = "test-bucket"
-            mock_storage_service._backend.list_objects.return_value = (
-                [
-                    ObjectMetadata(
-                        key="file1.txt",
-                        size_bytes=1024,
-                        content_type="text/plain",
-                        last_modified=datetime.now(UTC),
-                        etag="abc123",
-                        storage_class="STANDARD",
-                        custom_metadata={},
-                    ),
-                    ObjectMetadata(
-                        key="file2.pdf",
-                        size_bytes=2048,
-                        content_type="application/pdf",
-                        last_modified=datetime.now(UTC),
-                        etag="def456",
-                        storage_class="STANDARD",
-                        custom_metadata={},
-                    ),
-                ],
-                None,  # No continuation token
-            )
+        mock_storage_service._resolve_bucket.return_value = "test-bucket"
+        mock_storage_service._backend.list_objects.return_value = (
+            [
+                ObjectMetadata(
+                    key="file1.txt",
+                    size_bytes=1024,
+                    content_type="text/plain",
+                    last_modified=datetime.now(UTC),
+                    etag="abc123",
+                    storage_class="STANDARD",
+                    custom_metadata={},
+                ),
+                ObjectMetadata(
+                    key="file2.pdf",
+                    size_bytes=2048,
+                    content_type="application/pdf",
+                    last_modified=datetime.now(UTC),
+                    etag="def456",
+                    storage_class="STANDARD",
+                    custom_metadata={},
+                ),
+            ],
+            None,  # No continuation token
+        )
 
-            response = await client.get("/api/v1/storage/objects?prefix=&max_keys=100")
+        response = await storage_client.get("/api/v1/storage/objects?prefix=&max_keys=100")
 
-            assert response.status_code == status.HTTP_200_OK
-            data = response.json()
-            assert len(data["objects"]) == 2
-            assert data["total"] == 2
-            assert data["has_more"] is False
-            assert data["objects"][0]["key"] == "file1.txt"
-            assert data["objects"][1]["size_bytes"] == 2048
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data["objects"]) == 2
+        assert data["total"] == 2
+        assert data["has_more"] is False
+        assert data["objects"][0]["key"] == "file1.txt"
+        assert data["objects"][1]["size_bytes"] == 2048
 
     @pytest.mark.asyncio
     async def test_list_objects_with_pagination(
-        self, client: AsyncClient, mock_storage_service, mock_admin_user
+        self, storage_client: AsyncClient, mock_storage_service
     ):
         """Test object listing with pagination."""
         from example_service.infra.storage.backends import ObjectMetadata
 
-        with patch(
-            "example_service.features.storage.dependencies.get_storage_service",
-            return_value=mock_storage_service,
-        ), patch(
-            "example_service.features.storage.dependencies.require_role",
-            return_value=lambda: mock_admin_user,
-        ):
-            mock_storage_service._resolve_bucket.return_value = "test-bucket"
-            mock_storage_service._backend.list_objects.return_value = (
-                [
-                    ObjectMetadata(
-                        key="file1.txt",
-                        size_bytes=1024,
-                        content_type="text/plain",
-                        last_modified=datetime.now(UTC),
-                        etag="abc123",
-                        storage_class="STANDARD",
-                        custom_metadata={},
-                    )
-                ],
-                "next-token-123",  # Has more results
-            )
+        mock_storage_service._resolve_bucket.return_value = "test-bucket"
+        mock_storage_service._backend.list_objects.return_value = (
+            [
+                ObjectMetadata(
+                    key="file1.txt",
+                    size_bytes=1024,
+                    content_type="text/plain",
+                    last_modified=datetime.now(UTC),
+                    etag="abc123",
+                    storage_class="STANDARD",
+                    custom_metadata={},
+                )
+            ],
+            "next-token-123",  # Has more results
+        )
 
-            response = await client.get("/api/v1/storage/objects?max_keys=1")
+        response = await storage_client.get("/api/v1/storage/objects?max_keys=1")
 
-            assert response.status_code == status.HTTP_200_OK
-            data = response.json()
-            assert data["has_more"] is True
-            assert data["continuation_token"] == "next-token-123"
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["has_more"] is True
+        assert data["continuation_token"] == "next-token-123"
 
     @pytest.mark.asyncio
-    async def test_upload_object_success(
-        self, client: AsyncClient, mock_storage_service, mock_admin_user
-    ):
+    async def test_upload_object_success(self, storage_client: AsyncClient, mock_storage_service):
         """Test successful object upload."""
-        with patch(
-            "example_service.features.storage.dependencies.get_storage_service",
-            return_value=mock_storage_service,
-        ), patch(
-            "example_service.features.storage.dependencies.require_role",
-            return_value=lambda: mock_admin_user,
-        ):
-            mock_storage_service.upload_file.return_value = {
-                "key": "test.txt",
-                "bucket": "test-bucket",
-                "etag": "abc123",
-                "size_bytes": 1024,
-                "checksum_sha256": "def456",
-                "version_id": None,
-            }
+        mock_storage_service.upload_file.return_value = {
+            "key": "test.txt",
+            "bucket": "test-bucket",
+            "etag": "abc123",
+            "size_bytes": 1024,
+            "checksum_sha256": "def456",
+            "version_id": None,
+        }
 
-            files = {"file": ("test.txt", BytesIO(b"test content"), "text/plain")}
-            response = await client.post(
-                "/api/v1/storage/objects/test.txt", files=files
-            )
+        files = {"file": ("test.txt", BytesIO(b"test content"), "text/plain")}
+        response = await storage_client.post("/api/v1/storage/objects/test.txt", files=files)
 
-            assert response.status_code == status.HTTP_201_CREATED
-            data = response.json()
-            assert data["key"] == "test.txt"
-            assert data["size_bytes"] == 1024
-            assert data["etag"] == "abc123"
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert data["key"] == "test.txt"
+        assert data["size_bytes"] == 1024
+        assert data["etag"] == "abc123"
 
     @pytest.mark.asyncio
-    async def test_upload_object_with_acl(
-        self, client: AsyncClient, mock_storage_service, mock_admin_user
-    ):
+    async def test_upload_object_with_acl(self, storage_client: AsyncClient, mock_storage_service):
         """Test object upload with ACL."""
-        with patch(
-            "example_service.features.storage.dependencies.get_storage_service",
-            return_value=mock_storage_service,
-        ), patch(
-            "example_service.features.storage.dependencies.require_role",
-            return_value=lambda: mock_admin_user,
-        ):
-            mock_storage_service.upload_file.return_value = {
-                "key": "test.txt",
-                "bucket": "test-bucket",
-                "etag": "abc123",
-                "size_bytes": 1024,
-                "checksum_sha256": "def456",
-                "version_id": None,
-            }
+        mock_storage_service.upload_file.return_value = {
+            "key": "test.txt",
+            "bucket": "test-bucket",
+            "etag": "abc123",
+            "size_bytes": 1024,
+            "checksum_sha256": "def456",
+            "version_id": None,
+        }
 
-            files = {"file": ("test.txt", BytesIO(b"test content"), "text/plain")}
-            response = await client.post(
-                "/api/v1/storage/objects/test.txt?acl=public-read", files=files
-            )
+        files = {"file": ("test.txt", BytesIO(b"test content"), "text/plain")}
+        response = await storage_client.post(
+            "/api/v1/storage/objects/test.txt?acl=public-read", files=files
+        )
 
-            assert response.status_code == status.HTTP_201_CREATED
-            # Verify ACL was passed to upload_file
-            call_args = mock_storage_service.upload_file.call_args
-            assert call_args.kwargs["acl"] == "public-read"
+        assert response.status_code == status.HTTP_201_CREATED
+        # Verify ACL was passed to upload_file
+        call_args = mock_storage_service.upload_file.call_args
+        assert call_args.kwargs["acl"] == "public-read"
 
     @pytest.mark.asyncio
-    async def test_download_object_success(
-        self, client: AsyncClient, mock_storage_service, mock_admin_user
-    ):
+    async def test_download_object_success(self, storage_client: AsyncClient, mock_storage_service):
         """Test successful object download."""
-        with patch(
-            "example_service.features.storage.dependencies.get_storage_service",
-            return_value=mock_storage_service,
-        ), patch(
-            "example_service.features.storage.dependencies.require_role",
-            return_value=lambda: mock_admin_user,
-        ):
-            mock_storage_service.download_file.return_value = b"test content"
-            mock_storage_service.get_file_info.return_value = {
-                "content_type": "text/plain",
-                "size_bytes": 12,
-            }
+        mock_storage_service.download_file.return_value = b"test content"
+        mock_storage_service.get_file_info.return_value = {
+            "content_type": "text/plain",
+            "size_bytes": 12,
+        }
 
-            response = await client.get("/api/v1/storage/objects/test.txt")
+        response = await storage_client.get("/api/v1/storage/objects/test.txt")
 
-            assert response.status_code == status.HTTP_200_OK
-            assert response.content == b"test content"
-            assert response.headers["content-type"] == "text/plain"
+        assert response.status_code == status.HTTP_200_OK
+        assert response.content == b"test content"
+        # FastAPI may add charset to content-type
+        assert response.headers["content-type"].startswith("text/plain")
 
     @pytest.mark.asyncio
     async def test_download_object_not_found(
-        self, client: AsyncClient, mock_storage_service, mock_admin_user
+        self, storage_client: AsyncClient, mock_storage_service
     ):
         """Test downloading non-existent object."""
-        with patch(
-            "example_service.features.storage.dependencies.get_storage_service",
-            return_value=mock_storage_service,
-        ), patch(
-            "example_service.features.storage.dependencies.require_role",
-            return_value=lambda: mock_admin_user,
-        ):
-            mock_storage_service.download_file.side_effect = StorageFileNotFoundError(
-                "Object not found"
-            )
+        mock_storage_service.download_file.side_effect = StorageFileNotFoundError(
+            "Object not found"
+        )
 
-            response = await client.get("/api/v1/storage/objects/nonexistent.txt")
+        response = await storage_client.get("/api/v1/storage/objects/nonexistent.txt")
 
-            assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_404_NOT_FOUND
 
     @pytest.mark.asyncio
-    async def test_delete_object_success(
-        self, client: AsyncClient, mock_storage_service, mock_admin_user
-    ):
+    async def test_delete_object_success(self, storage_client: AsyncClient, mock_storage_service):
         """Test successful object deletion."""
-        with patch(
-            "example_service.features.storage.dependencies.get_storage_service",
-            return_value=mock_storage_service,
-        ), patch(
-            "example_service.features.storage.dependencies.require_role",
-            return_value=lambda: mock_admin_user,
-        ):
-            mock_storage_service.delete_file.return_value = True
+        mock_storage_service.delete_file.return_value = True
 
-            response = await client.delete("/api/v1/storage/objects/test.txt")
+        response = await storage_client.delete("/api/v1/storage/objects/test.txt")
 
-            assert response.status_code == status.HTTP_200_OK
-            data = response.json()
-            assert data["deleted"] is True
-            assert data["key"] == "test.txt"
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["deleted"] is True
+        assert data["key"] == "test.txt"
 
 
 class TestACLEndpoints:
     """Test ACL management endpoints."""
 
     @pytest.mark.asyncio
-    async def test_set_object_acl_success(
-        self, client: AsyncClient, mock_storage_service, mock_admin_user
-    ):
+    async def test_set_object_acl_success(self, storage_client: AsyncClient, mock_storage_service):
         """Test successful ACL setting."""
-        with patch(
-            "example_service.features.storage.dependencies.get_storage_service",
-            return_value=mock_storage_service,
-        ), patch(
-            "example_service.features.storage.dependencies.require_role",
-            return_value=lambda: mock_admin_user,
-        ):
-            mock_storage_service.set_object_acl.return_value = True
+        mock_storage_service.set_object_acl.return_value = True
 
-            response = await client.put(
-                "/api/v1/storage/objects/test.txt/acl",
-                json={"acl": "public-read"},
-            )
+        response = await storage_client.put(
+            "/api/v1/storage/objects/test.txt/acl",
+            json={"acl": "public-read"},
+        )
 
-            assert response.status_code == status.HTTP_200_OK
-            data = response.json()
-            assert data["success"] is True
-            assert "public-read" in data["message"]
-            mock_storage_service.set_object_acl.assert_awaited_once()
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["success"] is True
+        assert "public-read" in data["message"]
+        mock_storage_service.set_object_acl.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_get_object_acl_success(
-        self, client: AsyncClient, mock_storage_service, mock_admin_user
-    ):
+    async def test_get_object_acl_success(self, storage_client: AsyncClient, mock_storage_service):
         """Test successful ACL retrieval."""
-        with patch(
-            "example_service.features.storage.dependencies.get_storage_service",
-            return_value=mock_storage_service,
-        ), patch(
-            "example_service.features.storage.dependencies.require_role",
-            return_value=lambda: mock_admin_user,
-        ):
-            mock_storage_service.get_object_acl.return_value = {
+        # get_object_acl is async, so we need to use AsyncMock or return_value properly
+        from unittest.mock import AsyncMock
+
+        mock_storage_service.get_object_acl = AsyncMock(
+            return_value={
                 "owner": {"ID": "owner-id", "DisplayName": "owner"},
                 "grants": [
                     {
@@ -478,15 +391,16 @@ class TestACLEndpoints:
                     }
                 ],
             }
+        )
 
-            response = await client.get("/api/v1/storage/objects/test.txt/acl")
+        response = await storage_client.get("/api/v1/storage/objects/test.txt/acl")
 
-            assert response.status_code == status.HTTP_200_OK
-            data = response.json()
-            assert "owner" in data
-            assert "grants" in data
-            assert len(data["grants"]) == 1
-            mock_storage_service.get_object_acl.assert_awaited_once()
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "owner" in data
+        assert "grants" in data
+        assert len(data["grants"]) == 1
+        mock_storage_service.get_object_acl.assert_awaited_once()
 
 
 class TestSchemaValidation:
@@ -494,37 +408,23 @@ class TestSchemaValidation:
 
     @pytest.mark.asyncio
     async def test_bucket_create_validation(
-        self, client: AsyncClient, mock_storage_service, mock_admin_user
+        self, storage_client: AsyncClient, mock_storage_service
     ):
         """Test bucket creation schema validation."""
-        with patch(
-            "example_service.features.storage.dependencies.get_storage_service",
-            return_value=mock_storage_service,
-        ), patch(
-            "example_service.features.storage.dependencies.require_role",
-            return_value=lambda: mock_admin_user,
-        ):
-            # Too short bucket name
-            response = await client.post(
-                "/api/v1/storage/buckets",
-                json={"name": "ab"},  # Min length is 3
-            )
+        # Too short bucket name
+        response = await storage_client.post(
+            "/api/v1/storage/buckets",
+            json={"name": "ab"},  # Min length is 3
+        )
 
-            assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     @pytest.mark.asyncio
     async def test_object_list_query_validation(
-        self, client: AsyncClient, mock_storage_service, mock_admin_user
+        self, storage_client: AsyncClient, mock_storage_service
     ):
         """Test object list query parameter validation."""
-        with patch(
-            "example_service.features.storage.dependencies.get_storage_service",
-            return_value=mock_storage_service,
-        ), patch(
-            "example_service.features.storage.dependencies.require_role",
-            return_value=lambda: mock_admin_user,
-        ):
-            # max_keys too large
-            response = await client.get("/api/v1/storage/objects?max_keys=99999")
+        # max_keys too large
+        response = await storage_client.get("/api/v1/storage/objects?max_keys=99999")
 
-            assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY

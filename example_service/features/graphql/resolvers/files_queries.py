@@ -78,7 +78,7 @@ async def files_query(
     after: AfterArg = None,
     last: LastArg = None,
     before: BeforeArg = None,
-    status: strawberry.enum.EnumType | None = None,
+    status: FileStatus | None = None,
 ) -> FileConnection:
     """List files with Relay-style cursor pagination.
 

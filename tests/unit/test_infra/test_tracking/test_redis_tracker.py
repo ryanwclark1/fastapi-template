@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from example_service.tasks.tracking.redis_tracker import RedisTaskTracker
+from example_service.infra.tasks.tracking.redis_tracker import RedisTaskTracker
 
 
 class FakePipeline:
@@ -146,11 +146,11 @@ def tracker(monkeypatch):
     fake_pool = FakePool()
     # Avoid hitting real Redis during connect
     monkeypatch.setattr(
-        "example_service.tasks.tracking.redis_tracker.ConnectionPool.from_url",
+        "example_service.infra.tasks.tracking.redis_tracker.ConnectionPool.from_url",
         lambda *args, **kwargs: fake_pool,
     )
     monkeypatch.setattr(
-        "example_service.tasks.tracking.redis_tracker.Redis",
+        "example_service.infra.tasks.tracking.redis_tracker.Redis",
         FakeRedis,
     )
     tracker = RedisTaskTracker(redis_url="redis://test", key_prefix="task", ttl_seconds=3600)

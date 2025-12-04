@@ -260,6 +260,16 @@ async def test_lifespan_initializes_messaging_and_taskiq(monkeypatch: pytest.Mon
     monkeypatch.setattr(
         "example_service.app.lifespan.setup_tracing", lambda: calls.append("setup_tracing")
     )
+    # Patch task settings to enable tracking with redis backend (since redis is configured)
+    task_settings = SimpleNamespace(
+        tracking_enabled=True,
+        result_backend="redis",
+        is_redis_backend=True,
+        is_postgres_backend=False,
+    )
+    monkeypatch.setattr(
+        "example_service.app.lifespan.get_task_settings", lambda: task_settings
+    )
 
     async with lifespan(FastAPI()):
         pass

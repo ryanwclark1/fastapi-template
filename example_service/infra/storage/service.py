@@ -15,7 +15,6 @@ import logging
 from typing import TYPE_CHECKING, Any, BinaryIO
 
 if TYPE_CHECKING:
-
     from example_service.core.settings.storage import StorageSettings
 
 from example_service.core.settings import get_storage_settings
@@ -73,6 +72,13 @@ class StorageService:
     def settings(self) -> StorageSettings:
         """Get the storage settings."""
         return self._settings
+
+    @property
+    def backend_name(self) -> str | None:
+        """Get the backend name if initialized."""
+        if self._backend is not None:
+            return self._backend.backend_name
+        return None
 
     async def startup(self) -> None:
         """Initialize the storage client.

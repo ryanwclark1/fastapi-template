@@ -146,7 +146,9 @@ class BaseImporter[T](ABC):
                         else:
                             value = expected_type(value)
                     except (ValueError, TypeError) as e:
-                        errors.append((field, f"Cannot convert '{value}' to {expected_type.__name__}: {e}"))
+                        errors.append(
+                            (field, f"Cannot convert '{value}' to {expected_type.__name__}: {e}")
+                        )
                         continue
 
                 # Custom validation
@@ -274,7 +276,7 @@ class JSONImporter(BaseImporter[T]):
                     ParsedRecord(
                         row_number=row_num,
                         data={},
-                        errors=[("_record", f"Row {row_num} is not an object")]
+                        errors=[("_record", f"Row {row_num} is not an object")],
                     )
                 )
                 continue
@@ -316,7 +318,7 @@ class ExcelImporter(BaseImporter[T]):
     def parse_file(self, file_path: Path) -> list[ParsedRecord]:
         """Parse Excel file."""
         try:
-            from openpyxl import load_workbook  # type: ignore[import-untyped]
+            from openpyxl import load_workbook
         except ImportError as err:
             raise ImportError("openpyxl is required for Excel import") from err
 

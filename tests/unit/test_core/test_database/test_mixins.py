@@ -109,13 +109,98 @@ async def async_engine(postgres_container: str):
     Returns:
         SQLAlchemy async engine configured for PostgreSQL.
     """
+    import sqlalchemy as sa
+
     engine = create_async_engine(
         postgres_container,
         echo=False,
     )
 
-    # Create all tables
+    # Create enum types before creating tables
     async with engine.begin() as conn:
+        # Create all enum types that are used by models
+        # These must be created before tables that reference them
+        enum_definitions = [
+            (["pending", "processing", "ready", "failed", "deleted"], "filestatus"),
+            (["smtp", "aws_ses", "sendgrid", "mailgun", "console", "file"], "emailprovidertype"),
+            (["pending", "delivered", "failed", "retrying"], "deliverystatus"),
+            (["LLM", "TRANSCRIPTION", "EMBEDDING", "IMAGE", "PII_REDACTION"], "aiprovidertype"),
+            (
+                [
+                    "TRANSCRIPTION",
+                    "PII_REDACTION",
+                    "SUMMARY",
+                    "SENTIMENT",
+                    "COACHING",
+                    "FULL_ANALYSIS",
+                ],
+                "aijobtype",
+            ),
+            (["PENDING", "PROCESSING", "COMPLETED", "FAILED", "CANCELLED"], "aijobstatus"),
+            (
+                [
+                    "pending",
+                    "queued",
+                    "running",
+                    "completed",
+                    "failed",
+                    "cancelled",
+                    "retrying",
+                    "paused",
+                ],
+                "jobstatus",
+            ),
+            (["1", "2", "3", "4"], "jobpriority"),
+            (["enabled", "disabled", "percentage", "targeted"], "flagstatus"),
+            (
+                [
+                    "create",
+                    "read",
+                    "update",
+                    "delete",
+                    "bulk_create",
+                    "bulk_update",
+                    "bulk_delete",
+                    "export",
+                    "import",
+                    "login",
+                    "logout",
+                    "login_failed",
+                    "password_change",
+                    "token_refresh",
+                    "permission_denied",
+                    "acl_check",
+                    "archive",
+                    "restore",
+                    "purge",
+                ],
+                "auditaction",
+            ),
+        ]
+
+        # Create each enum type if it doesn't exist
+        for enum_values, enum_name in enum_definitions:
+            result = await conn.execute(
+                sa.text(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1 FROM pg_type WHERE typname = :enum_name
+                    )
+                    """
+                ),
+                {"enum_name": enum_name},
+            )
+            exists = result.scalar()
+
+            if not exists:
+                # Create the enum type using SQLAlchemy's Enum.create
+                # Capture enum in default argument to avoid closure issue
+                sa_enum = sa.Enum(*enum_values, name=enum_name)
+                await conn.run_sync(
+                    lambda sync_conn, e=sa_enum: e.create(sync_conn, checkfirst=False)
+                )
+
+        # Now create all tables
         await conn.run_sync(Base.metadata.create_all)
 
     yield engine

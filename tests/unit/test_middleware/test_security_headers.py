@@ -530,10 +530,10 @@ class TestEnvironmentAwareFeatures:
 
         assert "strict-transport-security" in response.headers
 
-    async def test_is_production_parameter_deprecated_but_works(self):
-        """Test that deprecated is_production parameter still works."""
+    async def test_environment_parameter_works(self):
+        """Test that environment parameter works."""
         app = FastAPI()
-        app.add_middleware(SecurityHeadersMiddleware, is_production=True)
+        app.add_middleware(SecurityHeadersMiddleware, environment="production")
 
         @app.get("/test")
         async def test_endpoint():

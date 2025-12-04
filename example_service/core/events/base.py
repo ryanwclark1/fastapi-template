@@ -9,6 +9,8 @@ Key features:
 - Causation tracking (which event caused this event)
 - Correlation IDs for distributed tracing
 - Automatic timestamp and ID generation
+- Message headers generation for RabbitMQ publishing
+- Optional routing key generation from format strings
 """
 
 from __future__ import annotations
@@ -80,6 +82,10 @@ class DomainEvent(BaseModel):
     event_type: ClassVar[str] = "domain.event"
     event_version: ClassVar[int] = 1
 
+    # Optional routing key format (e.g., "user.{action}" or "tenant.{tenant_uuid}.event")
+    # If not defined, event_type is used as the routing key
+    routing_key_fmt: ClassVar[str | None] = None
+
     # Instance attributes
     event_id: str = Field(
         default_factory=_generate_uuid7,
@@ -116,9 +122,18 @@ class DomainEvent(BaseModel):
         """Validate subclass has required class variables."""
         super().__init_subclass__(**kwargs)
         # Skip validation for intermediate base classes
-        if cls.__name__ in ("DomainEvent",):
+        # These are abstract event hierarchies that shouldn't define event_type
+        intermediate_bases = (
+            "DomainEvent",
+            "BaseEvent",  # Messaging base event
+            "ServiceEvent",
+            "TenantEvent",
+            "UserEvent",
+            "MultiUserEvent",
+        )
+        if cls.__name__ in intermediate_bases:
             return
-        # Ensure event_type is defined
+        # Ensure event_type is defined for concrete event classes
         if not hasattr(cls, "event_type") or cls.event_type == "domain.event":
             raise TypeError(f"{cls.__name__} must define 'event_type' class variable")
 
@@ -197,6 +212,86 @@ class DomainEvent(BaseModel):
             "event_version": self.event_version,
             **event_data,
         }
+
+    def headers(self) -> dict[str, Any]:
+        """Generate message headers for RabbitMQ publishing.
+
+        Returns a dictionary of headers containing event metadata.
+        Subclasses can override to add additional headers (e.g., tenant_uuid).
+
+        Headers are used for:
+        - Message routing (x-match headers exchange)
+        - Distributed tracing (correlation_id)
+        - Event identification (event_type, event_version)
+
+        Returns:
+            Dictionary of header key-value pairs.
+
+        Example:
+            event = UserCreatedEvent(user_id="123")
+            headers = event.headers()
+            # {
+            #     "x-event-type": "user.created",
+            #     "x-event-version": "1",
+            #     "x-event-id": "01234567-...",
+            #     "x-correlation-id": "...",
+            #     "x-service": "example-service"
+            # }
+        """
+        headers: dict[str, Any] = {
+            "x-event-type": self.event_type,
+            "x-event-version": str(self.event_version),
+            "x-event-id": self.event_id,
+            "x-service": self.service,
+            "x-timestamp": self.timestamp.isoformat(),
+        }
+
+        if self.correlation_id:
+            headers["x-correlation-id"] = self.correlation_id
+
+        if self.causation_id:
+            headers["x-causation-id"] = self.causation_id
+
+        return headers
+
+    @property
+    def routing_key(self) -> str:
+        """Generate routing key for message publishing.
+
+        If routing_key_fmt is defined, uses it as a format string with
+        event fields as values. Otherwise, returns the event_type.
+
+        The routing key determines which queues receive the message
+        when using a topic exchange.
+
+        Returns:
+            Routing key string.
+
+        Example:
+            # Without routing_key_fmt
+            class UserCreatedEvent(DomainEvent):
+                event_type: ClassVar[str] = "user.created"
+            event = UserCreatedEvent()
+            assert event.routing_key == "user.created"
+
+            # With routing_key_fmt
+            class UserActionEvent(DomainEvent):
+                event_type: ClassVar[str] = "user.action"
+                routing_key_fmt: ClassVar[str] = "user.{action}.{user_id}"
+                action: str
+                user_id: str
+            event = UserActionEvent(action="login", user_id="123")
+            assert event.routing_key == "user.login.123"
+        """
+        if self.routing_key_fmt is None:
+            return self.event_type
+
+        # Format routing key using event fields
+        try:
+            return self.routing_key_fmt.format(**self.model_dump())
+        except KeyError:
+            # Fall back to event_type if format fails
+            return self.event_type
 
     def __repr__(self) -> str:
         """Human-readable representation."""

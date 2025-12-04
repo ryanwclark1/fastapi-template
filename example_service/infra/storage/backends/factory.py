@@ -46,18 +46,6 @@ def create_storage_backend(settings: StorageSettings) -> StorageBackend:
 
             return S3Backend(settings)
 
-        case StorageBackendType.GCS:
-            # Future: GCS backend
-            raise StorageNotConfiguredError(
-                "GCS backend not yet implemented. Coming soon!",
-            )
-
-        case StorageBackendType.AZURE:
-            # Future: Azure Blob Storage backend
-            raise StorageNotConfiguredError(
-                "Azure backend not yet implemented. Coming soon!",
-            )
-
         case _:
             raise StorageNotConfiguredError(
                 f"Unsupported storage backend: {backend_type}. "

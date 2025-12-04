@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from example_service.tasks.tracking import factory
+from example_service.infra.tasks.tracking import factory
 
 
 @pytest.fixture(autouse=True)
@@ -32,8 +32,8 @@ def test_create_tracker_returns_redis(monkeypatch, redis_settings):
     settings = type("Settings", (), {"is_postgres_backend": False, "tracking_enabled": True,
                                      "redis_key_prefix": "task", "redis_result_ttl_seconds": 100,
                                      "redis_max_connections": 5})
-    monkeypatch.setattr("example_service.tasks.tracking.factory.get_task_settings", lambda: settings)
-    monkeypatch.setattr("example_service.tasks.tracking.factory.get_redis_settings", lambda: redis_settings)
+    monkeypatch.setattr("example_service.infra.tasks.tracking.factory.get_task_settings", lambda: settings)
+    monkeypatch.setattr("example_service.infra.tasks.tracking.factory.get_redis_settings", lambda: redis_settings)
     created_kwargs = {}
 
     class DummyRedisTracker:
@@ -41,7 +41,7 @@ def test_create_tracker_returns_redis(monkeypatch, redis_settings):
             created_kwargs.update(kwargs)
 
     monkeypatch.setattr(
-        "example_service.tasks.tracking.redis_tracker.RedisTaskTracker",
+        "example_service.infra.tasks.tracking.redis_tracker.RedisTaskTracker",
         DummyRedisTracker,
     )
 
@@ -55,8 +55,8 @@ def test_create_tracker_returns_redis(monkeypatch, redis_settings):
 def test_create_tracker_returns_postgres(monkeypatch, db_settings):
     """create_tracker should build Postgres tracker when backend is postgres."""
     settings = type("Settings", (), {"is_postgres_backend": True, "tracking_enabled": True})
-    monkeypatch.setattr("example_service.tasks.tracking.factory.get_task_settings", lambda: settings)
-    monkeypatch.setattr("example_service.tasks.tracking.factory.get_db_settings", lambda: db_settings)
+    monkeypatch.setattr("example_service.infra.tasks.tracking.factory.get_task_settings", lambda: settings)
+    monkeypatch.setattr("example_service.infra.tasks.tracking.factory.get_db_settings", lambda: db_settings)
 
     class DummyPostgresTracker:
         def __init__(self, dsn: str, pool_size: int, max_overflow: int):
@@ -65,7 +65,7 @@ def test_create_tracker_returns_postgres(monkeypatch, db_settings):
             self.max_overflow = max_overflow
 
     monkeypatch.setattr(
-        "example_service.tasks.tracking.postgres_tracker.PostgresTaskTracker",
+        "example_service.infra.tasks.tracking.postgres_tracker.PostgresTaskTracker",
         DummyPostgresTracker,
     )
 
@@ -89,9 +89,9 @@ def test_get_tracker_returns_global(monkeypatch):
 async def test_start_tracker_skips_when_disabled(monkeypatch):
     """start_tracker should no-op when tracking disabled."""
     settings = type("Settings", (), {"tracking_enabled": False, "result_backend": "redis"})
-    monkeypatch.setattr("example_service.tasks.tracking.factory.get_task_settings", lambda: settings)
+    monkeypatch.setattr("example_service.infra.tasks.tracking.factory.get_task_settings", lambda: settings)
     created = MagicMock()
-    monkeypatch.setattr("example_service.tasks.tracking.factory.create_tracker", created)
+    monkeypatch.setattr("example_service.infra.tasks.tracking.factory.create_tracker", created)
 
     await factory.start_tracker()
 
@@ -103,10 +103,10 @@ async def test_start_tracker_skips_when_disabled(monkeypatch):
 async def test_start_tracker_initializes_global(monkeypatch):
     """start_tracker should create and connect tracker when enabled."""
     settings = type("Settings", (), {"tracking_enabled": True, "result_backend": "redis"})
-    monkeypatch.setattr("example_service.tasks.tracking.factory.get_task_settings", lambda: settings)
+    monkeypatch.setattr("example_service.infra.tasks.tracking.factory.get_task_settings", lambda: settings)
     tracker_mock = MagicMock()
     tracker_mock.connect = AsyncMock()
-    monkeypatch.setattr("example_service.tasks.tracking.factory.create_tracker", lambda: tracker_mock)
+    monkeypatch.setattr("example_service.infra.tasks.tracking.factory.create_tracker", lambda: tracker_mock)
 
     await factory.start_tracker()
 

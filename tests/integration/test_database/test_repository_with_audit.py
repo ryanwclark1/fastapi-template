@@ -7,18 +7,17 @@ This test suite validates the repository pattern with enhanced audit capabilitie
 - Bulk operations with audit tracking
 - Complete lifecycle scenarios
 
-Tests use real SQLAlchemy sessions with in-memory SQLite to ensure
+Tests use real SQLAlchemy sessions with PostgreSQL testcontainers to ensure
 database operations work correctly without mocking.
 """
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import String, select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
 from example_service.core.database.base import (
@@ -68,31 +67,6 @@ class FullAuditPost(Base, IntegerPKMixin, TimestampMixin, AuditColumnsMixin, Sof
 
 
 @pytest.fixture
-async def engine():
-    """Create in-memory SQLite engine for tests."""
-    engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
-        echo=False,  # Set to True for SQL debugging
-    )
-    yield engine
-    await engine.dispose()
-
-
-@pytest.fixture
-async def session(engine) -> AsyncIterator[AsyncSession]:
-    """Provide an isolated database session with test tables created."""
-    # Create all test tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    # Create session factory
-    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-    async with factory() as session:
-        yield session
-
-
-@pytest.fixture
 def current_user() -> str:
     """Simulated current user for audit tracking."""
     return "test.user@example.com"
@@ -110,13 +84,13 @@ def admin_user() -> str:
 
 
 @pytest.mark.asyncio
-async def test_create_sets_created_by(session: AsyncSession, current_user: str) -> None:
+async def test_create_sets_created_by(db_session: AsyncSession, current_user: str) -> None:
     """Test that create() properly tracks who created the record."""
     repo = BaseRepository(AuditedDocument)
 
     doc = AuditedDocument(title="Test Document", created_by=current_user)
-    result = await repo.create(session, doc)
-    await session.commit()
+    result = await repo.create(db_session, doc)
+    await db_session.commit()
 
     assert result.id is not None
     assert result.created_by == current_user
@@ -126,14 +100,14 @@ async def test_create_sets_created_by(session: AsyncSession, current_user: str) 
 
 
 @pytest.mark.asyncio
-async def test_update_sets_updated_by(session: AsyncSession, current_user: str) -> None:
+async def test_update_sets_updated_by(db_session: AsyncSession, current_user: str) -> None:
     """Test that updates properly track who modified the record."""
     repo = BaseRepository(AuditedDocument)
 
     # Create document
     doc = AuditedDocument(title="Original", created_by=current_user)
-    doc = await repo.create(session, doc)
-    await session.commit()
+    doc = await repo.create(db_session, doc)
+    await db_session.commit()
 
     original_updated_at = doc.updated_at
 
@@ -145,10 +119,10 @@ async def test_update_sets_updated_by(session: AsyncSession, current_user: str) 
     # Update document with different user
     doc.title = "Updated"
     doc.updated_by = "updater@example.com"
-    session.add(doc)
-    await session.flush()
-    await session.refresh(doc)
-    await session.commit()
+    db_session.add(doc)
+    await db_session.flush()
+    await db_session.refresh(doc)
+    await db_session.commit()
 
     assert doc.created_by == current_user
     assert doc.updated_by == "updater@example.com"
@@ -157,15 +131,15 @@ async def test_update_sets_updated_by(session: AsyncSession, current_user: str) 
 
 @pytest.mark.asyncio
 async def test_complete_audit_trail_through_lifecycle(
-    session: AsyncSession, current_user: str, admin_user: str
+    db_session: AsyncSession, current_user: str, admin_user: str
 ) -> None:
     """Test complete audit trail: create -> update -> verify all fields."""
     repo = BaseRepository(AuditedDocument)
 
     # Create
     doc = AuditedDocument(title="Lifecycle Test", content="Initial", created_by=current_user)
-    doc = await repo.create(session, doc)
-    await session.commit()
+    doc = await repo.create(db_session, doc)
+    await db_session.commit()
 
     assert doc.created_by == current_user
     assert doc.updated_by is None
@@ -173,9 +147,9 @@ async def test_complete_audit_trail_through_lifecycle(
     # First update by same user
     doc.content = "First Update"
     doc.updated_by = current_user
-    session.add(doc)
-    await session.flush()
-    await session.refresh(doc)
+    db_session.add(doc)
+    await db_session.flush()
+    await db_session.refresh(doc)
 
     assert doc.created_by == current_user
     assert doc.updated_by == current_user
@@ -183,10 +157,10 @@ async def test_complete_audit_trail_through_lifecycle(
     # Second update by admin
     doc.content = "Admin Update"
     doc.updated_by = admin_user
-    session.add(doc)
-    await session.flush()
-    await session.refresh(doc)
-    await session.commit()
+    db_session.add(doc)
+    await db_session.flush()
+    await db_session.refresh(doc)
+    await db_session.commit()
 
     assert doc.created_by == current_user  # Creator never changes
     assert doc.updated_by == admin_user  # Last updater tracked
@@ -198,14 +172,14 @@ async def test_complete_audit_trail_through_lifecycle(
 
 
 @pytest.mark.asyncio
-async def test_soft_delete_via_update(session: AsyncSession, current_user: str) -> None:
+async def test_soft_delete_via_update(db_session: AsyncSession, current_user: str) -> None:
     """Test soft delete by setting deleted_at and deleted_by."""
     repo = BaseRepository(SoftDeletablePost)
 
     # Create post
     post = SoftDeletablePost(title="To Delete")
-    post = await repo.create(session, post)
-    await session.commit()
+    post = await repo.create(db_session, post)
+    await db_session.commit()
 
     assert not post.is_deleted
     assert post.deleted_at is None
@@ -214,10 +188,10 @@ async def test_soft_delete_via_update(session: AsyncSession, current_user: str) 
     # Soft delete
     post.deleted_at = datetime.now(UTC)
     post.deleted_by = current_user
-    session.add(post)
-    await session.flush()
-    await session.refresh(post)
-    await session.commit()
+    db_session.add(post)
+    await db_session.flush()
+    await db_session.refresh(post)
+    await db_session.commit()
 
     assert post.is_deleted
     assert post.deleted_at is not None
@@ -225,21 +199,21 @@ async def test_soft_delete_via_update(session: AsyncSession, current_user: str) 
 
 
 @pytest.mark.asyncio
-async def test_get_excludes_soft_deleted_by_default(session: AsyncSession) -> None:
+async def test_get_excludes_soft_deleted_by_default(db_session: AsyncSession) -> None:
     """Test that get() excludes soft-deleted records by default."""
     repo = BaseRepository(SoftDeletablePost)
 
     # Create and soft delete a post
     post = SoftDeletablePost(title="Deleted Post")
-    post = await repo.create(session, post)
+    post = await repo.create(db_session, post)
     post_id = post.id
-    await session.commit()
+    await db_session.commit()
 
     # Soft delete
     post.deleted_at = datetime.now(UTC)
     post.deleted_by = "system"
-    session.add(post)
-    await session.commit()
+    db_session.add(post)
+    await db_session.commit()
 
     # Query using repository - should apply soft delete filter
     # Note: BaseRepository.get() doesn't have include_deleted parameter
@@ -248,31 +222,31 @@ async def test_get_excludes_soft_deleted_by_default(session: AsyncSession) -> No
         SoftDeletablePost.id == post_id,
         SoftDeletablePost.deleted_at.is_(None),
     )
-    result = await session.execute(stmt)
+    result = await db_session.execute(stmt)
     found = result.scalar_one_or_none()
 
     assert found is None, "Soft-deleted record should not be found with filter"
 
 
 @pytest.mark.asyncio
-async def test_get_includes_soft_deleted_when_specified(session: AsyncSession) -> None:
+async def test_get_includes_soft_deleted_when_specified(db_session: AsyncSession) -> None:
     """Test that we can query soft-deleted records when explicitly included."""
     repo = BaseRepository(SoftDeletablePost)
 
     # Create and soft delete a post
     post = SoftDeletablePost(title="Deleted Post")
-    post = await repo.create(session, post)
+    post = await repo.create(db_session, post)
     post_id = post.id
-    await session.commit()
+    await db_session.commit()
 
     # Soft delete
     post.deleted_at = datetime.now(UTC)
     post.deleted_by = "system"
-    session.add(post)
-    await session.commit()
+    db_session.add(post)
+    await db_session.commit()
 
     # Query without soft delete filter - should find it
-    found = await repo.get(session, post_id)
+    found = await repo.get(db_session, post_id)
 
     assert found is not None
     assert found.is_deleted
@@ -280,7 +254,7 @@ async def test_get_includes_soft_deleted_when_specified(session: AsyncSession) -
 
 
 @pytest.mark.asyncio
-async def test_list_excludes_soft_deleted_by_default(session: AsyncSession) -> None:
+async def test_list_excludes_soft_deleted_by_default(db_session: AsyncSession) -> None:
     """Test that list() excludes soft-deleted records by default."""
     repo = BaseRepository(SoftDeletablePost)
 
@@ -289,20 +263,20 @@ async def test_list_excludes_soft_deleted_by_default(session: AsyncSession) -> N
     post2 = SoftDeletablePost(title="Deleted Post")
     post3 = SoftDeletablePost(title="Another Active")
 
-    await repo.create(session, post1)
-    await repo.create(session, post2)
-    await repo.create(session, post3)
-    await session.commit()
+    await repo.create(db_session, post1)
+    await repo.create(db_session, post2)
+    await repo.create(db_session, post3)
+    await db_session.commit()
 
     # Soft delete post2
     post2.deleted_at = datetime.now(UTC)
     post2.deleted_by = "system"
-    session.add(post2)
-    await session.commit()
+    db_session.add(post2)
+    await db_session.commit()
 
     # List with filter
     stmt = select(SoftDeletablePost).where(SoftDeletablePost.deleted_at.is_(None))
-    result = await session.execute(stmt)
+    result = await db_session.execute(stmt)
     posts = result.scalars().all()
 
     assert len(posts) == 2
@@ -311,7 +285,7 @@ async def test_list_excludes_soft_deleted_by_default(session: AsyncSession) -> N
 
 
 @pytest.mark.asyncio
-async def test_list_includes_all_with_soft_delete_included(session: AsyncSession) -> None:
+async def test_list_includes_all_with_soft_delete_included(db_session: AsyncSession) -> None:
     """Test that list() can include soft-deleted records when specified."""
     repo = BaseRepository(SoftDeletablePost)
 
@@ -319,46 +293,46 @@ async def test_list_includes_all_with_soft_delete_included(session: AsyncSession
     post1 = SoftDeletablePost(title="Active Post")
     post2 = SoftDeletablePost(title="Deleted Post")
 
-    await repo.create(session, post1)
-    await repo.create(session, post2)
-    await session.commit()
+    await repo.create(db_session, post1)
+    await repo.create(db_session, post2)
+    await db_session.commit()
 
     # Soft delete post2
     post2.deleted_at = datetime.now(UTC)
-    session.add(post2)
-    await session.commit()
+    db_session.add(post2)
+    await db_session.commit()
 
     # List without filter (all records)
-    posts = await repo.list(session, limit=100)
+    posts = await repo.list(db_session, limit=100)
 
     assert len(posts) == 2
 
 
 @pytest.mark.asyncio
-async def test_recovering_soft_deleted_record(session: AsyncSession, current_user: str) -> None:
+async def test_recovering_soft_deleted_record(db_session: AsyncSession, current_user: str) -> None:
     """Test recovering a soft-deleted record by clearing deleted_at."""
     repo = BaseRepository(SoftDeletablePost)
 
     # Create and soft delete
     post = SoftDeletablePost(title="Recoverable Post")
-    post = await repo.create(session, post)
+    post = await repo.create(db_session, post)
     post_id = post.id
-    await session.commit()
+    await db_session.commit()
 
     post.deleted_at = datetime.now(UTC)
     post.deleted_by = current_user
-    session.add(post)
-    await session.commit()
+    db_session.add(post)
+    await db_session.commit()
 
     assert post.is_deleted
 
     # Recover
     post.deleted_at = None
     post.deleted_by = None
-    session.add(post)
-    await session.flush()
-    await session.refresh(post)
-    await session.commit()
+    db_session.add(post)
+    await db_session.flush()
+    await db_session.refresh(post)
+    await db_session.commit()
 
     assert not post.is_deleted
     assert post.deleted_at is None
@@ -369,7 +343,7 @@ async def test_recovering_soft_deleted_record(session: AsyncSession, current_use
         SoftDeletablePost.id == post_id,
         SoftDeletablePost.deleted_at.is_(None),
     )
-    result = await session.execute(stmt)
+    result = await db_session.execute(stmt)
     found = result.scalar_one_or_none()
 
     assert found is not None
@@ -382,27 +356,27 @@ async def test_recovering_soft_deleted_record(session: AsyncSession, current_use
 
 
 @pytest.mark.asyncio
-async def test_offset_pagination_excludes_soft_deleted(session: AsyncSession) -> None:
+async def test_offset_pagination_excludes_soft_deleted(db_session: AsyncSession) -> None:
     """Test that offset pagination correctly excludes soft-deleted records."""
     repo = BaseRepository(SoftDeletablePost)
 
     # Create 10 posts
     for i in range(10):
         post = SoftDeletablePost(title=f"Post {i}")
-        await repo.create(session, post)
-    await session.commit()
+        await repo.create(db_session, post)
+    await db_session.commit()
 
     # Soft delete posts 2, 4, 6
-    posts = await repo.list(session, limit=100)
+    posts = await repo.list(db_session, limit=100)
     for i, post in enumerate(posts):
         if i in (2, 4, 6):
             post.deleted_at = datetime.now(UTC)
-            session.add(post)
-    await session.commit()
+            db_session.add(post)
+    await db_session.commit()
 
     # Query with soft delete filter
     stmt = select(SoftDeletablePost).where(SoftDeletablePost.deleted_at.is_(None))
-    result = await repo.search(session, stmt, limit=5, offset=0)
+    result = await repo.search(db_session, stmt, limit=5, offset=0)
 
     assert result.total == 7  # 10 - 3 deleted
     assert len(result.items) == 5
@@ -410,7 +384,7 @@ async def test_offset_pagination_excludes_soft_deleted(session: AsyncSession) ->
 
 
 @pytest.mark.asyncio
-async def test_cursor_pagination_excludes_soft_deleted(session: AsyncSession) -> None:
+async def test_cursor_pagination_excludes_soft_deleted(db_session: AsyncSession) -> None:
     """Test that cursor pagination correctly excludes soft-deleted records."""
     repo = BaseRepository(SoftDeletablePost)
 
@@ -419,19 +393,19 @@ async def test_cursor_pagination_excludes_soft_deleted(session: AsyncSession) ->
     for i in range(5):
         post = SoftDeletablePost(title=f"Post {i}")
         post.created_at = now + timedelta(seconds=i)
-        await repo.create(session, post)
-    await session.commit()
+        await repo.create(db_session, post)
+    await db_session.commit()
 
     # Soft delete post 2
-    posts = await repo.list(session, limit=100)
+    posts = await repo.list(db_session, limit=100)
     posts[2].deleted_at = datetime.now(UTC)
-    session.add(posts[2])
-    await session.commit()
+    db_session.add(posts[2])
+    await db_session.commit()
 
     # Cursor pagination with filter
     stmt = select(SoftDeletablePost).where(SoftDeletablePost.deleted_at.is_(None))
     result = await repo.paginate_cursor(
-        session,
+        db_session,
         stmt,
         first=3,
         order_by=[(SoftDeletablePost.created_at, "asc")],
@@ -443,26 +417,26 @@ async def test_cursor_pagination_excludes_soft_deleted(session: AsyncSession) ->
 
 
 @pytest.mark.asyncio
-async def test_pagination_counts_exclude_soft_deleted(session: AsyncSession) -> None:
+async def test_pagination_counts_exclude_soft_deleted(db_session: AsyncSession) -> None:
     """Test that pagination counts correctly exclude soft-deleted records."""
     repo = BaseRepository(SoftDeletablePost)
 
     # Create 20 posts
     for i in range(20):
         post = SoftDeletablePost(title=f"Post {i}")
-        await repo.create(session, post)
-    await session.commit()
+        await repo.create(db_session, post)
+    await db_session.commit()
 
     # Soft delete 5 posts
-    posts = await repo.list(session, limit=100)
+    posts = await repo.list(db_session, limit=100)
     for i in range(5):
         posts[i].deleted_at = datetime.now(UTC)
-        session.add(posts[i])
-    await session.commit()
+        db_session.add(posts[i])
+    await db_session.commit()
 
     # Search with filter
     stmt = select(SoftDeletablePost).where(SoftDeletablePost.deleted_at.is_(None))
-    result = await repo.search(session, stmt, limit=10, offset=0)
+    result = await repo.search(db_session, stmt, limit=10, offset=0)
 
     assert result.total == 15  # 20 - 5 deleted
     assert result.pages == 2  # 15 items / 10 per page
@@ -475,7 +449,7 @@ async def test_pagination_counts_exclude_soft_deleted(session: AsyncSession) -> 
 
 
 @pytest.mark.asyncio
-async def test_bulk_create_with_audit_fields(session: AsyncSession, current_user: str) -> None:
+async def test_bulk_create_with_audit_fields(db_session: AsyncSession, current_user: str) -> None:
     """Test bulk_create preserves audit fields.
 
     Note: bulk_create uses SQLAlchemy Core which bypasses ORM defaults,
@@ -496,27 +470,27 @@ async def test_bulk_create_with_audit_fields(session: AsyncSession, current_user
         for i in range(100)
     ]
 
-    count = await repo.bulk_create(session, docs, batch_size=25)
-    await session.commit()
+    count = await repo.bulk_create(db_session, docs, batch_size=25)
+    await db_session.commit()
 
     assert count == 100
 
     # Verify audit fields are preserved
-    all_docs = await repo.list(session, limit=100)
+    all_docs = await repo.list(db_session, limit=100)
     assert len(all_docs) == 100
     for doc in all_docs:
         assert doc.created_by == current_user
 
 
 @pytest.mark.asyncio
-async def test_create_many_with_audit_tracking(session: AsyncSession, current_user: str) -> None:
+async def test_create_many_with_audit_tracking(db_session: AsyncSession, current_user: str) -> None:
     """Test create_many preserves audit tracking and returns instances."""
     repo = BaseRepository(AuditedDocument)
 
     docs = [AuditedDocument(title=f"Doc {i}", created_by=current_user) for i in range(10)]
 
-    created = await repo.create_many(session, docs)
-    await session.commit()
+    created = await repo.create_many(db_session, docs)
+    await db_session.commit()
 
     assert len(created) == 10
     for doc in created:
@@ -526,37 +500,37 @@ async def test_create_many_with_audit_tracking(session: AsyncSession, current_us
 
 
 @pytest.mark.asyncio
-async def test_delete_many_for_soft_delete(session: AsyncSession) -> None:
+async def test_delete_many_for_soft_delete(db_session: AsyncSession) -> None:
     """Test delete_many for hard delete (note: soft delete should be done via update)."""
     repo = BaseRepository(SoftDeletablePost)
 
     # Create posts
     posts = [SoftDeletablePost(title=f"Post {i}") for i in range(5)]
-    created = await repo.create_many(session, posts)
-    await session.commit()
+    created = await repo.create_many(db_session, posts)
+    await db_session.commit()
 
     ids = [p.id for p in created]
 
     # Hard delete (not soft delete - for soft delete use update)
-    deleted_count = await repo.delete_many(session, ids[:3])
-    await session.commit()
+    deleted_count = await repo.delete_many(db_session, ids[:3])
+    await db_session.commit()
 
     assert deleted_count == 3
 
     # Verify remaining posts
-    remaining = await repo.list(session, limit=100)
+    remaining = await repo.list(db_session, limit=100)
     assert len(remaining) == 2
 
 
 @pytest.mark.asyncio
-async def test_upsert_with_audit_tracking(session: AsyncSession, current_user: str) -> None:
+async def test_upsert_with_audit_tracking(db_session: AsyncSession, current_user: str) -> None:
     """Test upsert_many preserves and updates audit tracking."""
     repo = BaseRepository(AuditedDocument)
 
     # Initial insert
     doc1 = AuditedDocument(title="Unique Doc 1", content="Original", created_by=current_user)
-    doc1 = await repo.create(session, doc1)
-    await session.commit()
+    doc1 = await repo.create(db_session, doc1)
+    await db_session.commit()
 
     # Upsert operation
     docs = [
@@ -570,22 +544,22 @@ async def test_upsert_with_audit_tracking(session: AsyncSession, current_user: s
     ]
 
     # Note: upsert requires PostgreSQL-specific syntax, but we can test the pattern
-    # For SQLite, we'll create directly
+    # Create directly
     for doc in docs:
-        existing = await repo.get_by(session, AuditedDocument.title, doc.title)
+        existing = await repo.get_by(db_session, AuditedDocument.title, doc.title)
         if existing:
             existing.content = doc.content
             existing.updated_by = doc.updated_by
-            session.add(existing)
+            db_session.add(existing)
         else:
-            await repo.create(session, doc)
-    await session.commit()
+            await repo.create(db_session, doc)
+    await db_session.commit()
 
     # Verify results
-    all_docs = await repo.list(session, limit=100)
+    all_docs = await repo.list(db_session, limit=100)
     assert len(all_docs) == 2
 
-    doc1_updated = await repo.get_by(session, AuditedDocument.title, "Unique Doc 1")
+    doc1_updated = await repo.get_by(db_session, AuditedDocument.title, "Unique Doc 1")
     assert doc1_updated is not None
     assert doc1_updated.content == "Updated"
     assert doc1_updated.updated_by == "updater@example.com"
@@ -598,15 +572,15 @@ async def test_upsert_with_audit_tracking(session: AsyncSession, current_user: s
 
 @pytest.mark.asyncio
 async def test_complete_lifecycle_create_update_soft_delete_recover(
-    session: AsyncSession, current_user: str, admin_user: str
+    db_session: AsyncSession, current_user: str, admin_user: str
 ) -> None:
     """Test complete lifecycle: create -> update -> soft delete -> recover."""
     repo = BaseRepository(FullAuditPost)
 
     # Step 1: Create
     post = FullAuditPost(title="Lifecycle Post", body="Initial content", created_by=current_user)
-    post = await repo.create(session, post)
-    await session.commit()
+    post = await repo.create(db_session, post)
+    await db_session.commit()
 
     assert post.created_by == current_user
     assert post.updated_by is None
@@ -615,10 +589,10 @@ async def test_complete_lifecycle_create_update_soft_delete_recover(
     # Step 2: Update
     post.body = "Updated content"
     post.updated_by = current_user
-    session.add(post)
-    await session.flush()
-    await session.refresh(post)
-    await session.commit()
+    db_session.add(post)
+    await db_session.flush()
+    await db_session.refresh(post)
+    await db_session.commit()
 
     assert post.updated_by == current_user
     assert not post.is_deleted
@@ -626,10 +600,10 @@ async def test_complete_lifecycle_create_update_soft_delete_recover(
     # Step 3: Soft Delete
     post.deleted_at = datetime.now(UTC)
     post.deleted_by = admin_user
-    session.add(post)
-    await session.flush()
-    await session.refresh(post)
-    await session.commit()
+    db_session.add(post)
+    await db_session.flush()
+    await db_session.refresh(post)
+    await db_session.commit()
 
     assert post.is_deleted
     assert post.deleted_by == admin_user
@@ -638,10 +612,10 @@ async def test_complete_lifecycle_create_update_soft_delete_recover(
     # Step 4: Recover
     post.deleted_at = None
     post.deleted_by = None
-    session.add(post)
-    await session.flush()
-    await session.refresh(post)
-    await session.commit()
+    db_session.add(post)
+    await db_session.flush()
+    await db_session.refresh(post)
+    await db_session.commit()
 
     assert not post.is_deleted
     assert post.created_by == current_user
@@ -649,7 +623,7 @@ async def test_complete_lifecycle_create_update_soft_delete_recover(
 
 
 @pytest.mark.asyncio
-async def test_querying_mixed_deleted_non_deleted_records(session: AsyncSession) -> None:
+async def test_querying_mixed_deleted_non_deleted_records(db_session: AsyncSession) -> None:
     """Test querying with a mix of deleted and non-deleted records."""
     repo = BaseRepository(FullAuditPost)
 
@@ -661,20 +635,20 @@ async def test_querying_mixed_deleted_non_deleted_records(session: AsyncSession)
             body=f"Content {i}",
             created_by=f"user{i}@example.com",
         )
-        post = await repo.create(session, post)
+        post = await repo.create(db_session, post)
         posts.append(post)
-    await session.commit()
+    await db_session.commit()
 
     # Soft delete alternating posts (0, 2, 4, 6, 8)
     for i in range(0, 10, 2):
         posts[i].deleted_at = datetime.now(UTC)
         posts[i].deleted_by = "admin@example.com"
-        session.add(posts[i])
-    await session.commit()
+        db_session.add(posts[i])
+    await db_session.commit()
 
     # Query active only
     stmt_active = select(FullAuditPost).where(FullAuditPost.deleted_at.is_(None))
-    result_active = await session.execute(stmt_active)
+    result_active = await db_session.execute(stmt_active)
     active_posts = result_active.scalars().all()
 
     assert len(active_posts) == 5
@@ -683,7 +657,7 @@ async def test_querying_mixed_deleted_non_deleted_records(session: AsyncSession)
 
     # Query deleted only
     stmt_deleted = select(FullAuditPost).where(FullAuditPost.deleted_at.is_not(None))
-    result_deleted = await session.execute(stmt_deleted)
+    result_deleted = await db_session.execute(stmt_deleted)
     deleted_posts = result_deleted.scalars().all()
 
     assert len(deleted_posts) == 5
@@ -692,24 +666,24 @@ async def test_querying_mixed_deleted_non_deleted_records(session: AsyncSession)
         assert post.deleted_by == "admin@example.com"
 
     # Query all (no filter)
-    all_posts = await repo.list(session, limit=100)
+    all_posts = await repo.list(db_session, limit=100)
     assert len(all_posts) == 10
 
 
 @pytest.mark.asyncio
 async def test_audit_trail_complete_at_each_step(
-    session: AsyncSession, current_user: str, admin_user: str
+    db_session: AsyncSession, current_user: str, admin_user: str
 ) -> None:
     """Verify audit trail is complete and accurate at every lifecycle step."""
     repo = BaseRepository(FullAuditPost)
 
     # Create
     post = FullAuditPost(title="Audit Test", body="Initial", created_by=current_user)
-    post = await repo.create(session, post)
-    await session.commit()
+    post = await repo.create(db_session, post)
+    await db_session.commit()
 
     # Audit check after create
-    retrieved = await repo.get(session, post.id)
+    retrieved = await repo.get(db_session, post.id)
     assert retrieved is not None
     assert retrieved.created_by == current_user
     assert retrieved.updated_by is None
@@ -721,13 +695,13 @@ async def test_audit_trail_complete_at_each_step(
     # Update
     post.body = "Modified"
     post.updated_by = admin_user
-    session.add(post)
-    await session.flush()
-    await session.refresh(post)
-    await session.commit()
+    db_session.add(post)
+    await db_session.flush()
+    await db_session.refresh(post)
+    await db_session.commit()
 
     # Audit check after update
-    retrieved = await repo.get(session, post.id)
+    retrieved = await repo.get(db_session, post.id)
     assert retrieved is not None
     assert retrieved.created_by == current_user  # Unchanged
     assert retrieved.updated_by == admin_user  # Updated
@@ -737,13 +711,13 @@ async def test_audit_trail_complete_at_each_step(
     # Soft delete
     post.deleted_at = datetime.now(UTC)
     post.deleted_by = admin_user
-    session.add(post)
-    await session.flush()
-    await session.refresh(post)
-    await session.commit()
+    db_session.add(post)
+    await db_session.flush()
+    await db_session.refresh(post)
+    await db_session.commit()
 
     # Audit check after soft delete
-    retrieved = await repo.get(session, post.id)
+    retrieved = await repo.get(db_session, post.id)
     assert retrieved is not None
     assert retrieved.created_by == current_user  # Unchanged
     assert retrieved.updated_by == admin_user  # Unchanged
@@ -754,7 +728,7 @@ async def test_audit_trail_complete_at_each_step(
 
 @pytest.mark.asyncio
 async def test_bulk_operations_preserve_audit_integrity(
-    session: AsyncSession, current_user: str
+    db_session: AsyncSession, current_user: str
 ) -> None:
     """Test that bulk operations maintain audit trail integrity.
 
@@ -777,13 +751,13 @@ async def test_bulk_operations_preserve_audit_integrity(
         for i in range(50)
     ]
 
-    count = await repo.bulk_create(session, posts, batch_size=10)
-    await session.commit()
+    count = await repo.bulk_create(db_session, posts, batch_size=10)
+    await db_session.commit()
 
     assert count == 50
 
     # Verify all have audit fields
-    all_posts = await repo.list(session, limit=100)
+    all_posts = await repo.list(db_session, limit=100)
     assert len(all_posts) == 50
 
     for post in all_posts:
@@ -798,21 +772,21 @@ async def test_bulk_operations_preserve_audit_integrity(
         post.deleted_at = now
         post.deleted_by = "bulk.admin@example.com"
 
-    updated = await repo.update_many(session, posts_to_delete)
-    await session.commit()
+    updated = await repo.update_many(db_session, posts_to_delete)
+    await db_session.commit()
 
     assert len(updated) == 20
 
     # Verify soft delete was applied
     stmt_active = select(FullAuditPost).where(FullAuditPost.deleted_at.is_(None))
-    result = await session.execute(stmt_active)
+    result = await db_session.execute(stmt_active)
     active_posts = result.scalars().all()
 
     assert len(active_posts) == 30
 
     # Verify deleted have correct audit info
     stmt_deleted = select(FullAuditPost).where(FullAuditPost.deleted_at.is_not(None))
-    result = await session.execute(stmt_deleted)
+    result = await db_session.execute(stmt_deleted)
     deleted_posts = result.scalars().all()
 
     assert len(deleted_posts) == 20
