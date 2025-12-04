@@ -1,8 +1,8 @@
 """Configuration management commands."""
 
 import json
-import sys
 from pathlib import Path
+import sys
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
@@ -302,90 +302,71 @@ def generate_env(output: str, overwrite: bool) -> None:
 
     info(f"Generating environment template: {output}")
 
-    env_template = """# Example Service Environment Configuration
-# Copy this file to .env and fill in your values
-
-# ============================================================================
-# APPLICATION SETTINGS
-# ============================================================================
-APP_SERVICE_NAME=example-service
-APP_ENVIRONMENT=development
-APP_DEBUG=true
-APP_HOST=0.0.0.0
-APP_PORT=8000
-APP_API_PREFIX=/api/v1
-APP_CORS_ORIGINS=["http://localhost:3000"]
-
-# ============================================================================
-# DATABASE SETTINGS (PostgreSQL)
-# ============================================================================
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=your_secure_password_here
-DB_NAME=example_service
-DB_POOL_SIZE=20
-DB_MAX_OVERFLOW=10
-DB_POOL_TIMEOUT=30.0
-DB_POOL_RECYCLE=3600
-DB_ECHO=false
-
-# ============================================================================
-# CACHE SETTINGS (Redis)
-# ============================================================================
-REDIS_URL=redis://localhost:6379/0
-REDIS_KEY_PREFIX=example_service:
-REDIS_TTL=3600
-REDIS_MAX_CONNECTIONS=50
-REDIS_SOCKET_TIMEOUT=5.0
-
-# ============================================================================
-# MESSAGE BROKER SETTINGS (RabbitMQ)
-# ============================================================================
-RABBIT_URL=amqp://guest:guest@localhost:5672/
-RABBIT_QUEUE_NAME=example_service_queue
-RABBIT_EXCHANGE=example_service_exchange
-RABBIT_ROUTING_KEY=example_service
-RABBIT_MAX_CONSUMERS=10
-
-# ============================================================================
-# AUTHENTICATION SETTINGS
-# ============================================================================
-AUTH_SECRET_KEY=your-secret-key-min-32-characters-long-change-this-in-production
-AUTH_ALGORITHM=HS256
-AUTH_ACCESS_TOKEN_EXPIRE_MINUTES=30
-
-# ============================================================================
-# LOGGING SETTINGS
-# ============================================================================
-LOG_LEVEL=INFO
-LOG_FORMAT=json
-LOG_JSON_LOGS=true
-
-# ============================================================================
-# OPENTELEMETRY SETTINGS
-# ============================================================================
-OTEL_ENABLED=false
-OTEL_SERVICE_NAME=example-service
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
-OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-OTEL_TRACES_SAMPLER=always_on
-OTEL_TRACES_EXPORTER=otlp
-
-# ============================================================================
-# TESTING OVERRIDES (optional)
-# ============================================================================
-# TESTING=true
-# TEST_DB_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
-"""
-
     try:
-        output_path.write_text(env_template)
+        # Extract defaults from settings classes
+        defaults = _extract_defaults_from_settings()
+
+        # Build .env content with sections
+        lines = [
+            "# Example Service Environment Configuration",
+            "# Copy this file to .env and fill in your values",
+            "",
+        ]
+
+        # Helper to add a section
+        def add_section(title: str, prefix: str, header_comments: list[str] | None = None) -> None:
+            lines.append("# " + "=" * 76)
+            lines.append(f"# {title}")
+            lines.append("# " + "=" * 76)
+
+            # Add header comments if provided
+            if header_comments:
+                for comment in header_comments:
+                    lines.append(f"# {comment}")
+                lines.append("")
+
+            # Get all env vars with this prefix
+            section_vars = {k: v[1] for k, v in defaults.items() if v[0] == prefix}
+
+            # Sort by name for consistent ordering
+            for var_name in sorted(section_vars.keys()):
+                value = section_vars[var_name]
+                lines.append(f"{var_name}={value}")
+
+            lines.append("")
+
+        # Add sections for each settings domain
+        add_section("APPLICATION SETTINGS", "APP_")
+        add_section(
+            "DATABASE SETTINGS (PostgreSQL)",
+            "DB_",
+            header_comments=[
+                "Option 1: Use DATABASE_URL (highest priority, recommended for production)",
+                "DATABASE_URL=postgresql+psycopg://user:password@host:port/dbname",
+                "",
+                "Option 2: Use individual DB_* variables below (fallback if DATABASE_URL not set)",
+            ],
+        )
+        add_section("CACHE SETTINGS (Redis)", "REDIS_")
+        add_section("MESSAGE BROKER SETTINGS (RabbitMQ)", "RABBIT_")
+        add_section("AUTHENTICATION SETTINGS", "AUTH_")
+        add_section("LOGGING SETTINGS", "LOG_")
+        add_section("OPENTELEMETRY SETTINGS", "OTEL_")
+        add_section("BACKUP SETTINGS", "BACKUP_")
+
+        # Write to file
+        env_content = "\n".join(lines)
+        output_path.write_text(env_content)
+
         success(f"Environment template created: {output}")
+        info(f"Total variables: {len(defaults)}")
         info("Copy this file to .env and update with your values")
 
     except Exception as e:
         error(f"Failed to generate environment template: {e}")
+        import traceback
+
+        traceback.print_exc()
         sys.exit(1)
 
 
@@ -428,10 +409,16 @@ def generate_env_with_defaults(output: str, overwrite: bool) -> None:
         ]
 
         # Helper to add a section
-        def add_section(title: str, prefix: str) -> None:
+        def add_section(title: str, prefix: str, header_comments: list[str] | None = None) -> None:
             lines.append("# " + "=" * 76)
             lines.append(f"# {title}")
             lines.append("# " + "=" * 76)
+
+            # Add header comments if provided
+            if header_comments:
+                for comment in header_comments:
+                    lines.append(f"# {comment}")
+                lines.append("")
 
             # Get all env vars with this prefix
             section_vars = {k: v[1] for k, v in defaults.items() if v[0] == prefix}
@@ -445,7 +432,16 @@ def generate_env_with_defaults(output: str, overwrite: bool) -> None:
 
         # Add sections for each settings domain
         add_section("APPLICATION SETTINGS", "APP_")
-        add_section("DATABASE SETTINGS (PostgreSQL)", "DB_")
+        add_section(
+            "DATABASE SETTINGS (PostgreSQL)",
+            "DB_",
+            header_comments=[
+                "Option 1: Use DATABASE_URL (highest priority, recommended for production)",
+                "DATABASE_URL=postgresql+psycopg://user:password@host:port/dbname",
+                "",
+                "Option 2: Use individual DB_* variables below (fallback if DATABASE_URL not set)",
+            ],
+        )
         add_section("CACHE SETTINGS (Redis)", "REDIS_")
         add_section("MESSAGE BROKER SETTINGS (RabbitMQ)", "RABBIT_")
         add_section("AUTHENTICATION SETTINGS", "AUTH_")
@@ -531,6 +527,7 @@ def show_env(show_all: bool, filter_prefix: str | None) -> None:
             "APP_API_PREFIX",
         ],
         "Database": [
+            "DATABASE_URL",
             "DB_HOST",
             "DB_PORT",
             "DB_USER",
@@ -628,15 +625,32 @@ def check_env() -> None:
 
     header("Environment Check")
 
+    # Check if DATABASE_URL is set (alternative to individual DB_* vars)
+    database_url = os.environ.get("DATABASE_URL")
+
     # Required variables (must be set)
-    required = [
-        "DB_HOST",
-        "DB_PORT",
-        "DB_USER",
-        "DB_PASSWORD",
-        "DB_NAME",
-        "AUTH_SECRET_KEY",
-    ]
+    # If DATABASE_URL is set, individual DB_* vars are optional
+    if database_url:
+        required = [
+            "AUTH_SECRET_KEY",
+        ]
+        db_vars_optional = [
+            "DB_HOST",
+            "DB_PORT",
+            "DB_USER",
+            "DB_PASSWORD",
+            "DB_NAME",
+        ]
+    else:
+        required = [
+            "DB_HOST",
+            "DB_PORT",
+            "DB_USER",
+            "DB_PASSWORD",
+            "DB_NAME",
+            "AUTH_SECRET_KEY",
+        ]
+        db_vars_optional = []
 
     # Optional but recommended
     recommended = [
@@ -648,6 +662,14 @@ def check_env() -> None:
     errors_list = []
     warnings_list = []
 
+    # Show DATABASE_URL status if set
+    if database_url:
+        section("Database Configuration")
+        click.echo(f"  {click.style('OK', fg='green')} DATABASE_URL (using URL format)")
+        click.echo(
+            f"  {click.style('INFO', fg='blue')} Individual DB_* variables are optional when DATABASE_URL is set"
+        )
+
     section("Required Variables")
     for var in required:
         value = os.environ.get(var)
@@ -656,6 +678,18 @@ def check_env() -> None:
         else:
             click.echo(f"  {click.style('MISSING', fg='red')} {var}")
             errors_list.append(var)
+
+    # Show optional DB vars if DATABASE_URL is set
+    if db_vars_optional:
+        section("Optional Database Variables (DATABASE_URL takes precedence)")
+        for var in db_vars_optional:
+            value = os.environ.get(var)
+            if value:
+                click.echo(
+                    f"  {click.style('SET', fg='yellow')} {var} (ignored, DATABASE_URL is used)"
+                )
+            else:
+                click.echo(f"  {click.style('--', fg='white', dim=True)} {var} (not needed)")
 
     section("Recommended Variables")
     for var in recommended:

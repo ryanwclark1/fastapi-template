@@ -317,7 +317,6 @@ select = [
 ]
 ignore = [
     "E501",    # line too long (handled by formatter)
-    "S101",    # assert usage - allowed in tests (handled per-file)
     "S104",    # possible binding to all interfaces - intentional for dev
     "S105",    # hardcoded password - false positives with variable names
     "S106",    # hardcoded password in function argument - false positives

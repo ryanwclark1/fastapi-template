@@ -7,15 +7,26 @@ Enhanced with:
 - Object filtering to exclude system tables
 - Empty migration detection to skip no-op revisions
 - Configurable via AlembicCommandConfig attributes
+- Dynamic model discovery (auto-imports all .models modules)
+- Environment variable URL handling (DATABASE_URL or DB_* vars)
 
 When using programmatic API (AlembicCommands), configuration is passed via
 config.attributes. When using CLI, defaults are used.
+
+Database URL priority:
+1. DATABASE_URL environment variable
+2. DB_* environment variables (via settings)
+3. sqlalchemy.url from alembic.ini
 """
 
 from __future__ import annotations
 
 import asyncio
+import importlib
+import logging
 from logging.config import fileConfig
+import os
+import pkgutil
 from typing import TYPE_CHECKING, Any
 
 # Import alembic-postgresql-enum to enable automatic enum autogeneration
@@ -24,6 +35,9 @@ from sqlalchemy import Column, pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
+
+# Import example_service package for dynamic model discovery
+import example_service
 
 # Import the models package so Base.metadata is aware of all mapped classes.
 # The package handles recursively loading feature-level models.
@@ -37,6 +51,8 @@ from example_service.core.settings import get_db_settings
 # Import job system models for Alembic auto-generation
 # These are in infra/tasks/jobs/ not features/, so need explicit import
 from example_service.infra.tasks.jobs import models as job_models
+
+logger = logging.getLogger("alembic.env")
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -57,11 +73,113 @@ if config.config_file_name is not None:
 # Target metadata for autogenerate
 target_metadata = Base.metadata
 
-# Override URL from settings (CLI usage)
-db_settings = get_db_settings()
-if db_settings.is_configured:
-    config.set_main_option("sqlalchemy.url", db_settings.get_sqlalchemy_url())
+# =============================================================================
+# Database URL Configuration
+# =============================================================================
 
+
+def get_database_url() -> str | None:
+    """Get database URL from environment variables or config.
+
+    Priority order:
+    1. DATABASE_URL environment variable
+    2. DB_* environment variables (via get_db_settings)
+    3. sqlalchemy.url from alembic.ini
+
+    Returns:
+        Database connection URL or None if not configured
+    """
+    # Check for full DATABASE_URL (highest priority)
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        # Convert postgresql:// to postgresql+psycopg:// if needed for async
+        if database_url.startswith("postgresql://"):
+            database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+        return database_url
+
+    # Fall back to settings system (uses DB_* env vars)
+    try:
+        db_settings = get_db_settings()
+        if db_settings.is_configured:
+            return db_settings.get_sqlalchemy_url()
+    except Exception as exc:
+        logger.debug("Could not load database settings: %s", exc)
+
+    # Last resort: use alembic.ini
+    return config.get_main_option("sqlalchemy.url")
+
+
+# Override URL from environment or settings (CLI usage)
+if not config.get_main_option("sqlalchemy.url"):
+    db_url = get_database_url()
+    if db_url:
+        config.set_main_option("sqlalchemy.url", db_url)
+
+
+# =============================================================================
+# Dynamic Model Discovery
+# =============================================================================
+
+
+def _should_import(module_name: str) -> bool:
+    """Return True if module likely defines SQLAlchemy models.
+
+    Args:
+        module_name: Full module path to check
+
+    Returns:
+        True if module should be imported for model discovery
+    """
+    return (
+        module_name.endswith(".models")
+        or module_name.endswith(".model")
+        or ".models." in module_name
+        or ".model." in module_name
+    )
+
+
+def _import_all_models() -> None:
+    """Import all example_service modules that likely contain SQLAlchemy models.
+
+    Walks the package tree and imports all modules matching model patterns.
+    This ensures all models are registered with Base.metadata for autogenerate.
+
+    Handles missing dependencies gracefully (logs debug message instead of failing).
+    """
+    if not hasattr(example_service, "__path__"):
+        logger.debug("example_service package has no __path__, skipping dynamic model discovery")
+        return
+
+    for _, module_name, _ in pkgutil.walk_packages(
+        example_service.__path__,
+        example_service.__name__ + ".",
+    ):
+        if not _should_import(module_name):
+            continue
+        try:
+            importlib.import_module(module_name)
+            logger.debug("Imported model module: %s", module_name)
+        except ModuleNotFoundError as exc:
+            # Only raise if it's a core example_service dependency
+            if exc.name and exc.name.startswith("example_service"):
+                raise
+            logger.debug(
+                "Skipping module %s during Alembic import; missing dependency %s",
+                module_name,
+                exc.name,
+            )
+        except Exception as exc:
+            # Log but don't fail on other import errors (e.g., missing optional deps)
+            logger.debug(
+                "Skipping module %s during Alembic import; error: %s",
+                module_name,
+                exc,
+            )
+
+
+# Run dynamic model discovery after explicit imports
+# This ensures we catch any models not explicitly imported above
+_import_all_models()
 
 # =============================================================================
 # Configuration Helpers
@@ -367,7 +485,9 @@ def process_revision_directives(
 
         # Add FTSMigrationHelper import to the migration
         if script.imports:
-            script.imports.add("from example_service.core.database.search.utils import FTSMigrationHelper")
+            script.imports.add(
+                "from example_service.core.database.search.utils import FTSMigrationHelper"
+            )
 
         # Store FTS models in script for template access
         # This will be used by a custom migration template
