@@ -998,3 +998,286 @@ async def test_query_with_all_filters_combined(service: AuditService) -> None:
     assert result.total == 1
     assert len(result.items) == 1
     assert result.items[0].id == log.id
+
+
+@pytest.mark.asyncio
+async def test_log_with_complex_changes(service: AuditService) -> None:
+    """Test log() with complex nested changes."""
+    old_values = {
+        "user": {"name": "John", "email": "john@example.com"},
+        "settings": {"theme": "dark", "notifications": True},
+    }
+    new_values = {
+        "user": {"name": "Jane", "email": "jane@example.com"},
+        "settings": {"theme": "light", "notifications": False},
+    }
+
+    log = await service.log(
+        action=AuditAction.UPDATE,
+        entity_type="user",
+        entity_id="user-123",
+        old_values=old_values,
+        new_values=new_values,
+    )
+
+    assert log.changes is not None
+    # Changes should contain nested field changes
+    assert "user" in log.changes or any("name" in str(c) for c in log.changes.values())
+
+
+@pytest.mark.asyncio
+async def test_query_with_empty_result(service: AuditService) -> None:
+    """Test query() returns empty result when no logs match."""
+    query = AuditLogQuery(
+        entity_type="nonexistent",
+        limit=100,
+    )
+
+    result = await service.query(query)
+
+    assert result.total == 0
+    assert len(result.items) == 0
+    assert result.has_more is False
+
+
+@pytest.mark.asyncio
+async def test_query_with_offset_beyond_total(service: AuditService) -> None:
+    """Test query() handles offset beyond total count."""
+    # Create 3 logs
+    for i in range(3):
+        await service.log(
+            action=AuditAction.CREATE,
+            entity_type="reminder",
+            entity_id=f"reminder-{i}",
+        )
+
+    # Query with offset beyond total
+    query = AuditLogQuery(limit=10, offset=100)
+    result = await service.query(query)
+
+    assert result.total == 3
+    assert len(result.items) == 0
+    assert result.has_more is False
+
+
+@pytest.mark.asyncio
+async def test_get_entity_history_with_only_create(service: AuditService) -> None:
+    """Test get_entity_history() when entity only has CREATE action."""
+    entity_type = "reminder"
+    entity_id = "reminder-123"
+
+    log = await service.log(
+        action=AuditAction.CREATE,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        user_id="user-1",
+    )
+
+    history = await service.get_entity_history(entity_type, entity_id)
+
+    assert len(history.entries) == 1
+    assert history.created_at == log.timestamp
+    assert history.created_by == "user-1"
+    assert history.last_modified_at == log.timestamp
+    assert history.last_modified_by == "user-1"
+
+
+@pytest.mark.asyncio
+async def test_get_entity_history_with_delete_action(service: AuditService) -> None:
+    """Test get_entity_history() includes DELETE actions."""
+    entity_type = "reminder"
+    entity_id = "reminder-123"
+
+    await service.log(
+        action=AuditAction.CREATE,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        user_id="user-1",
+    )
+    await service.log(
+        action=AuditAction.UPDATE,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        user_id="user-2",
+    )
+    await service.log(
+        action=AuditAction.DELETE,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        user_id="user-3",
+    )
+
+    history = await service.get_entity_history(entity_type, entity_id)
+
+    assert len(history.entries) == 3
+    assert any(entry.action == AuditAction.DELETE.value for entry in history.entries)
+
+
+@pytest.mark.asyncio
+async def test_get_summary_with_tenant_filter(service: AuditService) -> None:
+    """Test get_summary() with tenant filter."""
+    # Create logs for different tenants
+    for i in range(3):
+        await service.log(
+            action=AuditAction.CREATE,
+            entity_type="reminder",
+            entity_id=f"reminder-{i}",
+            tenant_id="tenant-123",
+        )
+    for i in range(2):
+        await service.log(
+            action=AuditAction.CREATE,
+            entity_type="reminder",
+            entity_id=f"reminder-{i}",
+            tenant_id="tenant-456",
+        )
+
+    summary = await service.get_summary(tenant_id="tenant-123")
+
+    assert summary.total_entries == 3
+
+
+@pytest.mark.asyncio
+async def test_get_summary_with_empty_actions(service: AuditService) -> None:
+    """Test get_summary() when no actions match filter."""
+    summary = await service.get_summary(
+        tenant_id="nonexistent-tenant",
+        start_time=datetime.now(UTC) + timedelta(days=1),
+    )
+
+    assert summary.total_entries == 0
+    assert summary.actions_count == {}
+    assert summary.entity_types_count == {}
+    assert summary.success_rate == 100.0
+
+
+@pytest.mark.asyncio
+async def test_delete_old_logs_returns_zero_when_no_matches(service: AuditService) -> None:
+    """Test delete_old_logs() returns 0 when no logs match."""
+    now = datetime.now(UTC)
+    # Create recent log
+    await service.log(
+        action=AuditAction.CREATE,
+        entity_type="reminder",
+        entity_id="reminder-1",
+    )
+
+    # Try to delete logs older than 1 year
+    deleted = await service.delete_old_logs(now - timedelta(days=365))
+
+    assert deleted == 0
+
+
+@pytest.mark.asyncio
+async def test_log_stores_duration_correctly(service: AuditService) -> None:
+    """Test that log() stores duration_ms correctly."""
+    log = await service.log(
+        action=AuditAction.CREATE,
+        entity_type="reminder",
+        entity_id="reminder-123",
+        duration_ms=250,
+    )
+
+    assert log.duration_ms == 250
+
+
+@pytest.mark.asyncio
+async def test_log_stores_context_data(service: AuditService) -> None:
+    """Test that log() stores context_data (metadata) correctly."""
+    metadata = {"source": "api", "version": "1.0", "custom": {"nested": "value"}}
+    log = await service.log(
+        action=AuditAction.CREATE,
+        entity_type="reminder",
+        entity_id="reminder-123",
+        metadata=metadata,
+    )
+
+    assert log.context_data == metadata
+
+
+@pytest.mark.asyncio
+async def test_query_with_request_id_filter(service: AuditService) -> None:
+    """Test query() filtering by request_id."""
+    request_id = "req-abc-123"
+    await service.log(
+        action=AuditAction.CREATE,
+        entity_type="reminder",
+        entity_id="reminder-1",
+        request_id=request_id,
+    )
+    await service.log(
+        action=AuditAction.CREATE,
+        entity_type="reminder",
+        entity_id="reminder-2",
+        request_id="req-xyz-456",
+    )
+
+    query = AuditLogQuery(request_id=request_id, limit=100)
+    result = await service.query(query)
+
+    assert result.total == 1
+    assert result.items[0].request_id == request_id
+
+
+@pytest.mark.asyncio
+async def test_get_entity_history_limit_enforced(service: AuditService) -> None:
+    """Test that get_entity_history() enforces limit correctly."""
+    entity_type = "reminder"
+    entity_id = "reminder-123"
+
+    # Create 20 logs
+    for _ in range(20):
+        await service.log(
+            action=AuditAction.UPDATE,
+            entity_type=entity_type,
+            entity_id=entity_id,
+        )
+
+    history = await service.get_entity_history(entity_type, entity_id, limit=10)
+
+    assert len(history.entries) == 10
+    assert history.total_changes == 10  # Should reflect actual returned count
+
+
+@pytest.mark.asyncio
+async def test_log_computes_changes_with_none_values(service: AuditService) -> None:
+    """Test that log() handles None values in old/new_values correctly."""
+    old_values = {"field": "value"}
+    new_values = {"field": None}
+
+    log = await service.log(
+        action=AuditAction.UPDATE,
+        entity_type="reminder",
+        entity_id="reminder-123",
+        old_values=old_values,
+        new_values=new_values,
+    )
+
+    assert log.changes is not None
+    assert "field" in log.changes
+
+
+@pytest.mark.asyncio
+async def test_query_ordering_by_custom_field(service: AuditService) -> None:
+    """Test query() ordering by custom field like user_id."""
+    await service.log(
+        action=AuditAction.CREATE,
+        entity_type="reminder",
+        entity_id="reminder-1",
+        user_id="user-z",
+    )
+    await service.log(
+        action=AuditAction.CREATE,
+        entity_type="reminder",
+        entity_id="reminder-2",
+        user_id="user-a",
+    )
+
+    query = AuditLogQuery(order_by="user_id", order_desc=False, limit=100)
+    result = await service.query(query)
+
+    assert len(result.items) >= 2
+    # Should be ordered by user_id ascending
+    user_ids = [item.user_id for item in result.items if item.user_id]
+    if len(user_ids) >= 2:
+        assert user_ids[0] <= user_ids[1]

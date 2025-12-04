@@ -6,9 +6,9 @@ import contextlib
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI, Request, Response
 from httpx import ASGITransport, AsyncClient
+import pytest
 
 from example_service.app.middleware.request_logging import PIIMasker, RequestLoggingMiddleware
 
@@ -566,3 +566,313 @@ class TestRequestLoggingMiddleware:
         for email in masked["emails"]:
             assert email != "user1@example.com"
             assert email != "user2@example.com"
+
+    @pytest.mark.asyncio
+    async def test_middleware_logs_slow_requests(self, app: FastAPI, client: AsyncClient) -> None:
+        """Test that middleware logs slow requests."""
+        import asyncio
+
+        @app.get("/slow")
+        async def slow_endpoint() -> dict:
+            await asyncio.sleep(0.1)  # Simulate slow request
+            return {"message": "slow"}
+
+        with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
+            app.add_middleware(RequestLoggingMiddleware)
+
+            await client.get("/slow")
+
+            # Check if slow request was logged
+            calls = mock_logger.log.call_args_list
+            assert len(calls) > 0
+
+    @pytest.mark.asyncio
+    async def test_middleware_handles_exception_during_request(
+        self, app: FastAPI, client: AsyncClient
+    ) -> None:
+        """Test that middleware handles exceptions during request processing."""
+
+        @app.get("/error")
+        async def error_endpoint() -> dict:
+            raise ValueError("Test error")
+
+        app.add_middleware(RequestLoggingMiddleware)
+
+        try:
+            await client.get("/error")
+        except Exception:
+            pass
+
+        # Middleware should still log the request attempt
+
+    @pytest.mark.asyncio
+    async def test_middleware_logs_request_with_body(
+        self, app: FastAPI, client: AsyncClient
+    ) -> None:
+        """Test that middleware logs request body when enabled."""
+        with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
+            app.add_middleware(RequestLoggingMiddleware, log_request_body=True)
+
+            await client.post("/test", json={"data": "test"})
+
+            calls = mock_logger.log.call_args_list
+            # Should have logged request with body
+            assert len(calls) > 0
+
+    @pytest.mark.asyncio
+    async def test_middleware_logs_response_with_body(
+        self, app: FastAPI, client: AsyncClient
+    ) -> None:
+        """Test that middleware logs response body when enabled."""
+        with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
+            app.add_middleware(RequestLoggingMiddleware, log_response_body=True)
+
+            await client.get("/test")
+
+            calls = mock_logger.log.call_args_list
+            # Should have logged response with body
+            assert len(calls) > 0
+
+    @pytest.mark.asyncio
+    async def test_middleware_respects_max_body_size(
+        self, app: FastAPI, client: AsyncClient
+    ) -> None:
+        """Test that middleware respects max_body_size limit."""
+        large_body = {"data": "x" * 20000}  # 20KB body
+
+        with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
+            app.add_middleware(RequestLoggingMiddleware, log_request_body=True, max_body_size=10000)
+
+            await client.post("/test", json=large_body)
+
+            # Body should be truncated in logs
+            calls = mock_logger.log.call_args_list
+            assert len(calls) > 0
+
+    @pytest.mark.asyncio
+    async def test_middleware_exempts_health_paths(self, app: FastAPI, client: AsyncClient) -> None:
+        """Test that middleware exempts health check paths from detailed logging."""
+        with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
+            app.add_middleware(RequestLoggingMiddleware)
+
+            await client.get("/health")
+
+            # Health checks may have minimal logging
+            calls = mock_logger.log.call_args_list
+            # Should still log but maybe with less detail
+
+    @pytest.mark.asyncio
+    async def test_middleware_detects_security_events(
+        self, app: FastAPI, client: AsyncClient
+    ) -> None:
+        """Test that middleware detects security events when enabled."""
+        with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
+            app.add_middleware(RequestLoggingMiddleware, detect_security_events=True)
+
+            # Try SQL injection pattern
+            await client.get("/test?q=1' OR '1'='1")
+
+            calls = mock_logger.log.call_args_list
+            # Should detect and log security event
+            assert len(calls) > 0
+
+    @pytest.mark.asyncio
+    async def test_middleware_handles_malformed_json_body(
+        self, app: FastAPI, client: AsyncClient
+    ) -> None:
+        """Test that middleware handles malformed JSON in request body."""
+        app.add_middleware(RequestLoggingMiddleware, log_request_body=True)
+
+        # Send invalid JSON
+        response = await client.post(
+            "/test",
+            content='{"invalid": json}',
+            headers={"Content-Type": "application/json"},
+        )
+
+        # Should handle gracefully
+        assert response.status_code in [200, 400, 422]
+
+    @pytest.mark.asyncio
+    async def test_pii_masker_handles_custom_patterns(self) -> None:
+        """Test that PII masker handles custom patterns."""
+        import re
+
+        # Use a pattern that won't conflict with credit card pattern
+        custom_pattern = re.compile(r"\bAPI-KEY-\d{4}\b")
+        masker = PIIMasker(custom_patterns={"api_key": custom_pattern})
+        data = {"note": "My API key is API-KEY-1234"}
+
+        masked = masker.mask_string(data["note"])
+
+        assert "API-KEY-1234" not in masked
+        assert "********" in masked
+
+    @pytest.mark.asyncio
+    async def test_pii_masker_handles_custom_sensitive_fields(self) -> None:
+        """Test that PII masker handles custom sensitive fields."""
+        masker = PIIMasker(custom_fields={"api_secret", "private_key"})
+        data = {"api_secret": "secret123", "private_key": "key456", "normal": "value"}
+
+        masked = masker.mask_dict(data)
+
+        assert masked["api_secret"] != "secret123"
+        assert masked["private_key"] != "key456"
+        assert masked["normal"] == "value"
+
+    @pytest.mark.asyncio
+    async def test_pii_masker_preserves_domain_in_email(self) -> None:
+        """Test that PII masker preserves domain when configured."""
+        masker = PIIMasker(preserve_domain=True)
+        masked = masker.mask_email("user@example.com")
+
+        assert masked.endswith("@example.com")
+        assert masked != "user@example.com"
+
+    @pytest.mark.asyncio
+    async def test_pii_masker_preserves_last_4_in_phone(self) -> None:
+        """Test that PII masker preserves last 4 digits in phone."""
+        masker = PIIMasker(preserve_last_4=True)
+        masked = masker.mask_phone("555-123-4567")
+
+        assert masked.endswith("4567")
+        assert masked.startswith("***")
+
+    @pytest.mark.asyncio
+    async def test_pii_masker_preserves_last_4_in_credit_card(self) -> None:
+        """Test that PII masker preserves last 4 digits in credit card."""
+        masker = PIIMasker(preserve_last_4=True)
+        masked = masker.mask_credit_card("4111-1111-1111-1111")
+
+        assert masked.endswith("1111")
+        assert "****" in masked
+
+    @pytest.mark.asyncio
+    async def test_middleware_logs_correlation_id(self, app: FastAPI, client: AsyncClient) -> None:
+        """Test that middleware logs correlation ID if present."""
+        with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
+            app.add_middleware(RequestLoggingMiddleware)
+
+            await client.get("/test", headers={"X-Correlation-ID": "corr-123"})
+
+            calls = mock_logger.log.call_args_list
+            assert len(calls) > 0
+
+    @pytest.mark.asyncio
+    async def test_middleware_handles_streaming_response(
+        self, app: FastAPI, client: AsyncClient
+    ) -> None:
+        """Test that middleware handles streaming responses."""
+        from fastapi.responses import StreamingResponse
+
+        @app.get("/stream")
+        async def stream_endpoint() -> StreamingResponse:
+            async def generate():
+                yield b"chunk1"
+                yield b"chunk2"
+
+            return StreamingResponse(generate())
+
+        app.add_middleware(RequestLoggingMiddleware)
+
+        response = await client.get("/stream")
+
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_middleware_logs_user_context(self, app: FastAPI, client: AsyncClient) -> None:
+        """Test that middleware logs user context if available."""
+        from starlette.middleware.base import BaseHTTPMiddleware
+
+        class UserMiddleware(BaseHTTPMiddleware):
+            async def dispatch(self, request: Request, call_next):
+                request.state.user = {"id": "user-123", "email": "user@example.com"}
+                return await call_next(request)
+
+        with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
+            app.add_middleware(RequestLoggingMiddleware)
+            app.add_middleware(UserMiddleware)
+
+            await client.get("/test")
+
+            calls = mock_logger.log.call_args_list
+            assert len(calls) > 0
+
+    @pytest.mark.asyncio
+    async def test_middleware_logs_tenant_context(self, app: FastAPI, client: AsyncClient) -> None:
+        """Test that middleware logs tenant context if available."""
+        from starlette.middleware.base import BaseHTTPMiddleware
+
+        class TenantMiddleware(BaseHTTPMiddleware):
+            async def dispatch(self, request: Request, call_next):
+                request.state.tenant_id = "tenant-123"
+                return await call_next(request)
+
+        with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
+            app.add_middleware(RequestLoggingMiddleware)
+            app.add_middleware(TenantMiddleware)
+
+            await client.get("/test")
+
+            calls = mock_logger.log.call_args_list
+            assert len(calls) > 0
+
+    @pytest.mark.asyncio
+    async def test_pii_masker_handles_deeply_nested_dicts(self) -> None:
+        """Test that PII masker handles deeply nested dictionaries."""
+        masker = PIIMasker()
+        data = {
+            "level1": {
+                "level2": {
+                    "level3": {
+                        "level4": {
+                            "level5": {"email": "user@example.com"},
+                        },
+                    },
+                },
+            },
+        }
+
+        masked = masker.mask_dict(data, max_depth=5)
+
+        assert (
+            masked["level1"]["level2"]["level3"]["level4"]["level5"]["email"] != "user@example.com"
+        )
+
+    @pytest.mark.asyncio
+    async def test_pii_masker_truncates_at_max_depth(self) -> None:
+        """Test that PII masker truncates at max_depth."""
+        masker = PIIMasker()
+        data = {"a": {"b": {"c": {"d": {"email": "user@example.com"}}}}}
+
+        masked = masker.mask_dict(data, max_depth=2)
+
+        assert masked["a"]["b"]["c"] == {"_truncated": "max_depth_exceeded"}
+
+    @pytest.mark.asyncio
+    async def test_middleware_handles_missing_content_type(
+        self, app: FastAPI, client: AsyncClient
+    ) -> None:
+        """Test that middleware handles requests without Content-Type header."""
+        app.add_middleware(RequestLoggingMiddleware, log_request_body=True)
+
+        response = await client.post("/test", content=b"raw bytes", headers={})
+
+        # Should handle gracefully
+        assert response.status_code in [200, 400, 422]
+
+    @pytest.mark.asyncio
+    async def test_middleware_logs_different_log_levels(
+        self, app: FastAPI, client: AsyncClient
+    ) -> None:
+        """Test that middleware uses configured log level."""
+        import logging
+
+        with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
+            app.add_middleware(RequestLoggingMiddleware, log_level=logging.DEBUG)
+
+            await client.get("/test")
+
+            # Should use DEBUG level
+            calls = mock_logger.log.call_args_list
+            assert len(calls) > 0

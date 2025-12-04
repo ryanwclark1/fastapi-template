@@ -19,7 +19,6 @@ keywords = [
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.13",
@@ -89,6 +88,8 @@ tests = [
     "pytest>=8.3.5",
     "pytest-asyncio>=0.26.0",
     "pytest-cov>=6.1.1",
+    "pytest-xdist>=3.6.0",                            # Parallel test execution
+    "pytest-timeout>=2.3.0",                          # Test timeout support
     "pytest-benchmark>=4.0.0",
     "aiosqlite>=0.20.0",
     "testcontainers[postgres,redis,rabbitmq]>=4.9.0",
@@ -124,6 +125,8 @@ tests = [
     "pytest>=8.3.5",
     "pytest-asyncio>=0.26.0",
     "pytest-cov>=6.1.1",
+    "pytest-xdist>=3.6.0",                            # Parallel test execution
+    "pytest-timeout>=2.3.0",                          # Test timeout support
     "pytest-benchmark>=4.0.0",
     "aiosqlite>=0.20.0",
     "testcontainers[postgres,redis,rabbitmq]>=4.9.0",
@@ -154,26 +157,62 @@ packages = ["example_service"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
+python_files = ["test_*.py", "*_test.py", "tests.py"]
+python_functions = ["test_*", "*_test"]
+python_classes = ["Test*", "*Tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 addopts = [
     "--strict-markers",
     "--strict-config",
+    "--tb=short",
     "--cov=example_service",
-    "--cov-report=term-missing",
-    "--cov-report=html",
+    "--cov-report=term-missing:skip-covered",
+    "--cov-report=html:coverage",
+    "--cov-report=xml:coverage.xml",
     "--cov-branch",
+    "--cov-fail-under=70",
+    "-n=auto",
+    "--dist=worksteal",
+    "--durations=10",
+    "--maxfail=5",
+    "--color=yes",
+    "--timeout=300",
     "--ignore=**/examples/*",
-    "-v",
 ]
 markers = [
-    "unit: Unit tests",
-    "integration: Integration tests",
-    "slow: Slow running tests",
-    "asyncio: Async tests",
+    # Basic categories
+    "unit: Unit tests (fast, isolated, <100ms)",
+    "integration: Integration tests (external dependencies, 1-10s)",
+    "functional: Functional tests (end-to-end scenarios)",
+    "e2e: End-to-end tests (full system integration)",
+    # Performance and load
+    "performance: Performance tests (load, stress, benchmarks)",
+    "slow: Tests that take more than 5 seconds",
+    "stress: Stress tests (high load, resource intensive)",
     "benchmark: Performance benchmark tests",
+    # Infrastructure dependencies
+    "network: Tests that require network access",
+    "database: Tests that require database connection",
+    "redis: Tests that require Redis connection",
+    "rabbitmq: Tests that require RabbitMQ",
+    "docker: Tests that require Docker containers",
+    # Test types
+    "async: Async-specific tests",
+    "asyncio: Async tests",
+    "api: API endpoint tests",
+    "auth: Authentication and authorization tests",
+    "security: Security and vulnerability tests",
+    "migration: Database migration tests",
+    "config: Configuration management tests",
+    "webhook: Webhook functionality tests",
+    "websocket: WebSocket connection tests",
+    # Quality assurance
+    "smoke: Basic smoke tests for CI",
+    "regression: Regression tests for specific bugs",
+    "flaky: Tests that are known to be flaky",
+    "property: Property-based tests using Hypothesis",
+    "snapshot: Snapshot tests using Syrupy",
 ]
 norecursedirs = [
     ".git",
@@ -190,6 +229,9 @@ norecursedirs = [
 
 [tool.coverage.run]
 source = ["example_service"]
+branch = true
+parallel = true
+concurrency = ["multiprocessing"]
 omit = [
     "*/tests/*",
     "*/__pycache__/*",
@@ -219,18 +261,27 @@ exclude_lines = [
     "raise NotImplementedError",
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
+    "if typing.TYPE_CHECKING:",
     "@abstractmethod",
     "@overload",
-    "if typing.TYPE_CHECKING:",
 ]
 precision = 2
 show_missing = true
 skip_covered = false
 skip_empty = true
+fail_under = 70
+
+[tool.coverage.html]
+directory = "coverage"
+
+[tool.coverage.xml]
+output = "coverage.xml"
 
 [tool.ruff]
 line-length = 100
+indent-width = 4
 target-version = "py313"
+respect-gitignore = true
 exclude = [
     ".git",
     ".venv",
@@ -262,6 +313,7 @@ select = [
     "PIE",  # flake8-pie - miscellaneous lints
     "PERF", # perflint - performance anti-patterns
     "ERA",  # eradicate - commented-out code
+    "D",    # pydocstyle
 ]
 ignore = [
     "E501",    # line too long (handled by formatter)
@@ -272,6 +324,12 @@ ignore = [
     "S311",    # pseudo-random generator - acceptable for non-crypto uses
     "PERF401", # Using a list comprehension to unpack - readability preference
     "ERA001",  # Commented-out code - may be intentional for documentation
+    "D100",    # Missing docstring in public module
+    "D211",    # No blank line before class docstring
+    "D213",    # Multi-line docstring summary on second line
+    "D203",    # One blank line before class docstring
+    "COM812",  # Trailing comma
+    "ANN401",  # ANY type annotation
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -319,24 +377,47 @@ ignore = [
 ]
 # Test files: more relaxed rules for fixtures and test patterns
 "tests/**/*.py" = [
-    "ARG001", # Unused function argument - fixtures often unused directly
-    "ARG002", # Unused method argument - test helpers/mocks
-    "ARG005", # Unused lambda argument - test assertions
-    "B008",   # Function call in argument defaults - pytest fixtures
-    "F401",   # Unused import - tests may import to verify importability
-    "S101",   # Use of assert - standard in pytest
-    "S105",   # Possible hardcoded password - test credentials
-    "S106",   # Possible hardcoded password - test credentials
-    "S110",   # try-except-pass - intentional in tests for failure path testing
-    "S603",   # subprocess call - safe in test fixtures (e.g., Docker CLI)
-    "S608",   # SQL injection - false positive for test query simulation
-    "SIM102", # Use a single if statement instead of nested if - readability in test assertions
-    "SIM116", # Use a dictionary instead of consecutive if - readability in test mocks
-    "SIM117", # Use single with statement - readability in tests
-    "RUF012", # Mutable ClassVar - false positive for SQLAlchemy __table_args__
-    "TC001",  # Move application import into TYPE_CHECKING block
-    "TC002",  # Move third-party import into TYPE_CHECKING block
-    "TC003",  # Move standard library import into TYPE_CHECKING block
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D105",
+    "D106",    # No docstrings in tests
+    "INP001",  # Import sorting
+    "S101",    # Use of assert
+    "S105",    # Possible hardcoded password
+    "S106",    # Possible hardcoded password in function call
+    "PLR2004", # Magic value in comparison
+    "SLF001",  # Private member access (common in tests)
+    "ANN001",
+    "ANN002",
+    "ANN003",
+    "ANN201",
+    "ANN202",  # Type annotations
+    "RET503",  # Missing explicit return
+    "ARG001",
+    "ARG002",  # Unused arguments
+    "ARG005",  # Unused lambda argument - test assertions
+    "F401",    # Unused imports
+    "B008",    # Function call in default argument
+    "PT011",
+    "PT012",
+    "PT017",
+    "PT022",   # pytest specific
+    "DTZ005",  # datetime.now() called without tz
+    "C901",    # Function is too complex
+    "FAST002", # FastAPI dependency without Annotated
+    "S110",    # try-except-pass - intentional in tests for failure path testing
+    "S603",    # subprocess call - safe in test fixtures (e.g., Docker CLI)
+    "S608",    # SQL injection - false positive for test query simulation
+    "SIM102",  # Use a single if statement instead of nested if - readability in test assertions
+    "SIM116",  # Use a dictionary instead of consecutive if - readability in test mocks
+    "SIM117",  # Use single with statement - readability in tests
+    "RUF012",  # Mutable ClassVar - false positive for SQLAlchemy __table_args__
+    "TC001",   # Move application import into TYPE_CHECKING block
+    "TC002",   # Move third-party import into TYPE_CHECKING block
+    "TC003",   # Move standard library import into TYPE_CHECKING block
 ]
 # Test conftest files: fixture definitions have specific patterns
 "tests/**/conftest.py" = [
@@ -380,6 +461,9 @@ known-first-party = ["example_service"]
 split-on-trailing-comma = true
 force-sort-within-sections = true
 
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
 [tool.mypy]
 python_version = "3.13"
 files = ["example_service", "tests", "alembic"]
@@ -402,6 +486,8 @@ strict_optional = true
 show_error_codes = true
 install_types = false
 show_traceback = true
+pretty = true
+namespace_packages = true
 exclude = ["^alembic/env\\.py$", ".*/examples/.*", "^scripts/"]
 
 [[tool.mypy.overrides]]
@@ -550,6 +636,10 @@ name = "ruff_fix"
 type = "exec"
 executable = "uv"
 options = "run ruff check --fix REVISION_SCRIPT_FILENAME"
+
+# === UV Configuration ===
+[tool.uv]
+default-groups = ["dev", "test"]
 
 [tool.pyright]
 exclude = ["**/.venv", "**/*.tmpl"]
