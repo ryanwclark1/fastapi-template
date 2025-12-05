@@ -5,6 +5,7 @@ from authenticated requests. Tenant context is used for:
 - Tenant-aware bucket resolution
 - Multi-tenant storage isolation
 - Audit logging and tracking
+- Database tenant filtering (via context var bridge)
 """
 
 from __future__ import annotations
@@ -15,6 +16,8 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import Depends, Header
 from frozendict import frozendict
 
+from example_service.app.middleware.tenant import set_tenant_context as set_middleware_tenant_context
+from example_service.core.schemas.tenant import TenantContext as SchemaTenantContext
 from example_service.infra.storage.backends import TenantContext
 
 from .auth import get_current_user
@@ -233,6 +236,10 @@ def get_tenant_context(
     operations. It tries JWT metadata first, then falls back to the X-Tenant-ID
     header.
 
+    This function also bridges to the middleware context var, enabling:
+    - TenantAwareSession for automatic database filtering
+    - Background tasks that need tenant context
+
     Args:
         user_context: Tenant context from JWT token
         header_context: Tenant context from X-Tenant-ID header
@@ -256,6 +263,7 @@ def get_tenant_context(
     """
     # JWT takes priority over header
     context = user_context or header_context
+    source = "jwt" if user_context else "header"
 
     if context:
         logger.debug(
@@ -263,9 +271,17 @@ def get_tenant_context(
             extra={
                 "tenant_uuid": context.tenant_uuid,
                 "tenant_slug": context.tenant_slug,
-                "source": "jwt" if user_context else "header",
+                "source": source,
             },
         )
+
+        # Bridge to middleware context var for database tenancy layer
+        # Maps storage TenantContext to schema TenantContext
+        schema_context = SchemaTenantContext(
+            tenant_id=context.tenant_uuid,
+            identified_by=source,
+        )
+        set_middleware_tenant_context(schema_context)
     else:
         logger.debug("No tenant context available")
 

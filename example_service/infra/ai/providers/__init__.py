@@ -3,10 +3,100 @@
 Provides abstraction layer for AI services:
 - Transcription providers (OpenAI Whisper, Deepgram, AssemblyAI, accent-stt)
 - LLM providers (OpenAI, Anthropic, Google, Azure OpenAI, Ollama)
+- Embedding providers (OpenAI, Cohere, local models)
 - PII redaction service client (accent-redaction)
 - Provider factory with tenant-aware configuration resolution
+
+Usage:
+    # Using the factory directly
+    from example_service.infra.ai.providers import get_factory
+    async with get_session() as session:
+        factory = get_factory(session)
+        provider = await factory.create_llm_provider("tenant-123")
+
+    # Using providers directly
+    from example_service.infra.ai.providers import OpenAIEmbeddingProvider
+    provider = OpenAIEmbeddingProvider(api_key="sk-...")
+    result = await provider.embed("Hello, world!")
+
+    # Using utility functions
+    from example_service.infra.ai.providers import (
+        get_available_providers,
+        get_default_providers,
+    )
+    print(get_available_providers())
+    print(get_default_providers())
 """
 
 from __future__ import annotations
 
-__all__ = []
+from .base import (
+    BaseProvider,
+    EmbeddingProvider,
+    EmbeddingResult,
+    LLMMessage,
+    LLMProvider,
+    LLMResponse,
+    PIIEntity,
+    PIIRedactionProvider,
+    PIIRedactionResult,
+    ProviderAuthenticationError,
+    ProviderConfig,
+    ProviderError,
+    ProviderInvalidInputError,
+    ProviderRateLimitError,
+    ProviderTimeoutError,
+    TranscriptionProvider,
+    TranscriptionResult,
+    TranscriptionSegment,
+)
+from .factory import (
+    ProviderFactory,
+    close_all_providers,
+    get_available_providers,
+    get_default_providers,
+    get_factory,
+    reset_factories,
+)
+from .openai_provider import (
+    OpenAIEmbeddingProvider,
+    OpenAILLMProvider,
+    OpenAITranscriptionProvider,
+)
+
+__all__ = [
+    # Main factory class
+    "ProviderFactory",
+    # Utility functions
+    "get_factory",
+    "get_available_providers",
+    "get_default_providers",
+    "close_all_providers",
+    "reset_factories",
+    # Base classes and protocols
+    "BaseProvider",
+    "TranscriptionProvider",
+    "LLMProvider",
+    "PIIRedactionProvider",
+    "EmbeddingProvider",
+    # Result models
+    "TranscriptionResult",
+    "TranscriptionSegment",
+    "LLMMessage",
+    "LLMResponse",
+    "PIIEntity",
+    "PIIRedactionResult",
+    "EmbeddingResult",
+    # Exceptions
+    "ProviderError",
+    "ProviderAuthenticationError",
+    "ProviderRateLimitError",
+    "ProviderTimeoutError",
+    "ProviderInvalidInputError",
+    # Configuration
+    "ProviderConfig",
+    # OpenAI implementations
+    "OpenAITranscriptionProvider",
+    "OpenAILLMProvider",
+    "OpenAIEmbeddingProvider",
+]

@@ -115,9 +115,9 @@ class AnthropicAdapter(ProviderAdapter):
         """Lazy initialize Anthropic client."""
         if self._client is None:
             try:
-                from anthropic import AsyncAnthropic
+                from anthropic import AsyncAnthropic  # type: ignore[import-not-found]
 
-                self._client = AsyncAnthropic(  # type: ignore[assignment]
+                self._client = AsyncAnthropic(
                     api_key=self.api_key,
                     timeout=self.timeout,
                     max_retries=self.max_retries,

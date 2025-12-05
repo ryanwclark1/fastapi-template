@@ -20,10 +20,7 @@ import logging
 from decimal import Decimal
 from typing import Any, ClassVar
 
-from example_service.infra.ai.capabilities.adapters.base import (
-    ProviderAdapter,
-    TimedExecution,
-)
+from example_service.infra.ai.capabilities.adapters.base import ProviderAdapter, TimedExecution
 from example_service.infra.ai.capabilities.types import (
     Capability,
     CapabilityMetadata,

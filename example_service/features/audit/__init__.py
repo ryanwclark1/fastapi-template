@@ -27,25 +27,41 @@ Usage:
 
 from __future__ import annotations
 
-from .decorators import audit_action, audited
+from .decorators import AuditContext, audit_action, audited
 from .models import AuditAction, AuditLog
+from .repository import AuditRepository, get_audit_repository
 from .router import router
-from .schemas import AuditLogCreate, AuditLogQuery, AuditLogResponse
+from .schemas import (
+    AuditLogCreate,
+    AuditLogQuery,
+    AuditLogResponse,
+    AuditSummary,
+    DangerousActionsResponse,
+    EntityAuditHistory,
+)
 from .service import AuditService, get_audit_service
 
 __all__ = [
+    # Enums/Actions
     "AuditAction",
+    "AuditContext",
     # Models
     "AuditLog",
     # Schemas
     "AuditLogCreate",
     "AuditLogQuery",
     "AuditLogResponse",
+    # Repository
+    "AuditRepository",
     # Service
     "AuditService",
-    "audit_action",
+    "AuditSummary",
+    "DangerousActionsResponse",
+    "EntityAuditHistory",
     # Decorators
+    "audit_action",
     "audited",
+    "get_audit_repository",
     "get_audit_service",
     # Router
     "router",

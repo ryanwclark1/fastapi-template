@@ -55,12 +55,6 @@ from example_service.app.middleware.request_logging import (
 from example_service.app.middleware.security_headers import SecurityHeadersMiddleware
 from example_service.app.middleware.size_limit import RequestSizeLimitMiddleware
 from example_service.app.middleware.tenant import (
-    HeaderTenantStrategy,
-    JWTClaimTenantStrategy,
-    PathPrefixTenantStrategy,
-    SubdomainTenantStrategy,
-    TenantIdentificationStrategy,
-    TenantMiddleware,
     clear_tenant_context,
     get_tenant_context,
     require_tenant,
@@ -79,13 +73,10 @@ __all__ = [
     "CorrelationIDMiddleware",
     "DebugMiddleware",
     "HeaderContextMiddleware",
-    "HeaderTenantStrategy",
     "I18nMiddleware",
-    "JWTClaimTenantStrategy",
     "MetricsMiddleware",
     "NPlusOneDetectionMiddleware",
     "PIIMasker",
-    "PathPrefixTenantStrategy",
     "QueryNormalizer",
     "QueryPattern",
     "RateLimitMiddleware",
@@ -93,17 +84,14 @@ __all__ = [
     "RequestLoggingMiddleware",
     "RequestSizeLimitMiddleware",
     "SecurityHeadersMiddleware",
-    "SubdomainTenantStrategy",
-    "TenantIdentificationStrategy",
-    # Tenant middleware
-    "TenantMiddleware",
+    # Tenant context helpers (for database tenancy layer)
     "clear_tenant_context",
-    # Configuration
-    "configure_middleware",
-    "create_i18n_middleware",
     "get_tenant_context",
     "require_tenant",
     "set_tenant_context",
+    # Configuration
+    "configure_middleware",
+    "create_i18n_middleware",
     "setup_n_plus_one_monitoring",
 ]
 

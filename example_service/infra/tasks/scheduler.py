@@ -250,6 +250,46 @@ async def _schedule_data_cleanup() -> None:
     await cleanup_expired_data.kiq()
 
 
+# -----------------------------------------------------------------------------
+# Analytics and Reporting Wrappers (Example Tasks)
+# -----------------------------------------------------------------------------
+
+
+async def _schedule_hourly_analytics() -> None:
+    """Wrapper for hourly analytics aggregation."""
+    from example_service.workers.analytics.tasks import aggregate_hourly_metrics
+
+    await aggregate_hourly_metrics.kiq()
+
+
+async def _schedule_daily_analytics() -> None:
+    """Wrapper for daily analytics aggregation."""
+    from example_service.workers.analytics.tasks import aggregate_daily_metrics
+
+    await aggregate_daily_metrics.kiq()
+
+
+async def _schedule_weekly_analytics() -> None:
+    """Wrapper for weekly analytics aggregation."""
+    from example_service.workers.analytics.tasks import aggregate_weekly_metrics
+
+    await aggregate_weekly_metrics.kiq()
+
+
+async def _schedule_monthly_analytics() -> None:
+    """Wrapper for monthly analytics aggregation."""
+    from example_service.workers.analytics.tasks import aggregate_monthly_metrics
+
+    await aggregate_monthly_metrics.kiq()
+
+
+async def _schedule_kpi_computation() -> None:
+    """Wrapper for business KPI computation."""
+    from example_service.workers.analytics.tasks import compute_business_kpis
+
+    await compute_business_kpis.kiq()
+
+
 # =============================================================================
 # Scheduler Management
 # =============================================================================
@@ -388,6 +428,55 @@ def setup_scheduled_jobs() -> None:
         trigger=CronTrigger(hour=2, minute=30),
         id="data_cleanup",
         name="Clean up expired database records",
+        replace_existing=True,
+    )
+
+    # -------------------------------------------------------------------------
+    # Analytics and Reporting Jobs (Examples - disable in production if not needed)
+    # -------------------------------------------------------------------------
+
+    # Hourly analytics aggregation - every hour at minute 5
+    scheduler.add_job(
+        func=_schedule_hourly_analytics,
+        trigger=CronTrigger(minute=5),
+        id="hourly_analytics",
+        name="Aggregate hourly metrics (example)",
+        replace_existing=True,
+    )
+
+    # Daily analytics aggregation - daily at 3 AM UTC
+    scheduler.add_job(
+        func=_schedule_daily_analytics,
+        trigger=CronTrigger(hour=3, minute=0),
+        id="daily_analytics",
+        name="Aggregate daily metrics (example)",
+        replace_existing=True,
+    )
+
+    # Weekly analytics aggregation - weekly on Monday at 4 AM UTC
+    scheduler.add_job(
+        func=_schedule_weekly_analytics,
+        trigger=CronTrigger(day_of_week="mon", hour=4, minute=0),
+        id="weekly_analytics",
+        name="Aggregate weekly metrics (example)",
+        replace_existing=True,
+    )
+
+    # Monthly analytics aggregation - monthly on 1st at 5 AM UTC
+    scheduler.add_job(
+        func=_schedule_monthly_analytics,
+        trigger=CronTrigger(day=1, hour=5, minute=0),
+        id="monthly_analytics",
+        name="Aggregate monthly metrics (example)",
+        replace_existing=True,
+    )
+
+    # KPI computation - daily at 6 AM UTC
+    scheduler.add_job(
+        func=_schedule_kpi_computation,
+        trigger=CronTrigger(hour=6, minute=0),
+        id="kpi_computation",
+        name="Compute business KPIs (example)",
         replace_existing=True,
     )
 

@@ -23,9 +23,19 @@ from example_service.core.database.enums import AuditAction as AuditActionEnum
 
 
 class AuditAction(StrEnum):
-    """Audit action types."""
+    """Audit action types.
 
-    # CRUD operations
+    Actions follow a hierarchical naming pattern: resource.verb for semantic clarity.
+    Use the helper properties and methods to extract metadata from action values.
+
+    Example:
+        action = AuditAction.USER_DELETED
+        print(action.resource_type)  # "user"
+        print(action.verb)           # "deleted"
+        print(action.is_dangerous()) # True
+    """
+
+    # CRUD operations (generic)
     CREATE = "create"
     READ = "read"
     UPDATE = "update"
@@ -56,6 +66,74 @@ class AuditAction(StrEnum):
     RESTORE = "restore"
     PURGE = "purge"
 
+    # User actions (hierarchical naming)
+    USER_CREATED = "user.created"
+    USER_UPDATED = "user.updated"
+    USER_DELETED = "user.deleted"
+    USER_SUSPENDED = "user.suspended"
+    USER_REACTIVATED = "user.reactivated"
+
+    # Role actions
+    ROLE_CREATED = "role.created"
+    ROLE_UPDATED = "role.updated"
+    ROLE_DELETED = "role.deleted"
+    ROLE_ASSIGNED = "role.assigned"
+    ROLE_REVOKED = "role.revoked"
+
+    # Permission actions
+    PERMISSION_GRANTED = "permission.granted"
+    PERMISSION_REVOKED = "permission.revoked"
+
+    # API key actions
+    API_KEY_CREATED = "api_key.created"
+    API_KEY_REVOKED = "api_key.revoked"
+
+    # Integration actions
+    INTEGRATION_CONNECTED = "integration.connected"
+    INTEGRATION_DISCONNECTED = "integration.disconnected"
+
+    @property
+    def resource_type(self) -> str | None:
+        """Extract resource type from action (e.g., 'user' from 'user.created').
+
+        Returns:
+            Resource type string, or None if action doesn't follow hierarchical pattern.
+        """
+        if "." in self.value:
+            return self.value.split(".")[0]
+        return None
+
+    @property
+    def verb(self) -> str:
+        """Extract verb from action (e.g., 'created' from 'user.created').
+
+        Returns:
+            Verb string. For non-hierarchical actions, returns the full value.
+        """
+        if "." in self.value:
+            return self.value.split(".")[1]
+        return self.value
+
+    def is_dangerous(self) -> bool:
+        """Check if action is potentially dangerous (delete, revoke, suspend, etc.).
+
+        Dangerous actions are those that modify or remove access/data and should
+        be flagged in security reviews and compliance audits.
+
+        Returns:
+            True for destructive actions that warrant additional scrutiny.
+        """
+        dangerous_verbs = {
+            "deleted",
+            "revoked",
+            "suspended",
+            "disconnected",
+            "purge",
+            "delete",
+            "bulk_delete",
+        }
+        return self.verb in dangerous_verbs
+
 
 class AuditLog(Base, UUIDv7PKMixin):
     """Audit log entry for tracking all significant actions.
@@ -70,6 +148,7 @@ class AuditLog(Base, UUIDv7PKMixin):
         entity_type: Type of entity affected (e.g., "reminder", "user")
         entity_id: ID of the affected entity
         user_id: ID of the user who performed the action
+        actor_roles: Roles the user had at time of action (for compliance)
         tenant_id: Tenant context (for multi-tenant systems)
         old_values: JSON of previous state (for updates/deletes)
         new_values: JSON of new state (for creates/updates)
@@ -87,6 +166,7 @@ class AuditLog(Base, UUIDv7PKMixin):
             entity_type="reminder",
             entity_id="123e4567-e89b-12d3-a456-426614174000",
             user_id="user-456",
+            actor_roles=["admin", "editor"],
             old_values={"title": "Old Title"},
             new_values={"title": "New Title"},
             changes={"title": {"old": "Old Title", "new": "New Title"}},
@@ -133,6 +213,13 @@ class AuditLog(Base, UUIDv7PKMixin):
         nullable=True,
         index=True,
         comment="User who performed the action",
+    )
+    actor_roles: Mapped[list[str]] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=list,
+        server_default="[]",
+        comment="Roles the user had at time of action (for compliance audits)",
     )
     tenant_id: Mapped[str | None] = mapped_column(
         String(255),
@@ -215,14 +302,18 @@ class AuditLog(Base, UUIDv7PKMixin):
 
     # Composite indexes for common query patterns
     __table_args__ = (
-        # Query by entity
+        # Query by entity (resource audit trail)
         Index("ix_audit_entity", "entity_type", "entity_id"),
-        # Query by user and time
+        # Query by user and time (user activity)
         Index("ix_audit_user_time", "user_id", "timestamp"),
-        # Query by tenant and time
+        # Query by tenant and time (tenant-scoped queries - most common)
         Index("ix_audit_tenant_time", "tenant_id", "timestamp"),
-        # Query by action and entity
+        # Query by action and entity type
         Index("ix_audit_action_entity", "action", "entity_type"),
+        # Query by action and time (security audits for dangerous actions)
+        Index("ix_audit_action_time", "action", "timestamp"),
+        # Query by tenant, user, and time (user activity within tenant)
+        Index("ix_audit_tenant_user_time", "tenant_id", "user_id", "timestamp"),
     )
 
     def __repr__(self) -> str:

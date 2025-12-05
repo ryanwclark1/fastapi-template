@@ -21,6 +21,7 @@ from .schemas import (
     AuditLogQuery,
     AuditLogResponse,
     AuditSummary,
+    DangerousActionsResponse,
     EntityAuditHistory,
 )
 from .service import AuditService
@@ -230,3 +231,48 @@ async def get_user_activity(
 
     service = AuditService(session)
     return await service.query(query)
+
+
+@router.get(
+    "/dangerous",
+    response_model=DangerousActionsResponse,
+    summary="List dangerous actions",
+    description="Get audit logs for potentially dangerous actions (deletes, revokes, suspensions).",
+)
+async def list_dangerous_actions(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    _user: Annotated[dict, Depends(get_current_user)],
+    tenant_id: Annotated[str | None, Query(description="Filter by tenant")] = None,
+    start_time: Annotated[datetime | None, Query(description="Start of time range")] = None,
+    end_time: Annotated[datetime | None, Query(description="End of time range")] = None,
+    limit: Annotated[int, Query(ge=1, le=1000, description="Maximum results")] = 50,
+    offset: Annotated[int, Query(ge=0, description="Number of results to skip")] = 0,
+) -> DangerousActionsResponse:
+    """List potentially dangerous audit actions for security review.
+
+    Dangerous actions include:
+    - Deletes (user.deleted, delete, bulk_delete, purge)
+    - Revocations (role.revoked, permission.revoked, api_key.revoked)
+    - Suspensions (user.suspended)
+    - Disconnections (integration.disconnected)
+
+    Use this endpoint for security audits and compliance reviews.
+
+    Args:
+        tenant_id: Optional tenant filter.
+        start_time: Optional start time filter.
+        end_time: Optional end time filter.
+        limit: Maximum number of results.
+        offset: Number of results to skip.
+
+    Returns:
+        Paginated list of dangerous audit logs.
+    """
+    service = AuditService(session)
+    return await service.list_dangerous_actions(
+        tenant_id=tenant_id,
+        start_time=start_time,
+        end_time=end_time,
+        limit=limit,
+        offset=offset,
+    )

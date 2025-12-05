@@ -83,6 +83,7 @@ def audited(
             # Extract context from args/kwargs
             request: Request | None = None
             user_id: str | None = None
+            actor_roles: list[str] = []
             tenant_id: str | None = None
             entity_id: str | None = None
 
@@ -96,14 +97,23 @@ def audited(
             if "request" in kwargs and isinstance(kwargs["request"], Request):
                 request = kwargs["request"]
 
-            # Extract user/tenant from request state
+            # Extract user/tenant/roles from request state
             if request:
                 user_id = getattr(request.state, "user_id", None)
                 if user_id is None:
                     user = getattr(request.state, "user", None)
                     if user:
                         user_id = getattr(user, "user_id", None) or getattr(user, "id", None)
+                        # Extract roles from user object
+                        user_roles = getattr(user, "roles", None)
+                        if user_roles:
+                            actor_roles = list(user_roles) if not isinstance(user_roles, list) else user_roles
                 tenant_id = getattr(request.state, "tenant_uuid", None)
+                # Also check for roles directly on request state
+                if not actor_roles:
+                    state_roles = getattr(request.state, "roles", None)
+                    if state_roles:
+                        actor_roles = list(state_roles) if not isinstance(state_roles, list) else state_roles
 
             # Try to extract entity_id from kwargs
             entity_id = kwargs.get("id") or kwargs.get("entity_id") # type: ignore
@@ -169,6 +179,7 @@ def audited(
                             entity_type=entity_type,
                             entity_id=entity_id,
                             user_id=user_id,
+                            actor_roles=actor_roles,
                             tenant_id=tenant_id,
                             new_values=new_values,
                             ip_address=request.client.host if request and request.client else None,
@@ -250,13 +261,23 @@ def audit_action(
             # Extract request context
             request: Request | None = kwargs.get("request") # type: ignore
             user_id: str | None = None
+            actor_roles: list[str] = []
             tenant_id: str | None = None
 
             if request:
                 user = getattr(request.state, "user", None)
                 if user:
                     user_id = getattr(user, "user_id", None)
+                    # Extract roles from user object
+                    user_roles = getattr(user, "roles", None)
+                    if user_roles:
+                        actor_roles = list(user_roles) if not isinstance(user_roles, list) else user_roles
                 tenant_id = getattr(request.state, "tenant_uuid", None)
+                # Also check for roles directly on request state
+                if not actor_roles:
+                    state_roles = getattr(request.state, "roles", None)
+                    if state_roles:
+                        actor_roles = list(state_roles) if not isinstance(state_roles, list) else state_roles
 
             start_time = time.monotonic()
             success = True
@@ -280,6 +301,7 @@ def audit_action(
                             entity_type=entity_type,
                             entity_id=entity_id,
                             user_id=user_id,
+                            actor_roles=actor_roles,
                             tenant_id=tenant_id,
                             old_values=old_values, # type: ignore
                             new_values=new_values, # type: ignore
@@ -323,6 +345,7 @@ class AuditContext:
         entity_type: str,
         entity_id: str | None = None,
         user_id: str | None = None,
+        actor_roles: list[str] | None = None,
         tenant_id: str | None = None,
         request_id: str | None = None,
     ) -> None:
@@ -333,6 +356,7 @@ class AuditContext:
             entity_type: Type of entity.
             entity_id: Entity ID.
             user_id: User performing the action.
+            actor_roles: Roles the user had at time of action.
             tenant_id: Tenant context.
             request_id: Request correlation ID.
         """
@@ -340,6 +364,7 @@ class AuditContext:
         self.entity_type = entity_type
         self.entity_id = entity_id
         self.user_id = user_id
+        self.actor_roles = actor_roles or []
         self.tenant_id = tenant_id
         self.request_id = request_id
 
@@ -351,6 +376,10 @@ class AuditContext:
 
         self._start_time: float | None = None
         self._session = None
+
+    def set_actor_roles(self, roles: list[str]) -> None:
+        """Set the actor roles for the audit entry."""
+        self.actor_roles = roles
 
     def set_old_values(self, values: dict[str, Any]) -> None:
         """Set the old values for the audit entry."""
@@ -400,6 +429,7 @@ class AuditContext:
                     entity_type=self.entity_type,
                     entity_id=self.entity_id,
                     user_id=self.user_id,
+                    actor_roles=self.actor_roles,
                     tenant_id=self.tenant_id,
                     old_values=self.old_values,
                     new_values=self.new_values,

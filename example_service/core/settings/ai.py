@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .yaml_sources import create_ai_yaml_source
@@ -20,6 +21,58 @@ AIProvider = Literal[
     "ollama",
 ]
 
+EmbeddingProvider = Literal["openai", "cohere", "local"]
+
+
+# ===== Provider Settings Data Classes =====
+
+
+@dataclass
+class LLMSettings:
+    """LLM provider settings container."""
+
+    provider: str
+    api_key: SecretStr | None
+    model: str
+    temperature: float
+    max_tokens: int
+    timeout: int
+    max_retries: int
+    base_url: str | None = None
+    endpoint: str | None = None
+    deployment_name: str | None = None
+    api_version: str | None = None
+
+
+@dataclass
+class TranscriptionSettings:
+    """Transcription provider settings container."""
+
+    provider: str
+    api_key: SecretStr | None
+    model: str
+    timeout: int
+    max_retries: int
+    service_url: str | None = None
+    language: str | None = None
+    speaker_labels: bool = True
+    punctuation: bool = True
+
+
+@dataclass
+class EmbeddingSettings:
+    """Embedding provider settings container."""
+
+    provider: str
+    api_key: SecretStr | None
+    model: str
+    timeout: int
+    max_retries: int
+    input_type: str | None = None
+    device: str | None = None
+    normalize: bool | None = None
+    batch_size: int | None = None
+
 
 class AISettings(BaseSettings):
     """AI services configuration settings.
@@ -30,6 +83,7 @@ class AISettings(BaseSettings):
     Supports multi-provider AI operations with tenant-level overrides:
     - LLM providers (OpenAI, Anthropic, Google, Azure OpenAI, Ollama)
     - Transcription providers (OpenAI Whisper, Deepgram, AssemblyAI, accent-stt)
+    - Embedding providers (OpenAI, Cohere, local models)
     - PII redaction via accent-redaction service
     - Cost tracking and usage metrics
     """
@@ -50,6 +104,14 @@ class AISettings(BaseSettings):
     default_transcription_model: str = Field(
         default="nova-2",
         description="Default transcription model (e.g., whisper-1, nova-2)",
+    )
+    default_embedding_provider: EmbeddingProvider = Field(
+        default="openai",
+        description="Default provider for text embeddings",
+    )
+    default_embedding_model: str = Field(
+        default="text-embedding-3-small",
+        description="Default embedding model (e.g., text-embedding-3-small, embed-english-v3.0)",
     )
 
     # ===== Provider API Keys (Service-level defaults) =====
@@ -119,6 +181,42 @@ class AISettings(BaseSettings):
     accent_redaction_api_key: SecretStr | None = Field(
         default=None,
         description="API key for accent-redaction service (if required)",
+    )
+
+    # ===== Embedding Providers =====
+    cohere_api_key: SecretStr | None = Field(
+        default=None,
+        description="Cohere API key for embeddings",
+    )
+    cohere_embedding_model: str = Field(
+        default="embed-english-v3.0",
+        description="Cohere embedding model",
+    )
+    cohere_input_type: Literal[
+        "search_document", "search_query", "classification", "clustering"
+    ] = Field(
+        default="search_document",
+        description="Cohere input type for embeddings",
+    )
+
+    # Local embedding configuration
+    local_embedding_model: str = Field(
+        default="sentence-transformers/all-MiniLM-L6-v2",
+        description="HuggingFace model name for local embeddings",
+    )
+    local_embedding_device: Literal["cpu", "cuda"] = Field(
+        default="cpu",
+        description="Device to run local embedding model on",
+    )
+    local_embedding_normalize: bool = Field(
+        default=True,
+        description="Normalize embedding vectors to unit length",
+    )
+    local_embedding_batch_size: int = Field(
+        default=32,
+        ge=1,
+        le=256,
+        description="Batch size for local embedding generation",
     )
 
     # ===== Feature Toggles =====
@@ -363,6 +461,17 @@ class AISettings(BaseSettings):
             )
         return v
 
+    @field_validator("default_embedding_provider")
+    @classmethod
+    def validate_embedding_provider(cls, v: str) -> str:
+        """Validate embedding provider name."""
+        valid_providers = {"openai", "cohere", "local"}
+        if v not in valid_providers:
+            raise ValueError(
+                f"Invalid embedding provider: {v}. Must be one of: {', '.join(valid_providers)}"
+            )
+        return v
+
     model_config = SettingsConfigDict(
         env_prefix="AI_",
         env_file=".env",
@@ -416,6 +525,72 @@ class AISettings(BaseSettings):
             ]
         )
 
+    @property
+    def has_embedding_provider(self) -> bool:
+        """Check if any embedding provider is configured."""
+        return any([
+            self.openai_api_key,  # OpenAI can be used for embeddings
+            self.cohere_api_key,
+            True,  # Local embeddings are always available
+        ])
+
+    @computed_field
+    @property
+    def available_llm_providers(self) -> list[str]:
+        """Get list of available LLM providers (those with API keys configured)."""
+        providers = []
+        if self.openai_api_key:
+            providers.append("openai")
+        if self.anthropic_api_key:
+            providers.append("anthropic")
+        if self.google_api_key:
+            providers.append("google")
+        if (
+            self.azure_openai_api_key
+            and self.azure_openai_endpoint
+            and self.azure_openai_deployment_name
+        ):
+            providers.append("azure_openai")
+        if self.ollama_base_url:
+            providers.append("ollama")
+        return providers
+
+    @computed_field
+    @property
+    def available_transcription_providers(self) -> list[str]:
+        """Get list of available transcription providers."""
+        providers = []
+        if self.openai_api_key:
+            providers.append("openai")
+        if self.deepgram_api_key:
+            providers.append("deepgram")
+        if self.assemblyai_api_key:
+            providers.append("assemblyai")
+        if self.accent_stt_url:
+            providers.append("accent_stt")
+        return providers
+
+    @computed_field
+    @property
+    def available_embedding_providers(self) -> list[str]:
+        """Get list of available embedding providers."""
+        providers = ["local"]  # Local embeddings always available
+        if self.openai_api_key:
+            providers.append("openai")
+        if self.cohere_api_key:
+            providers.append("cohere")
+        return providers
+
+    @computed_field
+    @property
+    def is_configured(self) -> bool:
+        """Check if at least one provider is properly configured."""
+        return bool(
+            self.has_llm_provider
+            or self.has_transcription_provider
+            or self.has_embedding_provider
+        )
+
     def get_provider_api_key(self, provider: str) -> SecretStr | None:
         """Get API key for specified provider."""
         provider_keys = {
@@ -427,5 +602,204 @@ class AISettings(BaseSettings):
             "assemblyai": self.assemblyai_api_key,
             "accent_stt": self.accent_stt_api_key,
             "accent_redaction": self.accent_redaction_api_key,
+            "cohere": self.cohere_api_key,
         }
         return provider_keys.get(provider)
+
+    # ===== Helper Methods for Provider Settings =====
+
+    def get_llm_settings(
+        self,
+        provider: str | None = None,
+    ) -> LLMSettings:
+        """Get settings for specified LLM provider or default.
+
+        Args:
+            provider: Provider name or None for default.
+
+        Returns:
+            LLMSettings object with provider configuration.
+
+        Raises:
+            ValueError: If provider is invalid or not configured.
+        """
+        provider = provider or self.default_llm_provider
+
+        if provider == "openai":
+            if not self.openai_api_key:
+                raise ValueError("OpenAI API key not configured")
+            return LLMSettings(
+                provider="openai",
+                api_key=self.openai_api_key,
+                model=self.default_llm_model,
+                temperature=self.llm_temperature,
+                max_tokens=self.llm_max_tokens,
+                timeout=self.llm_request_timeout_seconds,
+                max_retries=self.max_retries,
+            )
+        if provider == "anthropic":
+            if not self.anthropic_api_key:
+                raise ValueError("Anthropic API key not configured")
+            return LLMSettings(
+                provider="anthropic",
+                api_key=self.anthropic_api_key,
+                model=self.default_llm_model,
+                temperature=self.llm_temperature,
+                max_tokens=self.llm_max_tokens,
+                timeout=self.llm_request_timeout_seconds,
+                max_retries=self.max_retries,
+            )
+        if provider == "google":
+            if not self.google_api_key:
+                raise ValueError("Google AI API key not configured")
+            return LLMSettings(
+                provider="google",
+                api_key=self.google_api_key,
+                model=self.default_llm_model,
+                temperature=self.llm_temperature,
+                max_tokens=self.llm_max_tokens,
+                timeout=self.llm_request_timeout_seconds,
+                max_retries=self.max_retries,
+            )
+        if provider == "azure_openai":
+            if (
+                not self.azure_openai_api_key
+                or not self.azure_openai_endpoint
+                or not self.azure_openai_deployment_name
+            ):
+                raise ValueError(
+                    "Azure OpenAI not fully configured (requires api_key, endpoint, and deployment_name)"
+                )
+            return LLMSettings(
+                provider="azure_openai",
+                api_key=self.azure_openai_api_key,
+                model=self.azure_openai_deployment_name,
+                temperature=self.llm_temperature,
+                max_tokens=self.llm_max_tokens,
+                timeout=self.llm_request_timeout_seconds,
+                max_retries=self.max_retries,
+                endpoint=self.azure_openai_endpoint,
+                deployment_name=self.azure_openai_deployment_name,
+                api_version=self.azure_openai_api_version,
+            )
+        if provider == "ollama":
+            return LLMSettings(
+                provider="ollama",
+                api_key=None,
+                model=self.ollama_default_model,
+                temperature=self.llm_temperature,
+                max_tokens=self.llm_max_tokens,
+                timeout=self.llm_request_timeout_seconds,
+                max_retries=self.max_retries,
+                base_url=self.ollama_base_url,
+            )
+        raise ValueError(f"Invalid LLM provider: {provider}")
+
+    def get_transcription_settings(
+        self,
+        provider: str | None = None,
+    ) -> TranscriptionSettings:
+        """Get settings for specified transcription provider or default.
+
+        Args:
+            provider: Provider name or None for default.
+
+        Returns:
+            TranscriptionSettings object with provider configuration.
+
+        Raises:
+            ValueError: If provider is invalid or not configured.
+        """
+        provider = provider or self.default_transcription_provider
+
+        if provider == "openai":
+            if not self.openai_api_key:
+                raise ValueError("OpenAI API key not configured for transcription")
+            return TranscriptionSettings(
+                provider="openai",
+                api_key=self.openai_api_key,
+                model=self.default_transcription_model,
+                timeout=self.transcription_timeout_seconds,
+                max_retries=self.max_retries,
+            )
+        if provider == "deepgram":
+            if not self.deepgram_api_key:
+                raise ValueError("Deepgram API key not configured")
+            return TranscriptionSettings(
+                provider="deepgram",
+                api_key=self.deepgram_api_key,
+                model=self.default_transcription_model,
+                timeout=self.transcription_timeout_seconds,
+                max_retries=self.max_retries,
+            )
+        if provider == "assemblyai":
+            if not self.assemblyai_api_key:
+                raise ValueError("AssemblyAI API key not configured")
+            return TranscriptionSettings(
+                provider="assemblyai",
+                api_key=self.assemblyai_api_key,
+                model=self.default_transcription_model,
+                timeout=self.transcription_timeout_seconds,
+                max_retries=self.max_retries,
+            )
+        if provider == "accent_stt":
+            return TranscriptionSettings(
+                provider="accent_stt",
+                api_key=self.accent_stt_api_key,
+                model="accent-stt",
+                timeout=self.transcription_timeout_seconds,
+                max_retries=self.max_retries,
+                service_url=self.accent_stt_url,
+            )
+        raise ValueError(f"Invalid transcription provider: {provider}")
+
+    def get_embedding_settings(
+        self,
+        provider: str | None = None,
+    ) -> EmbeddingSettings:
+        """Get settings for specified embedding provider or default.
+
+        Args:
+            provider: Provider name or None for default.
+
+        Returns:
+            EmbeddingSettings object with provider configuration.
+
+        Raises:
+            ValueError: If provider is invalid or not configured.
+        """
+        provider = provider or self.default_embedding_provider
+
+        if provider == "openai":
+            if not self.openai_api_key:
+                raise ValueError("OpenAI API key not configured for embeddings")
+            return EmbeddingSettings(
+                provider="openai",
+                api_key=self.openai_api_key,
+                model=self.default_embedding_model,
+                timeout=self.llm_request_timeout_seconds,
+                max_retries=self.max_retries,
+            )
+        if provider == "cohere":
+            if not self.cohere_api_key:
+                raise ValueError("Cohere API key not configured")
+            return EmbeddingSettings(
+                provider="cohere",
+                api_key=self.cohere_api_key,
+                model=self.cohere_embedding_model,
+                timeout=30,  # Cohere typically faster
+                max_retries=self.max_retries,
+                input_type=self.cohere_input_type,
+            )
+        if provider == "local":
+            return EmbeddingSettings(
+                provider="local",
+                api_key=None,
+                model=self.local_embedding_model,
+                timeout=300,  # Local can take longer
+                max_retries=1,  # No retries for local
+                device=self.local_embedding_device,
+                normalize=self.local_embedding_normalize,
+                batch_size=self.local_embedding_batch_size,
+            )
+        raise ValueError(f"Invalid embedding provider: {provider}")

@@ -30,6 +30,7 @@ def run_fastapi_server() -> NoReturn:
         host=settings.host,
         port=settings.port,
         reload=settings.debug,
+        access_log=settings.debug,
         log_level=log_settings.level.lower(),
     )
     sys.exit(0)

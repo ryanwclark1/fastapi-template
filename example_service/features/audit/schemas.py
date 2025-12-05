@@ -33,6 +33,10 @@ class AuditLogCreate(BaseModel):
         max_length=255,
         description="User who performed the action",
     )
+    actor_roles: list[str] | None = Field(
+        default=None,
+        description="Roles the user had at time of action (for compliance audits)",
+    )
     tenant_id: str | None = Field(
         default=None,
         max_length=255,
@@ -103,6 +107,7 @@ class AuditLogResponse(BaseModel):
     entity_type: str = Field(description="Type of entity affected")
     entity_id: str | None = Field(description="ID of the affected entity")
     user_id: str | None = Field(description="User who performed the action")
+    actor_roles: list[str] = Field(default_factory=list, description="Roles user had at time of action")
     tenant_id: str | None = Field(description="Tenant context")
     old_values: dict[str, Any] | None = Field(description="Previous state")
     new_values: dict[str, Any] | None = Field(description="New state")
@@ -213,8 +218,22 @@ class AuditSummary(BaseModel):
     entity_types_count: dict[str, int] = Field(description="Count by entity type")
     success_rate: float = Field(description="Percentage of successful actions")
     unique_users: int = Field(description="Number of unique users")
+    dangerous_actions_count: int = Field(
+        default=0,
+        description="Number of dangerous actions (deletes, revokes, suspensions)",
+    )
     time_range_start: datetime | None = Field(description="Earliest entry")
     time_range_end: datetime | None = Field(description="Latest entry")
+
+
+class DangerousActionsResponse(BaseModel):
+    """Response for dangerous actions query."""
+
+    items: list[AuditLogResponse] = Field(description="Dangerous audit log entries")
+    total: int = Field(description="Total number of matching entries")
+    limit: int = Field(description="Results per page")
+    offset: int = Field(description="Current offset")
+    has_more: bool = Field(description="Whether more results exist")
 
 
 class EntityAuditHistory(BaseModel):

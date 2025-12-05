@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import delete, desc, func, select
+from sqlalchemy import delete, desc, func, or_, select
 
 from example_service.core.database.repository import BaseRepository, SearchResult
 from example_service.infra.logging import get_lazy_logger
@@ -128,6 +128,145 @@ class AuditRepository(BaseRepository[AuditLog]):
 
         _lazy.debug(lambda: f"get_entity_history: {entity_type}/{entity_id} -> {len(logs)} entries")
         return logs
+
+    async def list_dangerous_actions(
+        self,
+        session: AsyncSession,
+        *,
+        tenant_id: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> Sequence[AuditLog]:
+        """List dangerous actions (deletes, revokes, suspensions) for security review.
+
+        Dangerous actions are those that modify or remove access/data and should
+        be flagged in security reviews and compliance audits.
+
+        Args:
+            session: Database session.
+            tenant_id: Optional tenant filter.
+            start_time: Optional start datetime filter.
+            end_time: Optional end datetime filter.
+            limit: Maximum number of logs to return.
+            offset: Number of logs to skip.
+
+        Returns:
+            List of audit logs for dangerous actions ordered by timestamp desc.
+
+        Example:
+            # Get all dangerous actions in the last 24 hours
+            from datetime import datetime, timedelta
+            dangerous = await repo.list_dangerous_actions(
+                session,
+                start_time=datetime.now() - timedelta(days=1),
+            )
+        """
+        # Actions that modify or remove access/data
+        # Match both hierarchical (user.deleted) and flat (delete) patterns
+        dangerous_patterns = [
+            "%.deleted",
+            "%.revoked",
+            "%.suspended",
+            "%.disconnected",
+        ]
+        dangerous_exact = [
+            "delete",
+            "bulk_delete",
+            "purge",
+        ]
+
+        # Build OR condition for all patterns
+        action_filters = [
+            AuditLog.action.like(pattern) for pattern in dangerous_patterns
+        ]
+        action_filters.extend([
+            AuditLog.action == exact for exact in dangerous_exact
+        ])
+
+        stmt = (
+            select(AuditLog)
+            .where(or_(*action_filters))
+            .order_by(desc(AuditLog.timestamp))
+        )
+
+        if tenant_id:
+            stmt = stmt.where(AuditLog.tenant_id == tenant_id)
+
+        if start_time:
+            stmt = stmt.where(AuditLog.timestamp >= start_time)
+
+        if end_time:
+            stmt = stmt.where(AuditLog.timestamp <= end_time)
+
+        stmt = stmt.limit(limit).offset(offset)
+        result = await session.execute(stmt)
+        logs = result.scalars().all()
+
+        if logs:
+            self._logger.info(
+                "Dangerous actions queried",
+                extra={
+                    "count": len(logs),
+                    "tenant_id": tenant_id,
+                    "operation": "list_dangerous_actions",
+                },
+            )
+        else:
+            _lazy.debug(
+                lambda: f"list_dangerous_actions: tenant_id={tenant_id} -> no dangerous actions"
+            )
+
+        return logs
+
+    async def count_dangerous_actions(
+        self,
+        session: AsyncSession,
+        *,
+        tenant_id: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+    ) -> int:
+        """Count dangerous actions for a time period.
+
+        Args:
+            session: Database session.
+            tenant_id: Optional tenant filter.
+            start_time: Optional start datetime filter.
+            end_time: Optional end datetime filter.
+
+        Returns:
+            Count of dangerous actions.
+        """
+        dangerous_patterns = [
+            "%.deleted",
+            "%.revoked",
+            "%.suspended",
+            "%.disconnected",
+        ]
+        dangerous_exact = ["delete", "bulk_delete", "purge"]
+
+        action_filters = [
+            AuditLog.action.like(pattern) for pattern in dangerous_patterns
+        ]
+        action_filters.extend([
+            AuditLog.action == exact for exact in dangerous_exact
+        ])
+
+        stmt = select(func.count(AuditLog.id)).where(or_(*action_filters))
+
+        if tenant_id:
+            stmt = stmt.where(AuditLog.tenant_id == tenant_id)
+
+        if start_time:
+            stmt = stmt.where(AuditLog.timestamp >= start_time)
+
+        if end_time:
+            stmt = stmt.where(AuditLog.timestamp <= end_time)
+
+        result = await session.execute(stmt)
+        return result.scalar_one()
 
     async def get_summary_stats(
         self,

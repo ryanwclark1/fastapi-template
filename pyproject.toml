@@ -638,7 +638,7 @@ options = "run ruff check --fix REVISION_SCRIPT_FILENAME"
 
 # === UV Configuration ===
 [tool.uv]
-default-groups = ["dev", "test"]
+default-groups = ["dev", "tests"]
 
 [tool.pyright]
 exclude = ["**/.venv", "**/*.tmpl"]

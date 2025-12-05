@@ -1,8 +1,9 @@
-"""OpenAI provider implementations for transcription and LLM.
+"""OpenAI provider implementations for transcription, LLM, and embeddings.
 
 Provides:
 - OpenAITranscriptionProvider: Whisper API for speech-to-text
 - OpenAILLMProvider: GPT models for text generation
+- OpenAIEmbeddingProvider: Text embeddings for semantic search
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 from example_service.infra.ai.providers.base import (
     BaseProvider,
+    EmbeddingResult,
     LLMMessage,
     LLMResponse,
     ProviderAuthenticationError,
@@ -485,3 +487,218 @@ class OpenAILLMProvider(BaseProvider):
     def get_model_name(self) -> str:
         """Get the model name being used."""
         return self.model_name
+
+
+class OpenAIEmbeddingProvider(BaseProvider):
+    """OpenAI embeddings provider.
+
+    Supports:
+    - text-embedding-3-small (1536 dimensions)
+    - text-embedding-3-large (3072 dimensions)
+    - text-embedding-ada-002 (1536 dimensions, legacy)
+
+    Example:
+        provider = OpenAIEmbeddingProvider(
+            api_key="sk-...",
+            model_name="text-embedding-3-small"
+        )
+
+        # Single embedding
+        result = await provider.embed("Hello, world!")
+        print(result.embeddings[0][:5])  # First 5 dimensions
+
+        # Batch embeddings
+        result = await provider.embed_batch([
+            "Text 1", "Text 2", "Text 3"
+        ])
+        print(f"Generated {len(result.embeddings)} embeddings")
+    """
+
+    # Model dimensions mapping
+    MODEL_DIMENSIONS = {
+        "text-embedding-3-small": 1536,
+        "text-embedding-3-large": 3072,
+        "text-embedding-ada-002": 1536,
+    }
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model_name: str = "text-embedding-3-small",
+        timeout: int = 120,
+        max_retries: int = 3,
+        **kwargs: Any,  # noqa: ARG002
+    ) -> None:
+        """Initialize OpenAI embedding provider.
+
+        Args:
+            api_key: OpenAI API key
+            model_name: Embedding model (text-embedding-3-small, text-embedding-3-large, etc.)
+            timeout: Request timeout in seconds
+            max_retries: Maximum retry attempts
+            **kwargs: Additional arguments
+        """
+        super().__init__(api_key=api_key, timeout=timeout, max_retries=max_retries)
+        self.model_name = model_name
+        self.dimension = self.MODEL_DIMENSIONS.get(model_name, 1536)
+        self._validate_api_key()
+
+        # Lazy import to avoid dependency if not used
+        try:
+            from openai import AsyncOpenAI
+
+            self.client = AsyncOpenAI(
+                api_key=self.api_key,
+                timeout=self.timeout,
+                max_retries=self.max_retries,
+            )
+        except ImportError as e:
+            raise ImportError(
+                "openai package is required for OpenAI provider. Install with: pip install openai"
+            ) from e
+
+        logger.info(
+            f"Initialized OpenAI embeddings provider with model {model_name}",
+            extra={"model": model_name, "dimension": self.dimension},
+        )
+
+    def get_provider_name(self) -> str:
+        """Get provider name."""
+        return "openai"
+
+    def get_dimension(self) -> int:
+        """Get the dimension of embedding vectors."""
+        return self.dimension
+
+    def get_model_name(self) -> str:
+        """Get the model name being used."""
+        return self.model_name
+
+    async def embed(
+        self,
+        text: str | list[str],
+        normalize: bool = True,  # noqa: ARG002
+        **kwargs: Any,
+    ) -> EmbeddingResult:
+        """Generate embeddings for text(s).
+
+        Args:
+            text: Single text or list of texts to embed
+            normalize: Not used (OpenAI embeddings are already normalized)
+            **kwargs: Additional OpenAI parameters
+
+        Returns:
+            EmbeddingResult with embedding vectors and metadata
+
+        Raises:
+            ProviderError: If embedding generation fails
+        """
+        try:
+            # Convert single text to list
+            texts = [text] if isinstance(text, str) else text
+
+            if not texts:
+                raise ValueError("Text list cannot be empty")
+
+            # Call OpenAI embeddings API
+            response = await self.client.embeddings.create(
+                model=self.model_name,
+                input=texts,
+                **kwargs,
+            )
+
+            # Extract embeddings
+            embeddings = [item.embedding for item in response.data]
+
+            # Calculate usage
+            usage = None
+            if hasattr(response, "usage") and response.usage:
+                usage = {"total_tokens": response.usage.total_tokens}
+
+            return EmbeddingResult(
+                embeddings=embeddings,
+                model=response.model,
+                dimension=self.dimension,
+                usage=usage,
+                provider_metadata={"id": getattr(response, "id", None)},
+            )
+
+        except Exception as e:
+            error_msg = str(e)
+            if "401" in error_msg or "authentication" in error_msg.lower():
+                raise ProviderAuthenticationError(
+                    "Invalid OpenAI API key",
+                    provider="openai",
+                    operation="embeddings",
+                    original_error=e,
+                ) from e
+
+            raise ProviderError(
+                f"OpenAI embedding generation failed: {error_msg}",
+                provider="openai",
+                operation="embeddings",
+                original_error=e,
+            ) from e
+
+    async def embed_batch(
+        self,
+        texts: list[str],
+        batch_size: int = 100,
+        normalize: bool = True,
+        **kwargs: Any,
+    ) -> EmbeddingResult:
+        """Generate embeddings for large batches of texts.
+
+        Automatically splits into smaller batches to respect API limits.
+        OpenAI supports up to 2048 texts per request, but we default to 100
+        for better rate limit management.
+
+        Args:
+            texts: List of texts to embed
+            batch_size: Maximum texts per API request (max 100 recommended)
+            normalize: Not used (OpenAI embeddings are already normalized)
+            **kwargs: Additional OpenAI parameters
+
+        Returns:
+            EmbeddingResult with all embedding vectors
+
+        Raises:
+            ProviderError: If embedding generation fails
+        """
+        if not texts:
+            raise ValueError("Text list cannot be empty")
+
+        # OpenAI supports up to 2048 texts per request, but we cap at 100 for safety
+        batch_size = min(batch_size, 100)
+
+        all_embeddings: list[list[float]] = []
+        total_tokens = 0
+
+        # Process in batches
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i : i + batch_size]
+
+            # Get embeddings for this batch
+            result = await self.embed(batch, normalize=normalize, **kwargs)
+
+            all_embeddings.extend(result.embeddings)
+
+            if result.usage and "total_tokens" in result.usage:
+                total_tokens += result.usage["total_tokens"]
+
+            # Small delay between batches to avoid rate limits
+            if i + batch_size < len(texts):
+                import asyncio
+
+                await asyncio.sleep(0.1)
+
+        return EmbeddingResult(
+            embeddings=all_embeddings,
+            model=self.model_name,
+            dimension=self.dimension,
+            usage={"total_tokens": total_tokens} if total_tokens > 0 else None,
+            provider_metadata={
+                "batch_size": batch_size,
+                "total_batches": (len(texts) + batch_size - 1) // batch_size,
+            },
+        )

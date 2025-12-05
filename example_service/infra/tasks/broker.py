@@ -12,10 +12,118 @@ This module provides two separate Taskiq integrations:
    - Wraps FastStream broker to publish messages at scheduled times
    - Run scheduler: `taskiq scheduler example_service.infra.tasks.broker:stream_scheduler`
 
-Architecture:
-- FastStream RabbitRouter: Event-driven messaging (pub/sub handlers)
-- taskiq-aio-pika: Background task queue (async jobs)
-- taskiq-faststream: Scheduled message publishing (cron jobs that publish to queues)
+Architecture Decision: Two-Tier Task System
+============================================
+
+We use APScheduler + Taskiq instead of Taskiq's native scheduler because:
+
+1. **Runtime Control**: APScheduler allows pausing/resuming/rescheduling jobs
+   without code changes or restarts. This is critical for production operations.
+
+2. **Sophisticated Scheduling**: APScheduler provides:
+   - Job coalescing (multiple missed runs → single execution)
+   - Misfire handling with configurable grace periods
+   - Per-job timezone support
+   - Multiple triggers per job
+   - Job persistence across restarts
+
+3. **Monitoring & Observability**: APScheduler exposes job status, next run times,
+   and execution history through a rich API for operational visibility.
+
+4. **Separation of Concerns**:
+   - APScheduler: "WHEN to run" (scheduling logic, cron triggers)
+   - Taskiq: "HOW to run" (execution, retries, results, distributed processing)
+   - RabbitMQ: "WHERE to run" (task distribution, queue management)
+
+5. **Battle-Tested Maturity**: APScheduler has been production-proven since 2009
+   with extensive enterprise deployments.
+
+Alternative Approach (Not Used):
+---------------------------------
+Taskiq's native scheduler is simpler but less flexible:
+
+```python
+@broker.task(schedule=[{"cron": "0 2 * * *"}])
+async def my_task():
+    pass
+```
+
+This works well for:
+- Small applications with few scheduled tasks
+- Static schedules that rarely change
+- Simple deployments without operational complexity
+
+We chose APScheduler because this template targets production use cases
+requiring operational flexibility and enterprise-grade scheduling.
+
+RabbitMQ vs Redis for Message Broker
+=====================================
+
+We use RabbitMQ (taskiq-aio-pika) instead of Redis because:
+
+1. **Message Durability**: RabbitMQ persists messages to disk, surviving restarts
+2. **Delivery Guarantees**: At-least-once delivery with acknowledgments
+3. **Backpressure**: Automatic flow control prevents overwhelming slow consumers
+4. **High Availability**: Built-in clustering, mirroring, and failover
+5. **Dead Letter Exchanges**: Failed messages automatically routed to DLX for analysis
+6. **Priority Queues**: Native support for task prioritization
+7. **Enterprise Features**: SSL/TLS, fine-grained permissions, monitoring
+
+Redis is faster (lower latency) but lacks these enterprise features.
+For high-throughput, low-latency scenarios, consider Redis with careful
+attention to persistence configuration (AOF, snapshots).
+
+Result Backend Choice
+=====================
+
+We support both Redis and PostgreSQL result backends:
+
+**Redis** (default):
+- Ultra-fast result retrieval (~1ms latency)
+- Best for high-throughput systems (>1000 tasks/sec)
+- In-memory storage with optional persistence
+- Automatic TTL-based cleanup
+
+**PostgreSQL**:
+- Queryable task history with full SQL capabilities
+- Persistent storage for audit trails
+- Better for analytics and long-term debugging
+- No additional infrastructure if you already use PostgreSQL
+
+Configure via: TASK_RESULT_BACKEND=redis|postgres
+
+Middleware Stack
+================
+
+Middleware order is critical! Each middleware wraps the next:
+
+1. SimpleRetryMiddleware (outermost) - Must be first to wrap entire execution
+2. MetricsMiddleware - Records metrics for all attempts including retries
+3. TracingMiddleware - Creates OpenTelemetry spans for distributed tracing
+4. TrackingMiddleware (innermost) - Stores final execution state
+
+Changing this order can break retry logic or metrics accuracy.
+
+Task Discovery
+==============
+
+Tasks are registered by importing their modules at the bottom of this file.
+The worker process imports this module:
+
+    taskiq worker example_service.infra.tasks.broker:broker
+
+So all imports here are executed, registering tasks with the broker.
+If you add new task modules, import them at the bottom of this file.
+
+FastStream Integration
+======================
+
+The optional FastStream integration allows scheduled message publishing:
+- stream_scheduler publishes messages to FastStream broker on a schedule
+- Useful for event-driven architectures where scheduled events trigger workflows
+- Example: publish "daily_report_due" event at 8 AM, consumed by multiple services
+
+This is separate from the main Taskiq broker and is optional.
 """
 
 from __future__ import annotations
@@ -282,12 +390,14 @@ if broker is not None:
     # Import worker task modules to register them with the broker
     # Import scheduler for scheduled jobs
     import example_service.infra.tasks.scheduler
+    import example_service.workers.analytics.tasks
     import example_service.workers.backup.tasks
     import example_service.workers.cache.tasks
     import example_service.workers.cleanup.tasks
     import example_service.workers.export.tasks
     import example_service.workers.files.tasks
     import example_service.workers.notifications.tasks
+    import example_service.workers.reports.tasks
     import example_service.workers.tasks
     import example_service.workers.webhooks.tasks  # noqa: F401
 

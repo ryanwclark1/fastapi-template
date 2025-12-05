@@ -8,14 +8,11 @@ Wraps OpenAITranscriptionProvider and OpenAILLMProvider with:
 
 from __future__ import annotations
 
-import logging
 from decimal import Decimal
+import logging
 from typing import Any, ClassVar
 
-from example_service.infra.ai.capabilities.adapters.base import (
-    ProviderAdapter,
-    TimedExecution,
-)
+from example_service.infra.ai.capabilities.adapters.base import ProviderAdapter, TimedExecution
 from example_service.infra.ai.capabilities.types import (
     Capability,
     CapabilityMetadata,
@@ -104,9 +101,7 @@ class OpenAIAdapter(ProviderAdapter):
     def _get_llm_provider(self) -> Any:
         """Lazy initialize LLM provider."""
         if self._llm_provider is None:
-            from example_service.infra.ai.providers.openai_provider import (
-                OpenAILLMProvider,
-            )
+            from example_service.infra.ai.providers.openai_provider import OpenAILLMProvider
 
             self._llm_provider = OpenAILLMProvider(  # type: ignore[assignment]
                 api_key=self.api_key,

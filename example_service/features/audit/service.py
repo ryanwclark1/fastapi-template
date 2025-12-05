@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, or_, select
 
 from example_service.infra.database.session import get_async_session
 
@@ -19,16 +19,16 @@ from .schemas import (
     AuditLogQuery,
     AuditLogResponse,
     AuditSummary,
+    DangerousActionsResponse,
     EntityAuditHistory,
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from datetime import datetime
     from uuid import UUID
 
     from sqlalchemy.ext.asyncio import AsyncSession
-
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +74,7 @@ class AuditService:
         entity_type: str,
         entity_id: str | None = None,
         user_id: str | None = None,
+        actor_roles: list[str] | None = None,
         tenant_id: str | None = None,
         old_values: dict[str, Any] | None = None,
         new_values: dict[str, Any] | None = None,
@@ -94,6 +95,7 @@ class AuditService:
             entity_type: Type of entity affected.
             entity_id: ID of the affected entity.
             user_id: User who performed the action.
+            actor_roles: Roles the user had at time of action.
             tenant_id: Tenant context.
             old_values: Previous state (for updates/deletes).
             new_values: New state (for creates/updates).
@@ -118,6 +120,7 @@ class AuditService:
             entity_type=entity_type,
             entity_id=entity_id,
             user_id=user_id,
+            actor_roles=actor_roles or [],
             tenant_id=tenant_id,
             old_values=old_values,
             new_values=new_values,
@@ -164,6 +167,7 @@ class AuditService:
             entity_type=data.entity_type,
             entity_id=data.entity_id,
             user_id=data.user_id,
+            actor_roles=data.actor_roles,
             tenant_id=data.tenant_id,
             old_values=data.old_values,
             new_values=data.new_values,
@@ -177,6 +181,76 @@ class AuditService:
             error_message=data.error_message,
             duration_ms=data.duration_ms,
         )
+
+    async def log_bulk(
+        self,
+        entries: list[AuditLogCreate],
+    ) -> Sequence[AuditLog]:
+        """Create multiple audit entries efficiently.
+
+        This is more efficient than calling log() multiple times as it
+        uses a single database transaction for all entries.
+
+        Args:
+            entries: List of audit log creation data.
+
+        Returns:
+            Sequence of created audit log entries.
+
+        Example:
+            entries = [
+                AuditLogCreate(
+                    action=AuditAction.USER_CREATED,
+                    entity_type="user",
+                    entity_id="user-1",
+                    user_id="admin-1",
+                ),
+                AuditLogCreate(
+                    action=AuditAction.USER_CREATED,
+                    entity_type="user",
+                    entity_id="user-2",
+                    user_id="admin-1",
+                ),
+            ]
+            logs = await service.log_bulk(entries)
+        """
+        audit_logs = []
+        for data in entries:
+            changes = AuditLog.compute_changes(data.old_values, data.new_values)
+            audit_log = AuditLog(
+                action=data.action.value if hasattr(data.action, "value") else data.action,
+                entity_type=data.entity_type,
+                entity_id=data.entity_id,
+                user_id=data.user_id,
+                actor_roles=data.actor_roles or [],
+                tenant_id=data.tenant_id,
+                old_values=data.old_values,
+                new_values=data.new_values,
+                changes=changes,
+                ip_address=data.ip_address,
+                user_agent=data.user_agent,
+                request_id=data.request_id,
+                endpoint=data.endpoint,
+                method=data.method,
+                context_data=data.metadata,
+                success=data.success,
+                error_message=data.error_message,
+                duration_ms=data.duration_ms,
+            )
+            audit_logs.append(audit_log)
+
+        self.session.add_all(audit_logs)
+        await self.session.commit()
+
+        for audit_log in audit_logs:
+            await self.session.refresh(audit_log)
+
+        logger.debug(
+            f"Bulk created {len(audit_logs)} audit log entries",
+            extra={"count": len(audit_logs)},
+        )
+
+        return audit_logs
 
     async def get_by_id(self, audit_id: UUID) -> AuditLog | None:
         """Get an audit log entry by ID.
@@ -377,14 +451,104 @@ class AuditService:
         time_range_start = time_row[0] if time_row else None
         time_range_end = time_row[1] if time_row else None
 
+        # Count dangerous actions
+        dangerous_count = await self._count_dangerous_actions(tenant_id, start_time, end_time)
+
         return AuditSummary(
             total_entries=total_entries,
             actions_count=actions_count,
             entity_types_count=entity_types_count,
             success_rate=success_rate,
             unique_users=unique_users,
+            dangerous_actions_count=dangerous_count,
             time_range_start=time_range_start,
             time_range_end=time_range_end,
+        )
+
+    async def _count_dangerous_actions(
+        self,
+        tenant_id: str | None,
+        start_time: datetime | None,
+        end_time: datetime | None,
+    ) -> int:
+        """Count dangerous actions for a time period."""
+        dangerous_patterns = ["%.deleted", "%.revoked", "%.suspended", "%.disconnected"]
+        dangerous_exact = ["delete", "bulk_delete", "purge"]
+
+        action_filters = [AuditLog.action.like(pattern) for pattern in dangerous_patterns]
+        action_filters.extend([AuditLog.action == exact for exact in dangerous_exact])
+
+        stmt = select(func.count(AuditLog.id)).where(or_(*action_filters))
+
+        if tenant_id:
+            stmt = stmt.where(AuditLog.tenant_id == tenant_id)
+        if start_time:
+            stmt = stmt.where(AuditLog.timestamp >= start_time)
+        if end_time:
+            stmt = stmt.where(AuditLog.timestamp <= end_time)
+
+        result = await self.session.execute(stmt)
+        return result.scalar_one()
+
+    async def list_dangerous_actions(
+        self,
+        tenant_id: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> DangerousActionsResponse:
+        """List dangerous actions for security review.
+
+        Dangerous actions include deletes, revokes, suspensions, and disconnections
+        that could affect user access or data integrity.
+
+        Args:
+            tenant_id: Optional tenant filter.
+            start_time: Optional start time filter.
+            end_time: Optional end time filter.
+            limit: Maximum results to return.
+            offset: Number of results to skip.
+
+        Returns:
+            Response with dangerous actions and count.
+        """
+        dangerous_patterns = ["%.deleted", "%.revoked", "%.suspended", "%.disconnected"]
+        dangerous_exact = ["delete", "bulk_delete", "purge"]
+
+        action_filters = [AuditLog.action.like(pattern) for pattern in dangerous_patterns]
+        action_filters.extend([AuditLog.action == exact for exact in dangerous_exact])
+
+        stmt = (
+            select(AuditLog)
+            .where(or_(*action_filters))
+            .order_by(desc(AuditLog.timestamp))
+        )
+
+        if tenant_id:
+            stmt = stmt.where(AuditLog.tenant_id == tenant_id)
+        if start_time:
+            stmt = stmt.where(AuditLog.timestamp >= start_time)
+        if end_time:
+            stmt = stmt.where(AuditLog.timestamp <= end_time)
+
+        # Get total count
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total_result = await self.session.execute(count_stmt)
+        total = total_result.scalar() or 0
+
+        # Apply pagination
+        stmt = stmt.offset(offset).limit(limit)
+
+        result = await self.session.execute(stmt)
+        logs = result.scalars().all()
+
+        return DangerousActionsResponse(
+            items=[AuditLogResponse.model_validate(log) for log in logs],
+            total=total,
+            limit=limit,
+            offset=offset,
+            has_more=(offset + len(logs)) < total,
         )
 
     async def delete_old_logs(

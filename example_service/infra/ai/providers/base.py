@@ -4,7 +4,7 @@ Defines protocol classes for different AI capabilities:
 - TranscriptionProvider: Audio transcription (speech-to-text)
 - LLMProvider: Large language model operations
 - PIIRedactionProvider: PII detection and masking
-- EmbeddingProvider: Vector embeddings (future)
+- EmbeddingProvider: Vector embeddings
 
 Each provider implements these protocols to ensure consistent API.
 """
@@ -79,6 +79,16 @@ class PIIRedactionResult(BaseModel):
     redacted_text: str
     entities: list[PIIEntity]
     redaction_map: dict[str, str] | None = None  # Original -> Anonymized mapping
+    provider_metadata: dict[str, Any] | None = None
+
+
+class EmbeddingResult(BaseModel):
+    """Result of embedding generation."""
+
+    embeddings: list[list[float]]  # List of embedding vectors
+    model: str
+    dimension: int
+    usage: dict[str, int] | None = None  # {total_tokens}
     provider_metadata: dict[str, Any] | None = None
 
 
@@ -266,6 +276,68 @@ class PIIRedactionProvider(Protocol):
 
     def get_supported_entity_types(self) -> list[str]:
         """Get list of supported PII entity types."""
+        ...
+
+
+@runtime_checkable
+class EmbeddingProvider(Protocol):
+    """Protocol for text embedding providers.
+
+    Implementers: OpenAIEmbeddingProvider, CohereProvider, LocalEmbeddingProvider
+    """
+
+    async def embed(
+        self,
+        text: str | list[str],
+        normalize: bool = True,
+        **kwargs: Any,
+    ) -> EmbeddingResult:
+        """Generate embeddings for text(s).
+
+        Args:
+            text: Single text or list of texts to embed
+            normalize: Normalize vectors to unit length
+            **kwargs: Provider-specific options
+
+        Returns:
+            EmbeddingResult with embedding vectors and metadata
+
+        Raises:
+            ProviderError: If embedding generation fails
+        """
+        ...
+
+    async def embed_batch(
+        self,
+        texts: list[str],
+        batch_size: int = 100,
+        normalize: bool = True,
+        **kwargs: Any,
+    ) -> EmbeddingResult:
+        """Generate embeddings for large batches of texts.
+
+        Automatically splits into smaller batches to respect API limits.
+
+        Args:
+            texts: List of texts to embed
+            batch_size: Maximum texts per API request
+            normalize: Normalize vectors to unit length
+            **kwargs: Provider-specific options
+
+        Returns:
+            EmbeddingResult with all embedding vectors
+
+        Raises:
+            ProviderError: If embedding generation fails
+        """
+        ...
+
+    def get_dimension(self) -> int:
+        """Get the dimension of embedding vectors."""
+        ...
+
+    def get_model_name(self) -> str:
+        """Get the model name being used."""
         ...
 
 
