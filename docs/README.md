@@ -32,6 +32,7 @@ Understanding how the system is built.
 |----------|-------------|
 | [Architecture Overview](architecture/overview.md) | High-level service architecture and request flow |
 | [Final Architecture](architecture/final-architecture.md) | Complete system design with Accent-Auth integration |
+| [Multi-Tenancy](architecture/multi-tenancy.md) | Tenant context system, data isolation, and TenantAwareSession |
 | [Middleware Architecture](architecture/middleware-architecture.md) | Deep dive into middleware stack and ordering |
 
 ---
@@ -165,6 +166,6 @@ Historical documentation for reference.
 
 ## Document Statistics
 
-- **Total Documents**: 41
+- **Total Documents**: 42
 - **Categories**: 12
 - **Last Updated**: December 2025
