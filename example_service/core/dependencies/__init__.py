@@ -89,9 +89,30 @@ from example_service.core.dependencies.services import (
     HealthServiceDep,
     get_health_service,
 )
+from example_service.core.dependencies.availability import (
+    RequireAuth,
+    RequireBroker,
+    RequireCache,
+    RequireConsul,
+    RequireDatabase,
+    RequireDatabaseAndBroker,
+    RequireDatabaseAndCache,
+    RequireStorage,
+    require_services,
+)
 from example_service.infra.cache import get_cache
 
 __all__ = [
+    # Service availability
+    "RequireAuth",
+    "RequireBroker",
+    "RequireCache",
+    "RequireConsul",
+    "RequireDatabase",
+    "RequireDatabaseAndBroker",
+    "RequireDatabaseAndCache",
+    "RequireStorage",
+    "require_services",
     "EventPublisherDep",
     "ExtendedPagination",
     "ExtendedPaginationParams",

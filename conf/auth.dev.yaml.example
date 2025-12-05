@@ -1,0 +1,210 @@
+# Development Mode Authentication Configuration
+# Copy to conf/auth.dev.yaml and customize for local development
+#
+# WARNING: NEVER use dev_mode in production!
+# This configuration is for local development and testing only.
+
+# Enable dev mode (NEVER set to true in production)
+dev_mode: true
+
+# Default persona to use when AUTH_DEV_MOCK_USER env var is not set
+dev_mock_user: admin
+
+# Custom persona definitions
+# You can add your own personas here with specific permissions and ACLs
+dev_mock_users:
+  # =========================================================================
+  # Standard Personas (already defined in settings, shown here for reference)
+  # =========================================================================
+
+  # Example: Custom admin with specific tenant
+  my_admin:
+    user_id: admin-acme-001
+    email: admin@acme.com
+    roles:
+      - admin
+      - analyst
+    permissions:
+      - users:*
+      - reports:*
+      - analytics:*
+    acl:
+      - "#"  # Superuser wildcard
+    metadata:
+      tenant_uuid: acme-tenant-001
+      tenant_slug: acme-corp
+      session_uuid: dev-session-acme-admin
+      name: Acme Corp Admin
+      department: IT
+      organization: Acme Corporation
+
+  # Example: Department-specific user
+  sales_user:
+    user_id: sales-001
+    email: sales@acme.com
+    roles:
+      - user
+      - sales
+    permissions:
+      - leads:read
+      - leads:write
+      - opportunities:read
+    acl:
+      - "confd.leads.*.read"
+      - "confd.leads.*.write"
+      - "confd.opportunities.*.read"
+      - "confd.users.me.read"
+      - "confd.users.me.update"
+    metadata:
+      tenant_uuid: acme-tenant-001
+      tenant_slug: acme-corp
+      session_uuid: dev-session-sales
+      name: Sales Representative
+      department: Sales
+      region: US-West
+      territory: California
+
+  # Example: Multi-tenant support admin (can switch tenants)
+  support_admin:
+    user_id: support-admin-001
+    email: support@example.com
+    roles:
+      - support
+      - admin
+    permissions:
+      - support:*
+      - users:read
+      - tenants:read
+    acl:
+      - "*.*.*"  # Cross-tenant access
+      - "confd.users.*.read"
+      - "confd.tenants.*.read"
+    metadata:
+      # No fixed tenant - can use Accent-Tenant header to switch
+      name: Support Administrator
+      department: Customer Success
+      can_switch_tenants: true
+
+  # Example: Data analyst with read-only access
+  analyst:
+    user_id: analyst-001
+    email: analyst@acme.com
+    roles:
+      - analyst
+      - viewer
+    permissions:
+      - reports:read
+      - analytics:read
+      - dashboards:read
+    acl:
+      - "reportd.reports.*.read"
+      - "analyticsd.dashboards.*.read"
+      - "confd.users.me.read"
+    metadata:
+      tenant_uuid: acme-tenant-001
+      tenant_slug: acme-corp
+      session_uuid: dev-session-analyst
+      name: Data Analyst
+      department: Analytics
+
+  # Example: Integration service account
+  integration_service:
+    service_id: integration-service-001
+    roles:
+      - service
+      - integration
+    permissions:
+      - service:*
+      - webhooks:*
+    acl:
+      - "webhookd.#"  # Full webhook access
+      - "confd.users.*.read"  # Can read user data
+      - "*.*.*"  # Service-level access across tenants
+    metadata:
+      tenant_uuid: acme-tenant-001
+      tenant_slug: acme-corp
+      name: Integration Service
+      service_type: webhook_processor
+
+  # Example: Developer with specific ACLs for testing
+  developer:
+    user_id: dev-001
+    email: developer@acme.com
+    roles:
+      - developer
+      - user
+    permissions:
+      - api:*
+      - webhooks:read
+      - webhooks:write
+    acl:
+      - "confd.users.me.read"
+      - "confd.users.me.update"
+      - "webhookd.subscriptions.*.read"
+      - "webhookd.subscriptions.*.create"
+      - "webhookd.subscriptions.*.update"
+      - "apid.endpoints.*.read"
+    metadata:
+      tenant_uuid: acme-tenant-001
+      tenant_slug: acme-corp
+      session_uuid: dev-session-developer
+      name: Developer User
+      department: Engineering
+      team: Backend
+
+  # Example: Guest user with minimal permissions
+  guest:
+    user_id: guest-001
+    email: guest@example.com
+    roles:
+      - guest
+    permissions:
+      - public:read
+    acl:
+      - "confd.users.me.read"  # Can only read own profile
+    metadata:
+      tenant_uuid: acme-tenant-001
+      tenant_slug: acme-corp
+      session_uuid: dev-session-guest
+      name: Guest User
+      is_guest: true
+
+# =========================================================================
+# Usage Examples
+# =========================================================================
+
+# 1. Enable dev mode in .env:
+#    AUTH_DEV_MODE=true
+#    AUTH_DEV_MOCK_USER=admin
+
+# 2. Quick persona switching via environment:
+#    export AUTH_DEV_MOCK_USER=sales_user
+#    uvicorn example_service.app.main:app
+
+# 3. Testing with different personas:
+#    @pytest.fixture
+#    def test_sales_access(client, dev_mode_persona):
+#        dev_mode_persona("sales_user")
+#        response = client.get("/api/v1/leads")
+#        assert response.status_code == 200
+
+# =========================================================================
+# Security Notes
+# =========================================================================
+
+# - Dev mode is AUTOMATICALLY BLOCKED in production environments
+# - Every dev mode request logs a WARNING
+# - Production safety is enforced via Pydantic validator
+# - NEVER commit AUTH_DEV_MODE=true to production configs
+# - Use .env.local for local overrides (add to .gitignore)
+
+# =========================================================================
+# Persona Best Practices
+# =========================================================================
+
+# 1. Always include tenant_uuid and tenant_slug in metadata
+# 2. Use realistic ACL patterns that match your Accent-Auth config
+# 3. Document why each custom persona exists
+# 4. Keep persona permissions minimal (principle of least privilege)
+# 5. Test permission boundaries (ensure readonly can't write)
+# 6. Use different personas for different test scenarios

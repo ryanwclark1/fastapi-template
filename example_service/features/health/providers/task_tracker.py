@@ -20,11 +20,9 @@ import time
 from typing import TYPE_CHECKING
 
 from example_service.core.schemas.common import HealthStatus
-from example_service.features.health.providers import (
-    DEGRADED_LATENCY_THRESHOLD_MS,
-    HealthCheckResult,
-    ProviderConfig,
-)
+from example_service.core.settings.health import ProviderConfig
+
+from .protocol import DEGRADED_LATENCY_THRESHOLD_MS, HealthCheckResult
 
 if TYPE_CHECKING:
     from example_service.infra.tasks.tracking.base import BaseTaskTracker

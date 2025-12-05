@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from .backup import BackupSettings
     from .consul import ConsulSettings
     from .logs import LoggingSettings
+    from .mock import MockModeSettings
     from .otel import OtelSettings
     from .pagination import PaginationSettings
     from .postgres import PostgresSettings
@@ -131,6 +132,13 @@ def _get_pagination_settings() -> PaginationSettings:
     return PaginationSettings()
 
 
+def _get_mock_settings() -> MockModeSettings:
+    """Lazy import to avoid circular dependencies."""
+    from .mock import MockModeSettings
+
+    return MockModeSettings()
+
+
 class Settings(BaseSettings):
     """Unified settings composing all domain settings.
 
@@ -164,6 +172,7 @@ class Settings(BaseSettings):
     storage: StorageSettings = Field(default_factory=_get_storage_settings)
     task: TaskSettings = Field(default_factory=_get_task_settings)
     pagination: PaginationSettings = Field(default_factory=_get_pagination_settings)
+    mock: MockModeSettings = Field(default_factory=_get_mock_settings)
 
 
 def _rebuild_model() -> None:
@@ -178,6 +187,7 @@ def _rebuild_model() -> None:
     from .backup import BackupSettings
     from .consul import ConsulSettings
     from .logs import LoggingSettings
+    from .mock import MockModeSettings
     from .otel import OtelSettings
     from .pagination import PaginationSettings
     from .postgres import PostgresSettings
@@ -200,6 +210,7 @@ def _rebuild_model() -> None:
             "StorageSettings": StorageSettings,
             "TaskSettings": TaskSettings,
             "PaginationSettings": PaginationSettings,
+            "MockModeSettings": MockModeSettings,
         }
     )
 

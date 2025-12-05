@@ -313,3 +313,20 @@ def create_ai_yaml_source(settings_cls: type[BaseSettings]) -> ConfDYamlConfigSe
         confd_dir="ai.d",
         config_dir_env="AI_CONFIG_DIR",
     )
+
+
+def create_mock_yaml_source(settings_cls: type[BaseSettings]) -> ConfDYamlConfigSettingsSource:
+    """Create YAML source for MockModeSettings.
+
+    Loads from:
+    - conf/mock.yaml (base)
+    - conf/mock.d/*.yaml (overrides)
+
+    Override directory with: MOCK_CONFIG_DIR=/custom/path
+    """
+    return ConfDYamlConfigSettingsSource(
+        settings_cls,
+        yaml_file="mock.yaml",
+        confd_dir="mock.d",
+        config_dir_env="MOCK_CONFIG_DIR",
+    )

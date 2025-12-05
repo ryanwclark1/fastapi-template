@@ -742,3 +742,89 @@ def with_soft_delete(request):
                 pass
     """
     return request.param
+
+
+# ============================================================================
+# Development Mode Fixtures - Mock authentication for testing
+# ============================================================================
+
+
+@pytest.fixture
+def dev_mode_enabled(monkeypatch):
+    """Enable development mode for testing.
+
+    This fixture enables dev mode with the admin persona.
+    Use this when you need to test protected endpoints without
+    setting up full authentication.
+
+    Example:
+        async def test_admin_endpoint(client, dev_mode_enabled):
+            # No auth headers needed!
+            response = await client.get("/api/v1/admin/users")
+            assert response.status_code == 200
+
+    """
+    from unittest.mock import patch
+
+    from example_service.core.settings.loader import clear_settings_cache
+
+    with patch("example_service.core.settings.auth.get_app_settings") as mock_get_app:
+        mock_app_settings = type("AppSettings", (), {"environment": "development"})()
+        mock_get_app.return_value = mock_app_settings
+
+        monkeypatch.setenv("AUTH_DEV_MODE", "true")
+        monkeypatch.setenv("AUTH_DEV_MOCK_USER", "admin")
+
+        # Clear settings cache to pick up new env vars
+        clear_settings_cache()
+
+        yield
+
+        # Cleanup
+        clear_settings_cache()
+
+
+@pytest.fixture
+def dev_mode_persona(monkeypatch):
+    """Factory fixture for testing with different personas.
+
+    Returns:
+        Function that enables dev mode with specified persona.
+
+    Example:
+        async def test_permissions(client, dev_mode_persona):
+            # Test admin can delete
+            dev_mode_persona("admin")
+            response = await client.delete("/api/v1/users/123")
+            assert response.status_code == 200
+
+            # Test readonly cannot delete
+            dev_mode_persona("readonly")
+            response = await client.delete("/api/v1/users/123")
+            assert response.status_code == 403
+
+    """
+    from unittest.mock import patch
+
+    from example_service.core.settings.loader import clear_settings_cache
+
+    def set_persona(persona: str):
+        """Set the active dev mode persona.
+
+        Args:
+            persona: Persona name (admin, user, readonly, service,
+                     multitenant_admin, limited_user)
+
+        """
+        with patch("example_service.core.settings.auth.get_app_settings") as mock_get_app:
+            mock_app_settings = type("AppSettings", (), {"environment": "development"})()
+            mock_get_app.return_value = mock_app_settings
+
+            monkeypatch.setenv("AUTH_DEV_MODE", "true")
+            monkeypatch.setenv("AUTH_DEV_MOCK_USER", persona)
+            clear_settings_cache()
+
+    yield set_persona
+
+    # Cleanup
+    clear_settings_cache()

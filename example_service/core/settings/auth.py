@@ -63,6 +63,10 @@ class AuthSettings(BaseSettings):
     enable_permission_caching: bool = Field(default=True, description="Cache user ACL permissions")
     enable_acl_caching: bool = Field(default=True, description="Cache ACL validation results")
 
+    # NOTE: Development/mock mode has moved to MockModeSettings
+    # Use MOCK_MODE=true and MOCK_PERSONA=admin instead of AUTH_DEV_MODE
+    # See: example_service.core.settings.mock
+
     model_config = SettingsConfigDict(
         env_prefix="AUTH_",
         env_file=".env",
@@ -110,3 +114,4 @@ class AuthSettings(BaseSettings):
     def _normalize_token_cache_ttl(cls, value: Any) -> Any:
         """Allow inline comments in env values (e.g., "300  # seconds")."""
         return sanitize_inline_numeric(value)
+

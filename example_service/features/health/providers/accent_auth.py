@@ -11,8 +11,9 @@ import logging
 
 from example_service.core.schemas.common import HealthStatus
 from example_service.core.settings import get_auth_settings
-from example_service.features.health.providers import HealthCheckResult
 from example_service.infra.auth.accent_auth import get_accent_auth_client
+
+from .protocol import HealthCheckResult
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class AccentAuthHealthProvider:
 
     Example:
         # In lifespan.py startup
-        from example_service.features.health.accent_auth_provider import (
+        from example_service.features.health.providers import (
             AccentAuthHealthProvider,
         )
         from example_service.features.health.service import get_health_aggregator

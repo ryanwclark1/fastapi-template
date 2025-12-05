@@ -35,6 +35,7 @@ from .graphql import GraphQLSettings
 from .health import HealthCheckSettings
 from .i18n import I18nSettings
 from .logs import LoggingSettings
+from .mock import MockModeSettings
 from .otel import OtelSettings
 from .pagination import PaginationSettings
 from .postgres import PostgresSettings
@@ -225,6 +226,16 @@ def get_ai_settings() -> AISettings:
     return AISettings()
 
 
+@lru_cache(maxsize=1)
+def get_mock_settings() -> MockModeSettings:
+    """Get cached mock mode settings.
+
+    Returns:
+        Validated and frozen MockModeSettings instance.
+    """
+    return MockModeSettings()
+
+
 def clear_all_caches() -> None:
     """Clear all settings caches.
 
@@ -249,3 +260,4 @@ def clear_all_caches() -> None:
     get_email_settings.cache_clear()
     get_pagination_settings.cache_clear()
     get_ai_settings.cache_clear()
+    get_mock_settings.cache_clear()

@@ -10,7 +10,7 @@ from example_service.core.settings import (
     get_graphql_settings,
     get_websocket_settings,
 )
-from example_service.features.admin.email_admin import router as admin_email_router
+from example_service.features.admin.email import router as admin_email_router
 from example_service.features.ai.pipeline.router import router as ai_pipeline_router
 from example_service.features.audit.router import router as audit_router
 from example_service.features.datatransfer.router import router as datatransfer_router

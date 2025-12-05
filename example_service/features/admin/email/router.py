@@ -35,28 +35,6 @@ router = APIRouter(prefix="/admin/email", tags=["admin-email"])
 # =============================================================================
 
 
-class SystemEmailStats:
-    """System-wide email statistics."""
-
-    def __init__(
-        self,
-        total_tenants: int,
-        active_configs: int,
-        total_emails_sent: int,
-        total_cost_usd: float,
-        emails_by_provider: dict[str, int],
-        cost_by_provider: dict[str, float],
-        top_tenants: list[dict[str, Any]],
-    ):
-        self.total_tenants = total_tenants
-        self.active_configs = active_configs
-        self.total_emails_sent = total_emails_sent
-        self.total_cost_usd = total_cost_usd
-        self.emails_by_provider = emails_by_provider
-        self.cost_by_provider = cost_by_provider
-        self.top_tenants = top_tenants
-
-
 @router.get(
     "/usage",
     summary="Get system-wide email usage",
@@ -393,7 +371,3 @@ async def get_provider_distribution(
         if total_configs > 0
         else {},
     }
-
-
-# Add the typing import for the SystemEmailStats class
-from typing import Any  # noqa: E402

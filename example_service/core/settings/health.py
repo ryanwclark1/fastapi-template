@@ -185,6 +185,45 @@ class HealthCheckSettings(BaseSettings):
     )
 
     # ──────────────────────────────────────────────────────────────
+    # Service Availability Settings (for background health monitor)
+    # These settings control the background service availability system
+    # that gates endpoint access based on external service health.
+    # ──────────────────────────────────────────────────────────────
+
+    service_availability_enabled: bool = Field(
+        default=True,
+        description="Enable service availability monitoring and endpoint gating",
+    )
+
+    service_check_interval: float = Field(
+        default=30.0,
+        ge=5.0,
+        le=300.0,
+        description="Seconds between background health check cycles",
+    )
+
+    service_check_timeout: float = Field(
+        default=5.0,
+        ge=1.0,
+        le=30.0,
+        description="Timeout for individual service health checks",
+    )
+
+    service_failure_threshold: int = Field(
+        default=2,
+        ge=1,
+        le=10,
+        description="Consecutive failures before marking service unavailable",
+    )
+
+    service_recovery_threshold: int = Field(
+        default=1,
+        ge=1,
+        le=10,
+        description="Consecutive successes before marking service available",
+    )
+
+    # ──────────────────────────────────────────────────────────────
     # Helper methods
     # ──────────────────────────────────────────────────────────────
 

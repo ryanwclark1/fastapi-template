@@ -149,7 +149,7 @@ class StorageService:
         """Register health provider with the health aggregator."""
         try:
             from example_service.features.health.service import get_health_aggregator
-            from example_service.features.health.storage_provider import StorageHealthProvider
+            from example_service.features.health.providers import StorageHealthProvider
 
             aggregator = get_health_aggregator()
             if aggregator:

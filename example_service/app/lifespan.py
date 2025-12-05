@@ -249,7 +249,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 )
 
                 # Register rate limiter health provider with aggregator
-                from example_service.features.health.rate_limit_provider import (
+                from example_service.features.health.providers import (
                     RateLimiterHealthProvider,
                 )
                 from example_service.features.health.service import get_health_aggregator
@@ -262,7 +262,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 # Register Accent-Auth health provider (optional, never blocks startup)
                 if auth_settings.health_checks_enabled and auth_settings.service_url:
                     try:
-                        from example_service.features.health.accent_auth_provider import (
+                        from example_service.features.health.providers import (
                             AccentAuthHealthProvider,
                         )
 
@@ -357,7 +357,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 # Register task tracker health provider
                 try:
                     from example_service.features.health.service import get_health_aggregator
-                    from example_service.features.health.task_tracker_provider import (
+                    from example_service.features.health.providers import (
                         TaskTrackerHealthProvider,
                     )
 
@@ -472,6 +472,102 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 extra={"error": str(e)},
             )
 
+    # Initialize service availability health monitor
+    # This provides background health checking of external services and
+    # enables RequireX dependencies to gate endpoints based on service health.
+    health_settings = get_health_settings()
+    health_monitor_started = False
+    if health_settings.service_availability_enabled:
+        try:
+            from example_service.core.services.availability import ServiceName, get_service_registry
+            from example_service.core.services.health_monitor import get_health_monitor
+
+            health_monitor = get_health_monitor()
+
+            # Register health check functions for configured services
+            # These are async functions that return True if service is healthy
+
+            if db_settings.is_configured:
+
+                async def check_database() -> bool:
+                    try:
+                        from example_service.infra.database.session import get_async_engine
+
+                        engine = get_async_engine()
+                        if engine:
+                            async with engine.connect() as conn:
+                                await conn.execute(__import__("sqlalchemy").text("SELECT 1"))
+                            return True
+                    except Exception:
+                        pass
+                    return False
+
+                health_monitor.register_health_check(ServiceName.DATABASE, check_database)
+
+            if redis_settings.is_configured:
+
+                async def check_cache() -> bool:
+                    try:
+                        from example_service.infra.cache.redis import get_redis_client
+
+                        client = await get_redis_client()
+                        if client:
+                            await client.ping()
+                            return True
+                    except Exception:
+                        pass
+                    return False
+
+                health_monitor.register_health_check(ServiceName.CACHE, check_cache)
+
+            if rabbit_settings.is_configured:
+
+                async def check_broker() -> bool:
+                    try:
+                        from example_service.infra.messaging.broker import broker
+
+                        return broker is not None and broker._connection is not None
+                    except Exception:
+                        pass
+                    return False
+
+                health_monitor.register_health_check(ServiceName.BROKER, check_broker)
+
+            if storage_settings.is_configured:
+
+                async def check_storage() -> bool:
+                    try:
+                        from example_service.infra.storage import get_storage_service
+
+                        storage_service = get_storage_service()
+                        return storage_service.is_ready
+                    except Exception:
+                        pass
+                    return False
+
+                health_monitor.register_health_check(ServiceName.STORAGE, check_storage)
+
+            # Start the background health monitor
+            await health_monitor.start()
+            health_monitor_started = True
+            logger.info(
+                "Service availability health monitor started",
+                extra={
+                    "check_interval": health_settings.service_check_interval,
+                    "check_timeout": health_settings.service_check_timeout,
+                },
+            )
+
+            # Mark services as initially available (first check already ran in start())
+            registry = get_service_registry()
+            await registry.mark_all_available()
+
+        except Exception as e:
+            logger.warning(
+                "Failed to start service availability health monitor",
+                extra={"error": str(e)},
+            )
+
     logger.info(
         "Application startup complete - listening on %s:%s",
         app_settings.host,
@@ -488,6 +584,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "websocket_enabled": websocket_enabled,
             "task_tracking_enabled": tracker_started,
             "task_tracking_backend": task_settings.result_backend if tracker_started else None,
+            "service_availability_enabled": health_monitor_started,
             "host": app_settings.host,
             "port": app_settings.port,
         },
@@ -535,6 +632,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 "request_size_limit": app_settings.request_size_limit,
                 "enable_debug_middleware": app_settings.enable_debug_middleware,
                 "strict_csp": app_settings.strict_csp,
+                "service_availability_enabled": health_monitor_started,
             },
         )
 
@@ -543,6 +641,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Shutdown
     # Note: Settings are still available from startup phase (cached and frozen)
     logger.info("Application shutting down", extra={"service": app_settings.service_name})
+
+    # Stop service availability health monitor first (no external dependencies)
+    if health_monitor_started:
+        try:
+            from example_service.core.services.health_monitor import stop_health_monitor
+
+            await stop_health_monitor()
+            logger.info("Service availability health monitor stopped")
+        except Exception as e:
+            logger.warning(
+                "Error stopping service availability health monitor",
+                extra={"error": str(e)},
+            )
 
     # Stop Consul service discovery first (deregister before dependencies close)
     if consul_settings.is_configured:

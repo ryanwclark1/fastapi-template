@@ -118,6 +118,41 @@ class AuthUser(BaseModel):
         """Get the primary identifier (user_id or service_id)."""
         return self.user_id or self.service_id or "unknown"
 
+    @property
+    def tenant_id(self) -> str | None:
+        """Get tenant UUID from metadata.
+
+        This is a convenience property that extracts tenant_uuid from metadata.
+        For Accent-Auth integrations, this comes from the JWT token payload.
+
+        Returns:
+            Tenant UUID if available, None otherwise.
+
+        """
+        return self.metadata.get("tenant_uuid")
+
+    @property
+    def tenant_uuid(self) -> str | None:
+        """Alias for tenant_id for consistency with Accent-Auth naming.
+
+        Returns:
+            Tenant UUID if available, None otherwise.
+
+        """
+        return self.tenant_id
+
+    @property
+    def session_id(self) -> str | None:
+        """Get session UUID from metadata.
+
+        For Accent-Auth, this is the session_uuid from the JWT token.
+
+        Returns:
+            Session UUID if available, None otherwise.
+
+        """
+        return self.metadata.get("session_uuid")
+
     def has_permission(self, permission: str) -> bool:
         """Check if user/service has a specific permission.
 

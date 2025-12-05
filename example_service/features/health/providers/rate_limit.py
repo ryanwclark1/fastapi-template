@@ -10,7 +10,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from example_service.core.schemas.common import HealthStatus
-from example_service.features.health.providers import HealthCheckResult
+from .protocol import HealthCheckResult
 
 if TYPE_CHECKING:
     from example_service.infra.ratelimit.tracker import RateLimitStateTracker
