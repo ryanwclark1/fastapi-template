@@ -14,7 +14,6 @@ def strip_inline_comment(value: str) -> str:
     The check on ``value[idx - 1]`` avoids treating strings like
     ``foo#bar`` as comments because there is no preceding whitespace.
     """
-
     idx = value.find("#")
     if idx == -1:
         return value.strip()
@@ -27,7 +26,6 @@ def strip_inline_comment(value: str) -> str:
 
 def sanitize_inline_numeric(value: Any) -> Any:
     """Normalize numeric env vars that may include inline comments."""
-
     if isinstance(value, str):
         cleaned = strip_inline_comment(value)
         if cleaned:

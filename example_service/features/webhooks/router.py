@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession  # noqa: TC002
 
 from example_service.core.database import NotFoundError
 from example_service.core.dependencies.database import get_db_session
@@ -27,9 +28,6 @@ from example_service.features.webhooks.schemas import (
 from example_service.features.webhooks.service import WebhookService
 from example_service.infra.logging import get_lazy_logger
 from example_service.infra.metrics.tracking import track_feature_usage, track_user_action
-
-if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 

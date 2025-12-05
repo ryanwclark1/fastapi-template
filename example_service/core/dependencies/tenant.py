@@ -15,8 +15,11 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends, Header
 from frozendict import frozendict
+from sqlalchemy.ext.asyncio import AsyncSession  # noqa: TC002
 
-from example_service.app.middleware.tenant import set_tenant_context as set_middleware_tenant_context
+from example_service.app.middleware.tenant import (
+    set_tenant_context as set_middleware_tenant_context,
+)
 from example_service.core.schemas.tenant import TenantContext as SchemaTenantContext
 from example_service.infra.storage.backends import TenantContext
 
@@ -24,8 +27,6 @@ from .auth import get_current_user
 from .database import get_db_session
 
 if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
-
     from example_service.core.schemas.auth import AuthUser
 
 logger = logging.getLogger(__name__)

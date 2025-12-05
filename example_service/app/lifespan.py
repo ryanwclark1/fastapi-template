@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import inspect
-import logging
 from contextlib import asynccontextmanager
 from importlib import import_module
+import inspect
+import logging
 from typing import TYPE_CHECKING
 
 from example_service.core.settings import (
