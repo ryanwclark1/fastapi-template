@@ -1,10 +1,41 @@
-# Build stage
-FROM python:3.13-slim as builder
+###############################################
+# Base Image
+###############################################
+FROM python:3.13-slim AS python-base
 
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+ENV PYTHONUNBUFFERED=1 \
+  PYTHONDONTWRITEBYTECODE=1 \
+  PIP_NO_CACHE_DIR=off \
+  PIP_DISABLE_PIP_VERSION_CHECK=on \
+  PIP_DEFAULT_TIMEOUT=100 \
+  UV_SYSTEM_PYTHON=1 \
+  UV_COMPILE_BYTECODE=1 \
+  VENV_PATH="/app/.venv"
+
+ENV PATH="$VENV_PATH/bin:$PATH"
+
+###############################################
+# Builder Image
+###############################################
+FROM python-base AS builder-base
+
+# Install build dependencies
+RUN apt-get update -qq \
+  && apt-get install -y --no-install-recommends \
+  curl \
+  gcc \
+  libc6-dev \
+  libpq-dev \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install UV
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
 
 WORKDIR /app
+
+# Create virtual environment
+RUN uv venv .venv
 
 # Copy dependency files
 COPY pyproject.toml uv.lock* ./
@@ -14,16 +45,25 @@ COPY README.md README.md
 # Install dependencies
 RUN uv sync --frozen --no-dev
 
-# Runtime stage
-FROM python:3.13-slim
+###############################################
+# Production Image
+###############################################
+FROM python-base AS production
 
-# Copy uv from builder
-COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
+# Install runtime dependencies
+RUN apt-get update -qq \
+  && apt-get install -y --no-install-recommends \
+  libpq5 \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Copy uv from builder (needed for uv run)
+COPY --from=builder-base /root/.local/bin/uv /usr/local/bin/uv
 
-# Copy installed packages and application code
-COPY --from=builder /app/.venv /app/.venv
+# Copy the virtual environment
+COPY --from=builder-base /app/.venv /app/.venv
+
+# Copy application code
 COPY . .
 
 # Create logs directory
