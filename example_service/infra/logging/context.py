@@ -13,9 +13,9 @@ This approach is:
 
 from __future__ import annotations
 
-import logging
 from collections.abc import MutableMapping
 from contextvars import ContextVar
+import logging
 from typing import Any
 
 # Global context variable for log context

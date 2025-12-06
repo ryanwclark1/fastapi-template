@@ -28,9 +28,9 @@ Output:
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 import random
 import string
-from datetime import datetime, timedelta
 
 from locust import HttpUser, between, events, task
 

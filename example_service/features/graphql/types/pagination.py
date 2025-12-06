@@ -109,7 +109,6 @@ def create_pydantic_edge[T: "BaseModel"](
     )
     class NodeType:
         """Node type auto-generated from Pydantic model"""
-        pass
 
     # Create the Edge type
     @strawberry.type(

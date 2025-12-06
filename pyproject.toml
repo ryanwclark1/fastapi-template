@@ -119,7 +119,6 @@ dev = [
     "types-redis>=4.6.0.20241004",
     "types-openpyxl>=3.1.0",
     "types-requests>=2.32.0.20241016",
-    "types-phonenumbers>=8.13.0.20241016",
 ]
 tests = [
     "pytest>=8.3.5",
@@ -278,7 +277,7 @@ directory = "coverage"
 output = "coverage.xml"
 
 [tool.ruff]
-line-length = 100
+line-length = 88
 indent-width = 4
 target-version = "py313"
 respect-gitignore = true
@@ -292,43 +291,43 @@ exclude = [
     ".ruff_cache",
     "**/examples/*",
     "scripts",
+    "**/alembic/**",
+    "**/migrations/**",
 ]
 
 [tool.ruff.lint]
-select = [
-    "E",    # pycodestyle errors
-    "W",    # pycodestyle warnings
-    "F",    # pyflakes
-    "I",    # isort
-    "B",    # flake8-bugbear
-    "C4",   # flake8-comprehensions
-    "UP",   # pyupgrade
-    "ARG",  # flake8-unused-arguments
-    "SIM",  # flake8-simplify
-    "TC",   # flake8-type-checking
-    "LOG",  # flake8-logging - logging best practices
-    "RUF",  # Ruff-specific rules
-    "S",    # flake8-bandit - security checks
-    "PT",   # flake8-pytest-style - test conventions
-    "PIE",  # flake8-pie - miscellaneous lints
-    "PERF", # perflint - performance anti-patterns
-    "ERA",  # eradicate - commented-out code
-    "D",    # pydocstyle
-]
+select = ["ALL"]
+fixable = ["ALL"]
 ignore = [
-    "E501",    # line too long (handled by formatter)
-    "S104",    # possible binding to all interfaces - intentional for dev
-    "S105",    # hardcoded password - false positives with variable names
-    "S106",    # hardcoded password in function argument - false positives
-    "S311",    # pseudo-random generator - acceptable for non-crypto uses
-    "PERF401", # Using a list comprehension to unpack - readability preference
-    "ERA001",  # Commented-out code - may be intentional for documentation
-    "D100",    # Missing docstring in public module
-    "D211",    # No blank line before class docstring
-    "D213",    # Multi-line docstring summary on second line
-    "D203",    # One blank line before class docstring
-    "COM812",  # Trailing comma
-    "ANN401",  # ANY type annotation
+    # Documentation - add incrementally
+    "D100", # Missing docstring in public module
+    "D101", # Missing docstring in public class
+    "D102", # Missing docstring in public method
+    "D103", # Missing docstring in public function
+    "D104", # Missing docstring in public package
+    "D105", # Missing docstring in magic method
+    "D203", # One blank line before class docstring
+    "D211", # No blank line before class docstring
+    "D213", # Multi-line docstring summary on second line
+    # Type annotations - balanced approach
+    "ANN001", # Missing type annotation for function argument
+    "ANN003", # Missing type annotation for **kwargs
+    "ANN401", # Dynamically typed expressions (Any)
+    # Formatting
+    "COM812", # Trailing comma (conflicts with formatter)
+    "ISC001", # Implicitly concatenated string literals (conflicts with formatter)
+    "E501",   # Line too long (handled by formatter)
+    # Security - practical exceptions
+    "S104", # Possible binding to all interfaces - intentional for dev
+    "S105", # Hardcoded password - false positives
+    "S106", # Hardcoded password in function argument
+    "S311", # Pseudo-random generator - acceptable for non-crypto
+    # Code patterns
+    "PERF401", # Manual list comprehension - readability preference
+    "ERA001",  # Commented-out code - may be intentional
+    "TD003",   # Missing issue link for TODO
+    "FIX002",  # Line contains TODO
+    "PLC0415",
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -437,6 +436,23 @@ ignore = [
 "example_service/cli/commands/search.py" = [
     "S608", # SQL injection - false positive, identifiers validated via safe_table_reference
 ]
+# Tools/scripts: CLI tools and linting utilities
+"tools/**/*.py" = [
+    "T201",   # print statements - common in CLI tools
+    "D100",   # Missing docstring in public module
+    "D101",   # Missing docstring in public class
+    "D102",   # Missing docstring in public method
+    "D103",   # Missing docstring in public function
+    "D104",   # Missing docstring in public package
+    "D105",   # Missing docstring in magic method
+    "ARG001", # Unused function argument - common in CLI tools
+    "ARG002", # Unused function argument - common in CLI tools
+    "S101",   # Use of assert - acceptable in tools
+    "INP001", # Import sorting - less critical for tools
+    "EXE001", # Executable found in library code - common in CLI tools
+    "D107",   # Missing docstring in __main__
+    "ANN204", # Missing type annotation for return value
+]
 
 [tool.ruff.lint.flake8-type-checking]
 # Declarative base classes must see annotations at runtime (e.g. datetime, uuid)
@@ -453,7 +469,8 @@ indent-style = "space"
 line-ending = "auto"
 skip-magic-trailing-comma = false
 docstring-code-format = true
-docstring-code-line-length = "dynamic"
+docstring-code-line-length = 88
+preview = true
 
 [tool.ruff.lint.isort]
 known-first-party = ["example_service"]

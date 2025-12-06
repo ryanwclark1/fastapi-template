@@ -8,8 +8,8 @@ This module provides:
 
 from __future__ import annotations
 
-import logging
 from datetime import UTC, datetime
+import logging
 from typing import Any
 
 from sqlalchemy import select, update
@@ -477,7 +477,9 @@ if broker is not None:
             Dictionary with send result.
         """
         try:
-            from example_service.infra.email.enhanced_service import get_enhanced_email_service
+            from example_service.infra.email.enhanced_service import (
+                get_enhanced_email_service,
+            )
 
             email_service = get_enhanced_email_service()
         except RuntimeError:
@@ -598,7 +600,9 @@ if broker is not None:
             Dictionary with send result.
         """
         try:
-            from example_service.infra.email.enhanced_service import get_enhanced_email_service
+            from example_service.infra.email.enhanced_service import (
+                get_enhanced_email_service,
+            )
 
             email_service = get_enhanced_email_service()
             use_enhanced = True

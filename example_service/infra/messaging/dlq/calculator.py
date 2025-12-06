@@ -49,7 +49,6 @@ def calculate_delay(
         delay_2 = calculate_delay(config, 1)  # ~2000ms (with jitter: 1000-3000ms)
         delay_3 = calculate_delay(config, 2)  # ~4000ms (with jitter: 2000-6000ms)
     """
-
     # Calculate base delay based on policy
     base_delay = _calculate_base_delay(
         policy=config.retry_policy,

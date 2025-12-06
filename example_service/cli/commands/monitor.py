@@ -7,14 +7,22 @@ This module provides CLI commands for monitoring:
 - Log viewing
 """
 
+from datetime import UTC, datetime
 import shutil
 import sys
-from datetime import UTC, datetime
 from typing import Any, cast
 
 import click
 
-from example_service.cli.utils import coro, error, header, info, section, success, warning
+from example_service.cli.utils import (
+    coro,
+    error,
+    header,
+    info,
+    section,
+    success,
+    warning,
+)
 
 
 @click.group(name="monitor")
@@ -175,8 +183,7 @@ def _check_scheduler() -> dict:
         if scheduler.running:
             job_count = len(scheduler.get_jobs())
             return {"healthy": True, "configured": True, "info": f"{job_count} jobs"}
-        else:
-            return {"healthy": False, "configured": True, "error": "Not running"}
+        return {"healthy": False, "configured": True, "error": "Not running"}
     except Exception as e:
         return {"healthy": False, "configured": True, "error": str(e)}
 
@@ -434,8 +441,8 @@ def view_logs(lines: int, follow: bool, level: str | None) -> None:
     Note: This requires logs to be written to a file.
     Configure LOG_FILE in your environment.
     """
-    import subprocess
     from pathlib import Path
+    import subprocess
 
     from example_service.core.settings import get_logging_settings
 
@@ -514,7 +521,7 @@ def view_logs(lines: int, follow: bool, level: str | None) -> None:
                 grep_proc.terminate()
         else:
             # tail_path is resolved via shutil.which(), log_file is validated path
-            subprocess.run(cmd)  # noqa: S603
+            subprocess.run(cmd, check=False)  # noqa: S603
 
     except FileNotFoundError:
         error("tail command not found")

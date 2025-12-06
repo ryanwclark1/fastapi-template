@@ -12,8 +12,8 @@ import logging
 from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
-import strawberry
 from sqlalchemy import select
+import strawberry
 
 from example_service.features.audit.models import AuditLog
 from example_service.features.audit.schemas import AuditLogResponse

@@ -116,11 +116,17 @@ def _patch_fastapi_middleware_ordering() -> None:
         from fastapi import FastAPI
         from starlette.middleware import Middleware
 
-        from example_service.app.middleware.correlation_id import CorrelationIDMiddleware
+        from example_service.app.middleware.correlation_id import (
+            CorrelationIDMiddleware,
+        )
         from example_service.app.middleware.rate_limit import RateLimitMiddleware
         from example_service.app.middleware.request_id import RequestIDMiddleware
-        from example_service.app.middleware.request_logging import RequestLoggingMiddleware
-        from example_service.app.middleware.security_headers import SecurityHeadersMiddleware
+        from example_service.app.middleware.request_logging import (
+            RequestLoggingMiddleware,
+        )
+        from example_service.app.middleware.security_headers import (
+            SecurityHeadersMiddleware,
+        )
         from example_service.app.middleware.size_limit import RequestSizeLimitMiddleware
     except Exception:  # pragma: no cover - FastAPI/middleware imports missing
         return

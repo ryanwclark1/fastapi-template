@@ -10,7 +10,10 @@ from fastapi import FastAPI, Request, Response
 from httpx import ASGITransport, AsyncClient
 import pytest
 
-from example_service.app.middleware.request_logging import PIIMasker, RequestLoggingMiddleware
+from example_service.app.middleware.request_logging import (
+    PIIMasker,
+    RequestLoggingMiddleware,
+)
 
 # ============================================================================
 # PIIMasker Tests
@@ -248,7 +251,9 @@ class TestRequestLoggingMiddleware:
     @pytest.mark.asyncio
     async def test_middleware_logs_user_context(self, app: FastAPI, client: AsyncClient) -> None:
         """Test that middleware logs user context from request state."""
-        from example_service.app.middleware.request_logging import RequestLoggingMiddleware
+        from example_service.app.middleware.request_logging import (
+            RequestLoggingMiddleware,
+        )
 
         middleware = RequestLoggingMiddleware(app, log_request_body=False)
 
@@ -509,14 +514,13 @@ class TestRequestLoggingMiddleware:
                     if log_data.get("event") == "response":
                         assert "response_size" in log_data
                         break
-            else:
-                # If only one call, check it anyway
-                if calls:
-                    log_data = calls[-1][1].get("extra", {})
-                    # response_size may not be present if content-length header is missing
-                    # which is fine for this test
-                    if "content-length" in str(log_data.get("headers", {})):
-                        assert "response_size" in log_data
+            # If only one call, check it anyway
+            elif calls:
+                log_data = calls[-1][1].get("extra", {})
+                # response_size may not be present if content-length header is missing
+                # which is fine for this test
+                if "content-length" in str(log_data.get("headers", {})):
+                    assert "response_size" in log_data
 
     @pytest.mark.asyncio
     async def test_middleware_handles_missing_client_info(

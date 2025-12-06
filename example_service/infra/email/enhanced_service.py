@@ -34,7 +34,11 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from example_service.core.exceptions import RateLimitException
-from example_service.core.models.email_config import EmailAuditLog, EmailProviderType, EmailUsageLog
+from example_service.core.models.email_config import (
+    EmailAuditLog,
+    EmailProviderType,
+    EmailUsageLog,
+)
 from example_service.infra.ratelimit import check_rate_limit
 
 from . import metrics
@@ -51,7 +55,11 @@ from .schemas import (
     EmailResult,
     EmailStatus,
 )
-from .templates import EmailTemplateRenderer, TemplateNotFoundError, get_template_renderer
+from .templates import (
+    EmailTemplateRenderer,
+    TemplateNotFoundError,
+    get_template_renderer,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -466,7 +474,9 @@ class EnhancedEmailService:
         Returns:
             Task ID for tracking
         """
-        from example_service.workers.notifications.tasks import send_tenant_template_email_task
+        from example_service.workers.notifications.tasks import (
+            send_tenant_template_email_task,
+        )
 
         recipients = [to] if isinstance(to, str) else list(to)
 
@@ -542,24 +552,23 @@ class EnhancedEmailService:
                     **delivery_result.metadata,
                 },
             )
-        else:
-            return EmailResult(
-                success=False,
-                message_id=delivery_result.message_id,
-                status=EmailStatus.FAILED,
-                recipients_accepted=delivery_result.recipients_accepted,
-                recipients_rejected=delivery_result.recipients_rejected,
-                backend=delivery_result.provider,
-                error=delivery_result.error,
-                error_code=delivery_result.error_code,
-                retry_count=0,
-                metadata={
-                    "provider": delivery_result.provider,
-                    "duration_ms": delivery_result.duration_ms,
-                    "tenant_id": config.tenant_id,
-                    **delivery_result.metadata,
-                },
-            )
+        return EmailResult(
+            success=False,
+            message_id=delivery_result.message_id,
+            status=EmailStatus.FAILED,
+            recipients_accepted=delivery_result.recipients_accepted,
+            recipients_rejected=delivery_result.recipients_rejected,
+            backend=delivery_result.provider,
+            error=delivery_result.error,
+            error_code=delivery_result.error_code,
+            retry_count=0,
+            metadata={
+                "provider": delivery_result.provider,
+                "duration_ms": delivery_result.duration_ms,
+                "tenant_id": config.tenant_id,
+                **delivery_result.metadata,
+            },
+        )
 
     def template_exists(self, template_name: str) -> bool:
         """Check if a template exists.
@@ -603,10 +612,9 @@ class EnhancedEmailService:
             self._resolver.invalidate(tenant_id)
             self._factory.invalidate_cache(tenant_id)
             return 1
-        else:
-            count = self._resolver.invalidate_all()
-            self._factory.invalidate_cache()
-            return count
+        count = self._resolver.invalidate_all()
+        self._factory.invalidate_cache()
+        return count
 
     # =========================================================================
     # Phase 3: Rate Limiting, Usage Logging, and Audit Logging

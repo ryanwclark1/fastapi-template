@@ -38,10 +38,10 @@ Usage:
 from __future__ import annotations
 
 import contextlib
-import logging
-import weakref
 from dataclasses import dataclass, field
+import logging
 from typing import TYPE_CHECKING, Any
+import weakref
 
 from sqlalchemy import event, text
 from sqlalchemy.orm import Mapper
@@ -169,7 +169,6 @@ class SearchManager:
         """
         # This is called once after all mappers are set up
         # We don't need to do anything here since we process tables on create
-        pass
 
     def _on_table_create(
         self,

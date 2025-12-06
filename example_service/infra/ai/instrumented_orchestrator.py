@@ -70,8 +70,8 @@ WebSocket Integration:
 
 from __future__ import annotations
 
-import logging
 from decimal import Decimal
+import logging
 from typing import TYPE_CHECKING, Any
 
 from example_service.infra.ai.capabilities.registry import (
@@ -358,7 +358,7 @@ class InstrumentedOrchestrator:
                         capability=step.capability.value if step.capability else "unknown",
                         status="success" if op.success else "failure",
                         latency_seconds=(op.latency_ms or 0) / 1000,
-                        cost_usd=op.cost_usd or Decimal("0"),
+                        cost_usd=op.cost_usd or Decimal(0),
                         error_code=op.error_code,
                         tenant_id=tenant_id,
                     )

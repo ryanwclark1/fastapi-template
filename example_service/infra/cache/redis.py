@@ -11,10 +11,11 @@ This module provides a high-level Redis cache client that includes:
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator  # noqa: TC003
+from contextlib import asynccontextmanager
 import json
 import logging
 import time
-from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, cast
 
 from opentelemetry import trace
@@ -40,7 +41,7 @@ from example_service.infra.metrics.prometheus import (
 from example_service.utils.retry import retry
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Awaitable
+    from collections.abc import Awaitable
 
 logger = logging.getLogger(__name__)
 redis_settings = get_redis_settings()
@@ -181,13 +182,12 @@ class RedisCache:
                     )
                 else:
                     cache_hits_total.labels(cache_name=cache_name).inc()
+            elif trace_id:
+                cache_misses_total.labels(cache_name=cache_name).inc(
+                    exemplar={"trace_id": trace_id}
+                )
             else:
-                if trace_id:
-                    cache_misses_total.labels(cache_name=cache_name).inc(
-                        exemplar={"trace_id": trace_id}
-                    )
-                else:
-                    cache_misses_total.labels(cache_name=cache_name).inc()
+                cache_misses_total.labels(cache_name=cache_name).inc()
 
             # Record operation duration
             if trace_id:

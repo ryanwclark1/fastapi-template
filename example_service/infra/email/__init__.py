@@ -73,7 +73,11 @@ from .schemas import (
     EmailStatus,
 )
 from .service import EmailService, get_email_service
-from .templates import EmailTemplateRenderer, TemplateNotFoundError, get_template_renderer
+from .templates import (
+    EmailTemplateRenderer,
+    TemplateNotFoundError,
+    get_template_renderer,
+)
 
 __all__ = [
     # Provider System

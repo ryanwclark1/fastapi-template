@@ -91,22 +91,21 @@ def process_graphql_errors(
         if is_user_facing_error(error):
             # Keep the error as-is (validation, auth, etc.)
             processed_errors.append(error.formatted)
+        # Mask internal errors in production
+        elif is_production:
+            masked_error = mask_internal_error(error)
+            processed_errors.append(masked_error)
         else:
-            # Mask internal errors in production
-            if is_production:
-                masked_error = mask_internal_error(error)
-                processed_errors.append(masked_error)
-            else:
-                # In development, include full error details
-                formatted = error.formatted
-                # Add helpful debug info in development
-                if error.original_error:
-                    formatted["extensions"] = formatted.get("extensions", {})
-                    formatted["extensions"]["debug"] = {
-                        "exception_type": type(error.original_error).__name__,
-                        "exception_message": str(error.original_error),
-                    }
-                processed_errors.append(formatted)
+            # In development, include full error details
+            formatted = error.formatted
+            # Add helpful debug info in development
+            if error.original_error:
+                formatted["extensions"] = formatted.get("extensions", {})
+                formatted["extensions"]["debug"] = {
+                    "exception_type": type(error.original_error).__name__,
+                    "exception_message": str(error.original_error),
+                }
+            processed_errors.append(formatted)
 
     return processed_errors
 

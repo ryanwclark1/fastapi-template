@@ -17,8 +17,8 @@ Example:
 
 from __future__ import annotations
 
-import logging
 from datetime import UTC, datetime
+import logging
 from typing import TYPE_CHECKING, Any
 
 from example_service.core.schemas.common import HealthStatus

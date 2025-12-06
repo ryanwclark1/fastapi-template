@@ -13,6 +13,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from example_service.core.schemas.common import HealthStatus
+
 from .protocol import DEGRADED_LATENCY_THRESHOLD_MS, HealthCheckResult
 
 if TYPE_CHECKING:

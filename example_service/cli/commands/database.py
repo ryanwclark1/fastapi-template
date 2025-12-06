@@ -28,7 +28,15 @@ from typing import Any
 import click
 from sqlalchemy import text
 
-from example_service.cli.utils import coro, error, header, info, section, success, warning
+from example_service.cli.utils import (
+    coro,
+    error,
+    header,
+    info,
+    section,
+    success,
+    warning,
+)
 
 
 def get_alembic_commands() -> Any:
@@ -711,7 +719,7 @@ async def shell() -> None:
 
         # Run psql interactively
         # psql_cmd is constructed from validated database settings, not user input
-        subprocess.run(psql_cmd, env=env)  # noqa: S603
+        subprocess.run(psql_cmd, check=False, env=env)  # noqa: S603
 
     except FileNotFoundError:
         error("psql command not found. Please install PostgreSQL client tools.")

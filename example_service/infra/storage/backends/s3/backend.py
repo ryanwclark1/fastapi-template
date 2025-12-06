@@ -7,8 +7,8 @@ S3-compatible services using aioboto3.
 from __future__ import annotations
 
 import hashlib
-import logging
 from io import BytesIO
+import logging
 from typing import TYPE_CHECKING, Any, BinaryIO, cast
 
 if TYPE_CHECKING:

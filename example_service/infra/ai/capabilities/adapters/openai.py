@@ -12,7 +12,10 @@ from decimal import Decimal
 import logging
 from typing import Any, ClassVar
 
-from example_service.infra.ai.capabilities.adapters.base import ProviderAdapter, TimedExecution
+from example_service.infra.ai.capabilities.adapters.base import (
+    ProviderAdapter,
+    TimedExecution,
+)
 from example_service.infra.ai.capabilities.types import (
     Capability,
     CapabilityMetadata,
@@ -101,7 +104,9 @@ class OpenAIAdapter(ProviderAdapter):
     def _get_llm_provider(self) -> Any:
         """Lazy initialize LLM provider."""
         if self._llm_provider is None:
-            from example_service.infra.ai.providers.openai_provider import OpenAILLMProvider
+            from example_service.infra.ai.providers.openai_provider import (
+                OpenAILLMProvider,
+            )
 
             self._llm_provider = OpenAILLMProvider(  # type: ignore[assignment]
                 api_key=self.api_key,
@@ -232,19 +237,18 @@ class OpenAIAdapter(ProviderAdapter):
         # Route to appropriate handler
         if capability in (Capability.LLM_GENERATION, Capability.LLM_STREAMING):
             return await self._execute_llm_generation(input_data, **options)
-        elif capability == Capability.LLM_STRUCTURED:
+        if capability == Capability.LLM_STRUCTURED:
             return await self._execute_llm_structured(input_data, **options)
-        elif capability == Capability.TRANSCRIPTION:
+        if capability == Capability.TRANSCRIPTION:
             return await self._execute_transcription(input_data, **options)
-        elif capability == Capability.TRANSCRIPTION_DUAL_CHANNEL:
+        if capability == Capability.TRANSCRIPTION_DUAL_CHANNEL:
             return await self._execute_transcription_dual_channel(input_data, **options)
-        else:
-            return self._create_error_result(
-                capability,
-                f"Unsupported capability: {capability}",
-                error_code="UNSUPPORTED_CAPABILITY",
-                retryable=False,
-            )
+        return self._create_error_result(
+            capability,
+            f"Unsupported capability: {capability}",
+            error_code="UNSUPPORTED_CAPABILITY",
+            retryable=False,
+        )
 
     async def _execute_llm_generation(
         self,

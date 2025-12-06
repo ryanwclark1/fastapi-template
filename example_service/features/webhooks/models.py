@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import json
 from datetime import datetime
+import json
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -35,8 +35,7 @@ class StringArray(TypeDecorator):
     def load_dialect_impl(self, dialect):
         if dialect.name == "postgresql":
             return dialect.type_descriptor(ARRAY(String(100)))
-        else:
-            return dialect.type_descriptor(Text())
+        return dialect.type_descriptor(Text())
 
     def process_bind_param(self, value, dialect):
         if value is None:

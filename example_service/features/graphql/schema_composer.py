@@ -17,7 +17,10 @@ from typing import Any
 
 import strawberry
 
-from example_service.features.graphql.config import get_feature_registry, get_graphql_features
+from example_service.features.graphql.config import (
+    get_feature_registry,
+    get_graphql_features,
+)
 
 logger = logging.getLogger(__name__)
 

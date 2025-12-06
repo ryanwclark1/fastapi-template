@@ -12,8 +12,8 @@ import logging
 from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
-import strawberry
 from sqlalchemy import select
+import strawberry
 
 from example_service.features.graphql.types.base import PageInfoType
 from example_service.features.graphql.types.webhooks import (
@@ -102,7 +102,9 @@ async def webhook_deliveries_query(
 ) -> WebhookDeliveryConnection:
     """Get deliveries for a webhook."""
     ctx = info.context
-    from example_service.features.webhooks.repository import get_webhook_delivery_repository
+    from example_service.features.webhooks.repository import (
+        get_webhook_delivery_repository,
+    )
 
     repo = get_webhook_delivery_repository()
 

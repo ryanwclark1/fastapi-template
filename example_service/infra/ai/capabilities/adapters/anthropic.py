@@ -17,11 +17,14 @@ Pricing (as of 2025-01):
 
 from __future__ import annotations
 
-import logging
 from decimal import Decimal
+import logging
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from example_service.infra.ai.capabilities.adapters.base import ProviderAdapter, TimedExecution
+from example_service.infra.ai.capabilities.adapters.base import (
+    ProviderAdapter,
+    TimedExecution,
+)
 from example_service.infra.ai.capabilities.types import (
     Capability,
     CapabilityMetadata,
@@ -250,15 +253,14 @@ class AnthropicAdapter(ProviderAdapter):
             Capability.COACHING_ANALYSIS,
         ):
             return await self._execute_generation(capability, input_data, **options)
-        elif capability == Capability.LLM_STRUCTURED:
+        if capability == Capability.LLM_STRUCTURED:
             return await self._execute_structured(input_data, **options)
-        else:
-            return self._create_error_result(
-                capability,
-                f"Unsupported capability: {capability}",
-                error_code="UNSUPPORTED_CAPABILITY",
-                retryable=False,
-            )
+        return self._create_error_result(
+            capability,
+            f"Unsupported capability: {capability}",
+            error_code="UNSUPPORTED_CAPABILITY",
+            retryable=False,
+        )
 
     async def _execute_generation(
         self,
@@ -510,7 +512,7 @@ class AnthropicAdapter(ProviderAdapter):
                             return resolve(defs[def_name])
                     return obj
                 return {k: resolve(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
+            if isinstance(obj, list):
                 return [resolve(item) for item in obj]
             return obj
 

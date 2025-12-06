@@ -44,13 +44,13 @@ Example:
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING, Any, TypeVar
+import uuid
 
 if TYPE_CHECKING:
     from example_service.infra.ai.capabilities.types import (
@@ -138,13 +138,13 @@ class StepCondition:
         # Evaluate operator
         if self.operator == ConditionalOperator.EXISTS:
             return bool(current is not None)
-        elif self.operator == ConditionalOperator.NOT_EXISTS:
+        if self.operator == ConditionalOperator.NOT_EXISTS:
             return bool(current is None)
-        elif self.operator == ConditionalOperator.EQUALS:
+        if self.operator == ConditionalOperator.EQUALS:
             return bool(current == self.value)
-        elif self.operator == ConditionalOperator.NOT_EQUALS:
+        if self.operator == ConditionalOperator.NOT_EQUALS:
             return bool(current != self.value)
-        elif self.operator == ConditionalOperator.CONTAINS:
+        if self.operator == ConditionalOperator.CONTAINS:
             if current is None:
                 return False
             try:
@@ -478,8 +478,8 @@ class StepResult:
     def cost_usd(self) -> Decimal:
         """Get step cost."""
         if self.operation_result:
-            return self.operation_result.cost_usd or Decimal("0")
-        return Decimal("0")
+            return self.operation_result.cost_usd or Decimal(0)
+        return Decimal(0)
 
 
 @dataclass
@@ -580,7 +580,7 @@ class PipelineResult:
 
     # Metrics
     total_duration_ms: float = 0
-    total_cost_usd: Decimal = field(default_factory=lambda: Decimal("0"))
+    total_cost_usd: Decimal = field(default_factory=lambda: Decimal(0))
 
     # Timing
     started_at: datetime | None = None

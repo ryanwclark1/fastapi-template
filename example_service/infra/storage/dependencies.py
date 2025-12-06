@@ -53,7 +53,7 @@ Optional storage::
         # Use storage when available
         return await storage.get_file_metadata(file_id)
 
-Notes
+Notes:
 -----
 - The storage service is lazily initialized on first access
 - Dependencies are async to allow for future async initialization patterns

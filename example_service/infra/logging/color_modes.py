@@ -6,9 +6,9 @@ and provides appropriate ANSI escape sequences for each mode.
 
 from __future__ import annotations
 
+from enum import IntEnum
 import os
 import sys
-from enum import IntEnum
 from typing import TextIO
 
 
@@ -57,11 +57,11 @@ def detect_color_mode(stream: TextIO | None = None) -> ColorMode:
     if force_color:
         if force_color == "0":
             return ColorMode.NO_COLOR
-        elif force_color == "1":
+        if force_color == "1":
             return ColorMode.ANSI_16
-        elif force_color == "2":
+        if force_color == "2":
             return ColorMode.ANSI_256
-        elif force_color.isdigit() and int(force_color) >= 3:
+        if force_color.isdigit() and int(force_color) >= 3:
             return ColorMode.TRUECOLOR
 
     # Check NO_COLOR (per spec: https://no-color.org/)

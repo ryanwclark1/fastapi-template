@@ -38,6 +38,9 @@ Authentication Dependencies:
 
     # External auth service (Bearer token)
     from example_service.core.dependencies.auth import (
+        CurrentActiveUser,
+        CurrentUser,
+        OptionalUser,
         get_current_user,
         get_current_user_optional,
         require_permission,
@@ -56,8 +59,22 @@ Authentication Dependencies:
     )
 """
 
+from example_service.core.dependencies.availability import (
+    RequireAuth,
+    RequireBroker,
+    RequireCache,
+    RequireConsul,
+    RequireDatabase,
+    RequireDatabaseAndBroker,
+    RequireDatabaseAndCache,
+    RequireStorage,
+    require_services,
+)
 from example_service.core.dependencies.database import get_db_session
-from example_service.core.dependencies.events import EventPublisherDep, get_event_publisher
+from example_service.core.dependencies.events import (
+    EventPublisherDep,
+    get_event_publisher,
+)
 
 # Re-export pagination dependencies
 from example_service.core.dependencies.pagination import (
@@ -88,17 +105,6 @@ from example_service.core.dependencies.services import (
     HealthService,
     HealthServiceDep,
     get_health_service,
-)
-from example_service.core.dependencies.availability import (
-    RequireAuth,
-    RequireBroker,
-    RequireCache,
-    RequireConsul,
-    RequireDatabase,
-    RequireDatabaseAndBroker,
-    RequireDatabaseAndCache,
-    RequireStorage,
-    require_services,
 )
 from example_service.infra.cache import get_cache
 

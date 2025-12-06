@@ -5,8 +5,8 @@ from __future__ import annotations
 import os
 from unittest.mock import AsyncMock, patch
 
-import pytest
 from fastapi import HTTPException, Request
+import pytest
 
 from example_service.core.schemas.auth import AuthUser
 from example_service.core.settings.auth import AuthSettings

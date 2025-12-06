@@ -8,17 +8,17 @@ Provides low-level email sending with support for multiple backends:
 
 from __future__ import annotations
 
-import json
-import logging
-import ssl
-import uuid
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from functools import lru_cache
+import json
+import logging
 from pathlib import Path
+import ssl
+import uuid
 
 from example_service.core.settings.email import EmailSettings
 from example_service.utils.retry import retry
@@ -93,7 +93,6 @@ class SMTPClient(BaseEmailClient):
     async def connect(self) -> None:
         """Establish SMTP connection."""
         # aiosmtplib creates connections per-send, so we don't maintain persistent connection
-        pass
 
     async def disconnect(self) -> None:
         """Close SMTP connection."""
@@ -323,11 +322,9 @@ class ConsoleClient(BaseEmailClient):
 
     async def connect(self) -> None:
         """No connection needed."""
-        pass
 
     async def disconnect(self) -> None:
         """No disconnection needed."""
-        pass
 
     async def health_check(self) -> bool:
         """Console is always healthy."""
@@ -408,7 +405,6 @@ class FileClient(BaseEmailClient):
 
     async def disconnect(self) -> None:
         """No disconnection needed."""
-        pass
 
     async def health_check(self) -> bool:
         """Check if output directory is writable."""

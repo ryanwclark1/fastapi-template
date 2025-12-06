@@ -7,8 +7,8 @@ import sys
 from types import SimpleNamespace
 from types import SimpleNamespace as Namespace
 
-import pytest
 from fastapi import FastAPI
+import pytest
 
 
 class DummySettings:

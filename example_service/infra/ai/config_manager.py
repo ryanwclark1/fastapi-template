@@ -18,7 +18,11 @@ from sqlalchemy import select
 
 from example_service.core.database.types import decrypt_value, encrypt_value
 from example_service.core.settings import get_ai_settings
-from example_service.features.ai.models import AIProviderType, TenantAIConfig, TenantAIFeature
+from example_service.features.ai.models import (
+    AIProviderType,
+    TenantAIConfig,
+    TenantAIFeature,
+)
 from example_service.infra.ai.providers.base import ProviderConfig
 
 if TYPE_CHECKING:

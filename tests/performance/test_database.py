@@ -50,7 +50,15 @@ class TestQueryBuilding:
     @pytest.mark.benchmark(group="query-building")
     def test_complex_select_build(self, benchmark):
         """Benchmark building a complex select query with joins."""
-        from sqlalchemy import Column, ForeignKey, Integer, MetaData, String, Table, select
+        from sqlalchemy import (
+            Column,
+            ForeignKey,
+            Integer,
+            MetaData,
+            String,
+            Table,
+            select,
+        )
 
         metadata = MetaData()
         users = Table(

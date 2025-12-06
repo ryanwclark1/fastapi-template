@@ -29,11 +29,11 @@ Example:
 from __future__ import annotations
 
 import asyncio
-import logging
-import time
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 from example_service.core.schemas.common import HealthStatus
@@ -368,7 +368,9 @@ class HealthAggregator:
 
                 return name, result
             except Exception as e:
-                from example_service.infra.metrics.health import health_check_errors_total
+                from example_service.infra.metrics.health import (
+                    health_check_errors_total,
+                )
 
                 logger.exception("Health check failed for provider", extra={"provider": name})
 

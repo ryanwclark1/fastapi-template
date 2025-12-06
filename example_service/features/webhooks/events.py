@@ -7,9 +7,9 @@ payloads across different event sources.
 
 from __future__ import annotations
 
-import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
+import uuid
 
 if TYPE_CHECKING:
     from example_service.features.files.models import File
@@ -305,6 +305,6 @@ def get_event_category(event_type: str) -> str | None:
     """
     if event_type.startswith("file."):
         return "file"
-    elif event_type.startswith("reminder."):
+    if event_type.startswith("reminder."):
         return "reminder"
     return None

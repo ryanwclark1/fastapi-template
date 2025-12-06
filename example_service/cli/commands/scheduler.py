@@ -10,14 +10,22 @@ This module provides CLI commands for managing APScheduler jobs:
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 import inspect
 import sys
-from datetime import UTC, datetime
 from typing import Any
 
 import click
 
-from example_service.cli.utils import coro, error, header, info, section, success, warning
+from example_service.cli.utils import (
+    coro,
+    error,
+    header,
+    info,
+    section,
+    success,
+    warning,
+)
 
 
 @click.group(name="scheduler")
@@ -133,7 +141,6 @@ async def run_job(job_id: str, wait: bool) -> None:
     This will execute the job's function immediately, regardless of its schedule.
 
     Examples:
-
     \b
       example-service scheduler run cleanup_sessions
       example-service scheduler run database_backup --wait

@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator  # noqa: TC003
+from contextlib import asynccontextmanager
 import logging
 import time
-from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 from opentelemetry import trace
 from sqlalchemy import event, text
@@ -26,9 +27,6 @@ from example_service.infra.metrics.prometheus import (
 )
 from example_service.infra.metrics.tracking import track_slow_query
 from example_service.utils.retry import retry
-
-if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
 
 logger = logging.getLogger(__name__)
 

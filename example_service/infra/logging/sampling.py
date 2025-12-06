@@ -9,11 +9,11 @@ endpoints can generate millions of logs per day.
 
 from __future__ import annotations
 
+from collections import defaultdict
 import logging
 import random
-import time
-from collections import defaultdict
 from threading import Lock
+import time
 from typing import Any
 
 
@@ -100,9 +100,8 @@ class SamplingFilter(logging.Filter):
         if random.random() < sample_rate:
             self._increment_counter("sampled", record.name)
             return True
-        else:
-            self._increment_counter("dropped", record.name)
-            return False
+        self._increment_counter("dropped", record.name)
+        return False
 
     def _increment_counter(self, counter_type: str, logger_name: str) -> None:
         """Thread-safe counter increment.
@@ -220,9 +219,8 @@ class RateLimitFilter(logging.Filter):
             if len(timestamps) < self.max_logs_per_window:
                 timestamps.append(current_time)
                 return True
-            else:
-                self._dropped_count[logger_name] += 1
-                return False
+            self._dropped_count[logger_name] += 1
+            return False
 
     def get_stats(self) -> dict[str, dict[str, Any]]:
         """Get rate limiting statistics.

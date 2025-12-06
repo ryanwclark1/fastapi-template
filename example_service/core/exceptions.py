@@ -439,3 +439,36 @@ class InternalServerException(AppException):
             instance=instance,
             extra=extra,
         )
+
+
+# Aliases for convenience/backward compatibility
+AuthenticationError = UnauthorizedException
+AuthorizationError = ForbiddenException
+BackendServiceError = ServiceUnavailableException
+BadRequestError = BadRequestException
+NotFoundError = NotFoundException
+ResourceNotFoundError = NotFoundException
+ValidationError = ValidationException
+
+
+__all__ = [
+    "AppException",
+    # Aliases
+    "AuthenticationError",
+    "AuthorizationError",
+    "BackendServiceError",
+    "BadRequestError",
+    "BadRequestException",
+    "CircuitBreakerOpenException",
+    "ConflictException",
+    "ForbiddenException",
+    "InternalServerException",
+    "NotFoundError",
+    "NotFoundException",
+    "RateLimitException",
+    "ResourceNotFoundError",
+    "ServiceUnavailableException",
+    "UnauthorizedException",
+    "ValidationError",
+    "ValidationException",
+]

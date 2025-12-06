@@ -258,14 +258,13 @@ def get_instance_state(instance: Any) -> str:
 
     if state.transient:
         return "transient"
-    elif state.pending:
+    if state.pending:
         return "pending"
-    elif state.deleted:
+    if state.deleted:
         return "deleted"
-    elif state.detached:
+    if state.detached:
         return "detached"
-    else:
-        return "persistent"
+    return "persistent"
 
 
 def is_new(instance: Any) -> bool:

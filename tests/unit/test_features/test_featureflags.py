@@ -6,8 +6,8 @@ from datetime import UTC, datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-import pytest
 from fastapi import HTTPException, status
+import pytest
 from starlette.requests import Request
 from starlette.types import Scope
 

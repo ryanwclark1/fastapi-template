@@ -21,9 +21,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from datetime import datetime
 import json
 import logging
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from example_service.core.settings import get_rabbit_settings, get_websocket_settings

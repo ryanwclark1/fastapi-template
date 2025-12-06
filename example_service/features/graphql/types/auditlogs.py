@@ -14,7 +14,10 @@ import strawberry
 from example_service.features.audit.models import AuditAction as ModelAuditAction
 from example_service.features.audit.schemas import AuditLogResponse
 from example_service.features.graphql.types.base import PageInfoType
-from example_service.features.graphql.types.pydantic_bridge import pydantic_field, pydantic_type
+from example_service.features.graphql.types.pydantic_bridge import (
+    pydantic_field,
+    pydantic_type,
+)
 
 # ============================================================================
 # Enums

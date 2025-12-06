@@ -717,10 +717,10 @@ class SearchService:
         """
         if syntax == SearchSyntax.WEB:
             return func.websearch_to_tsquery(config, query)
-        elif syntax == SearchSyntax.PHRASE:
+        if syntax == SearchSyntax.PHRASE:
             return func.phraseto_tsquery(config, query)
-        else:  # PLAIN
-            return func.plainto_tsquery(config, query)
+        # PLAIN
+        return func.plainto_tsquery(config, query)
 
     async def _get_highlighted_snippet(
         self,

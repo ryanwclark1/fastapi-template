@@ -29,7 +29,11 @@ from .base import (
     ProviderCapabilities,
 )
 from .console import ConsoleProvider
-from .factory import EmailProviderFactory, get_provider_factory, initialize_provider_factory
+from .factory import (
+    EmailProviderFactory,
+    get_provider_factory,
+    initialize_provider_factory,
+)
 from .file import FileProvider
 from .mailgun import MailgunProvider
 from .sendgrid import SendGridProvider

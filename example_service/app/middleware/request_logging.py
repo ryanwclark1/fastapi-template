@@ -20,8 +20,8 @@ import json
 import logging
 import re
 import time
-import uuid
 from typing import TYPE_CHECKING, Any, ClassVar
+import uuid
 
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -176,8 +176,7 @@ class PIIMasker:
                 local[0] + self.mask_char * (len(local) - 1) if len(local) > 1 else self.mask_char
             )
             return f"{masked_local}@{domain}"
-        else:
-            return f"{self.mask_char * 3}@{self.mask_char * 3}.com"
+        return f"{self.mask_char * 3}@{self.mask_char * 3}.com"
 
     def mask_phone(self, phone: str) -> str:
         """Mask phone number.
@@ -541,7 +540,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             if "application/json" in content_type:
                 body_data = json.loads(body_bytes.decode("utf-8"))
                 return body_bytes, self.masker.mask_dict(body_data)
-            elif "application/x-www-form-urlencoded" in content_type:
+            if "application/x-www-form-urlencoded" in content_type:
                 # Parse form data
                 form_str = body_bytes.decode("utf-8")
                 form_data: dict[str, str] = {}

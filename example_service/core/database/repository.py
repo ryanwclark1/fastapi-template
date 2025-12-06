@@ -25,8 +25,8 @@ Example:
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
+import logging
 from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import Select, func, insert, select

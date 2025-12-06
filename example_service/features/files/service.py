@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import contextlib
-import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, BinaryIO
+import uuid
 
 from sqlalchemy.orm import selectinload
 
@@ -54,7 +54,9 @@ class FileService(BaseService):
     def _ensure_storage(self) -> StorageService:
         """Ensure storage service is available, raising error if not configured."""
         if not self._storage.is_ready:
-            from example_service.infra.storage.exceptions import StorageNotConfiguredError
+            from example_service.infra.storage.exceptions import (
+                StorageNotConfiguredError,
+            )
 
             raise StorageNotConfiguredError(
                 message="Storage service is not available",

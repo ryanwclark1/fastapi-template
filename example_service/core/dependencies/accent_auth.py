@@ -541,7 +541,6 @@ def get_tenant_uuid() -> str | None:
                 raise HTTPException(400, "Tenant context required")
             return {"tenant_uuid": tenant_uuid}
     """
-
     # Try to get from request state (set by get_current_user)
     try:
         from starlette.requests import Request as StarletteRequest

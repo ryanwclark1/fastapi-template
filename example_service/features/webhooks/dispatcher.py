@@ -7,8 +7,8 @@ background job system (Celery, RQ, etc.) rather than executing synchronously.
 
 from __future__ import annotations
 
-import logging
 from datetime import UTC, datetime, timedelta
+import logging
 from typing import TYPE_CHECKING
 
 from example_service.features.webhooks.client import WebhookClient
@@ -165,34 +165,33 @@ async def process_pending_deliveries(
                 response_body=result.response_body,
                 response_time_ms=result.response_time_ms,
             )
-        else:
-            # Check if we should retry
-            if delivery.attempt_count + 1 < delivery.max_attempts:
-                # Calculate exponential backoff
-                retry_delay_seconds = min(2**delivery.attempt_count * 60, 3600)  # Max 1 hour
-                next_retry_at = datetime.now(UTC) + timedelta(seconds=retry_delay_seconds)
+        # Check if we should retry
+        elif delivery.attempt_count + 1 < delivery.max_attempts:
+            # Calculate exponential backoff
+            retry_delay_seconds = min(2**delivery.attempt_count * 60, 3600)  # Max 1 hour
+            next_retry_at = datetime.now(UTC) + timedelta(seconds=retry_delay_seconds)
 
-                await delivery_repo.update_status(
-                    session,
-                    delivery.id,
-                    DeliveryStatus.RETRYING.value,
-                    response_status_code=result.status_code,
-                    response_body=result.response_body,
-                    response_time_ms=result.response_time_ms,
-                    error_message=result.error_message,
-                    next_retry_at=next_retry_at,
-                )
-            else:
-                # Max retries reached
-                await delivery_repo.update_status(
-                    session,
-                    delivery.id,
-                    DeliveryStatus.FAILED.value,
-                    response_status_code=result.status_code,
-                    response_body=result.response_body,
-                    response_time_ms=result.response_time_ms,
-                    error_message=result.error_message,
-                )
+            await delivery_repo.update_status(
+                session,
+                delivery.id,
+                DeliveryStatus.RETRYING.value,
+                response_status_code=result.status_code,
+                response_body=result.response_body,
+                response_time_ms=result.response_time_ms,
+                error_message=result.error_message,
+                next_retry_at=next_retry_at,
+            )
+        else:
+            # Max retries reached
+            await delivery_repo.update_status(
+                session,
+                delivery.id,
+                DeliveryStatus.FAILED.value,
+                response_status_code=result.status_code,
+                response_body=result.response_body,
+                response_time_ms=result.response_time_ms,
+                error_message=result.error_message,
+            )
 
         await session.commit()
         processed_count += 1

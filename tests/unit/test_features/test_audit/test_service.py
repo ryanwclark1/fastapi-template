@@ -13,7 +13,10 @@ from example_service.features.audit.schemas import (
     AuditLogCreate,
     AuditLogQuery,
 )
-from example_service.features.audit.service import AuditService, get_audit_service_with_session
+from example_service.features.audit.service import (
+    AuditService,
+    get_audit_service_with_session,
+)
 
 
 @pytest.fixture

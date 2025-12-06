@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 class AITaskError(Exception):
     """AI task operation error."""
 
-    pass
 
 
 if broker is not None:
@@ -80,7 +79,10 @@ if broker is not None:
         )
 
         try:
-            from example_service.infra.ai import get_instrumented_orchestrator, get_pipeline
+            from example_service.infra.ai import (
+                get_instrumented_orchestrator,
+                get_pipeline,
+            )
 
             # Get pipeline definition
             pipeline = get_pipeline(pipeline_name)

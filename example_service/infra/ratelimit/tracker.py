@@ -7,9 +7,9 @@ and logging.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 import logging
 import threading
-from datetime import UTC, datetime
 
 from example_service.infra.ratelimit.status import (
     RateLimitProtectionState,

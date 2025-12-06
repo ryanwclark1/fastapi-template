@@ -587,7 +587,7 @@ class TestInvalidateTags:
         async def mock_smembers(tag_key):
             if tag_key == "tag:user:42":
                 return {b"user:42:data"}
-            elif tag_key == "tag:users:all":
+            if tag_key == "tag:users:all":
                 return {b"users:list", b"users:count"}
             return set()
 
@@ -642,9 +642,9 @@ class TestInvalidateTags:
             # Return different sized sets
             if "tag1" in tag_key:
                 return {b"k1", b"k2", b"k3"}
-            elif "tag2" in tag_key:
+            if "tag2" in tag_key:
                 return {b"k4", b"k5"}
-            elif "tag3" in tag_key:
+            if "tag3" in tag_key:
                 return {b"k6"}
             return set()
 
@@ -660,9 +660,9 @@ class TestInvalidateTags:
             # Fifth call (tag3): 1 key, sixth call (tag3 tag set): 1
             if delete_call_count in [1]:  # tag1 cache keys
                 return 3
-            elif delete_call_count in [3]:  # tag2 cache keys
+            if delete_call_count in [3]:  # tag2 cache keys
                 return 2
-            elif delete_call_count in [5]:  # tag3 cache keys
+            if delete_call_count in [5]:  # tag3 cache keys
                 return 1
             return 1  # For tag set deletions
 

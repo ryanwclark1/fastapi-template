@@ -37,12 +37,12 @@ Example with WebSocket:
 
 from __future__ import annotations
 
-import asyncio
-import logging
 from abc import ABC, abstractmethod
+import asyncio
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+import logging
 from typing import TYPE_CHECKING, Any
 
 from example_service.infra.ai.events.types import (

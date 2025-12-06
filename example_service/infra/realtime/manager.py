@@ -15,12 +15,12 @@ The manager supports two modes:
 from __future__ import annotations
 
 import asyncio
+from collections import defaultdict
 import contextlib
+from dataclasses import dataclass, field
 import json
 import logging
 import time
-from collections import defaultdict
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
@@ -477,8 +477,7 @@ class ConnectionManager:
                         channel = channel.decode()
 
                     # Remove prefix to get logical channel name
-                    if channel.startswith(self._channel_prefix):
-                        channel = channel[len(self._channel_prefix) :]
+                    channel = channel.removeprefix(self._channel_prefix)
 
                     data = message["data"]
                     if isinstance(data, bytes):

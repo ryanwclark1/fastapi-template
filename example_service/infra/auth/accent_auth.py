@@ -18,8 +18,8 @@ Requirements:
 from __future__ import annotations
 
 import asyncio
-import logging
 from functools import lru_cache
+import logging
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
@@ -35,7 +35,9 @@ logger = logging.getLogger(__name__)
 
 # Import the accent-auth-client library (required)
 try:
-    from accent_auth_client import Client as AccentAuthClientLib  # type: ignore[import-not-found]
+    from accent_auth_client import (
+        Client as AccentAuthClientLib,  # type: ignore[import-not-found]
+    )
     from accent_auth_client.exceptions import (  # type: ignore[import-not-found]
         InvalidTokenException,
         MissingPermissionsTokenException,
@@ -199,7 +201,6 @@ class AccentAuthClient:
     ) -> None:
         """Async context manager exit."""
         # accent-auth-client doesn't require explicit cleanup
-        pass
 
     @property
     def base_url(self) -> str:

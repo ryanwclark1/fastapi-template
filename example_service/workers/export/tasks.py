@@ -9,9 +9,9 @@ This module provides:
 from __future__ import annotations
 
 import csv
+from datetime import UTC, datetime
 import json
 import logging
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 

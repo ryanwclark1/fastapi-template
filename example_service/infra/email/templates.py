@@ -9,11 +9,11 @@ Provides email template rendering with support for:
 
 from __future__ import annotations
 
-import logging
-import re
 from functools import lru_cache
 from html import unescape
+import logging
 from pathlib import Path
+import re
 from typing import TYPE_CHECKING, Any
 
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound, select_autoescape
@@ -155,8 +155,7 @@ class EmailTemplateRenderer:
 
         if is_html:
             return content, self._html_to_text(content)
-        else:
-            return None, content
+        return None, content
 
     def template_exists(self, template_name: str) -> bool:
         """Check if a template exists.
@@ -253,7 +252,6 @@ class EmailTemplateRenderer:
 class TemplateNotFoundError(Exception):
     """Raised when an email template cannot be found."""
 
-    pass
 
 
 @lru_cache(maxsize=1)

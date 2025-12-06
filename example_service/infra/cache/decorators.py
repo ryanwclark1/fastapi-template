@@ -33,11 +33,11 @@ Example:
 
 from __future__ import annotations
 
+from functools import wraps
 import hashlib
 import inspect
 import json
 import logging
-from functools import wraps
 from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
 
 from example_service.infra.cache.redis import get_cache

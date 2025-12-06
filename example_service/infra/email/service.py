@@ -9,8 +9,8 @@ Provides a simple interface for sending emails with:
 
 from __future__ import annotations
 
-import logging
 from functools import lru_cache
+import logging
 from typing import TYPE_CHECKING, Any
 
 from .client import EmailClient, get_email_client, get_email_settings
@@ -20,11 +20,14 @@ from .schemas import (
     EmailPriority,
     EmailResult,
 )
-from .templates import EmailTemplateRenderer, TemplateNotFoundError, get_template_renderer
+from .templates import (
+    EmailTemplateRenderer,
+    TemplateNotFoundError,
+    get_template_renderer,
+)
 
 if TYPE_CHECKING:
     from example_service.core.settings.email import EmailSettings
-    pass
 
 logger = logging.getLogger(__name__)
 

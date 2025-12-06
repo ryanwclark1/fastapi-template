@@ -9,8 +9,8 @@ This module provides:
 
 from __future__ import annotations
 
-import logging
 from datetime import UTC, datetime, timedelta
+import logging
 from typing import Any
 from uuid import UUID
 
@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__)
 class WebhookDeliveryError(Exception):
     """Webhook delivery operation error."""
 
-    pass
 
 
 # Retry configuration
@@ -285,9 +284,8 @@ if broker is not None:
 
                     return response_data
 
-                else:
-                    # Non-2xx response or error: Schedule retry
-                    raise WebhookDeliveryError(result.error_message or f"HTTP {result.status_code}")
+                # Non-2xx response or error: Schedule retry
+                raise WebhookDeliveryError(result.error_message or f"HTTP {result.status_code}")
 
             except Exception as e:
                 # Step 5: Handle delivery failure
@@ -331,29 +329,28 @@ if broker is not None:
                         "next_retry_at": next_retry_at.isoformat(),
                         "error": str(e),
                     }
-                else:
-                    # Max retries exceeded
-                    await update_delivery_status(
-                        delivery_id,
-                        status=DeliveryStatus.FAILED.value,
-                        error_message=str(e),
-                    )
+                # Max retries exceeded
+                await update_delivery_status(
+                    delivery_id,
+                    status=DeliveryStatus.FAILED.value,
+                    error_message=str(e),
+                )
 
-                    logger.error(
-                        "Webhook delivery failed permanently",
-                        extra={
-                            "delivery_id": delivery_id,
-                            "attempt_count": new_attempt_count,
-                            "error": str(e),
-                        },
-                    )
-
-                    return {
-                        "status": "failed",
+                logger.error(
+                    "Webhook delivery failed permanently",
+                    extra={
                         "delivery_id": delivery_id,
                         "attempt_count": new_attempt_count,
                         "error": str(e),
-                    }
+                    },
+                )
+
+                return {
+                    "status": "failed",
+                    "delivery_id": delivery_id,
+                    "attempt_count": new_attempt_count,
+                    "error": str(e),
+                }
 
         except Exception as e:
             logger.exception(

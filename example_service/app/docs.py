@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import html
+from importlib import resources
 import json
 import logging
-from importlib import resources
 from typing import Any
 
 from fastapi import FastAPI, HTTPException

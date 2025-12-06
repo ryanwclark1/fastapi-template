@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import pytest
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from httpx import AsyncClient
+import pytest
 
 from example_service.app.middleware.security_headers import (
     SecurityHeadersMiddleware,

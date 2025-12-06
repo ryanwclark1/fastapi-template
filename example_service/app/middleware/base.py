@@ -13,9 +13,9 @@ eliminating code duplication while preserving their specific behaviors.
 
 from __future__ import annotations
 
-import uuid
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
+import uuid
 
 from starlette.datastructures import MutableHeaders
 
@@ -102,7 +102,6 @@ class HeaderContextMiddleware(ABC):
             was_generated: True if value was generated, False if from header.
         """
         _ = scope, value, was_generated
-        return None
 
     def on_response_start(self, scope: Scope, value: str) -> None:
         """Hook called when response starts (before header injection).
@@ -114,7 +113,6 @@ class HeaderContextMiddleware(ABC):
             value: The value being added to response.
         """
         _ = scope, value
-        return None
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Process ASGI request with header context propagation.

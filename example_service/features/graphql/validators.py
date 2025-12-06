@@ -22,9 +22,9 @@ from typing import NewType
 from urllib.parse import urlparse
 
 import bleach
-import strawberry
 from email_validator import EmailNotValidError
 from email_validator import validate_email as validate_email_address
+import strawberry
 
 __all__ = [
     "Email",

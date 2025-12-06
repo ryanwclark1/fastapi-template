@@ -11,9 +11,8 @@ This module demonstrates production patterns for complex task workflows:
 from __future__ import annotations
 
 import asyncio
-import logging
 from datetime import UTC, datetime
-from pathlib import Path
+import logging
 from typing import Any
 
 from example_service.infra.tasks.broker import broker

@@ -14,14 +14,10 @@ The context variables here serve as a bridge for non-dependency contexts
 
 from __future__ import annotations
 
-import logging
 from contextvars import ContextVar
-from typing import TYPE_CHECKING
+import logging
 
 from example_service.core.schemas.tenant import TenantContext
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 

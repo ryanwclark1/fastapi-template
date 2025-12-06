@@ -21,8 +21,8 @@ from decimal import Decimal
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from httpx import ASGITransport, AsyncClient
+import pytest
 
 from example_service.infra.ai.capabilities import Capability, ProviderType
 from example_service.infra.ai.events import EventType

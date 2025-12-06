@@ -117,7 +117,7 @@ def tracker(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_connect_and_disconnect(monkeypatch):
-    """connect initializes engine and tests session; disconnect disposes."""
+    """Connect initializes engine and tests session; disconnect disposes."""
     engine = MagicMock()
     engine.dispose = AsyncMock()
     session = FakeSession([FakeResult()])

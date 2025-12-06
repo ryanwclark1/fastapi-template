@@ -10,14 +10,17 @@ This module provides REST API endpoints for task management operations:
 
 from __future__ import annotations
 
-import logging
 from datetime import datetime  # noqa: TC003
+import logging
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
 
 from example_service.core.database import NotFoundError
-from example_service.core.exceptions import InternalServerException, ServiceUnavailableException
+from example_service.core.exceptions import (
+    InternalServerException,
+    ServiceUnavailableException,
+)
 from example_service.features.tasks.schemas import (
     CancelTaskRequest,
     CancelTaskResponse,

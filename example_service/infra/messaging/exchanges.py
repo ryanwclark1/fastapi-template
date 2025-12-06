@@ -161,4 +161,4 @@ async def setup_exchanges_and_queues(broker: RabbitBroker) -> None:
     # are registered, so this function is primarily for documentation and
     # explicit setup scenarios. In most cases, FastStream's automatic
     # declaration is sufficient.
-    pass  # FastStream handles this automatically
+    # FastStream handles this automatically

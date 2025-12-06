@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-import pytest
 from pydantic import ValidationError
+import pytest
 
 from example_service.features.tasks.schemas import (
     CancelTaskRequest,

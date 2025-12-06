@@ -27,7 +27,10 @@ from example_service.features.webhooks.schemas import (
 )
 from example_service.features.webhooks.service import WebhookService
 from example_service.infra.logging import get_lazy_logger
-from example_service.infra.metrics.tracking import track_feature_usage, track_user_action
+from example_service.infra.metrics.tracking import (
+    track_feature_usage,
+    track_user_action,
+)
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -271,7 +274,9 @@ async def test_webhook(
         max_attempts=1,
     )
 
-    from example_service.features.webhooks.repository import get_webhook_delivery_repository
+    from example_service.features.webhooks.repository import (
+        get_webhook_delivery_repository,
+    )
 
     delivery_repo = get_webhook_delivery_repository()
     created_delivery = await delivery_repo.create(session, delivery)

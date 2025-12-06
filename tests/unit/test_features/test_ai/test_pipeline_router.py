@@ -7,9 +7,9 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI, status
 from httpx import ASGITransport, AsyncClient
+import pytest
 
 from example_service.features.ai.pipeline.router import router
 from example_service.features.ai.pipeline.schemas import (
@@ -17,7 +17,11 @@ from example_service.features.ai.pipeline.schemas import (
     SetBudgetRequest,
 )
 from example_service.infra.ai.capabilities import Capability, ProviderType
-from example_service.infra.ai.observability import BudgetAction, BudgetCheckResult, BudgetPeriod
+from example_service.infra.ai.observability import (
+    BudgetAction,
+    BudgetCheckResult,
+    BudgetPeriod,
+)
 from example_service.infra.ai.pipelines.types import (
     PipelineDefinition,
     PipelineResult,

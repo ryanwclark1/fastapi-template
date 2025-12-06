@@ -6,9 +6,9 @@ from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI, status
 from httpx import ASGITransport, AsyncClient
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from example_service.core.models.email_config import EmailConfig, EmailProviderType

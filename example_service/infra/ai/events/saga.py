@@ -51,9 +51,9 @@ Resumption:
 from __future__ import annotations
 
 import asyncio
-import logging
 from datetime import datetime
 from decimal import Decimal
+import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -281,7 +281,7 @@ class SagaCoordinator:
         """Execute pipeline with event emission for each step."""
         total_weight = pipeline.get_total_progress_weight()
         completed_weight = 0.0
-        total_cost = Decimal("0")
+        total_cost = Decimal(0)
         step_index = 0
 
         # Merge configurations
@@ -511,7 +511,10 @@ class SagaCoordinator:
 
                 # Emit fallback event if there are more providers
                 if len(fallbacks_attempted) < len(fallback_chain):
-                    from example_service.infra.ai.events.types import BaseEvent, EventType
+                    from example_service.infra.ai.events.types import (
+                        BaseEvent,
+                        EventType,
+                    )
 
                     # Custom provider fallback event
                     await self.event_store.append(

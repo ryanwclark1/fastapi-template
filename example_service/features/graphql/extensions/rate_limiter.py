@@ -26,7 +26,7 @@ from strawberry.extensions import SchemaExtension
 # Stub for missing cache module
 def get_cache_instance():  # type: ignore[misc]
     """Stub for missing cache module."""
-    return None
+    return
 
 
 logger = logging.getLogger(__name__)
@@ -206,19 +206,18 @@ class GraphQLRateLimiter(SchemaExtension):
                 # For now, we'll use a simplified sync approach
                 logger.warning("Async rate limiting not fully implemented yet")
                 return
-            else:
-                # Sync cache (if available)
-                count_value = cache.get(key) or 0
-                count = int(count_value) + 1  # type: ignore[arg-type]
+            # Sync cache (if available)
+            count_value = cache.get(key) or 0
+            count = int(count_value) + 1  # type: ignore[arg-type]
 
-                if count > limit:
-                    raise RateLimitExceeded(
-                        f"Rate limit exceeded for {operation_type} operations. "
-                        f"Limit: {limit} per {self.window} seconds"
-                    )
+            if count > limit:
+                raise RateLimitExceeded(
+                    f"Rate limit exceeded for {operation_type} operations. "
+                    f"Limit: {limit} per {self.window} seconds"
+                )
 
-                # Set new count with expiry
-                cache.set(key, count, ttl=self.window)
+            # Set new count with expiry
+            cache.set(key, count, ttl=self.window)
 
         except RateLimitExceeded:
             raise
@@ -270,7 +269,6 @@ class GraphQLRateLimiter(SchemaExtension):
 class RateLimitExceeded(Exception):
     """Exception raised when rate limit is exceeded."""
 
-    pass
 
 
 # ============================================================================

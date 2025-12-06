@@ -5,11 +5,11 @@ Provides importers for CSV, JSON, and Excel formats with validation.
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 import csv
 import io
 import json
 import logging
-from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, TypeVar
 
 if TYPE_CHECKING:
@@ -389,20 +389,19 @@ def get_importer(
             field_types=field_types,
             field_validators=field_validators,
         )
-    elif format_lower == "json":
+    if format_lower == "json":
         return JSONImporter(
             required_fields=required_fields,
             field_types=field_types,
             field_validators=field_validators,
         )
-    elif format_lower in ("xlsx", "excel"):
+    if format_lower in ("xlsx", "excel"):
         return ExcelImporter(
             required_fields=required_fields,
             field_types=field_types,
             field_validators=field_validators,
         )
-    else:
-        raise ValueError(f"Unsupported import format: {format}")
+    raise ValueError(f"Unsupported import format: {format}")
 
 
 __all__ = [

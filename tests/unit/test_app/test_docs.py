@@ -6,8 +6,8 @@ import html
 import sys
 from types import ModuleType, SimpleNamespace
 
-import pytest
 from fastapi import FastAPI
+import pytest
 from starlette.routing import Mount
 
 from example_service.app import docs as docs_module
@@ -51,7 +51,7 @@ def test_configure_documentation_mounts_static_and_skips_docs_when_disabled(
         get_redoc_url=lambda: "/redoc",
         get_swagger_ui_oauth2_redirect_url=lambda: "/oauth",
         get_openapi_url=lambda: "/schema",
-        get_swagger_ui_parameters=lambda: {},
+        get_swagger_ui_parameters=dict,
     )
 
     monkeypatch.setattr(docs_module, "get_app_settings", lambda: settings)

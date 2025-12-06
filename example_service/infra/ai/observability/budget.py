@@ -51,11 +51,11 @@ Example:
 from __future__ import annotations
 
 import asyncio
-import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from decimal import Decimal
 from enum import Enum
+import logging
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -105,9 +105,9 @@ class BudgetConfig:
         """Get limit for a specific period."""
         if period == BudgetPeriod.DAILY:
             return self.daily_limit_usd
-        elif period == BudgetPeriod.WEEKLY:
+        if period == BudgetPeriod.WEEKLY:
             return self.weekly_limit_usd
-        elif period == BudgetPeriod.MONTHLY:
+        if period == BudgetPeriod.MONTHLY:
             return self.monthly_limit_usd
         return None
 
@@ -130,7 +130,7 @@ class BudgetCheckResult:
         """Get remaining budget."""
         if self.limit_usd is None:
             return None
-        return max(Decimal("0"), self.limit_usd - self.current_spend_usd)
+        return max(Decimal(0), self.limit_usd - self.current_spend_usd)
 
 
 @dataclass
@@ -182,7 +182,7 @@ class InMemoryBudgetStore:
         """Get total spend for a tenant in a time period."""
         until = until or datetime.utcnow()
 
-        total = Decimal("0")
+        total = Decimal(0)
         for record in self._records:
             if (
                 record.tenant_id == tenant_id
@@ -351,7 +351,7 @@ class BudgetService:
             return BudgetCheckResult(
                 allowed=True,
                 action=BudgetAction.ALLOWED,
-                current_spend_usd=Decimal("0"),
+                current_spend_usd=Decimal(0),
                 limit_usd=None,
                 percent_used=0.0,
                 period=BudgetPeriod.DAILY,
@@ -531,15 +531,15 @@ class BudgetService:
         for record in records:
             if record.pipeline_name:
                 by_pipeline[record.pipeline_name] = (
-                    by_pipeline.get(record.pipeline_name, Decimal("0")) + record.cost_usd
+                    by_pipeline.get(record.pipeline_name, Decimal(0)) + record.cost_usd
                 )
             if record.provider:
                 by_provider[record.provider] = (
-                    by_provider.get(record.provider, Decimal("0")) + record.cost_usd
+                    by_provider.get(record.provider, Decimal(0)) + record.cost_usd
                 )
             if record.capability:
                 by_capability[record.capability] = (
-                    by_capability.get(record.capability, Decimal("0")) + record.cost_usd
+                    by_capability.get(record.capability, Decimal(0)) + record.cost_usd
                 )
 
         limit = config.get_limit(period) if config else None
@@ -565,14 +565,14 @@ class BudgetService:
 
         if period == BudgetPeriod.HOURLY:
             return now.replace(minute=0, second=0, microsecond=0)
-        elif period == BudgetPeriod.DAILY:
+        if period == BudgetPeriod.DAILY:
             return now.replace(hour=0, minute=0, second=0, microsecond=0)
-        elif period == BudgetPeriod.WEEKLY:
+        if period == BudgetPeriod.WEEKLY:
             # Start of week (Monday)
             days_since_monday = now.weekday()
             start = now - timedelta(days=days_since_monday)
             return start.replace(hour=0, minute=0, second=0, microsecond=0)
-        elif period == BudgetPeriod.MONTHLY:
+        if period == BudgetPeriod.MONTHLY:
             return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
         return now

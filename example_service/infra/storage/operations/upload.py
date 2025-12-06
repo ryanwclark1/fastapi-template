@@ -118,8 +118,8 @@ async def upload_file_chunked(
             on_progress=progress,
         )
     """
-    import mimetypes
     from io import BytesIO
+    import mimetypes
 
     file_size = file_path.stat().st_size
 

@@ -157,17 +157,15 @@ class Range[T: (date, datetime, int, Decimal)]:
             if self.lower_inc:
                 if value < self.lower:
                     return False
-            else:
-                if value <= self.lower:
-                    return False
+            elif value <= self.lower:
+                return False
 
         if self.upper is not None:
             if self.upper_inc:
                 if value > self.upper:
                     return False
-            else:
-                if value >= self.upper:
-                    return False
+            elif value >= self.upper:
+                return False
 
         return True
 

@@ -40,9 +40,9 @@ Example:
 from __future__ import annotations
 
 import asyncio
-import logging
 from datetime import datetime
 from decimal import Decimal
+import logging
 from typing import TYPE_CHECKING, Any
 
 from example_service.infra.ai.capabilities.registry import (
@@ -246,7 +246,7 @@ class PipelineExecutor:
         """
         total_weight = pipeline.get_total_progress_weight()
         completed_weight = 0.0
-        total_cost = Decimal("0")
+        total_cost = Decimal(0)
 
         try:
             # Execute each step

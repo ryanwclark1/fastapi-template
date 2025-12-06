@@ -25,7 +25,9 @@ if TYPE_CHECKING:
 
 def clear_log_context() -> None:
     """Proxy to logging context's clear_log_context for easy patching."""
-    from example_service.infra.logging.context import clear_log_context as _clear_log_context
+    from example_service.infra.logging.context import (
+        clear_log_context as _clear_log_context,
+    )
     _clear_log_context()
 
 

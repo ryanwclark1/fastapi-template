@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import html
-import json
 from dataclasses import dataclass
+import html
 from importlib import resources
+import json
 from typing import Final
 
 from fastapi import APIRouter, HTTPException, Request

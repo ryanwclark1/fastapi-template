@@ -388,7 +388,6 @@ class RoutingKeySecurityError(ValueError):
     - Non-printable character injection
     """
 
-    pass
 
 
 __all__ = [

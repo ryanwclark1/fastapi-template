@@ -126,7 +126,7 @@ class Job(Base):
         nullable=True, comment="Execution duration in milliseconds"
     )
     cost_usd: Mapped[Decimal] = mapped_column(
-        Numeric(10, 6), nullable=False, default=Decimal("0"), comment="Total cost in USD"
+        Numeric(10, 6), nullable=False, default=Decimal(0), comment="Total cost in USD"
     )
 
     # Results (PostgreSQL only)

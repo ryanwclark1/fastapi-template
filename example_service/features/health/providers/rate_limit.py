@@ -10,6 +10,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from example_service.core.schemas.common import HealthStatus
+
 from .protocol import HealthCheckResult
 
 if TYPE_CHECKING:

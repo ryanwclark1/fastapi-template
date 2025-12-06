@@ -196,8 +196,7 @@ def rgb_to_ansi_16(rgb: tuple[int, int, int]) -> str:
     # 8-15: bright colors (90-97)
     if nearest_idx < 8:
         return f"\033[{30 + nearest_idx}m"
-    else:
-        return f"\033[{90 + (nearest_idx - 8)}m"
+    return f"\033[{90 + (nearest_idx - 8)}m"
 
 
 def rgb_to_ansi_256(rgb: tuple[int, int, int]) -> str:
@@ -270,12 +269,11 @@ def rgb_to_ansi(
 
     if mode >= ColorMode.TRUECOLOR:
         return rgb_to_ansi_truecolor(rgb)
-    elif mode >= ColorMode.ANSI_256:
+    if mode >= ColorMode.ANSI_256:
         return rgb_to_ansi_256(rgb)
-    elif mode >= ColorMode.ANSI_16:
+    if mode >= ColorMode.ANSI_16:
         return rgb_to_ansi_16(rgb)
-    else:
-        return ""  # NO_COLOR mode
+    return ""  # NO_COLOR mode
 
 
 def hex_to_ansi(
@@ -327,8 +325,7 @@ def rgb_to_ansi_bg_16(rgb: tuple[int, int, int]) -> str:
 
     if nearest_idx < 8:
         return f"\033[{40 + nearest_idx}m"
-    else:
-        return f"\033[{100 + (nearest_idx - 8)}m"
+    return f"\033[{100 + (nearest_idx - 8)}m"
 
 
 def rgb_to_ansi_bg_256(rgb: tuple[int, int, int]) -> str:
@@ -377,12 +374,11 @@ def rgb_to_ansi_bg(
 
     if mode >= ColorMode.TRUECOLOR:
         return rgb_to_ansi_bg_truecolor(rgb)
-    elif mode >= ColorMode.ANSI_256:
+    if mode >= ColorMode.ANSI_256:
         return rgb_to_ansi_bg_256(rgb)
-    elif mode >= ColorMode.ANSI_16:
+    if mode >= ColorMode.ANSI_16:
         return rgb_to_ansi_bg_16(rgb)
-    else:
-        return ""
+    return ""
 
 
 def hex_to_ansi_bg(

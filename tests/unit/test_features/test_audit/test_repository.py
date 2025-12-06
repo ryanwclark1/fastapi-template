@@ -8,7 +8,10 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from example_service.features.audit.models import AuditAction, AuditLog
-from example_service.features.audit.repository import AuditRepository, get_audit_repository
+from example_service.features.audit.repository import (
+    AuditRepository,
+    get_audit_repository,
+)
 from example_service.features.audit.schemas import AuditLogQuery
 
 

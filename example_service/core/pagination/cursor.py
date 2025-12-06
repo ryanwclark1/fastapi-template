@@ -17,8 +17,8 @@ Encoded: eyJ2IjogeyJjcmVhdGVkX2F0IjogIjIwMjUtMDEtMTVUMTA6MzA6MDBaIiwgImlkIjogImF
 from __future__ import annotations
 
 import base64
-import json
 from datetime import datetime
+import json
 from typing import Any, Literal
 from uuid import UUID
 

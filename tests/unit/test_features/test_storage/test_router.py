@@ -5,16 +5,19 @@ from datetime import UTC, datetime
 from io import BytesIO
 from unittest.mock import AsyncMock
 
-import pytest
 from fastapi import Depends, FastAPI, status
 from httpx import ASGITransport, AsyncClient
+import pytest
 
 from example_service.core.dependencies.auth import get_current_user, require_role
 from example_service.core.dependencies.tenant import get_tenant_context
 from example_service.core.schemas.auth import AuthUser
 from example_service.features.storage.dependencies import get_storage_service
 from example_service.infra.storage.backends import TenantContext
-from example_service.infra.storage.exceptions import StorageError, StorageFileNotFoundError
+from example_service.infra.storage.exceptions import (
+    StorageError,
+    StorageFileNotFoundError,
+)
 
 
 @pytest.fixture

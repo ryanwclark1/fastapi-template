@@ -48,9 +48,9 @@ class TestConsulHealthProvider:
         async def mock_get(path):
             if path == "/v1/agent/self":
                 return mock_agent_response
-            elif path == "/v1/status/leader":
+            if path == "/v1/status/leader":
                 return mock_leader_response
-            elif path == "/v1/agent/services":
+            if path == "/v1/agent/services":
                 return mock_services_response
             raise ValueError(f"Unexpected path: {path}")
 
@@ -103,9 +103,9 @@ class TestConsulHealthProvider:
         async def mock_get(path):
             if path == "/v1/agent/self":
                 return mock_agent_response
-            elif path == "/v1/status/leader":
+            if path == "/v1/status/leader":
                 return mock_leader_response
-            elif path == "/v1/agent/services":
+            if path == "/v1/agent/services":
                 return mock_services_response
             raise ValueError(f"Unexpected path: {path}")
 
@@ -146,9 +146,9 @@ class TestConsulHealthProvider:
         async def mock_get(path):
             if path == "/v1/agent/self":
                 return mock_agent_response
-            elif path == "/v1/status/leader":
+            if path == "/v1/status/leader":
                 return mock_leader_response
-            elif path == "/v1/agent/services":
+            if path == "/v1/agent/services":
                 return mock_services_response
             raise ValueError(f"Unexpected path: {path}")
 
@@ -247,9 +247,9 @@ class TestConsulHealthProvider:
         async def mock_get(path):
             if path == "/v1/agent/self":
                 return mock_agent_response
-            elif path == "/v1/status/leader":
+            if path == "/v1/status/leader":
                 return mock_leader_response
-            elif path == "/v1/agent/services":
+            if path == "/v1/agent/services":
                 return mock_services_response
             raise ValueError(f"Unexpected path: {path}")
 
@@ -291,9 +291,9 @@ class TestConsulHealthProvider:
         async def mock_get(path):
             if path == "/v1/agent/self":
                 return mock_agent_response
-            elif path == "/v1/status/leader":
+            if path == "/v1/status/leader":
                 return mock_leader_response
-            elif path == "/v1/agent/services":
+            if path == "/v1/agent/services":
                 return mock_services_response
             raise ValueError(f"Unexpected path: {path}")
 
@@ -337,9 +337,9 @@ class TestConsulHealthProvider:
         async def mock_get(path):
             if path == "/v1/agent/self":
                 return mock_agent_response
-            elif path == "/v1/status/leader":
+            if path == "/v1/status/leader":
                 raise httpx.HTTPError("Leader endpoint error")
-            elif path == "/v1/agent/services":
+            if path == "/v1/agent/services":
                 raise httpx.HTTPError("Services endpoint error")
             raise ValueError(f"Unexpected path: {path}")
 

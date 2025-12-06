@@ -13,8 +13,8 @@ import logging
 from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
-import strawberry
 from sqlalchemy import select
+import strawberry
 
 from example_service.features.featureflags.models import FeatureFlag
 from example_service.features.featureflags.schemas import (
@@ -103,7 +103,9 @@ async def feature_flags_query(
         FeatureFlagConnection with edges and page_info
     """
     ctx = info.context
-    from example_service.features.featureflags.repository import get_feature_flag_repository
+    from example_service.features.featureflags.repository import (
+        get_feature_flag_repository,
+    )
 
     repo = get_feature_flag_repository()
 

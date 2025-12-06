@@ -6,11 +6,11 @@ with progress tracking, validation, and storage integration.
 
 from __future__ import annotations
 
-import logging
-import uuid
 from datetime import UTC, datetime
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
+import uuid
 
 from sqlalchemy import select
 
@@ -30,7 +30,6 @@ from .schemas import (
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    pass
 
 logger = logging.getLogger(__name__)
 

@@ -17,14 +17,14 @@ Usage:
 
 from __future__ import annotations
 
-import logging
-import ssl
-import uuid
 from datetime import UTC, datetime
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+import logging
+import ssl
 from typing import TYPE_CHECKING
+import uuid
 
 from example_service.utils.retry import retry
 

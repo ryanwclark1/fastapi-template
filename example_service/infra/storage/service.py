@@ -148,8 +148,8 @@ class StorageService:
     def _register_health_provider(self) -> None:
         """Register health provider with the health aggregator."""
         try:
-            from example_service.features.health.service import get_health_aggregator
             from example_service.features.health.providers import StorageHealthProvider
+            from example_service.features.health.service import get_health_aggregator
 
             aggregator = get_health_aggregator()
             if aggregator:

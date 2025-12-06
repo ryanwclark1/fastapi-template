@@ -37,7 +37,10 @@ from example_service.features.files.schemas import (
 )
 from example_service.features.files.service import FileService
 from example_service.infra.logging import get_lazy_logger
-from example_service.infra.metrics.tracking import track_feature_usage, track_user_action
+from example_service.infra.metrics.tracking import (
+    track_feature_usage,
+    track_user_action,
+)
 from example_service.infra.storage import get_storage_service
 from example_service.infra.storage.client import (
     InvalidFileError,

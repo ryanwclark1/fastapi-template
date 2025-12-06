@@ -6,8 +6,8 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
-import pytest
 from fastapi import Request
+import pytest
 from starlette.types import Scope
 
 from example_service.features.audit import decorators

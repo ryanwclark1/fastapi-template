@@ -33,10 +33,10 @@ Example:
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager, contextmanager
 import functools
 import logging
 import time
-from contextlib import asynccontextmanager, contextmanager
 from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
 
 if TYPE_CHECKING:

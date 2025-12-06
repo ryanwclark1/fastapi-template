@@ -13,7 +13,12 @@ from typing import TYPE_CHECKING, Literal, cast
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from example_service.core.database import BeforeAfter, LimitOffset, OrderBy, SearchFilter
+from example_service.core.database import (
+    BeforeAfter,
+    LimitOffset,
+    OrderBy,
+    SearchFilter,
+)
 from example_service.core.database.repository import SearchResult, TenantAwareRepository
 from example_service.core.database.search import search
 from example_service.features.reminders.models import Reminder
@@ -524,15 +529,14 @@ class ReminderRepository(TenantAwareRepository[Reminder]):
         # Add rank column for relevance score extraction
         if mode == "web":
             ts_query = func.websearch_to_tsquery("english", query)
+        # For plain/prefix mode, build appropriate tsquery
+        elif prefix:
+            # Prefix matching: add :* to each term
+            terms = query.split()
+            prefix_terms = " & ".join(f"{t}:*" for t in terms if t)
+            ts_query = func.to_tsquery("english", prefix_terms)
         else:
-            # For plain/prefix mode, build appropriate tsquery
-            if prefix:
-                # Prefix matching: add :* to each term
-                terms = query.split()
-                prefix_terms = " & ".join(f"{t}:*" for t in terms if t)
-                ts_query = func.to_tsquery("english", prefix_terms)
-            else:
-                ts_query = func.plainto_tsquery("english", query)
+            ts_query = func.plainto_tsquery("english", query)
 
         stmt = stmt.add_columns(
             func.ts_rank(Reminder.search_vector, ts_query).label("search_rank")

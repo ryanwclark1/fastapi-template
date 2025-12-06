@@ -6,8 +6,8 @@ Allows fine-grained control over lazy evaluation, exception info, stack depth, e
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Mapping, MutableMapping
+import logging
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:

@@ -13,8 +13,8 @@ import logging
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-import strawberry
 from sqlalchemy.exc import IntegrityError
+import strawberry
 
 from example_service.features.featureflags.models import FeatureFlag, FlagStatus
 from example_service.features.featureflags.repository import get_feature_flag_repository
@@ -375,7 +375,9 @@ async def delete_feature_flag_mutation(
         flag_data = serialize_model_for_event(flag)
 
         # Delete associated overrides first
-        from example_service.features.featureflags.repository import get_flag_override_repository
+        from example_service.features.featureflags.repository import (
+            get_flag_override_repository,
+        )
 
         override_repo = get_flag_override_repository()
         deleted_overrides = await override_repo.delete_by_flag(ctx.session, flag_key)

@@ -292,8 +292,7 @@ def trace_resolver(resolver_name: str):
 
         if asyncio.iscoroutinefunction(func):
             return async_wrapper
-        else:
-            return sync_wrapper
+        return sync_wrapper
 
     return decorator
 

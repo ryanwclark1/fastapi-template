@@ -5,7 +5,11 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from example_service.features.featureflags.models import FeatureFlag, FlagOverride, FlagStatus
+from example_service.features.featureflags.models import (
+    FeatureFlag,
+    FlagOverride,
+    FlagStatus,
+)
 from example_service.features.featureflags.repository import (
     FeatureFlagRepository,
     FlagOverrideRepository,

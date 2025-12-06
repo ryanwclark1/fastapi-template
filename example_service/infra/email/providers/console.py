@@ -12,8 +12,8 @@ Usage:
 from __future__ import annotations
 
 import logging
-import uuid
 from typing import TYPE_CHECKING
+import uuid
 
 from .base import BaseEmailProvider, EmailDeliveryResult, ProviderCapabilities
 

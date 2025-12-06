@@ -532,7 +532,10 @@ class TestSynonymIntegration:
     @pytest.mark.asyncio
     async def test_query_rewriter_with_synonyms(self, search_session):
         """QueryRewriter should use synonym dictionary."""
-        from example_service.core.database.search import QueryRewriter, get_default_synonyms
+        from example_service.core.database.search import (
+            QueryRewriter,
+            get_default_synonyms,
+        )
 
         rewriter = QueryRewriter.with_dictionary(get_default_synonyms())
 

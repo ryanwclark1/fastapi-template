@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
+import re
 from typing import Any
 
 import click
@@ -499,10 +499,9 @@ def to_plural(text: str) -> str:
     """Convert singular noun to plural (simple rules)."""
     if text.endswith("y"):
         return text[:-1] + "ies"
-    elif text.endswith(("s", "x", "z", "ch", "sh")):
+    if text.endswith(("s", "x", "z", "ch", "sh")):
         return text + "es"
-    else:
-        return text + "s"
+    return text + "s"
 
 
 def get_template_context(model_name: str) -> dict[str, Any]:
@@ -571,7 +570,6 @@ def resource(
     for a new resource following FastAPI conventions.
 
     Example:
-
         example-service generate resource Product --all
 
         example-service generate resource Order --model --schema --crud
@@ -691,7 +689,6 @@ def router(name: str, prefix: str, tag: str | None) -> None:
     Creates a basic FastAPI router with health check endpoint.
 
     Example:
-
         example-service generate router webhooks --prefix /webhooks
 
     Args:
@@ -734,7 +731,6 @@ def middleware(name: str) -> None:
     Creates a FastAPI middleware with logging and error handling.
 
     Example:
-
         example-service generate middleware audit_log
 
     Args:
@@ -826,7 +822,6 @@ def migration(name: str) -> None:
     Creates an empty Alembic migration with upgrade/downgrade functions.
 
     Example:
-
         example-service generate migration add_user_roles
 
     Args:
@@ -1753,7 +1748,6 @@ def feature(
     This follows the project's feature-based architecture pattern.
 
     Examples:
-
         # Generate complete feature
         example-service generate feature products --all
 

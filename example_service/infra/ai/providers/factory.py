@@ -256,7 +256,9 @@ class ProviderFactory:
             logger.debug(f"OpenAI transcription provider not available: {e}")
 
         try:
-            from example_service.infra.ai.providers.deepgram_provider import DeepgramProvider
+            from example_service.infra.ai.providers.deepgram_provider import (
+                DeepgramProvider,
+            )
 
             self.register_transcription_provider("deepgram", DeepgramProvider)
         except ImportError as e:
@@ -273,7 +275,9 @@ class ProviderFactory:
 
         # LLM providers
         try:
-            from example_service.infra.ai.providers.openai_provider import OpenAILLMProvider
+            from example_service.infra.ai.providers.openai_provider import (
+                OpenAILLMProvider,
+            )
 
             self.register_llm_provider("openai", OpenAILLMProvider)
         except ImportError as e:

@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock
 
-import pytest
 from fastapi import FastAPI, Request
+import pytest
 from starlette.testclient import TestClient
 
 from example_service.app.middleware.correlation_id import (

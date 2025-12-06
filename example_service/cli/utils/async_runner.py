@@ -9,8 +9,7 @@ T = TypeVar("T")
 
 
 def run_async[T](coro: Awaitable[T]) -> T:
-    """
-    Run an async coroutine in a new event loop.
+    """Run an async coroutine in a new event loop.
 
     Args:
         coro: The coroutine to run
@@ -36,8 +35,7 @@ def run_async[T](coro: Awaitable[T]) -> T:
 
 
 def async_command(func: Callable[..., Awaitable[Any]]) -> Callable[..., Any]:
-    """
-    Decorator to convert an async function into a Click command.
+    """Decorator to convert an async function into a Click command.
 
     Usage:
         @click.command()
@@ -54,8 +52,7 @@ def async_command(func: Callable[..., Awaitable[Any]]) -> Callable[..., Any]:
 
 
 def coro[T](f: Callable[..., Coroutine[Any, Any, T]]) -> Callable[..., T]:
-    """
-    Decorator that makes an async function synchronous for Click.
+    """Decorator that makes an async function synchronous for Click.
 
     This is useful for Click commands that need to run async code.
 

@@ -121,9 +121,8 @@ async def _lookup_tenant(
                 extra={"tenant_id": tenant_id, "uuid": uuid, "slug": slug},
             )
             return (uuid, slug)
-        else:
-            # Expired entry
-            del _tenant_cache[tenant_id]
+        # Expired entry
+        del _tenant_cache[tenant_id]
 
     # Query database - try by ID first (most common case)
     stmt = select(Tenant).where(

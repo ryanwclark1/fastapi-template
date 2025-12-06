@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import pytest
 from fastapi import FastAPI
+import pytest
 
 from example_service.app import main as main_module
 

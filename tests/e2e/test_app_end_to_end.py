@@ -5,9 +5,9 @@ from __future__ import annotations
 import importlib
 import os
 
-import pytest
 from faststream.rabbit.testing import TestRabbitBroker
 from httpx import ASGITransport, AsyncClient
+import pytest
 
 from example_service.core.settings.loader import clear_all_caches
 
@@ -17,7 +17,6 @@ pytestmark = pytest.mark.anyio
 @pytest.fixture
 async def e2e_stack(monkeypatch):
     """Spin up the full app with middleware and Rabbit router (patched in-memory)."""
-
     original_rabbit_enabled = os.environ.get("RABBIT_ENABLED")
     monkeypatch.setenv("RABBIT_ENABLED", "true")
     clear_all_caches()

@@ -43,9 +43,9 @@ Usage:
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 from enum import StrEnum
+import re
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from sqlalchemy import func, not_
@@ -155,28 +155,28 @@ class SearchQueryParser:
         # Field with quoted phrase: field:"value" or field:'value'
         "field_phrase": re.compile(r'(\w+):["\']([^"\']+)["\']'),
         # Field with range: field:[min TO max] or field:{min TO max}
-        "field_range": re.compile(r'(\w+):[\[\{](\S+)\s+TO\s+(\S+)[\]\}]', re.IGNORECASE),
+        "field_range": re.compile(r"(\w+):[\[\{](\S+)\s+TO\s+(\S+)[\]\}]", re.IGNORECASE),
         # Field with comparison: field:>value, field:>=value, etc.
-        "field_compare": re.compile(r'(\w+):(>=?|<=?)(\S+)'),
+        "field_compare": re.compile(r"(\w+):(>=?|<=?)(\S+)"),
         # Field with simple value: field:value
-        "field_term": re.compile(r'(\w+):(\S+)'),
+        "field_term": re.compile(r"(\w+):(\S+)"),
         # Quoted phrase: "exact phrase"
         "phrase": re.compile(r'["\']([^"\']+)["\']'),
         # Prefix: word*
-        "prefix": re.compile(r'(\w+)\*'),
+        "prefix": re.compile(r"(\w+)\*"),
         # Fuzzy: ~word
-        "fuzzy": re.compile(r'~(\w+)'),
+        "fuzzy": re.compile(r"~(\w+)"),
         # Exclude: -word or !word
-        "exclude": re.compile(r'[-!](\w+)'),
+        "exclude": re.compile(r"[-!](\w+)"),
         # OR operator
-        "or": re.compile(r'\bOR\b|\|', re.IGNORECASE),
+        "or": re.compile(r"\bOR\b|\|", re.IGNORECASE),
         # AND operator
-        "and": re.compile(r'\bAND\b|&', re.IGNORECASE),
+        "and": re.compile(r"\bAND\b|&", re.IGNORECASE),
         # Parentheses
-        "lparen": re.compile(r'\('),
-        "rparen": re.compile(r'\)'),
+        "lparen": re.compile(r"\("),
+        "rparen": re.compile(r"\)"),
         # Plain word
-        "word": re.compile(r'\b(\w+)\b'),
+        "word": re.compile(r"\b(\w+)\b"),
     }
 
     def __init__(

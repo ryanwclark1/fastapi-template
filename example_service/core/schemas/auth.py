@@ -203,7 +203,7 @@ class AuthUser(BaseModel):
         resource_acl = self.acl[resource]
         if isinstance(resource_acl, list):
             return action in resource_acl
-        elif isinstance(resource_acl, dict):
+        if isinstance(resource_acl, dict):
             return bool(resource_acl.get(action, False))
 
         return False

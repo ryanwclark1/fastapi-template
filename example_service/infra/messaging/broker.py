@@ -21,9 +21,9 @@ Usage Patterns:
 from __future__ import annotations
 
 import asyncio
-import logging
 from contextlib import asynccontextmanager
 from enum import Enum
+import logging
 from typing import TYPE_CHECKING, Any
 
 from example_service.app.docs import ensure_asyncapi_template_patched
@@ -372,14 +372,13 @@ async def check_broker_health() -> dict[str, Any]:
                 "state": ConnectionState.CONNECTED.value,
                 "is_connected": True,
             }
-        else:
-            # Broker not running
-            return {
-                "status": "unhealthy",
-                "state": ConnectionState.DISCONNECTED.value,
-                "is_connected": False,
-                "reason": "broker_not_running",
-            }
+        # Broker not running
+        return {
+            "status": "unhealthy",
+            "state": ConnectionState.DISCONNECTED.value,
+            "is_connected": False,
+            "reason": "broker_not_running",
+        }
     except Exception as e:
         logger.exception("Error checking broker health", extra={"error": str(e)})
         return {

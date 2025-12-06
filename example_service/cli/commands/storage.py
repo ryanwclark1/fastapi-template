@@ -7,11 +7,11 @@ This module provides CLI commands for managing S3-compatible storage including:
 - Batch file operations (upload, download, copy, move, delete)
 """
 
+from datetime import datetime
 import fnmatch
+from pathlib import Path
 import sys
 import time
-from datetime import datetime
-from pathlib import Path
 
 import click
 
@@ -278,8 +278,8 @@ async def check() -> None:
         # Check 4: Permissions (optional test file)
         click.echo("\n4. Read/Write Permissions:")
         try:
-            import tempfile
             from pathlib import Path
+            import tempfile
 
             # Create a small test file
             test_key = f"_healthcheck_test_{int(time.time())}.txt"

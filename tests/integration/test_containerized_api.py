@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from pathlib import Path
 import shutil
 import subprocess
 import time
-from collections.abc import Iterator
-from pathlib import Path
 
 import httpx
 import pytest

@@ -36,30 +36,30 @@ Example:
 
 from __future__ import annotations
 
+# Import ProviderConfig for backward compatibility
+from example_service.core.settings.health import ProviderConfig
+
+# Application-specific providers
+from .accent_auth import AccentAuthHealthProvider
+from .consul import ConsulHealthProvider
+
+# Core infrastructure providers
+from .database import DatabaseHealthProvider
+from .external import ExternalServiceHealthProvider
+from .pool import DatabasePoolHealthProvider
+
 # Protocol and base types
 from .protocol import (
     DEGRADED_LATENCY_THRESHOLD_MS,
     HealthCheckResult,
     HealthProvider,
 )
-
-# Core infrastructure providers
-from .database import DatabaseHealthProvider
-from .redis import RedisHealthProvider
 from .rabbitmq import RabbitMQHealthProvider
-from .external import ExternalServiceHealthProvider
-from .s3 import S3StorageHealthProvider
-from .consul import ConsulHealthProvider
-from .pool import DatabasePoolHealthProvider
-
-# Application-specific providers
-from .accent_auth import AccentAuthHealthProvider
 from .rate_limit import RateLimiterHealthProvider
+from .redis import RedisHealthProvider
+from .s3 import S3StorageHealthProvider
 from .storage import StorageHealthProvider
 from .task_tracker import TaskTrackerHealthProvider
-
-# Import ProviderConfig for backward compatibility
-from example_service.core.settings.health import ProviderConfig
 
 __all__ = [
     # Protocol and base types

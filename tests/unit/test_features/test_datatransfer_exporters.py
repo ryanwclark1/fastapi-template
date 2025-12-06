@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime, timezone
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4

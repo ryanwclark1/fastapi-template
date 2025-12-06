@@ -37,11 +37,11 @@ Example:
 from __future__ import annotations
 
 import base64
+from datetime import UTC, datetime
 import logging
 import os
 import time
 import uuid
-from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 

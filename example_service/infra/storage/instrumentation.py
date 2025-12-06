@@ -8,8 +8,8 @@ Provides unified observability for storage operations through:
 
 from __future__ import annotations
 
-import time
 from contextlib import asynccontextmanager
+import time
 from typing import TYPE_CHECKING, Any
 
 from opentelemetry import trace

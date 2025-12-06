@@ -40,11 +40,11 @@ Performance:
 
 from __future__ import annotations
 
+from collections import defaultdict
+from contextvars import ContextVar
 import logging
 import re
 import time
-from collections import defaultdict
-from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any
 
 from starlette.middleware.base import BaseHTTPMiddleware

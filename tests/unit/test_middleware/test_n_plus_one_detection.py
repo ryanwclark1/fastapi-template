@@ -6,8 +6,8 @@ import time
 from typing import Any
 from unittest.mock import Mock, patch
 
-import pytest
 from fastapi import FastAPI, Request, Response
+import pytest
 from starlette.testclient import TestClient
 
 from example_service.app.middleware.n_plus_one_detection import (

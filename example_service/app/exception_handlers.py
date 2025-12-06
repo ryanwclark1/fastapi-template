@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from http import HTTPStatus
 import json
 import logging
-from http import HTTPStatus
 from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, Request, status

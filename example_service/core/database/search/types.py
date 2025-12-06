@@ -60,11 +60,10 @@ class TSVECTOR(TypeDecorator):
         """
         if dialect.name == "postgresql":
             return dialect.type_descriptor(PG_TSVECTOR())
-        else:
-            # Fallback for SQLite testing
-            from sqlalchemy import Text
+        # Fallback for SQLite testing
+        from sqlalchemy import Text
 
-            return dialect.type_descriptor(Text())
+        return dialect.type_descriptor(Text())
 
 
 def combine_vectors(

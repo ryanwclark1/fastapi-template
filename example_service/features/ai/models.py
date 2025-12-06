@@ -9,8 +9,8 @@ Models:
 
 from __future__ import annotations
 
-import enum
 from datetime import UTC, datetime
+import enum
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 

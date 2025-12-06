@@ -52,7 +52,9 @@ from example_service.features.graphql.resolvers.files_queries import (
 )
 
 # Import reminder resolvers (from monolithic files)
-from example_service.features.graphql.resolvers.mutations import Mutation as ReminderMutation
+from example_service.features.graphql.resolvers.mutations import (
+    Mutation as ReminderMutation,
+)
 from example_service.features.graphql.resolvers.queries import Query as ReminderQuery
 from example_service.features.graphql.resolvers.subscriptions import (
     Subscription as ReminderSubscription,

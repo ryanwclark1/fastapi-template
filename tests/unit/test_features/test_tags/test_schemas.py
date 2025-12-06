@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import pytest
 from pydantic import ValidationError
+import pytest
 
 pytest.importorskip("dateutil.rrule", reason="Reminder schemas require python-dateutil")
 

@@ -12,9 +12,9 @@ Design decisions:
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
+import time
 from typing import Any
 
 # ─────────────────────────────────────────────────────

@@ -9,8 +9,8 @@ This module provides:
 
 from __future__ import annotations
 
-import logging
 from datetime import UTC, datetime, timedelta
+import logging
 from pathlib import Path
 from typing import Any
 

@@ -84,7 +84,7 @@ class TenantMixin:
         if existing_args:
             if isinstance(existing_args, dict):
                 return (new_index, existing_args)
-            elif isinstance(existing_args, tuple):
+            if isinstance(existing_args, tuple):
                 return (*existing_args, new_index)
 
         return (new_index,)
@@ -352,4 +352,3 @@ def get_tenant_filter(model_class: type, tenant_id: str | None = None) -> Any:
 class TenantIsolationError(Exception):
     """Raised when tenant isolation is violated."""
 
-    pass

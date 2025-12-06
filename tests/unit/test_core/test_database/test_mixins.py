@@ -10,8 +10,8 @@ This module tests the enhanced database layer including:
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
 from uuid import UUID
 
 import pytest
@@ -28,10 +28,6 @@ from example_service.core.database.base import (
     UUIDPKMixin,
     UUIDv7PKMixin,
 )
-
-if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
-
 
 # ============================================================================
 # Test Models - Using composable mixins to test different combinations

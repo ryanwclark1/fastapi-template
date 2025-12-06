@@ -7,8 +7,8 @@ This module provides:
 
 from __future__ import annotations
 
-import logging
 from datetime import UTC, datetime
+import logging
 from typing import Any
 
 from sqlalchemy import func, select

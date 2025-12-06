@@ -9,7 +9,11 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from example_service.core.settings import get_db_settings, get_redis_settings, get_task_settings
+from example_service.core.settings import (
+    get_db_settings,
+    get_redis_settings,
+    get_task_settings,
+)
 
 if TYPE_CHECKING:
     from example_service.infra.tasks.tracking.base import BaseTaskTracker
@@ -47,7 +51,9 @@ def create_tracker() -> BaseTaskTracker:
     task_settings = get_task_settings()
 
     if task_settings.is_postgres_backend:
-        from example_service.infra.tasks.tracking.postgres_tracker import PostgresTaskTracker
+        from example_service.infra.tasks.tracking.postgres_tracker import (
+            PostgresTaskTracker,
+        )
 
         db_settings = get_db_settings()
         logger.info("Creating PostgreSQL task tracker")
@@ -57,18 +63,17 @@ def create_tracker() -> BaseTaskTracker:
             pool_size=5,
             max_overflow=10,
         )
-    else:
-        from example_service.infra.tasks.tracking.redis_tracker import RedisTaskTracker
+    from example_service.infra.tasks.tracking.redis_tracker import RedisTaskTracker
 
-        redis_settings = get_redis_settings()
-        logger.info("Creating Redis task tracker")
+    redis_settings = get_redis_settings()
+    logger.info("Creating Redis task tracker")
 
-        return RedisTaskTracker(
-            redis_url=redis_settings.url,
-            key_prefix=task_settings.redis_key_prefix,
-            ttl_seconds=task_settings.redis_result_ttl_seconds,
-            max_connections=task_settings.redis_max_connections,
-        )
+    return RedisTaskTracker(
+        redis_url=redis_settings.url,
+        key_prefix=task_settings.redis_key_prefix,
+        ttl_seconds=task_settings.redis_result_ttl_seconds,
+        max_connections=task_settings.redis_max_connections,
+    )
 
 
 def get_tracker() -> BaseTaskTracker | None:

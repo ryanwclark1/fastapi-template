@@ -547,8 +547,7 @@ def get_pipeline(name: str, **kwargs: Any) -> PipelineDefinition:
     factory = PREDEFINED_PIPELINES[name]
     if kwargs:
         return factory(**kwargs)  # type: ignore[operator, no-any-return]
-    else:
-        return factory()  # type: ignore[operator, no-any-return]
+    return factory()  # type: ignore[operator, no-any-return]
 
 
 def list_pipelines() -> list[dict]:

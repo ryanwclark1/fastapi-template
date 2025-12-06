@@ -25,11 +25,11 @@ Example:
 from __future__ import annotations
 
 import asyncio
-import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 from functools import lru_cache
+import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -264,7 +264,7 @@ class DLQAlerter:
         """
         if retry_count >= self.config.critical_threshold:
             return AlertSeverity.CRITICAL
-        elif retry_count >= self.config.warning_threshold:
+        if retry_count >= self.config.warning_threshold:
             return AlertSeverity.WARNING
         return AlertSeverity.INFO
 

@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import importlib
 from datetime import UTC, datetime
+import importlib
 from unittest.mock import AsyncMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
 from httpx import ASGITransport, AsyncClient
+import pytest
 
 from example_service.features.tasks.schemas import CancelTaskResponse, TaskName
 
@@ -26,7 +26,7 @@ class MockTaskService:
         self.get_task_details = AsyncMock()
         self.trigger_task = AsyncMock()
         self.cancel_task = AsyncMock()
-        self.get_scheduled_jobs = lambda: []  # Synchronous in service implementation
+        self.get_scheduled_jobs = list  # Synchronous in service implementation
         self.get_scheduled_job = lambda _job_id: None
         self.pause_job = lambda _job_id: True
         self.resume_job = lambda _job_id: True

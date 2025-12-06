@@ -27,7 +27,11 @@ from example_service.infra.metrics.prometheus import (
     taskiq_task_duration_seconds,
     taskiq_tasks_total,
 )
-from example_service.infra.tasks.tracking import get_tracker, start_tracker, stop_tracker
+from example_service.infra.tasks.tracking import (
+    get_tracker,
+    start_tracker,
+    stop_tracker,
+)
 from example_service.infra.tracing.opentelemetry import get_tracer
 
 logger = logging.getLogger(__name__)

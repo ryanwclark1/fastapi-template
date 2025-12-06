@@ -131,32 +131,31 @@ class QueryCacheExtension(SchemaExtension):
                 # (This is a known limitation of Strawberry extensions)
                 logger.debug("Async cache not supported in extensions yet")
                 return None
-            else:
-                # Sync cache
-                cached_result = cache.get(cache_key)
-                if cached_result:
-                    logger.debug(
-                        "Cache hit",
-                        extra={
-                            "cache_key": cache_key,
-                            "operation_name": execution_context.operation_name,
-                        },
-                    )
-                    # Deserialize and return cached result
-                    return json.loads(cached_result)
-
-                # Cache miss - execute query and cache result
+            # Sync cache
+            cached_result = cache.get(cache_key)
+            if cached_result:
                 logger.debug(
-                    "Cache miss",
+                    "Cache hit",
                     extra={
                         "cache_key": cache_key,
                         "operation_name": execution_context.operation_name,
                     },
                 )
+                # Deserialize and return cached result
+                return json.loads(cached_result)
 
-                # Let the query execute normally
-                # We'll cache the result in on_request_end
-                return None
+            # Cache miss - execute query and cache result
+            logger.debug(
+                "Cache miss",
+                extra={
+                    "cache_key": cache_key,
+                    "operation_name": execution_context.operation_name,
+                },
+            )
+
+            # Let the query execute normally
+            # We'll cache the result in on_request_end
+            return None
 
         except Exception as e:
             # Don't fail the operation if caching has issues
@@ -218,17 +217,16 @@ class QueryCacheExtension(SchemaExtension):
                 # Async cache - skip for now
                 logger.debug("Async cache not supported in extensions yet")
                 return
-            else:
-                # Sync cache
-                cache.set(cache_key, cache_value, ttl=self.ttl)
-                logger.debug(
-                    "Cached query result",
-                    extra={
-                        "cache_key": cache_key,
-                        "operation_name": execution_context.operation_name,
-                        "ttl": self.ttl,
-                    },
-                )
+            # Sync cache
+            cache.set(cache_key, cache_value, ttl=self.ttl)
+            logger.debug(
+                "Cached query result",
+                extra={
+                    "cache_key": cache_key,
+                    "operation_name": execution_context.operation_name,
+                    "ttl": self.ttl,
+                },
+            )
 
         except Exception as e:
             # Don't fail the operation if caching has issues

@@ -200,16 +200,15 @@ def _create_result_backend() -> Any:
             keep_results=True,
             result_ttl_seconds=task_settings.tracking_retention_seconds,
         )
-    else:
-        logger.info(
-            "Using Redis result backend for tasks",
-            extra={"ttl_seconds": task_settings.redis_result_ttl_seconds},
-        )
-        return RedisAsyncResultBackend(
-            redis_url=redis_settings.get_url(),
-            result_ex_time=task_settings.redis_result_ttl_seconds,
-            prefix_str=task_settings.redis_key_prefix,
-        )
+    logger.info(
+        "Using Redis result backend for tasks",
+        extra={"ttl_seconds": task_settings.redis_result_ttl_seconds},
+    )
+    return RedisAsyncResultBackend(
+        redis_url=redis_settings.get_url(),
+        result_ex_time=task_settings.redis_result_ttl_seconds,
+        prefix_str=task_settings.redis_key_prefix,
+    )
 
 
 def _can_create_broker() -> bool:
@@ -307,9 +306,8 @@ if BrokerWrapper is not None and StreamScheduler is not None and LabelScheduleSo
         logger.info("Taskiq scheduled message publisher configured")
     else:
         logger.warning("FastStream broker not available - scheduled publishing disabled")
-else:
-    if BrokerWrapper is None:
-        logger.debug("taskiq-faststream not installed - scheduled publishing disabled")
+elif BrokerWrapper is None:
+    logger.debug("taskiq-faststream not installed - scheduled publishing disabled")
 
 
 async def get_broker() -> AsyncIterator[AioPikaBrokerType | None]:

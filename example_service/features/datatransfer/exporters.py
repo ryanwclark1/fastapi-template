@@ -5,12 +5,12 @@ Provides exporters for CSV, JSON, and Excel formats with streaming support.
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 import csv
+from datetime import datetime
 import io
 import json
 import logging
-from abc import ABC, abstractmethod
-from datetime import datetime
 from typing import TYPE_CHECKING, Any, TypeVar
 from uuid import UUID
 
@@ -358,12 +358,11 @@ def get_exporter(
     format_lower = format.lower()
     if format_lower == "csv":
         return CSVExporter(fields=fields, include_headers=include_headers)
-    elif format_lower == "json":
+    if format_lower == "json":
         return JSONExporter(fields=fields, include_headers=include_headers)
-    elif format_lower in ("xlsx", "excel"):
+    if format_lower in ("xlsx", "excel"):
         return ExcelExporter(fields=fields, include_headers=include_headers)
-    else:
-        raise ValueError(f"Unsupported export format: {format}")
+    raise ValueError(f"Unsupported export format: {format}")
 
 
 __all__ = [

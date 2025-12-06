@@ -8,10 +8,9 @@ Provides:
 
 from __future__ import annotations
 
-import os
-from collections.abc import Iterator
+from collections.abc import AsyncGenerator, Iterator
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+import os
 from uuid import uuid4
 
 import pytest
@@ -32,9 +31,6 @@ from example_service.core.database import Base
 from example_service.features.graphql.context import GraphQLContext
 from example_service.features.graphql.dataloaders import create_dataloaders
 from example_service.features.reminders.models import Reminder
-
-if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
 
 
 @pytest.fixture(scope="session")

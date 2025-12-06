@@ -14,12 +14,12 @@ Key differences from unit tests:
 from __future__ import annotations
 
 import asyncio
-import uuid
 from unittest.mock import MagicMock, patch
+import uuid
 
-import pytest
 from fastapi import FastAPI, Request
 from httpx import ASGITransport, AsyncClient
+import pytest
 
 from example_service.app.middleware.correlation_id import CorrelationIDMiddleware
 from example_service.app.middleware.metrics import MetricsMiddleware

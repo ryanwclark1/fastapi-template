@@ -127,20 +127,19 @@ class AssemblyAIProvider(BaseProvider):
                     operation="file_upload",
                     original_error=e,
                 ) from e
-            elif e.response.status_code == 429:
+            if e.response.status_code == 429:
                 raise ProviderRateLimitError(
                     "AssemblyAI rate limit exceeded during upload",
                     provider="assemblyai",
                     operation="file_upload",
                     original_error=e,
                 ) from e
-            else:
-                raise ProviderError(
-                    f"AssemblyAI upload failed: HTTP {e.response.status_code}",
-                    provider="assemblyai",
-                    operation="file_upload",
-                    original_error=e,
-                ) from e
+            raise ProviderError(
+                f"AssemblyAI upload failed: HTTP {e.response.status_code}",
+                provider="assemblyai",
+                operation="file_upload",
+                original_error=e,
+            ) from e
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(
                 "AssemblyAI upload timed out",
@@ -214,20 +213,19 @@ class AssemblyAIProvider(BaseProvider):
                     operation="create_transcript",
                     original_error=e,
                 ) from e
-            elif e.response.status_code == 429:
+            if e.response.status_code == 429:
                 raise ProviderRateLimitError(
                     "AssemblyAI rate limit exceeded",
                     provider="assemblyai",
                     operation="create_transcript",
                     original_error=e,
                 ) from e
-            else:
-                raise ProviderError(
-                    f"AssemblyAI transcript creation failed: HTTP {e.response.status_code}",
-                    provider="assemblyai",
-                    operation="create_transcript",
-                    original_error=e,
-                ) from e
+            raise ProviderError(
+                f"AssemblyAI transcript creation failed: HTTP {e.response.status_code}",
+                provider="assemblyai",
+                operation="create_transcript",
+                original_error=e,
+            ) from e
         except Exception as e:
             raise ProviderError(
                 f"AssemblyAI transcript creation error: {e}",
@@ -271,14 +269,14 @@ class AssemblyAIProvider(BaseProvider):
 
                 if status == "completed":
                     return data
-                elif status == "error":
+                if status == "error":
                     error_msg = data.get("error", "Unknown error")
                     raise ProviderError(
                         f"AssemblyAI transcription failed: {error_msg}",
                         provider="assemblyai",
                         operation="poll_transcript",
                     )
-                elif status in ("queued", "processing"):
+                if status in ("queued", "processing"):
                     # Still processing, continue polling
                     await asyncio.sleep(self.poll_interval)
                 else:
@@ -297,13 +295,12 @@ class AssemblyAIProvider(BaseProvider):
                         operation="poll_transcript",
                         original_error=e,
                     ) from e
-                else:
-                    raise ProviderError(
-                        f"AssemblyAI polling failed: HTTP {e.response.status_code}",
-                        provider="assemblyai",
-                        operation="poll_transcript",
-                        original_error=e,
-                    ) from e
+                raise ProviderError(
+                    f"AssemblyAI polling failed: HTTP {e.response.status_code}",
+                    provider="assemblyai",
+                    operation="poll_transcript",
+                    original_error=e,
+                ) from e
             except ProviderError:
                 # Re-raise provider errors
                 raise

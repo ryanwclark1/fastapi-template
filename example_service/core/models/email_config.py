@@ -8,9 +8,9 @@ Models:
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 import enum
 import os
-from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
@@ -18,7 +18,9 @@ from sqlalchemy import JSON, Boolean, Float, ForeignKey, Index, Integer, String,
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from example_service.core.database.base import Base
-from example_service.core.database.enums import EmailProviderType as EmailProviderTypeEnum
+from example_service.core.database.enums import (
+    EmailProviderType as EmailProviderTypeEnum,
+)
 from example_service.core.database.types import EncryptedString
 
 if TYPE_CHECKING:

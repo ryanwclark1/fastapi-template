@@ -68,7 +68,6 @@ RESERVED_KEYWORDS = frozenset(
 class IdentifierValidationError(ValueError):
     """Invalid SQL identifier."""
 
-    pass
 
 
 def validate_identifier(

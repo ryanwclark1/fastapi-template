@@ -150,7 +150,6 @@ class ReminderResponse(ReminderBase):
     @classmethod
     def from_model(cls, reminder: Reminder) -> ReminderResponse:
         """Create response from model instance with recurrence info."""
-
         recurrence = None
         if reminder.recurrence_rule:
             recurrence = RecurrenceInfo(

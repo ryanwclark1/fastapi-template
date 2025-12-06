@@ -8,11 +8,13 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from frozendict import frozendict
+import pytest
 
 from example_service.app.middleware.tenant import (
     clear_tenant_context,
+)
+from example_service.app.middleware.tenant import (
     get_tenant_context as get_middleware_tenant_context,
 )
 from example_service.core.dependencies.tenant import (
@@ -175,7 +177,9 @@ class TestTenantAwareSessionIntegration:
         1. Endpoint uses TenantContextDep (calls get_tenant_context)
         2. TenantAwareSession reads from middleware context var
         """
-        from example_service.core.database.tenancy import get_tenant_context as db_get_tenant_context
+        from example_service.core.database.tenancy import (
+            get_tenant_context as db_get_tenant_context,
+        )
 
         # Arrange: Set up tenant via dependency (simulating endpoint call)
         storage_context = TenantContext(

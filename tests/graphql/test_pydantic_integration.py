@@ -28,7 +28,11 @@ from example_service.features.reminders.schemas import (
     ReminderResponse,
     ReminderUpdate,
 )
-from tests.graphql.conftest import CREATE_REMINDER_MUTATION, REMINDER_QUERY, REMINDERS_QUERY
+from tests.graphql.conftest import (
+    CREATE_REMINDER_MUTATION,
+    REMINDER_QUERY,
+    REMINDERS_QUERY,
+)
 
 if TYPE_CHECKING:
     from example_service.core.pagination.schemas import PageInfo

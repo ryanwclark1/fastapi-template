@@ -26,9 +26,9 @@ Usage in tests:
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from enum import Enum
+import logging
 from typing import Any
 
 logger = logging.getLogger(__name__)

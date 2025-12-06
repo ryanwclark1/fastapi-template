@@ -10,8 +10,8 @@ This module provides:
 from __future__ import annotations
 
 import asyncio
-import logging
 from datetime import UTC, datetime, timedelta
+import logging
 from typing import TYPE_CHECKING, Any
 
 from example_service.core.settings import get_backup_settings, get_db_settings
@@ -26,7 +26,6 @@ logger = logging.getLogger(__name__)
 class BackupError(Exception):
     """Database backup operation error."""
 
-    pass
 
 
 async def run_pg_dump(

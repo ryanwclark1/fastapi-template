@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import os
 from collections.abc import AsyncGenerator
 from hashlib import sha256
 from io import BytesIO
+import os
 from unittest.mock import AsyncMock
 from uuid import uuid4
 

@@ -14,9 +14,9 @@ import logging
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-import strawberry
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+import strawberry
 
 from example_service.features.graphql.events import (
     publish_tag_event,

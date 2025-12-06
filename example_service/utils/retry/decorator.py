@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+from functools import wraps
 import logging
 import time
-from functools import wraps
 from typing import TYPE_CHECKING, ParamSpec, TypeVar
 
 from example_service.infra.metrics.tracking import (

@@ -388,4 +388,4 @@ class MockModeSettings(BaseSettings):
         return self.get_active_user()
 
 
-__all__ = ["MockUserSettings", "MockModeSettings", "DEFAULT_PERSONAS"]
+__all__ = ["DEFAULT_PERSONAS", "MockModeSettings", "MockUserSettings"]

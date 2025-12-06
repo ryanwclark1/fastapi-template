@@ -42,23 +42,22 @@ except Exception:  # pragma: no cover - best effort
 class TaskServiceError(Exception):
     """Base exception for task service errors."""
 
-    pass
 
 
 class BrokerNotConfiguredError(TaskServiceError):
     """Raised when the task broker is not configured."""
 
-    pass
 
 
 class TrackerNotAvailableError(TaskServiceError):
     """Raised when task tracking is not available."""
 
-    pass
 
 
 if TYPE_CHECKING:
-    from apscheduler.schedulers.asyncio import AsyncIOScheduler  # type: ignore[import-untyped]
+    from apscheduler.schedulers.asyncio import (
+        AsyncIOScheduler,  # type: ignore[import-untyped]
+    )
 
     from example_service.infra.tasks.tracking.base import BaseTaskTracker
 
@@ -466,7 +465,9 @@ class TaskManagementService:
 
             # Notification tasks
             case TaskName.check_due_reminders:
-                from example_service.workers.notifications.tasks import check_due_reminders
+                from example_service.workers.notifications.tasks import (
+                    check_due_reminders,
+                )
 
                 return await check_due_reminders.kiq()
 
@@ -661,7 +662,9 @@ def get_task_service(
         scheduler = globals().get("scheduler")
         if scheduler is None:
             try:
-                from example_service.infra.tasks.scheduler import scheduler as app_scheduler
+                from example_service.infra.tasks.scheduler import (
+                    scheduler as app_scheduler,
+                )
 
                 scheduler = app_scheduler
                 globals()["scheduler"] = app_scheduler

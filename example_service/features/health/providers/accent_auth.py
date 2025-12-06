@@ -113,17 +113,16 @@ class AccentAuthHealthProvider:
                             "status_code": response.status_code,
                         },
                     )
-                else:
-                    return HealthCheckResult(
-                        status=HealthStatus.UNHEALTHY,
-                        message="Unexpected status code from Accent-Auth",
-                        latency_ms=latency_ms,
-                        metadata={
-                            "url": str(self._settings.service_url),
-                            "status_code": response.status_code,
-                            "error": "Unexpected status code",
-                        },
-                    )
+                return HealthCheckResult(
+                    status=HealthStatus.UNHEALTHY,
+                    message="Unexpected status code from Accent-Auth",
+                    latency_ms=latency_ms,
+                    metadata={
+                        "url": str(self._settings.service_url),
+                        "status_code": response.status_code,
+                        "error": "Unexpected status code",
+                    },
+                )
 
         except httpx.ConnectError as e:
             logger.warning(

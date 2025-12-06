@@ -117,7 +117,6 @@ def setup_tracing() -> None:
             extra={"exception": str(e)},
         )
         # Don't fail startup if tracing fails
-        pass
 
 
 def _setup_instrumentations() -> None:

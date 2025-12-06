@@ -21,10 +21,10 @@ Example:
 
 from __future__ import annotations
 
-import logging
-import time
 from collections import deque
 from enum import IntEnum
+import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
@@ -216,14 +216,13 @@ class ObservableSpanExporter(SpanExporter):
         # Map common errors to categories
         if "timeout" in error_name.lower() or "Timeout" in str(error):
             return "timeout"
-        elif "connection" in error_name.lower() or "Connection" in str(error):
+        if "connection" in error_name.lower() or "Connection" in str(error):
             return "connection_error"
-        elif "unavailable" in str(error).lower():
+        if "unavailable" in str(error).lower():
             return "service_unavailable"
-        elif "permission" in str(error).lower() or "auth" in str(error).lower():
+        if "permission" in str(error).lower() or "auth" in str(error).lower():
             return "auth_error"
-        else:
-            return "unknown"
+        return "unknown"
 
     def shutdown(self) -> None:
         """Shutdown the underlying exporter."""

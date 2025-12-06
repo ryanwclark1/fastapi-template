@@ -22,8 +22,8 @@ Exit codes:
 from __future__ import annotations
 
 import ast
-import sys
 from pathlib import Path
+import sys
 
 # Database QUERY operations that should NOT be in routers
 # These represent direct data access that should go through repository layer

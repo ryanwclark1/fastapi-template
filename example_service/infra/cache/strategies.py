@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import json
-import logging
 from dataclasses import dataclass
 from enum import Enum
 from functools import wraps
+import hashlib
+import json
+import logging
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from example_service.infra.cache import get_cache
@@ -133,9 +133,8 @@ class CacheManager:
                 if cached:
                     tracking.track_token_cache(True)  # Reusing cache hit metric
                     return self.config.deserialize(cached)
-                else:
-                    tracking.track_token_cache(False)
-                    return None
+                tracking.track_token_cache(False)
+                return None
             except Exception as e:
                 logger.error(f"Cache get failed for key {key}: {e}", exc_info=True)
                 return None
@@ -602,10 +601,9 @@ def cached(
                 return await cache_manager.get_with_refresh(
                     cache_key, lambda: func(*args, **kwargs), ttl
                 )
-            else:
-                return await cache_manager.get_or_fetch(
-                    cache_key, lambda: func(*args, **kwargs), ttl
-                )
+            return await cache_manager.get_or_fetch(
+                cache_key, lambda: func(*args, **kwargs), ttl
+            )
 
         return wrapper
 

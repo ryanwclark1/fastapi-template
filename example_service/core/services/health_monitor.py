@@ -29,14 +29,13 @@ Example:
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable, Coroutine
 import logging
 import time
-from collections.abc import Callable, Coroutine
 from typing import Any
 
 from example_service.core.services.availability import (
     ServiceName,
-    ServiceStatus,
     get_service_registry,
 )
 
@@ -144,7 +143,7 @@ class HealthMonitor:
                 timeout=self._check_timeout,
             )
             result = "healthy" if is_healthy else "unhealthy"
-        except asyncio.TimeoutError:
+        except TimeoutError:
             is_healthy = False
             error = f"Health check timed out after {self._check_timeout}s"
             result = "timeout"
@@ -248,7 +247,9 @@ class HealthMonitor:
 
     async def _monitor_loop(self) -> None:
         """Main monitoring loop."""
-        from example_service.infra.metrics.availability import health_monitor_running_gauge
+        from example_service.infra.metrics.availability import (
+            health_monitor_running_gauge,
+        )
 
         logger.info(
             "Health monitor starting",
@@ -279,7 +280,7 @@ class HealthMonitor:
                     )
                     # Stop event was set
                     break
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # Normal timeout, continue to next cycle
                     continue
         finally:
@@ -313,7 +314,7 @@ class HealthMonitor:
         if self._task:
             try:
                 await asyncio.wait_for(self._task, timeout=5.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 self._task.cancel()
                 try:
                     await self._task

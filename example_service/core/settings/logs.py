@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import warnings
 from pathlib import Path
 from typing import Any, Literal
+import warnings
 
 from pydantic import Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict

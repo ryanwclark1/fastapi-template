@@ -12,7 +12,15 @@ from typing import Any
 
 import click
 
-from example_service.cli.utils import coro, error, header, info, section, success, warning
+from example_service.cli.utils import (
+    coro,
+    error,
+    header,
+    info,
+    section,
+    success,
+    warning,
+)
 
 
 @click.group(name="tasks")
@@ -99,7 +107,6 @@ async def run_task(task_name: str, arg: tuple, wait: bool, timeout: int) -> None
     TASK_NAME is the name of the task to run (e.g., cleanup_temp_files, backup_database).
 
     Examples:
-
     \b
       example-service tasks run cleanup_temp_files
       example-service tasks run cleanup_temp_files -a max_age_hours=12
@@ -330,7 +337,7 @@ def start_worker(concurrency: int, queue: str | None) -> None:
         cmd.extend(["--queue", queue])
 
     try:
-        subprocess.run(cmd)  # noqa: S603
+        subprocess.run(cmd, check=False)  # noqa: S603
     except KeyboardInterrupt:
         info("Worker stopped")
     except FileNotFoundError:

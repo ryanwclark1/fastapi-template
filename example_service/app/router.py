@@ -19,7 +19,6 @@ from example_service.features.featureflags.router import router as featureflags_
 from example_service.features.files.router import router as files_router
 from example_service.features.health.router import router as health_router
 from example_service.features.metrics.router import router as metrics_router
-from example_service.features.realtime.router import router as realtime_router
 from example_service.features.reminders.router import router as reminders_router
 from example_service.features.search.router import router as search_router
 from example_service.features.storage.router import router as storage_router
@@ -94,6 +93,8 @@ def setup_routers(app: FastAPI) -> None:
     # Include WebSocket realtime router if enabled
     ws_settings = get_websocket_settings()
     if ws_settings.enabled:
+        from example_service.features.realtime.router import router as realtime_router
+
         app.include_router(realtime_router, prefix=api_prefix, tags=["realtime"])
         logger.info("WebSocket realtime router included - endpoints at /api/v1/ws")
 

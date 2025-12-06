@@ -15,10 +15,10 @@ Design Principles:
 
 from __future__ import annotations
 
-import logging
-import time
 from abc import ABC, abstractmethod
 from decimal import Decimal
+import logging
+import time
 from typing import Any
 
 from example_service.infra.ai.capabilities.types import (
@@ -233,7 +233,7 @@ class ProviderAdapter(ABC):
         """
         cap_meta = self.get_capability_metadata(capability)
         if not cap_meta:
-            return Decimal("0")
+            return Decimal(0)
 
         input_tokens_val = usage.get("input_tokens", 0)
         output_tokens_val = usage.get("output_tokens", 0)
@@ -313,6 +313,6 @@ class TimedExecution:
         self.start_time = time.perf_counter()
         return self
 
-    async def __aexit__(self, *args: Any) -> None:
+    async def __aexit__(self, *args: object) -> None:
         self.end_time = time.perf_counter()
         self.elapsed_ms = (self.end_time - self.start_time) * 1000

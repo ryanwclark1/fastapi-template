@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import pytest
 from fastapi import FastAPI
+import pytest
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from example_service.app.middleware.metrics import MetricsMiddleware

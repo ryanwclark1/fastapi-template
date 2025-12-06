@@ -25,8 +25,7 @@ from example_service.infra.logging.config import setup_logging
 @click.version_option(version="0.1.0", prog_name="example-service")
 @click.pass_context
 def cli(ctx: click.Context) -> None:
-    """
-    Example Service CLI - Management commands for FastAPI microservice.
+    """Example Service CLI - Management commands for FastAPI microservice.
 
     This CLI provides commands for managing the service infrastructure including
     database operations, cache management, server running, configuration validation,

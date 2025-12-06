@@ -11,7 +11,15 @@ import sys
 import click
 from sqlalchemy import text
 
-from example_service.cli.utils import coro, error, header, info, section, success, warning
+from example_service.cli.utils import (
+    coro,
+    error,
+    header,
+    info,
+    section,
+    success,
+    warning,
+)
 from example_service.core.database.validation import safe_table_reference
 from example_service.infra.database.session import create_async_engine
 
@@ -54,7 +62,6 @@ async def rebuild(entity: tuple[str, ...], batch_size: int, force: bool) -> None
     - Adding new searchable fields
     - Fixing corrupted search vectors
     """
-
     from example_service.features.search.service import SEARCHABLE_ENTITIES
 
     entities_to_rebuild = list(entity) if entity else list(SEARCHABLE_ENTITIES.keys())
@@ -159,7 +166,6 @@ async def stats() -> None:
     - Number of indexed documents
     - Index health metrics
     """
-
     from example_service.features.search.service import SEARCHABLE_ENTITIES
 
     header("Search Index Statistics")
@@ -419,7 +425,10 @@ async def test(query: str, entity: str | None, limit: int) -> None:
     Useful for debugging search issues and tuning.
     """
     from example_service.features.search.schemas import SearchRequest, SearchSyntax
-    from example_service.features.search.service import SEARCHABLE_ENTITIES, SearchService
+    from example_service.features.search.service import (
+        SEARCHABLE_ENTITIES,
+        SearchService,
+    )
     from example_service.infra.database.session import async_sessionmaker
 
     header(f'Testing Search: "{query}"')
@@ -478,7 +487,6 @@ async def triggers() -> None:
 
     Lists all search-related triggers and their status.
     """
-
     header("Search Triggers Status")
 
     engine = create_async_engine()  # type: ignore

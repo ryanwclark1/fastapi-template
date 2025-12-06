@@ -97,7 +97,7 @@ def dev(
 
         success("Starting uvicorn...")
         # S603: Safe - using list (not shell=True), host validated, port/log_level/workers validated by Click
-        subprocess.run(cmd)  # noqa: S603
+        subprocess.run(cmd, check=False)  # noqa: S603
 
     except KeyboardInterrupt:
         info("\nShutting down server...")
@@ -170,7 +170,7 @@ def prod(
 
         success("Starting uvicorn in production mode...")
         # S603: Safe - using list (not shell=True), host validated, port/workers validated by Click
-        subprocess.run(cmd)  # noqa: S603
+        subprocess.run(cmd, check=False)  # noqa: S603
 
     except KeyboardInterrupt:
         info("\nShutting down server...")

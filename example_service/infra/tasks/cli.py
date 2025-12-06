@@ -88,7 +88,11 @@ class TrackingCommand(TaskiqCMD):
         Args:
             args: Parsed command-line arguments.
         """
-        from example_service.infra.tasks.tracking import get_tracker, start_tracker, stop_tracker
+        from example_service.infra.tasks.tracking import (
+            get_tracker,
+            start_tracker,
+            stop_tracker,
+        )
 
         # Initialize tracking backend
         await start_tracker()

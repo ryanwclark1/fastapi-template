@@ -7,15 +7,23 @@ This module provides CLI commands for data management:
 """
 
 import csv
-import json
-import sys
 from datetime import datetime
+import json
 from pathlib import Path
+import sys
 from typing import Any
 
 import click
 
-from example_service.cli.utils import coro, error, header, info, section, success, warning
+from example_service.cli.utils import (
+    coro,
+    error,
+    header,
+    info,
+    section,
+    success,
+    warning,
+)
 
 
 @click.group(name="data")
@@ -64,7 +72,6 @@ async def export_data(
     TABLE is the name of the table to export (e.g., users, posts, reminders).
 
     Examples:
-
     \b
       example-service data export users --format csv -o users.csv
       example-service data export posts --format json --limit 100
@@ -198,7 +205,6 @@ async def import_data(
     FILE_PATH is the path to the data file.
 
     Examples:
-
     \b
       example-service data import users users.csv
       example-service data import posts data.json --dry-run

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import enum
 from datetime import datetime
+import enum
 from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String

@@ -18,9 +18,9 @@ Usage:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import logging
 import time
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from example_service.core.models.email_config import EmailConfig, EmailProviderType

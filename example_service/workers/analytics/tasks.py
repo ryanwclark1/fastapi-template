@@ -10,12 +10,9 @@ This module demonstrates production-ready patterns for data aggregation:
 
 from __future__ import annotations
 
-import logging
 from datetime import UTC, datetime, timedelta
+import logging
 from typing import Any
-
-from sqlalchemy import func, select
-from sqlalchemy.dialects.postgresql import insert
 
 from example_service.infra.database.session import get_async_session
 from example_service.infra.tasks.broker import broker

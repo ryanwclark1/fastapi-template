@@ -21,9 +21,9 @@ import contextlib
 import time
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI, HTTPException, Request
 from httpx import ASGITransport, AsyncClient
+import pytest
 
 from example_service.app.middleware.debug import DebugMiddleware
 from example_service.app.middleware.i18n import I18nMiddleware

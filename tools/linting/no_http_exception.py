@@ -22,8 +22,8 @@ Example output:
 from __future__ import annotations
 
 import ast
-import sys
 from pathlib import Path
+import sys
 
 
 class HTTPExceptionChecker(ast.NodeVisitor):

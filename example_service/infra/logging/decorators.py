@@ -6,9 +6,9 @@ Inspired by loguru's @logger.catch decorator for cleaner error handling.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import functools
 import logging
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, TypeVar
 
 if TYPE_CHECKING:

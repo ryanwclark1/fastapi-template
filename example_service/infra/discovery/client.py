@@ -151,22 +151,21 @@ class ConsulClient:
                         },
                     )
                     return True
-                else:
-                    span.set_attribute("consul.success", False)
-                    span.set_attribute("consul.status_code", response.status_code)
-                    service_discovery_registrations_total.labels(status="failure").inc()
-                    service_discovery_errors_total.labels(
-                        operation="register", error_type="http_error"
-                    ).inc()
-                    logger.warning(
-                        "Consul registration failed",
-                        extra={
-                            "service_id": service_id,
-                            "status_code": response.status_code,
-                            "response": response.text[:200],
-                        },
-                    )
-                    return False
+                span.set_attribute("consul.success", False)
+                span.set_attribute("consul.status_code", response.status_code)
+                service_discovery_registrations_total.labels(status="failure").inc()
+                service_discovery_errors_total.labels(
+                    operation="register", error_type="http_error"
+                ).inc()
+                logger.warning(
+                    "Consul registration failed",
+                    extra={
+                        "service_id": service_id,
+                        "status_code": response.status_code,
+                        "response": response.text[:200],
+                    },
+                )
+                return False
 
             except httpx.TimeoutException as e:
                 duration = time.perf_counter() - start_time
@@ -234,21 +233,20 @@ class ConsulClient:
                         extra={"service_id": service_id},
                     )
                     return True
-                else:
-                    span.set_attribute("consul.success", False)
-                    span.set_attribute("consul.status_code", response.status_code)
-                    service_discovery_deregistrations_total.labels(status="failure").inc()
-                    service_discovery_errors_total.labels(
-                        operation="deregister", error_type="http_error"
-                    ).inc()
-                    logger.warning(
-                        "Consul deregistration failed",
-                        extra={
-                            "service_id": service_id,
-                            "status_code": response.status_code,
-                        },
-                    )
-                    return False
+                span.set_attribute("consul.success", False)
+                span.set_attribute("consul.status_code", response.status_code)
+                service_discovery_deregistrations_total.labels(status="failure").inc()
+                service_discovery_errors_total.labels(
+                    operation="deregister", error_type="http_error"
+                ).inc()
+                logger.warning(
+                    "Consul deregistration failed",
+                    extra={
+                        "service_id": service_id,
+                        "status_code": response.status_code,
+                    },
+                )
+                return False
 
             except httpx.TimeoutException as e:
                 duration = time.perf_counter() - start_time
@@ -321,24 +319,23 @@ class ConsulClient:
                     ).inc()
                     logger.debug("TTL %s sent to Consul", status, extra={"check_id": check_id})
                     return True
-                else:
-                    span.set_attribute("consul.success", False)
-                    span.set_attribute("consul.status_code", response.status_code)
-                    service_discovery_ttl_passes_total.labels(
-                        status="failure", check_status=status
-                    ).inc()
-                    service_discovery_errors_total.labels(
-                        operation=operation, error_type="http_error"
-                    ).inc()
-                    logger.warning(
-                        "TTL %s failed",
-                        status,
-                        extra={
-                            "check_id": check_id,
-                            "status_code": response.status_code,
-                        },
-                    )
-                    return False
+                span.set_attribute("consul.success", False)
+                span.set_attribute("consul.status_code", response.status_code)
+                service_discovery_ttl_passes_total.labels(
+                    status="failure", check_status=status
+                ).inc()
+                service_discovery_errors_total.labels(
+                    operation=operation, error_type="http_error"
+                ).inc()
+                logger.warning(
+                    "TTL %s failed",
+                    status,
+                    extra={
+                        "check_id": check_id,
+                        "status_code": response.status_code,
+                    },
+                )
+                return False
 
             except httpx.TimeoutException as e:
                 duration = time.perf_counter() - start_time

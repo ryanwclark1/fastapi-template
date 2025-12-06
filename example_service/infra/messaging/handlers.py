@@ -15,8 +15,8 @@ AsyncAPI Documentation:
 
 from __future__ import annotations
 
-import logging
 from datetime import UTC, datetime
+import logging
 
 from example_service.infra.messaging.broker import router
 from example_service.infra.messaging.events import (

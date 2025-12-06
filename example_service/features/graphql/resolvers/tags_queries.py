@@ -12,8 +12,8 @@ import logging
 from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
-import strawberry
 from sqlalchemy import func, select
+import strawberry
 
 from example_service.features.graphql.types.base import PageInfoType
 from example_service.features.graphql.types.tags import TagConnection, TagEdge, TagType

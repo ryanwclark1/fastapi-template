@@ -155,7 +155,6 @@ class TestTracedHandler:
         @traced_handler()
         async def documented_handler(event):
             """This is a documented handler."""
-            pass
 
         assert documented_handler.__name__ == "documented_handler"
         assert "documented handler" in documented_handler.__doc__

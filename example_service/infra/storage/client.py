@@ -9,8 +9,8 @@ from __future__ import annotations
 import asyncio
 import fnmatch
 import hashlib
-import logging
 from io import BytesIO
+import logging
 from typing import TYPE_CHECKING, Any, BinaryIO
 
 from example_service.infra.storage.exceptions import (
@@ -949,18 +949,17 @@ class StorageClient:
                 error_msg = str(result)
                 logger.error(f"Unexpected error deleting {key}: {error_msg}")
                 failed.append({"key": key, "error": error_msg})
-            else:
-                # Type narrowing: result is tuple[str, bool, str | None] here
-                if isinstance(result, tuple) and len(result) == 3:
-                    key, success, error = result
-                    if success:
-                        deleted.append(key)
-                    else:
-                        failed.append({"key": key, "error": error or "Unknown error"})
+            # Type narrowing: result is tuple[str, bool, str | None] here
+            elif isinstance(result, tuple) and len(result) == 3:
+                key, success, error = result
+                if success:
+                    deleted.append(key)
                 else:
-                    # Fallback for unexpected result type
-                    logger.warning(f"Unexpected result type: {type(result)}")
-                    failed.append({"key": keys[i], "error": "Unexpected result format"})
+                    failed.append({"key": key, "error": error or "Unknown error"})
+            else:
+                # Fallback for unexpected result type
+                logger.warning(f"Unexpected result type: {type(result)}")
+                failed.append({"key": keys[i], "error": "Unexpected result format"})
 
         logger.info(
             f"Batch deletion completed: {len(deleted)}/{len(keys)} deleted",

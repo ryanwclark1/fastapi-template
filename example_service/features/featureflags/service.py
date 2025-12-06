@@ -5,9 +5,9 @@ Provides flag management and evaluation with caching support.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 import hashlib
 import logging
-from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import delete, select

@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 import contextlib
 import json
-from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI, status
 from httpx import ASGITransport, AsyncClient
+import pytest
 from websockets.exceptions import ConnectionClosed
 
 from example_service.core.settings import get_websocket_settings
@@ -87,7 +87,7 @@ class TestWebSocketEndpoint:
         """Test that WebSocket closes when disabled."""
         # WebSocket connections can't be tested with httpx directly
         # This test verifies the logic path
-        pass  # Integration test would be needed
+        # Integration test would be needed
 
     @pytest.mark.asyncio
     async def test_websocket_manager_not_initialized(self, realtime_client: AsyncClient) -> None:
@@ -97,13 +97,12 @@ class TestWebSocketEndpoint:
 
             # WebSocket connections require actual WebSocket client
             # This test verifies the logic path
-            pass  # Integration test would be needed
+            # Integration test would be needed
 
     @pytest.mark.asyncio
     async def test_websocket_connection_refused(self, realtime_client: AsyncClient) -> None:
         """Test WebSocket connection refused handling."""
         # Integration test would be needed for actual WebSocket testing
-        pass
 
 
 class TestGetStats:

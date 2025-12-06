@@ -23,9 +23,9 @@ Example:
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass, field
 import io
 import logging
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 

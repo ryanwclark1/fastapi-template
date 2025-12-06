@@ -7,9 +7,9 @@ storing task execution data in Redis with configurable TTL.
 from __future__ import annotations
 
 import contextlib
+from datetime import UTC, datetime
 import json
 import logging
-from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
 from redis.asyncio import ConnectionPool, Redis

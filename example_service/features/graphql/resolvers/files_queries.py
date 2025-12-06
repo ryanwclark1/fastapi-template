@@ -12,13 +12,17 @@ import logging
 from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
-import strawberry
 from sqlalchemy import select
+import strawberry
 
 from example_service.features.files.models import File, FileStatus
 from example_service.features.files.schemas import FileRead
 from example_service.features.graphql.types.base import PageInfoType
-from example_service.features.graphql.types.files import FileConnection, FileEdge, FileType
+from example_service.features.graphql.types.files import (
+    FileConnection,
+    FileEdge,
+    FileType,
+)
 
 if TYPE_CHECKING:
     from strawberry.types import Info

@@ -14,7 +14,9 @@ from example_service.core.settings import (
     get_auth_settings,
     get_consul_settings,
     get_db_settings,
+    get_health_settings,
     get_logging_settings,
+    get_mock_settings,
     get_otel_settings,
     get_rabbit_settings,
     get_redis_settings,
@@ -55,6 +57,40 @@ if TYPE_CHECKING:
     from example_service.core.settings.redis import RedisSettings
 
 logger = logging.getLogger(__name__)
+
+# Module-level state for health check dependencies
+_health_service: object | None = None
+_service_clients: dict[str, object] = {}
+
+
+def get_health_service() -> object | None:
+    """Get the health service instance.
+
+    Returns:
+        HealthService instance or None if not initialized.
+    """
+    return _health_service
+
+
+def get_all_service_clients() -> dict[str, object]:
+    """Get all service client instances.
+
+    Returns:
+        Dictionary mapping service names to client instances.
+    """
+    return _service_clients
+
+
+def get_service_client(name: str) -> object | None:
+    """Get a service client instance by name.
+
+    Args:
+        name: Service client name (e.g., 'auth', 'confd', 'calld').
+
+    Returns:
+        Service client instance or None if not initialized.
+    """
+    return _service_clients.get(name)
 
 
 def _load_taskiq_module() -> ModuleType | None:
@@ -148,6 +184,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     rabbit_settings = get_rabbit_settings()
     otel_settings = get_otel_settings()
     log_settings = get_logging_settings()
+
+    # Import and check mock settings
+    mock_settings = get_mock_settings()
+
     taskiq_module: ModuleType | None = None
     scheduler_module: ModuleType | None = None
 
@@ -195,7 +235,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             )
 
     # Initialize database connection with retry
-    if db_settings.is_configured:
+    # Skip database initialization in mock mode (not needed for UI development)
+    if db_settings.is_configured and not mock_settings.enabled:
         try:
             await init_database()
             logger.info("Database connection initialized")
@@ -215,7 +256,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             )
         except Exception as e:
             if db_settings.startup_require_db:
-                logger.error(
+                logger.exception(
                     "Database required but unavailable, failing startup",
                     extra={"error": str(e), "startup_require_db": True},
                 )
@@ -225,9 +266,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                     "Database unavailable, continuing in degraded mode",
                     extra={"error": str(e), "startup_require_db": False},
                 )
+    elif mock_settings.enabled:
+        logger.info(
+            "Database initialization skipped in mock mode",
+            extra={"mock_mode": True, "persona": mock_settings.persona},
+        )
 
     # Initialize Redis cache
-    if redis_settings.is_configured:
+    # Skip Redis initialization in mock mode (not needed for UI development)
+    if redis_settings.is_configured and not mock_settings.enabled:
         try:
             await start_cache()
             logger.info("Redis cache initialized")
@@ -245,18 +292,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 set_rate_limit_tracker(rate_limit_tracker)
                 logger.info(
                     "Rate limit state tracker initialized",
-                    extra={"failure_threshold": redis_settings.rate_limit_failure_threshold},
+                    extra={
+                        "failure_threshold": redis_settings.rate_limit_failure_threshold
+                    },
                 )
 
                 # Register rate limiter health provider with aggregator
                 from example_service.features.health.providers import (
                     RateLimiterHealthProvider,
                 )
-                from example_service.features.health.service import get_health_aggregator
+                from example_service.features.health.service import (
+                    get_health_aggregator,
+                )
 
                 aggregator = get_health_aggregator()
                 if aggregator:
-                    aggregator.add_provider(RateLimiterHealthProvider(rate_limit_tracker))
+                    aggregator.add_provider(
+                        RateLimiterHealthProvider(rate_limit_tracker)
+                    )
                     logger.info("Rate limiter health provider registered")
 
                 # Register Accent-Auth health provider (optional, never blocks startup)
@@ -307,6 +360,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                     set_rate_limit_tracker(tracker)
                 except Exception as e:
                     logger.debug("Failed to initialize rate limit tracker", exc_info=e)
+    elif mock_settings.enabled:
+        logger.info(
+            "Redis cache initialization skipped in mock mode",
+            extra={"mock_mode": True, "persona": mock_settings.persona},
+        )
 
     # Initialize storage service
     if storage_settings.is_configured:
@@ -338,13 +396,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Initialize task execution tracker (for querying task history via REST API)
     # Supports both Redis and PostgreSQL backends based on TASK_RESULT_BACKEND setting
+    # Skip task tracking in mock mode (not needed for UI development)
     task_settings = get_task_settings()
     tracker_started = False
-    if task_settings.tracking_enabled:
+    if task_settings.tracking_enabled and not mock_settings.enabled:
         # Check if the required backend is configured
-        can_start_tracker = (task_settings.is_redis_backend and redis_settings.is_configured) or (
-            task_settings.is_postgres_backend and db_settings.is_configured
-        )
+        can_start_tracker = (
+            task_settings.is_redis_backend and redis_settings.is_configured
+        ) or (task_settings.is_postgres_backend and db_settings.is_configured)
         if can_start_tracker:
             try:
                 await start_tracker()
@@ -356,9 +415,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
                 # Register task tracker health provider
                 try:
-                    from example_service.features.health.service import get_health_aggregator
                     from example_service.features.health.providers import (
                         TaskTrackerHealthProvider,
+                    )
+                    from example_service.features.health.service import (
+                        get_health_aggregator,
                     )
 
                     aggregator = get_health_aggregator()
@@ -384,6 +445,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                     "db_configured": db_settings.is_configured,
                 },
             )
+    elif mock_settings.enabled:
+        logger.info(
+            "Task execution tracker initialization skipped in mock mode",
+            extra={"mock_mode": True, "persona": mock_settings.persona},
+        )
 
     # Initialize RabbitMQ/FastStream broker for event-driven messaging
     # Note: RabbitRouter automatically connects when included in FastAPI app.
@@ -440,7 +506,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Initialize Taskiq broker for background tasks (independent of FastStream)
     # Taskiq uses its own RabbitMQ connection via taskiq-aio-pika
-    initialization_result = _initialize_taskiq_and_scheduler(rabbit_settings, redis_settings)
+    initialization_result = _initialize_taskiq_and_scheduler(
+        rabbit_settings, redis_settings
+    )
     if inspect.isawaitable(initialization_result):
         initialization = await initialization_result
     else:
@@ -479,7 +547,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     health_monitor_started = False
     if health_settings.service_availability_enabled:
         try:
-            from example_service.core.services.availability import ServiceName, get_service_registry
+            from example_service.core.services.availability import (
+                ServiceName,
+                get_service_registry,
+            )
             from example_service.core.services.health_monitor import get_health_monitor
 
             health_monitor = get_health_monitor()
@@ -491,18 +562,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
                 async def check_database() -> bool:
                     try:
-                        from example_service.infra.database.session import get_async_engine
+                        from example_service.infra.database.session import (
+                            get_async_engine,
+                        )
 
                         engine = get_async_engine()
                         if engine:
                             async with engine.connect() as conn:
-                                await conn.execute(__import__("sqlalchemy").text("SELECT 1"))
+                                await conn.execute(
+                                    __import__("sqlalchemy").text("SELECT 1")
+                                )
                             return True
                     except Exception:
                         pass
                     return False
 
-                health_monitor.register_health_check(ServiceName.DATABASE, check_database)
+                health_monitor.register_health_check(
+                    ServiceName.DATABASE, check_database
+                )
 
             if redis_settings.is_configured:
 
@@ -580,10 +657,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "database_enabled": db_settings.is_configured,
             "cache_enabled": redis_settings.is_configured,
             "messaging_enabled": rabbit_settings.is_configured,
-            "outbox_enabled": db_settings.is_configured and rabbit_settings.is_configured,
+            "outbox_enabled": db_settings.is_configured
+            and rabbit_settings.is_configured,
             "websocket_enabled": websocket_enabled,
             "task_tracking_enabled": tracker_started,
-            "task_tracking_backend": task_settings.result_backend if tracker_started else None,
+            "task_tracking_backend": task_settings.result_backend
+            if tracker_started
+            else None,
             "service_availability_enabled": health_monitor_started,
             "host": app_settings.host,
             "port": app_settings.port,
@@ -640,7 +720,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Shutdown
     # Note: Settings are still available from startup phase (cached and frozen)
-    logger.info("Application shutting down", extra={"service": app_settings.service_name})
+    logger.info(
+        "Application shutting down", extra={"service": app_settings.service_name}
+    )
 
     # Stop service availability health monitor first (no external dependencies)
     if health_monitor_started:
@@ -701,7 +783,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("RabbitMQ broker closed")
 
     # Close task execution tracker (before Redis since Redis tracker depends on Redis)
-    if tracker_started:
+    # Skip in mock mode since it wasn't started
+    if tracker_started and not mock_settings.enabled:
         await stop_tracker()
         logger.info("Task execution tracker closed")
 
@@ -721,12 +804,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             )
 
     # Close Redis cache
-    if redis_settings.is_configured:
+    # Skip in mock mode since it wasn't started
+    if redis_settings.is_configured and not mock_settings.enabled:
         await stop_cache()
         logger.info("Redis cache closed")
 
-    # Close database connection
-    if db_settings.is_configured:
+    # Close database connection (skip in mock mode since it wasn't initialized)
+    if db_settings.is_configured and not mock_settings.enabled:
         await close_database()
         logger.info("Database connection closed")
 

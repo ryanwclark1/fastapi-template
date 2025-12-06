@@ -19,15 +19,15 @@ When adding new features:
 
 from __future__ import annotations
 
-import contextlib
-import os
 from collections.abc import AsyncGenerator, Iterator
+import contextlib
 from datetime import UTC, datetime
+import os
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from httpx import ASGITransport, AsyncClient
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -144,7 +144,10 @@ def searchable_metadata():
                 __search_fields__ = ["title"]
                 # ... triggers created automatically!
     """
-    from example_service.core.database.search import make_searchable, remove_searchable_listeners
+    from example_service.core.database.search import (
+        make_searchable,
+        remove_searchable_listeners,
+    )
 
     managers = []
 

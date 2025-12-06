@@ -10,8 +10,8 @@ Provides batch upload, download, and delete operations with:
 from __future__ import annotations
 
 import asyncio
-import logging
 from dataclasses import dataclass, field
+import logging
 from typing import TYPE_CHECKING, Any, BinaryIO
 
 if TYPE_CHECKING:
@@ -86,8 +86,8 @@ async def batch_upload(
         result = await batch_upload(client, items, max_concurrency=10)
         print(f"Success rate: {result.success_rate}%")
     """
-    import time
     from io import BytesIO
+    import time
 
     start_time = time.perf_counter()
     semaphore = asyncio.Semaphore(max_concurrency)

@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from httpx import AsyncClient
+import pytest
 
 from example_service.infra.auth.accent_auth import (
     AccentAuthACL,
@@ -337,14 +337,12 @@ class TestAccentAuthIntegration:
         """Test that Accent-Tenant header is used for tenant context."""
         # This would require mocking the auth service
         # Placeholder for actual implementation
-        pass
 
     @pytest.mark.asyncio
     async def test_acl_permission_check(self, client: AsyncClient):
         """Test ACL-based permission checking on endpoints."""
         # This would require mocking the auth service and testing
         # endpoints decorated with require_acl()
-        pass
 
 
 class TestAccentAuthDependencies:
@@ -354,7 +352,6 @@ class TestAccentAuthDependencies:
     async def test_get_current_user_caching(self):
         """Test that token validation results are cached."""
         # Mock Redis cache and verify caching behavior
-        pass
 
     @pytest.mark.asyncio
     async def test_require_acl_dependency(self):

@@ -5,9 +5,9 @@ Provides decorators for automatic audit logging of service methods.
 
 from __future__ import annotations
 
+from functools import wraps
 import logging
 import time
-from functools import wraps
 from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
 
 from .models import AuditAction

@@ -27,10 +27,10 @@ Usage:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import json
 import logging
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -123,7 +123,7 @@ class SearchCache:
         """
         if hasattr(request, "model_dump"):
             return request.model_dump() # type: ignore[no-any-return]
-        elif hasattr(request, "__dict__"):
+        if hasattr(request, "__dict__"):
             return {k: v for k, v in request.__dict__.items() if not k.startswith("_")}
         return {}
 

@@ -35,12 +35,12 @@ Example:
 
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from typing import Any
+import uuid
 
 
 class EventType(str, Enum):
@@ -154,7 +154,7 @@ class WorkflowCompletedEvent(BaseEvent):
     pipeline_name: str = ""
     completed_steps: list[str] = field(default_factory=list)
     total_duration_ms: float = 0
-    total_cost_usd: Decimal = field(default_factory=lambda: Decimal("0"))
+    total_cost_usd: Decimal = field(default_factory=lambda: Decimal(0))
     output_keys: list[str] = field(default_factory=list)
 
     def _get_specific_fields(self) -> dict[str, Any]:
@@ -178,7 +178,7 @@ class WorkflowFailedEvent(BaseEvent):
     error_code: str | None = None
     completed_steps: list[str] = field(default_factory=list)
     total_duration_ms: float = 0
-    total_cost_usd: Decimal = field(default_factory=lambda: Decimal("0"))
+    total_cost_usd: Decimal = field(default_factory=lambda: Decimal(0))
     retryable: bool = False
 
     def _get_specific_fields(self) -> dict[str, Any]:
@@ -249,7 +249,7 @@ class StepCompletedEvent(BaseEvent):
     fallbacks_attempted: list[str] = field(default_factory=list)
     retries: int = 0
     duration_ms: float = 0
-    cost_usd: Decimal = field(default_factory=lambda: Decimal("0"))
+    cost_usd: Decimal = field(default_factory=lambda: Decimal(0))
     output_key: str = ""
 
     def _get_specific_fields(self) -> dict[str, Any]:
@@ -391,7 +391,7 @@ class CostIncurredEvent(BaseEvent):
     step_name: str = ""
     provider: str = ""
     capability: str = ""
-    cost_usd: Decimal = field(default_factory=lambda: Decimal("0"))
+    cost_usd: Decimal = field(default_factory=lambda: Decimal(0))
     usage: dict[str, Any] = field(default_factory=dict)
 
     def _get_specific_fields(self) -> dict[str, Any]:
@@ -409,8 +409,8 @@ class BudgetWarningEvent(BaseEvent):
     """Event emitted when approaching budget limit."""
 
     event_type: EventType = field(default=EventType.BUDGET_WARNING, init=False)
-    budget_limit_usd: Decimal = field(default_factory=lambda: Decimal("0"))
-    current_spend_usd: Decimal = field(default_factory=lambda: Decimal("0"))
+    budget_limit_usd: Decimal = field(default_factory=lambda: Decimal(0))
+    current_spend_usd: Decimal = field(default_factory=lambda: Decimal(0))
     percent_used: float = 0.0
     threshold_percent: float = 80.0
 
@@ -428,9 +428,9 @@ class BudgetExceededEvent(BaseEvent):
     """Event emitted when budget limit is exceeded."""
 
     event_type: EventType = field(default=EventType.BUDGET_EXCEEDED, init=False)
-    budget_limit_usd: Decimal = field(default_factory=lambda: Decimal("0"))
-    current_spend_usd: Decimal = field(default_factory=lambda: Decimal("0"))
-    exceeded_by_usd: Decimal = field(default_factory=lambda: Decimal("0"))
+    budget_limit_usd: Decimal = field(default_factory=lambda: Decimal(0))
+    current_spend_usd: Decimal = field(default_factory=lambda: Decimal(0))
+    exceeded_by_usd: Decimal = field(default_factory=lambda: Decimal(0))
     action_taken: str = ""  # e.g., "blocked", "warned", "allowed"
 
     def _get_specific_fields(self) -> dict[str, Any]:

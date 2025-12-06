@@ -325,10 +325,9 @@ class ConsulService:
             status = result.get("status", "unknown")
             if status == "healthy":
                 return "healthy"
-            elif status == "degraded":
+            if status == "degraded":
                 return "degraded"
-            else:
-                return "unhealthy"
+            return "unhealthy"
 
         except Exception as e:
             logger.warning("Error checking app health", extra={"error": str(e)})

@@ -319,21 +319,21 @@ class OtelSettings(BaseSettings):
 
         if self.sampler_type == "always_on":
             return ALWAYS_ON
-        elif self.sampler_type == "always_off":
+        if self.sampler_type == "always_off":
             return ALWAYS_OFF
-        elif self.sampler_type == "trace_id_ratio":
+        if self.sampler_type == "trace_id_ratio":
             return TraceIdRatioBased(self.sample_rate)
-        else:  # parent_based
-            # Choose root sampler
-            root_sampler: Any
-            if self.parent_sampler_root == "always_on":
-                root_sampler = ALWAYS_ON
-            elif self.parent_sampler_root == "always_off":
-                root_sampler = ALWAYS_OFF
-            else:  # trace_id_ratio
-                root_sampler = TraceIdRatioBased(self.sample_rate)
+        # parent_based
+        # Choose root sampler
+        root_sampler: Any
+        if self.parent_sampler_root == "always_on":
+            root_sampler = ALWAYS_ON
+        elif self.parent_sampler_root == "always_off":
+            root_sampler = ALWAYS_OFF
+        else:  # trace_id_ratio
+            root_sampler = TraceIdRatioBased(self.sample_rate)
 
-            return ParentBased(root=root_sampler)
+        return ParentBased(root=root_sampler)
 
     def _build_tls_credentials(self) -> Any | None:
         """Build gRPC SSL credentials from TLS settings.

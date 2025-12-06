@@ -155,7 +155,7 @@ class CapabilityMetadata:
     provider_name: str
 
     # Cost information
-    cost_per_unit: Decimal = Decimal("0")
+    cost_per_unit: Decimal = Decimal(0)
     cost_unit: CostUnit = CostUnit.PER_REQUEST
     output_cost_per_unit: Decimal | None = None  # For LLMs with separate output pricing
 
@@ -200,18 +200,18 @@ class CapabilityMetadata:
             Estimated cost in USD
         """
         if self.cost_unit == CostUnit.FREE:
-            return Decimal("0")
+            return Decimal(0)
 
         if self.cost_unit == CostUnit.PER_1K_TOKENS:
             input_cost = (Decimal(input_tokens) / Decimal(1000)) * self.cost_per_unit
-            output_cost = Decimal("0")
+            output_cost = Decimal(0)
             if output_tokens and self.output_cost_per_unit:
                 output_cost = (Decimal(output_tokens) / Decimal(1000)) * self.output_cost_per_unit
             return input_cost + output_cost
 
         if self.cost_unit == CostUnit.PER_1M_TOKENS:
             input_cost = (Decimal(input_tokens) / Decimal(1_000_000)) * self.cost_per_unit
-            output_cost = Decimal("0")
+            output_cost = Decimal(0)
             if output_tokens and self.output_cost_per_unit:
                 output_cost = (
                     Decimal(output_tokens) / Decimal(1_000_000)
@@ -230,7 +230,7 @@ class CapabilityMetadata:
         if self.cost_unit == CostUnit.PER_REQUEST:
             return Decimal(request_count) * self.cost_per_unit
 
-        return Decimal("0")
+        return Decimal(0)
 
 
 @dataclass
@@ -342,7 +342,7 @@ class OperationResult:
 
     # Usage and cost
     usage: dict[str, Any] = field(default_factory=dict)
-    cost_usd: Decimal = Decimal("0")
+    cost_usd: Decimal = Decimal(0)
     latency_ms: float = 0.0
 
     # Error handling

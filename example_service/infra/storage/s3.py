@@ -6,8 +6,8 @@ in S3-compatible storage (AWS S3, MinIO, LocalStack, etc.).
 
 from __future__ import annotations
 
-import logging
 from datetime import UTC, datetime, timedelta
+import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -32,7 +32,6 @@ except ImportError:
 class S3ClientError(Exception):
     """S3 client operation error."""
 
-    pass
 
 
 class S3Client:

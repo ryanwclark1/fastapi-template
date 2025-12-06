@@ -11,18 +11,19 @@ This module provides reusable fixtures for integration testing including:
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-import pytest_asyncio
 from fastapi import FastAPI, Request
 from httpx import ASGITransport, AsyncClient
+import pytest
+import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Generator
+    from collections.abc import Generator
 
 
 @pytest.fixture(scope="session")

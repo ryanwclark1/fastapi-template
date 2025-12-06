@@ -38,15 +38,11 @@ Example:
 from __future__ import annotations
 
 import asyncio
-import logging
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import Enum
 from functools import lru_cache
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    pass
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -220,7 +216,7 @@ class ServiceAvailabilityRegistry:
             previous_available = status.health_available
 
             # Update timestamps and error
-            status.last_check = datetime.now(timezone.utc)
+            status.last_check = datetime.now(UTC)
             status.last_error = error if not is_healthy else None
 
             if is_healthy:

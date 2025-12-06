@@ -123,41 +123,40 @@ def cached_field(
                     # For now, skip caching for async cache in sync resolvers
                     logger.debug("Async cache not supported in sync field resolvers")
                     return func(self, *args, **kwargs)
-                else:
-                    # Sync cache
-                    cached_result = cache.get(cache_key_str)
-                    if cached_result is not None:
-                        logger.debug(
-                            "Field cache hit",
-                            extra={
-                                "cache_key": cache_key_str,
-                                "field": func.__name__,
-                            },
-                        )
-                        # Deserialize result
-                        import json
-
-                        return json.loads(cached_result)
-
-                    # Cache miss - call function and cache result
-                    result = func(self, *args, **kwargs)
-
-                    # Serialize and cache result
-                    import json
-
-                    cache_value = json.dumps(result)
-                    cache.set(cache_key_str, cache_value, ttl=ttl)
-
+                # Sync cache
+                cached_result = cache.get(cache_key_str)
+                if cached_result is not None:
                     logger.debug(
-                        "Field cached",
+                        "Field cache hit",
                         extra={
                             "cache_key": cache_key_str,
                             "field": func.__name__,
-                            "ttl": ttl,
                         },
                     )
+                    # Deserialize result
+                    import json
 
-                    return result
+                    return json.loads(cached_result)
+
+                # Cache miss - call function and cache result
+                result = func(self, *args, **kwargs)
+
+                # Serialize and cache result
+                import json
+
+                cache_value = json.dumps(result)
+                cache.set(cache_key_str, cache_value, ttl=ttl)
+
+                logger.debug(
+                    "Field cached",
+                    extra={
+                        "cache_key": cache_key_str,
+                        "field": func.__name__,
+                        "ttl": ttl,
+                    },
+                )
+
+                return result
 
             except Exception as e:
                 # Don't fail the field resolution if caching has issues

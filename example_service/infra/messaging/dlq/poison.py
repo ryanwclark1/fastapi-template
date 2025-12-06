@@ -20,9 +20,9 @@ Design decisions:
 
 from __future__ import annotations
 
+from collections import OrderedDict
 import hashlib
 import threading
-from collections import OrderedDict
 from typing import Final
 
 # ============================================================================
@@ -127,16 +127,14 @@ class PoisonMessageDetector:
                     # Move to end for LRU ordering
                     self._cache.move_to_end(msg_hash)
                     return new_count >= self.threshold
-                else:
-                    # Different error - reset count
-                    self._cache[msg_hash] = (1, error_sig)
-                    self._cache.move_to_end(msg_hash)
-                    return False
-            else:
-                # First failure for this message
-                self._evict_if_needed()
+                # Different error - reset count
                 self._cache[msg_hash] = (1, error_sig)
+                self._cache.move_to_end(msg_hash)
                 return False
+            # First failure for this message
+            self._evict_if_needed()
+            self._cache[msg_hash] = (1, error_sig)
+            return False
 
     def is_poison(self, message_body: bytes) -> bool:
         """Check if a message is currently classified as poison.

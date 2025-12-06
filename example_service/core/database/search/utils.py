@@ -456,10 +456,10 @@ def build_ts_query_sql(
     """
     if query_type == "phrase":
         return f"phraseto_tsquery('{config}', $${query}$$)"
-    elif query_type == "plain":
+    if query_type == "plain":
         return f"plainto_tsquery('{config}', $${query}$$)"
-    else:  # websearch
-        return f"websearch_to_tsquery('{config}', $${query}$$)"
+    # websearch
+    return f"websearch_to_tsquery('{config}', $${query}$$)"
 
 
 __all__ = [

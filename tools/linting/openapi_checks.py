@@ -21,8 +21,8 @@ Note:
 from __future__ import annotations
 
 import ast
-import sys
 from pathlib import Path
+import sys
 
 # HTTP decorator names that define endpoints
 HTTP_DECORATORS = {"get", "post", "put", "patch", "delete", "head", "options"}

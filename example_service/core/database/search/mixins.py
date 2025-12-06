@@ -364,7 +364,6 @@ DROP FUNCTION IF EXISTS {table_name}_search_vector_update();
         a database roundtrip to use PostgreSQL's to_tsvector function.
         """
         # Database triggers are the recommended approach
-        pass
 
     @classmethod
     def get_search_stats_sql(cls, table_name: str | None = None) -> str:

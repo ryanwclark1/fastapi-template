@@ -16,8 +16,8 @@ Pricing (as of 2025-01):
 
 from __future__ import annotations
 
-import logging
 from decimal import Decimal
+import logging
 from typing import Any, ClassVar
 
 from example_service.infra.ai.capabilities.adapters.base import (
@@ -209,19 +209,18 @@ class DeepgramAdapter(ProviderAdapter):
             return await self._execute_transcription(
                 input_data, speaker_diarization=False, **options
             )
-        elif capability == Capability.TRANSCRIPTION_DIARIZATION:
+        if capability == Capability.TRANSCRIPTION_DIARIZATION:
             return await self._execute_transcription(
                 input_data, speaker_diarization=True, **options
             )
-        elif capability == Capability.TRANSCRIPTION_DUAL_CHANNEL:
+        if capability == Capability.TRANSCRIPTION_DUAL_CHANNEL:
             return await self._execute_dual_channel(input_data, **options)
-        else:
-            return self._create_error_result(
-                capability,
-                f"Unsupported capability: {capability}",
-                error_code="UNSUPPORTED_CAPABILITY",
-                retryable=False,
-            )
+        return self._create_error_result(
+            capability,
+            f"Unsupported capability: {capability}",
+            error_code="UNSUPPORTED_CAPABILITY",
+            retryable=False,
+        )
 
     async def _execute_transcription(
         self,

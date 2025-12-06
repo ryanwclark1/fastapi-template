@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any
 
-import pytest
 from fastapi import FastAPI
+import pytest
 
 from example_service.app.lifespan import lifespan
 
@@ -35,7 +35,6 @@ async def test_lifespan_runs_with_all_dependencies_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Minimal lifespan should complete without hitting external resources."""
-
     dummy = DummySettings()
     _patch_setting_getters(
         monkeypatch,
@@ -57,7 +56,6 @@ async def test_lifespan_runs_with_all_dependencies_disabled(
 @pytest.mark.asyncio
 async def test_lifespan_initializes_database_and_cache(monkeypatch: pytest.MonkeyPatch) -> None:
     """When services are configured, startup should call init and shutdown should close them."""
-
     db_settings = DummySettings(is_configured=True)
     redis_settings = DummySettings(is_configured=True)
     app_settings = DummySettings()

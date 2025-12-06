@@ -6,9 +6,9 @@ Provides WebSocket subscriptions for:
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 import json
 import logging
-from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry

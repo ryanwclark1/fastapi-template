@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 
 import click
 
@@ -29,7 +29,6 @@ def lint(fix: bool, watch: bool) -> None:
     fix issues where possible.
 
     Example:
-
         example-service dev lint
 
         example-service dev lint --fix
@@ -44,7 +43,7 @@ def lint(fix: bool, watch: bool) -> None:
 
     click.echo("🔍 Running linter...")
     # cmd is constructed from hardcoded command, not user input
-    result = subprocess.run(cmd)  # noqa: S603
+    result = subprocess.run(cmd, check=False)  # noqa: S603
 
     if result.returncode == 0:
         click.echo("✅ No linting issues found!")
@@ -61,7 +60,6 @@ def format(check: bool) -> None:
     Automatically formats Python code according to project standards.
 
     Example:
-
         example-service dev format
 
         example-service dev format --check
@@ -75,7 +73,7 @@ def format(check: bool) -> None:
 
     click.echo("🎨 Formatting code...")
     # cmd is constructed from hardcoded command, not user input
-    result = subprocess.run(cmd)  # noqa: S603
+    result = subprocess.run(cmd, check=False)  # noqa: S603
 
     if result.returncode == 0:
         if check:
@@ -95,7 +93,6 @@ def typecheck(strict: bool) -> None:
     Performs static type analysis to catch type-related bugs.
 
     Example:
-
         example-service dev typecheck
 
         example-service dev typecheck --strict
@@ -107,7 +104,7 @@ def typecheck(strict: bool) -> None:
 
     click.echo("🔬 Running type checker...")
     # cmd is constructed from hardcoded command, not user input
-    result = subprocess.run(cmd)  # noqa: S603
+    result = subprocess.run(cmd, check=False)  # noqa: S603
 
     if result.returncode == 0:
         click.echo("✅ No type errors found!")
@@ -138,7 +135,6 @@ def test(
     Runs the test suite with optional coverage analysis and filtering.
 
     Example:
-
         example-service dev test
 
         example-service dev test --coverage
@@ -176,7 +172,7 @@ def test(
 
     click.echo("🧪 Running tests...")
     # cmd is constructed from hardcoded command, not user input
-    result = subprocess.run(cmd)  # noqa: S603
+    result = subprocess.run(cmd, check=False)  # noqa: S603
 
     if result.returncode == 0:
         click.echo("✅ All tests passed!")
@@ -194,7 +190,6 @@ def quality(fix: bool) -> None:
     Use before committing code.
 
     Example:
-
         example-service dev quality
 
         example-service dev quality --fix
@@ -220,7 +215,7 @@ def quality(fix: bool) -> None:
             sys.exit(1)
         result = subprocess.run(  # noqa: S603
             [executable, "dev", *cmd],
-            capture_output=False,
+            check=False, capture_output=False,
         )
 
         if result.returncode != 0:
@@ -254,7 +249,6 @@ def serve(port: int, host: str, reload: bool, workers: int) -> None:
     Starts a Uvicorn server with automatic reloading for development.
 
     Example:
-
         example-service dev serve
 
         example-service dev serve --port 8080 --host 0.0.0.0
@@ -285,7 +279,7 @@ def serve(port: int, host: str, reload: bool, workers: int) -> None:
     click.echo("📝 Press Ctrl+C to stop\n")
 
     # cmd is constructed from validated CLI options, not arbitrary user input
-    subprocess.run(cmd)  # noqa: S603
+    subprocess.run(cmd, check=False)  # noqa: S603
 
 
 @dev.command()
@@ -295,7 +289,6 @@ def clean() -> None:
     Removes Python cache files, build artifacts, and test outputs.
 
     Example:
-
         example-service dev clean
     """
     patterns = [
@@ -318,7 +311,7 @@ def clean() -> None:
     removed_count = 0
 
     for pattern in patterns:
-        for path in Path(".").glob(pattern):
+        for path in Path().glob(pattern):
             if path.is_file():
                 path.unlink()
                 removed_count += 1
@@ -343,7 +336,6 @@ def deps() -> None:
     Shows information about installed dependencies and available updates.
 
     Example:
-
         example-service dev deps
     """
     click.echo("📦 Checking dependencies...\n")
@@ -351,14 +343,14 @@ def deps() -> None:
     # Show installed packages
     click.echo("Installed packages:")
     # Hardcoded command, not user input
-    subprocess.run(["uv", "pip", "list"])  # noqa: S607
+    subprocess.run(["uv", "pip", "list"], check=False)  # noqa: S607
 
     click.echo("\n" + "=" * 60)
 
     # Check for outdated packages
     click.echo("\nOutdated packages:")
     # Hardcoded command, not user input
-    subprocess.run(["uv", "pip", "list", "--outdated"])  # noqa: S607
+    subprocess.run(["uv", "pip", "list", "--outdated"], check=False)  # noqa: S607
 
 
 @dev.command()
@@ -369,7 +361,6 @@ def info(show_all: bool) -> None:
     Displays Python version, dependencies, and environment status.
 
     Example:
-
         example-service dev info
 
         example-service dev info --all
@@ -387,7 +378,7 @@ def info(show_all: bool) -> None:
         # UV version
         click.echo("\nUV Version:")
         # Hardcoded command, not user input
-        subprocess.run(["uv", "--version"])  # noqa: S607
+        subprocess.run(["uv", "--version"], check=False)  # noqa: S607
 
         # Environment variables
         import os
@@ -416,7 +407,6 @@ def run(command: tuple[str, ...]) -> None:
     Executes any command within the UV virtual environment.
 
     Example:
-
         example-service dev run python --version
 
         example-service dev run alembic current
@@ -427,6 +417,6 @@ def run(command: tuple[str, ...]) -> None:
 
     click.echo(f"🏃 Running: {' '.join(command)}\n")
     # cmd is constructed from CLI arguments, user should only run trusted commands
-    result = subprocess.run(cmd)  # noqa: S603
+    result = subprocess.run(cmd, check=False)  # noqa: S603
 
     sys.exit(result.returncode)

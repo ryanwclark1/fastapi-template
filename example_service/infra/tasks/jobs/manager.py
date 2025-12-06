@@ -10,8 +10,8 @@ The JobManager provides a unified interface for:
 
 from __future__ import annotations
 
-import logging
 from datetime import UTC, datetime
+import logging
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select

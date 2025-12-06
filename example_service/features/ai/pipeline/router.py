@@ -16,9 +16,9 @@ Architecture Overview:
 from __future__ import annotations
 
 import contextlib
-import logging
 from datetime import UTC, datetime
 from decimal import Decimal
+import logging
 from typing import TYPE_CHECKING, Annotated, Any
 from uuid import uuid4
 
@@ -58,7 +58,11 @@ from example_service.features.ai.pipeline.schemas import (
     StepResultSchema,
     StepStatus,
 )
-from example_service.infra.ai.capabilities import Capability, ProviderType, get_capability_registry
+from example_service.infra.ai.capabilities import (
+    Capability,
+    ProviderType,
+    get_capability_registry,
+)
 from example_service.infra.ai.events import EventType, get_event_store
 from example_service.infra.ai.instrumented_orchestrator import (
     InstrumentedOrchestrator,
@@ -229,50 +233,49 @@ async def execute_pipeline(
             stream_url=f"/ws/ai/pipelines/{execution_id}/events",
         )
 
-    else:
-        # Execute synchronously
-        result = await orchestrator.execute(
-            pipeline=pipeline,
-            input_data=request.input_data,
-            tenant_id=tenant_id,
-            budget_limit_usd=request.budget_limit_usd,
+    # Execute synchronously
+    result = await orchestrator.execute(
+        pipeline=pipeline,
+        input_data=request.input_data,
+        tenant_id=tenant_id,
+        budget_limit_usd=request.budget_limit_usd,
+    )
+
+    # For sync execution, return result response
+    step_results: dict[str, StepResultSchema] = {}
+    for step_name, step_data in getattr(result, "step_results", {}).items():
+        step_results[step_name] = StepResultSchema(
+            step_name=step_name,
+            status=StepStatus(step_data.get("status", "completed")),
+            provider_used=step_data.get("provider_used"),
+            fallbacks_attempted=step_data.get("fallbacks_attempted", []),
+            retries=step_data.get("retries", 0),
+            duration_ms=step_data.get("duration_ms"),
+            cost_usd=str(step_data.get("cost", Decimal(0))),
+            error=step_data.get("error"),
+            skipped_reason=step_data.get("skipped_reason"),
         )
 
-        # For sync execution, return result response
-        step_results: dict[str, StepResultSchema] = {}
-        for step_name, step_data in getattr(result, "step_results", {}).items():
-            step_results[step_name] = StepResultSchema(
-                step_name=step_name,
-                status=StepStatus(step_data.get("status", "completed")),
-                provider_used=step_data.get("provider_used"),
-                fallbacks_attempted=step_data.get("fallbacks_attempted", []),
-                retries=step_data.get("retries", 0),
-                duration_ms=step_data.get("duration_ms"),
-                cost_usd=str(step_data.get("cost", Decimal("0"))),
-                error=step_data.get("error"),
-                skipped_reason=step_data.get("skipped_reason"),
-            )
-
-        # Return result response with 200 status for sync execution
-        response.status_code = status.HTTP_200_OK
-        return PipelineResultResponse(
-            execution_id=result.execution_id,
-            pipeline_name=result.pipeline_name,
-            pipeline_version=result.pipeline_version,
-            status=_map_result_status(result),
-            success=result.success,
-            output=result.output,
-            completed_steps=result.completed_steps,
-            failed_step=result.failed_step,
-            step_results=step_results,
-            total_duration_ms=result.total_duration_ms,
-            total_cost_usd=str(result.total_cost_usd),
-            started_at=result.started_at,
-            completed_at=result.completed_at,
-            compensation_performed=result.compensation_performed,
-            compensated_steps=result.compensated_steps,
-            error=result.error,
-        )
+    # Return result response with 200 status for sync execution
+    response.status_code = status.HTTP_200_OK
+    return PipelineResultResponse(
+        execution_id=result.execution_id,
+        pipeline_name=result.pipeline_name,
+        pipeline_version=result.pipeline_version,
+        status=_map_result_status(result),
+        success=result.success,
+        output=result.output,
+        completed_steps=result.completed_steps,
+        failed_step=result.failed_step,
+        step_results=step_results,
+        total_duration_ms=result.total_duration_ms,
+        total_cost_usd=str(result.total_cost_usd),
+        started_at=result.started_at,
+        completed_at=result.completed_at,
+        compensation_performed=result.compensation_performed,
+        compensated_steps=result.compensated_steps,
+        error=result.error,
+    )
 
 
 async def _execute_pipeline_background(
@@ -511,7 +514,7 @@ async def get_budget_status(
     remaining = None
     percent_used = check.percent_used
     if check.limit_usd is not None and check.limit_usd > 0:
-        remaining = max(Decimal("0"), check.limit_usd - check.current_spend_usd)
+        remaining = max(Decimal(0), check.limit_usd - check.current_spend_usd)
 
     return BudgetStatusResponse(
         tenant_id=tenant_id,
@@ -578,7 +581,7 @@ async def get_spend_summary(
         period=period,
         start_date=start_date,
         end_date=now,
-        total_spend_usd=str(summary.get("total", Decimal("0"))),
+        total_spend_usd=str(summary.get("total", Decimal(0))),
         record_count=summary.get("record_count", 0),
         by_pipeline={k: str(v) for k, v in summary.get("by_pipeline", {}).items()},
         by_provider={k: str(v) for k, v in summary.get("by_provider", {}).items()},
@@ -899,7 +902,7 @@ async def get_execution_progress_legacy(
         steps_completed=completed_steps,
         total_steps=total_steps,
         estimated_remaining_seconds=state.get("estimated_remaining_seconds") if state else None,
-        current_cost_usd=str(state.get("total_cost", Decimal("0"))) if state else "0",
+        current_cost_usd=str(state.get("total_cost", Decimal(0))) if state else "0",
     )
 
 
@@ -957,7 +960,7 @@ async def get_execution_result(
             fallbacks_attempted=step_data.get("fallbacks_attempted", []),
             retries=step_data.get("retries", 0),
             duration_ms=step_data.get("duration_ms"),
-            cost_usd=str(step_data.get("cost", Decimal("0"))),
+            cost_usd=str(step_data.get("cost", Decimal(0))),
             error=step_data.get("error"),
             skipped_reason=step_data.get("skipped_reason"),
         )
@@ -978,7 +981,7 @@ async def get_execution_result(
         failed_step=state.get("failed_step"),
         step_results=step_results,
         total_duration_ms=state.get("total_duration_ms", 0),
-        total_cost_usd=str(state.get("total_cost", Decimal("0"))),
+        total_cost_usd=str(state.get("total_cost", Decimal(0))),
         started_at=state.get("started_at"),
         completed_at=state.get("completed_at"),
         compensation_performed=state.get("compensation_performed", False),
@@ -1092,7 +1095,7 @@ async def stream_execution_events(
             EventType.WORKFLOW_CANCELLED,
         ):
             return EventCategory.WORKFLOW in category_filter
-        elif event_type in (
+        if event_type in (
             EventType.STEP_STARTED,
             EventType.STEP_COMPLETED,
             EventType.STEP_FAILED,
@@ -1100,11 +1103,11 @@ async def stream_execution_events(
             EventType.STEP_RETRYING,
         ):
             return EventCategory.STEP in category_filter
-        elif event_type in (EventType.PROGRESS_UPDATE,):
+        if event_type in (EventType.PROGRESS_UPDATE,):
             return EventCategory.PROGRESS in category_filter
-        elif event_type in (EventType.COST_INCURRED,):
+        if event_type in (EventType.COST_INCURRED,):
             return EventCategory.COST in category_filter
-        elif event_type in (
+        if event_type in (
             EventType.COMPENSATION_STARTED,
             EventType.COMPENSATION_STEP,
             EventType.COMPENSATION_COMPLETED,
@@ -1209,7 +1212,6 @@ def _map_result_status(result: PipelineResult) -> PipelineStatus:
     """Map pipeline result to API status."""
     if result.success:
         return PipelineStatus.COMPLETED
-    elif result.failed_step:
+    if result.failed_step:
         return PipelineStatus.FAILED
-    else:
-        return PipelineStatus.FAILED
+    return PipelineStatus.FAILED

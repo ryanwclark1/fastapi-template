@@ -16,11 +16,14 @@ This is an internal service, so:
 
 from __future__ import annotations
 
-import logging
 from decimal import Decimal
+import logging
 from typing import Any, ClassVar
 
-from example_service.infra.ai.capabilities.adapters.base import ProviderAdapter, TimedExecution
+from example_service.infra.ai.capabilities.adapters.base import (
+    ProviderAdapter,
+    TimedExecution,
+)
 from example_service.infra.ai.capabilities.types import (
     Capability,
     CapabilityMetadata,
@@ -124,7 +127,7 @@ class AccentRedactionAdapter(ProviderAdapter):
                 CapabilityMetadata(
                     capability=Capability.PII_DETECTION,
                     provider_name="accent_redaction",
-                    cost_per_unit=Decimal("0"),  # Internal service - free
+                    cost_per_unit=Decimal(0),  # Internal service - free
                     cost_unit=CostUnit.FREE,
                     quality_tier=QualityTier.PREMIUM,
                     priority=1,  # Highest priority for PII
@@ -133,7 +136,7 @@ class AccentRedactionAdapter(ProviderAdapter):
                 CapabilityMetadata(
                     capability=Capability.PII_REDACTION,
                     provider_name="accent_redaction",
-                    cost_per_unit=Decimal("0"),
+                    cost_per_unit=Decimal(0),
                     cost_unit=CostUnit.FREE,
                     quality_tier=QualityTier.PREMIUM,
                     priority=1,
@@ -161,15 +164,14 @@ class AccentRedactionAdapter(ProviderAdapter):
         """
         if capability == Capability.PII_DETECTION:
             return await self._execute_detection(input_data, **options)
-        elif capability == Capability.PII_REDACTION:
+        if capability == Capability.PII_REDACTION:
             return await self._execute_redaction(input_data, **options)
-        else:
-            return self._create_error_result(
-                capability,
-                f"Unsupported capability: {capability}",
-                error_code="UNSUPPORTED_CAPABILITY",
-                retryable=False,
-            )
+        return self._create_error_result(
+            capability,
+            f"Unsupported capability: {capability}",
+            error_code="UNSUPPORTED_CAPABILITY",
+            retryable=False,
+        )
 
     async def _execute_detection(
         self,

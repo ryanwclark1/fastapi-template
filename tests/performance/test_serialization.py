@@ -6,12 +6,12 @@ which is a critical path in API request/response handling.
 
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime
+import json
 from uuid import uuid4
 
-import pytest
 from pydantic import BaseModel, Field
+import pytest
 
 
 # Sample models for benchmarking

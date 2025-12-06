@@ -63,9 +63,9 @@ Supplementary Usage:
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable
 from functools import wraps
+import logging
 from typing import Any, TypeVar
 
 from opentelemetry import trace
@@ -128,7 +128,9 @@ def traced_handler(handler_name: str | None = None) -> Callable[[F], F]:
 
             if event is not None:
                 attributes["message.id"] = str(getattr(event, "event_id", "unknown"))
-                attributes["message.type"] = str(getattr(event, "event_type", "unknown"))
+                attributes["message.type"] = str(
+                    getattr(event, "event_type", "unknown")
+                )
                 # Include service name if available
                 if hasattr(event, "service"):
                     attributes["message.service"] = str(event.service)
@@ -148,14 +150,14 @@ def traced_handler(handler_name: str | None = None) -> Callable[[F], F]:
                 span.record_exception(e)
                 span.set_status(trace.Status(trace.StatusCode.ERROR))
                 span.set_attribute("message.status", "failure")
-                logger.error(
-                    f"Handler {name} failed",
+                logger.exception(
+                    "Handler %s failed",
+                    name,
                     extra={
                         "handler_name": name,
                         "error": str(e),
                         "message_id": attributes.get("message.id"),
                     },
-                    exc_info=True,
                 )
                 raise
             finally:

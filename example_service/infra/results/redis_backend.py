@@ -136,7 +136,6 @@ class RedisAsyncResultBackend(AsyncResultBackend[_ReturnType]):
         Connection pool is already created in __init__, so this is a no-op
         that exists for consistency with AsyncResultBackend interface.
         """
-        pass
 
     async def shutdown(self) -> None:
         """Closes Redis connection pool."""
@@ -338,7 +337,6 @@ class RedisAsyncClusterResultBackend(AsyncResultBackend[_ReturnType]):
         Connection is already created in __init__, so this is a no-op
         that exists for consistency with AsyncResultBackend interface.
         """
-        pass
 
     async def shutdown(self) -> None:
         """Closes Redis cluster connection."""
@@ -502,7 +500,6 @@ class RedisAsyncSentinelResultBackend(AsyncResultBackend[_ReturnType]):
         Sentinel connection is already created in __init__, so this is a no-op
         that exists for consistency with AsyncResultBackend interface.
         """
-        pass
 
     @asynccontextmanager
     async def _acquire_master_conn(self) -> AsyncIterator[_Redis]:

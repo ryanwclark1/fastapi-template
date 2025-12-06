@@ -11,10 +11,10 @@ Usage:
 
 from __future__ import annotations
 
-import logging
-import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+import logging
+import time
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:

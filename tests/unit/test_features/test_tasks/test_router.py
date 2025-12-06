@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import importlib
 from datetime import UTC, datetime
+import importlib
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
 from httpx import ASGITransport, AsyncClient
+import pytest
 
 from example_service.app.exception_handlers import configure_exception_handlers
 from example_service.features.tasks.schemas import (

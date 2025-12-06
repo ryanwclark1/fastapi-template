@@ -12,9 +12,9 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Annotated
 
-import httpx
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+import httpx
 
 from example_service.core.schemas.auth import AuthUser, TokenPayload
 from example_service.core.settings import get_auth_settings
@@ -172,7 +172,9 @@ async def get_current_user(
             )
             return auth_user
     except Exception as e:
-        logger.warning("Cache lookup failed, proceeding to validation", extra={"error": str(e)})
+        logger.warning(
+            "Cache lookup failed, proceeding to validation", extra={"error": str(e)}
+        )
 
     # Validate with auth service
     try:
@@ -272,7 +274,9 @@ def require_permission(permission: str) -> Callable[[AuthUser], Awaitable[AuthUs
             pass
     """
 
-    async def permission_checker(user: Annotated[AuthUser, Depends(get_current_user)]) -> AuthUser:
+    async def permission_checker(
+        user: Annotated[AuthUser, Depends(get_current_user)],
+    ) -> AuthUser:
         if not user.has_permission(permission):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -281,6 +285,40 @@ def require_permission(permission: str) -> Callable[[AuthUser], Awaitable[AuthUs
         return user
 
     return permission_checker
+
+
+def require_permissions(
+    permissions: list[str],
+) -> Callable[[AuthUser], Awaitable[AuthUser]]:
+    """Dependency factory to require multiple permissions.
+
+    Args:
+        permissions: List of required permissions.
+
+    Returns:
+        Dependency function that checks for all permissions.
+
+    Example:
+            @router.delete("/users/{user_id}")
+        async def delete_user(
+            user: Annotated[AuthUser, Depends(require_permissions(["users:delete", "users:admin"]))]
+        ):
+            # Only users with all specified permissions can access
+            pass
+    """
+
+    async def permissions_checker(
+        user: Annotated[AuthUser, Depends(get_current_user)],
+    ) -> AuthUser:
+        missing = [p for p in permissions if not user.has_permission(p)]
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Missing required permissions: {', '.join(missing)}",
+            )
+        return user
+
+    return permissions_checker
 
 
 def require_role(role: str) -> Callable[[AuthUser], Awaitable[AuthUser]]:
@@ -301,7 +339,9 @@ def require_role(role: str) -> Callable[[AuthUser], Awaitable[AuthUser]]:
             pass
     """
 
-    async def role_checker(user: Annotated[AuthUser, Depends(get_current_user)]) -> AuthUser:
+    async def role_checker(
+        user: Annotated[AuthUser, Depends(get_current_user)],
+    ) -> AuthUser:
         if not user.has_role(role):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -333,7 +373,9 @@ def require_resource_access(
             pass
     """
 
-    async def acl_checker(user: Annotated[AuthUser, Depends(get_current_user)]) -> AuthUser:
+    async def acl_checker(
+        user: Annotated[AuthUser, Depends(get_current_user)],
+    ) -> AuthUser:
         if not user.can_access_resource(resource, action):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -342,3 +384,22 @@ def require_resource_access(
         return user
 
     return acl_checker
+
+
+# Type aliases for dependency injection
+CurrentUser = Annotated[AuthUser, Depends(get_current_user)]
+CurrentActiveUser = Annotated[AuthUser, Depends(get_current_user)]
+OptionalUser = Annotated[AuthUser | None, Depends(get_current_user_optional)]
+
+
+__all__ = [
+    "CurrentActiveUser",
+    "CurrentUser",
+    "OptionalUser",
+    "get_current_user",
+    "get_current_user_optional",
+    "require_permission",
+    "require_permissions",
+    "require_resource_access",
+    "require_role",
+]

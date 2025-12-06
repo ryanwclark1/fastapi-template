@@ -10,7 +10,7 @@ Provides metrics for:
 Metric Naming Convention:
     ai_<component>_<metric>_<unit>
 
-    Examples:
+Examples:
     - ai_pipeline_executions_total
     - ai_step_duration_seconds
     - ai_provider_cost_usd_total

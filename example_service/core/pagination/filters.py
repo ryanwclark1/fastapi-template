@@ -185,11 +185,10 @@ class CursorFilter(StatementFilter):
                     compare_cond = column < cursor_value
                 else:
                     compare_cond = column > cursor_value
-            else:  # "before"
-                if direction == "desc":
-                    compare_cond = column > cursor_value
-                else:
-                    compare_cond = column < cursor_value
+            elif direction == "desc":
+                compare_cond = column > cursor_value
+            else:
+                compare_cond = column < cursor_value
 
             # Combine: (prev_cols = their_values) AND (this_col op cursor_value)
             if eq_conditions:

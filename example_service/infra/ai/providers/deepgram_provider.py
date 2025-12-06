@@ -147,52 +147,51 @@ class DeepgramProvider(BaseProvider):
                             confidence=utt.get("confidence"),
                         )
                     )
-            else:
-                # Fallback to words if no utterances
-                if "words" in alternatives:
-                    # Group words into segments
-                    current_segment = []
-                    current_start = None
+            # Fallback to words if no utterances
+            elif "words" in alternatives:
+                # Group words into segments
+                current_segment = []
+                current_start = None
 
-                    for word in alternatives["words"]:
-                        if current_start is None:
-                            current_start = word["start"]
-                        current_segment.append(word["word"])
+                for word in alternatives["words"]:
+                    if current_start is None:
+                        current_start = word["start"]
+                    current_segment.append(word["word"])
 
-                        # Create segment every ~10 words or at punctuation
-                        if len(current_segment) >= 10 or word["word"].endswith((".", "!", "?")):
-                            segments.append(
-                                TranscriptionSegment(
-                                    text=" ".join(current_segment),
-                                    start=current_start,
-                                    end=word["end"],
-                                    confidence=alternatives.get("confidence"),
-                                )
-                            )
-                            current_segment = []
-                            current_start = None
-
-                    # Add remaining words
-                    if current_segment:
-                        last_word = alternatives["words"][-1]
+                    # Create segment every ~10 words or at punctuation
+                    if len(current_segment) >= 10 or word["word"].endswith((".", "!", "?")):
                         segments.append(
                             TranscriptionSegment(
                                 text=" ".join(current_segment),
-                                start=current_start or 0.0,
-                                end=last_word["end"],
+                                start=current_start,
+                                end=word["end"],
                                 confidence=alternatives.get("confidence"),
                             )
                         )
-                else:
-                    # No words available, create single segment
+                        current_segment = []
+                        current_start = None
+
+                # Add remaining words
+                if current_segment:
+                    last_word = alternatives["words"][-1]
                     segments.append(
                         TranscriptionSegment(
-                            text=transcript,
-                            start=0.0,
-                            end=results.get("duration", 0.0),
+                            text=" ".join(current_segment),
+                            start=current_start or 0.0,
+                            end=last_word["end"],
                             confidence=alternatives.get("confidence"),
                         )
                     )
+            else:
+                # No words available, create single segment
+                segments.append(
+                    TranscriptionSegment(
+                        text=transcript,
+                        start=0.0,
+                        end=results.get("duration", 0.0),
+                        confidence=alternatives.get("confidence"),
+                    )
+                )
 
             # Get duration
             duration = results.get("duration")

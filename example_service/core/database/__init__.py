@@ -158,6 +158,19 @@ from example_service.core.database.inspection import (
     is_new,
     is_persistent,
 )
+from example_service.core.database.migration_helpers import (
+    create_exclusion_constraint,
+    create_extension,
+    create_gist_index,
+    create_gist_index_multi,
+    create_ltree_indexes,
+    create_no_overlap_constraint,
+    drop_exclusion_constraint,
+    drop_extension,
+    drop_gist_index,
+    drop_ltree_indexes,
+    ensure_btree_gist,
+)
 from example_service.core.database.ranges import (
     DateRange,
     DateRangeType,
@@ -200,19 +213,6 @@ from example_service.core.database.validation import (
     IdentifierValidationError,
     safe_table_reference,
     validate_identifier,
-)
-from example_service.core.database.migration_helpers import (
-    create_exclusion_constraint,
-    create_extension,
-    create_gist_index,
-    create_gist_index_multi,
-    create_ltree_indexes,
-    create_no_overlap_constraint,
-    drop_exclusion_constraint,
-    drop_extension,
-    drop_gist_index,
-    drop_ltree_indexes,
-    ensure_btree_gist,
 )
 
 __all__ = [

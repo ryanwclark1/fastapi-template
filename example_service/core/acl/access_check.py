@@ -12,9 +12,9 @@ ACLs are obtained from the external auth service via token validation.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from functools import lru_cache
+import re
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

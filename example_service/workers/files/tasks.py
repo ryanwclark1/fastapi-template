@@ -8,9 +8,9 @@ This module provides:
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 import io
 import logging
-from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import delete, select
@@ -32,7 +32,6 @@ logger = logging.getLogger(__name__)
 class FileProcessingError(Exception):
     """File processing operation error."""
 
-    pass
 
 
 async def get_file_from_storage(file_id: str) -> dict[str, Any]:
