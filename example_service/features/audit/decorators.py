@@ -75,7 +75,11 @@ def audited(
                     detected_action = AuditAction.UPDATE
                 elif "delete" in method_name or "remove" in method_name:
                     detected_action = AuditAction.DELETE
-                elif "get" in method_name or "read" in method_name or "list" in method_name:
+                elif (
+                    "get" in method_name
+                    or "read" in method_name
+                    or "list" in method_name
+                ):
                     detected_action = AuditAction.READ
                 else:
                     detected_action = AuditAction.READ
@@ -103,20 +107,30 @@ def audited(
                 if user_id is None:
                     user = getattr(request.state, "user", None)
                     if user:
-                        user_id = getattr(user, "user_id", None) or getattr(user, "id", None)
+                        user_id = getattr(user, "user_id", None) or getattr(
+                            user, "id", None
+                        )
                         # Extract roles from user object
                         user_roles = getattr(user, "roles", None)
                         if user_roles:
-                            actor_roles = list(user_roles) if not isinstance(user_roles, list) else user_roles
+                            actor_roles = (
+                                list(user_roles)
+                                if not isinstance(user_roles, list)
+                                else user_roles
+                            )
                 tenant_id = getattr(request.state, "tenant_uuid", None)
                 # Also check for roles directly on request state
                 if not actor_roles:
                     state_roles = getattr(request.state, "roles", None)
                     if state_roles:
-                        actor_roles = list(state_roles) if not isinstance(state_roles, list) else state_roles
+                        actor_roles = (
+                            list(state_roles)
+                            if not isinstance(state_roles, list)
+                            else state_roles
+                        )
 
             # Try to extract entity_id from kwargs
-            entity_id = kwargs.get("id") or kwargs.get("entity_id") # type: ignore
+            entity_id = kwargs.get("id") or kwargs.get("entity_id")  # type: ignore
             if entity_id is not None:
                 entity_id = str(entity_id)
 
@@ -182,9 +196,15 @@ def audited(
                             actor_roles=actor_roles,
                             tenant_id=tenant_id,
                             new_values=new_values,
-                            ip_address=request.client.host if request and request.client else None,
-                            user_agent=request.headers.get("user-agent") if request else None,
-                            request_id=getattr(request.state, "request_id", None) if request else None,
+                            ip_address=request.client.host
+                            if request and request.client
+                            else None,
+                            user_agent=request.headers.get("user-agent")
+                            if request
+                            else None,
+                            request_id=getattr(request.state, "request_id", None)
+                            if request
+                            else None,
                             endpoint=str(request.url.path) if request else None,
                             method=request.method if request else None,
                             metadata=metadata,
@@ -195,7 +215,8 @@ def audited(
                 except Exception as audit_error:
                     # Don't fail the main operation if audit logging fails
                     logger.warning(
-                        f"Failed to create audit log: {audit_error}",
+                        "Failed to create audit log: %s",
+                        audit_error,
                         extra={"entity_type": entity_type, "action": detected_action},
                     )
 
@@ -259,7 +280,7 @@ def audit_action(
             new_values = kwargs.get(new_values_param) if new_values_param else None
 
             # Extract request context
-            request: Request | None = kwargs.get("request") # type: ignore
+            request: Request | None = kwargs.get("request")  # type: ignore
             user_id: str | None = None
             actor_roles: list[str] = []
             tenant_id: str | None = None
@@ -271,13 +292,21 @@ def audit_action(
                     # Extract roles from user object
                     user_roles = getattr(user, "roles", None)
                     if user_roles:
-                        actor_roles = list(user_roles) if not isinstance(user_roles, list) else user_roles
+                        actor_roles = (
+                            list(user_roles)
+                            if not isinstance(user_roles, list)
+                            else user_roles
+                        )
                 tenant_id = getattr(request.state, "tenant_uuid", None)
                 # Also check for roles directly on request state
                 if not actor_roles:
                     state_roles = getattr(request.state, "roles", None)
                     if state_roles:
-                        actor_roles = list(state_roles) if not isinstance(state_roles, list) else state_roles
+                        actor_roles = (
+                            list(state_roles)
+                            if not isinstance(state_roles, list)
+                            else state_roles
+                        )
 
             start_time = time.monotonic()
             success = True
@@ -303,11 +332,17 @@ def audit_action(
                             user_id=user_id,
                             actor_roles=actor_roles,
                             tenant_id=tenant_id,
-                            old_values=old_values, # type: ignore
-                            new_values=new_values, # type: ignore
-                            ip_address=request.client.host if request and request.client else None,
-                            user_agent=request.headers.get("user-agent") if request else None,
-                            request_id=getattr(request.state, "request_id", None) if request else None,
+                            old_values=old_values,  # type: ignore
+                            new_values=new_values,  # type: ignore
+                            ip_address=request.client.host
+                            if request and request.client
+                            else None,
+                            user_agent=request.headers.get("user-agent")
+                            if request
+                            else None,
+                            request_id=getattr(request.state, "request_id", None)
+                            if request
+                            else None,
                             endpoint=str(request.url.path) if request else None,
                             method=request.method if request else None,
                             success=success,
@@ -315,7 +350,7 @@ def audit_action(
                             duration_ms=duration_ms,
                         )
                 except Exception as audit_error:
-                    logger.warning(f"Failed to create audit log: {audit_error}")
+                    logger.warning("Failed to create audit log: %s", audit_error)
 
         return wrapper
 
@@ -407,7 +442,7 @@ class AuditContext:
         self._start_time = time.monotonic()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None: # type: ignore
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore
         """Exit the audit context and log the entry."""
         from example_service.infra.database.session import get_async_session
 
@@ -440,4 +475,4 @@ class AuditContext:
                     duration_ms=duration_ms,
                 )
         except Exception as e:
-            logger.warning(f"Failed to create audit log in context: {e}")
+            logger.warning("Failed to create audit log in context: %s", e)

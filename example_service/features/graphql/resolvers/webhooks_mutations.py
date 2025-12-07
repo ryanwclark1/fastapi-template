@@ -87,7 +87,7 @@ async def create_webhook_mutation(
         await ctx.session.commit()
         await ctx.session.refresh(webhook)
 
-        logger.info(f"Created webhook: {webhook.id} ({webhook.name})")
+        logger.info("Created webhook: %s (%s)", webhook.id, webhook.name)
 
         # Publish event for real-time subscriptions
         await publish_webhook_event(
@@ -100,13 +100,13 @@ async def create_webhook_mutation(
 
     except IntegrityError as e:
         await ctx.session.rollback()
-        logger.exception(f"Error creating webhook: {e}")
+        logger.exception("Error creating webhook: %s", e)
         return WebhookError(
             code=WebhookErrorCode.INTERNAL_ERROR,
             message="Failed to create webhook",
         )
     except Exception as e:
-        logger.exception(f"Error creating webhook: {e}")
+        logger.exception("Error creating webhook: %s", e)
         await ctx.session.rollback()
         return WebhookError(
             code=WebhookErrorCode.INTERNAL_ERROR,
@@ -171,7 +171,7 @@ async def update_webhook_mutation(
         await ctx.session.commit()
         await ctx.session.refresh(webhook)
 
-        logger.info(f"Updated webhook: {webhook.id} ({webhook.name})")
+        logger.info("Updated webhook: %s (%s)", webhook.id, webhook.name)
 
         # Publish event for real-time subscriptions
         await publish_webhook_event(
@@ -183,7 +183,7 @@ async def update_webhook_mutation(
         return WebhookSuccess(webhook=WebhookType.from_pydantic(webhook_pydantic))
 
     except Exception as e:
-        logger.exception(f"Error updating webhook: {e}")
+        logger.exception("Error updating webhook: %s", e)
         await ctx.session.rollback()
         return WebhookError(
             code=WebhookErrorCode.INTERNAL_ERROR,
@@ -207,7 +207,9 @@ async def delete_webhook_mutation(
     try:
         webhook = await repo.get(ctx.session, webhook_uuid)
         if webhook is None:
-            return DeletePayload(success=False, message=f"Webhook with ID {id} not found")
+            return DeletePayload(
+                success=False, message=f"Webhook with ID {id} not found"
+            )
 
         # Capture webhook data before deletion
         webhook_data = serialize_model_for_event(webhook)
@@ -216,7 +218,7 @@ async def delete_webhook_mutation(
         await repo.delete(ctx.session, webhook)
         await ctx.session.commit()
 
-        logger.info(f"Deleted webhook: {webhook_uuid} ({webhook_name})")
+        logger.info("Deleted webhook: %s (%s)", webhook_uuid, webhook_name)
 
         # Publish event for real-time subscriptions
         await publish_webhook_event(
@@ -227,7 +229,7 @@ async def delete_webhook_mutation(
         return DeletePayload(success=True, message="Webhook deleted successfully")
 
     except Exception as e:
-        logger.exception(f"Error deleting webhook: {e}")
+        logger.exception("Error deleting webhook: %s", e)
         await ctx.session.rollback()
         return DeletePayload(success=False, message="Failed to delete webhook")
 
@@ -274,7 +276,7 @@ async def test_webhook_mutation(
         await ctx.session.commit()
         await ctx.session.refresh(delivery)
 
-        logger.info(f"Test delivery created for webhook: {webhook_uuid}")
+        logger.info("Test delivery created for webhook: %s", webhook_uuid)
 
         return WebhookTestResult(
             success=True,
@@ -282,7 +284,7 @@ async def test_webhook_mutation(
         )
 
     except Exception as e:
-        logger.exception(f"Error testing webhook: {e}")
+        logger.exception("Error testing webhook: %s", e)
         await ctx.session.rollback()
         return WebhookTestResult(
             success=False,
@@ -306,13 +308,17 @@ async def retry_delivery_mutation(
     try:
         delivery = await repo.get(ctx.session, delivery_uuid)
         if delivery is None:
-            return DeletePayload(success=False, message=f"Delivery with ID {delivery_id} not found")
+            return DeletePayload(
+                success=False, message=f"Delivery with ID {delivery_id} not found"
+            )
 
         if delivery.status == "delivered":
             return DeletePayload(success=False, message="Delivery already succeeded")
 
         if delivery.attempt_count >= delivery.max_attempts:
-            return DeletePayload(success=False, message="Delivery has exhausted all retries")
+            return DeletePayload(
+                success=False, message="Delivery has exhausted all retries"
+            )
 
         # Reset for retry
         delivery.status = "pending"
@@ -320,12 +326,12 @@ async def retry_delivery_mutation(
 
         await ctx.session.commit()
 
-        logger.info(f"Retry scheduled for delivery: {delivery_uuid}")
+        logger.info("Retry scheduled for delivery: %s", delivery_uuid)
 
         return DeletePayload(success=True, message="Delivery retry scheduled")
 
     except Exception as e:
-        logger.exception(f"Error retrying delivery: {e}")
+        logger.exception("Error retrying delivery: %s", e)
         await ctx.session.rollback()
         return DeletePayload(success=False, message="Failed to retry delivery")
 

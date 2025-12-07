@@ -177,22 +177,18 @@ class CorrelationIDMiddleware(HeaderContextMiddleware):
             # Ensure correlation ID is in error response for tracing
             if value and not response_started:
                 header_bytes = self.header_name.encode("latin-1")
-                await send(
-                    {
-                        "type": "http.response.start",
-                        "status": 500,
-                        "headers": [
-                            (header_bytes, value.encode("latin-1")),
-                            (b"content-type", b"text/plain; charset=utf-8"),
-                        ],
-                    }
-                )
-                await send(
-                    {
-                        "type": "http.response.body",
-                        "body": b"Internal Server Error",
-                    }
-                )
+                await send({
+                    "type": "http.response.start",
+                    "status": 500,
+                    "headers": [
+                        (header_bytes, value.encode("latin-1")),
+                        (b"content-type", b"text/plain; charset=utf-8"),
+                    ],
+                })
+                await send({
+                    "type": "http.response.body",
+                    "body": b"Internal Server Error",
+                })
                 logger.exception(
                     "Unhandled exception while processing request",
                     extra={"correlation_id": value},

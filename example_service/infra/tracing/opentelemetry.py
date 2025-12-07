@@ -113,7 +113,8 @@ def setup_tracing() -> None:
 
     except Exception as e:
         logger.error(
-            f"Failed to setup OpenTelemetry tracing: {e}",
+            "Failed to setup OpenTelemetry tracing: %s",
+            e,
             extra={"exception": str(e)},
         )
         # Don't fail startup if tracing fails
@@ -140,7 +141,7 @@ def _setup_instrumentations() -> None:
             HTTPXClientInstrumentor().instrument()
             logger.debug("HTTPX instrumentation enabled")
         except Exception as e:
-            logger.warning(f"Failed to instrument HTTPX: {e}")
+            logger.warning("Failed to instrument HTTPX: %s", e)
 
     # Instrument SQLAlchemy for database queries (if enabled)
     if otel_settings.instrument_sqlalchemy:
@@ -148,7 +149,7 @@ def _setup_instrumentations() -> None:
             SQLAlchemyInstrumentor().instrument()
             logger.debug("SQLAlchemy instrumentation enabled")
         except Exception as e:
-            logger.warning(f"Failed to instrument SQLAlchemy: {e}")
+            logger.warning("Failed to instrument SQLAlchemy: %s", e)
 
     # Instrument psycopg for PostgreSQL operations (if enabled)
     if otel_settings.instrument_psycopg:
@@ -156,7 +157,7 @@ def _setup_instrumentations() -> None:
             PsycopgInstrumentor().instrument()
             logger.debug("psycopg instrumentation enabled")
         except Exception as e:
-            logger.warning(f"Failed to instrument psycopg: {e}")
+            logger.warning("Failed to instrument psycopg: %s", e)
 
 
 def instrument_app(app: Any) -> None:
@@ -185,7 +186,8 @@ def instrument_app(app: Any) -> None:
         logger.debug("FastAPI instrumentation enabled")
     except Exception as e:
         logger.warning(
-            f"Failed to instrument FastAPI app: {e}",
+            "Failed to instrument FastAPI app: %s",
+            e,
             extra={"exception": str(e)},
         )
 

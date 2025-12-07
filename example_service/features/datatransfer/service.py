@@ -269,7 +269,9 @@ class DataTransferService:
             # Upload to storage if requested
             storage_uri = None
             if request.upload_to_storage:
-                storage_uri = await self._upload_to_storage(file_path, request.entity_type)
+                storage_uri = await self._upload_to_storage(
+                    file_path, request.entity_type
+                )
 
             return ExportResult(
                 status=ExportStatus.COMPLETED,
@@ -287,7 +289,7 @@ class DataTransferService:
             )
 
         except Exception as e:
-            logger.exception(f"Export failed for {request.entity_type}")
+            logger.exception("Export failed for %s", request.entity_type)
             return ExportResult(
                 status=ExportStatus.FAILED,
                 export_id=export_id,
@@ -394,14 +396,18 @@ class DataTransferService:
                                     row=record.row_number,
                                     field=field if field != "_record" else None,
                                     error=error,
-                                    value=record.data.get(field) if field != "_record" else None,
+                                    value=record.data.get(field)
+                                    if field != "_record"
+                                    else None,
                                 )
                             )
 
             # If validation only, return here
             if validate_only:
                 return ImportResult(
-                    status=ImportStatus.COMPLETED if not validation_errors else ImportStatus.FAILED,
+                    status=ImportStatus.COMPLETED
+                    if not validation_errors
+                    else ImportStatus.FAILED,
                     import_id=import_id,
                     entity_type=entity_type,
                     format=format,
@@ -441,7 +447,9 @@ class DataTransferService:
                     # Check for existing record if update_existing is enabled
                     existing = None
                     if update_existing and "id" in record.data:
-                        existing = await self.session.get(model_class, record.data["id"])
+                        existing = await self.session.get(
+                            model_class, record.data["id"]
+                        )
 
                     if existing:
                         # Update existing
@@ -451,7 +459,9 @@ class DataTransferService:
                         successful += 1
                     elif "id" in record.data:
                         # Skip if exists and not updating
-                        existing = await self.session.get(model_class, record.data["id"])
+                        existing = await self.session.get(
+                            model_class, record.data["id"]
+                        )
                         if existing:
                             skipped += 1
                             continue
@@ -459,7 +469,9 @@ class DataTransferService:
                     if not existing:
                         # Create new record
                         # Remove id if present to let DB generate it
-                        create_data = {k: v for k, v in record.data.items() if k != "id"}
+                        create_data = {
+                            k: v for k, v in record.data.items() if k != "id"
+                        }
                         new_record = model_class(**create_data)
                         self.session.add(new_record)
                         successful += 1
@@ -484,7 +496,9 @@ class DataTransferService:
                             total_rows=total_rows,
                             processed_rows=successful + failed + skipped,
                             successful_rows=successful,
-                            failed_rows=failed + len(parsed_records) - len(valid_records),
+                            failed_rows=failed
+                            + len(parsed_records)
+                            - len(valid_records),
                             skipped_rows=skipped,
                             validation_errors=validation_errors,
                             started_at=started_at,
@@ -520,7 +534,7 @@ class DataTransferService:
             )
 
         except Exception as e:
-            logger.exception(f"Import failed for {entity_type}")
+            logger.exception("Import failed for %s", entity_type)
             return ImportResult(
                 status=ImportStatus.FAILED,
                 import_id=import_id,
@@ -555,7 +569,7 @@ class DataTransferService:
             return await s3_client.upload_file(file_path, s3_key)
 
         except Exception as e:
-            logger.warning(f"Failed to upload to storage: {e}")
+            logger.warning("Failed to upload to storage: %s", e)
             return None
 
 

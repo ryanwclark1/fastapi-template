@@ -225,9 +225,11 @@ class SearchService:
                     ],
                     suggestions=cached.get("suggestions", []),
                     did_you_mean=DidYouMeanSuggestion(**cached["did_you_mean"])
-                    if cached.get("did_you_mean") else None,
+                    if cached.get("did_you_mean")
+                    else None,
                     facets=[FacetResult(**f) for f in cached.get("facets", [])]
-                    if cached.get("facets") else None,
+                    if cached.get("facets")
+                    else None,
                     took_ms=0,  # Indicate cache hit with 0ms
                 )
 
@@ -260,7 +262,9 @@ class SearchService:
         # Generate "Did you mean?" suggestions for low/no results
         did_you_mean = None
         if total_hits < 3 and self.enable_fuzzy_fallback:
-            did_you_mean = await self._generate_did_you_mean(request.query, entity_types)
+            did_you_mean = await self._generate_did_you_mean(
+                request.query, entity_types
+            )
 
         # Generate suggestions if few results
         suggestions = []
@@ -280,7 +284,7 @@ class SearchService:
                     search_syntax=request.syntax.value,
                 )
             except Exception as e:
-                logger.warning(f"Failed to record search analytics: {e}")
+                logger.warning("Failed to record search analytics: %s", e)
 
         response = SearchResponse(
             query=request.query,
@@ -297,7 +301,7 @@ class SearchService:
             try:
                 await cache.set_search_results(request, response)
             except Exception as e:
-                logger.warning(f"Failed to cache search results: {e}")
+                logger.warning("Failed to cache search results: %s", e)
 
         return response
 
@@ -349,7 +353,7 @@ class SearchService:
 
         # Main query
         stmt = (
-            select( # type: ignore
+            select(  # type: ignore
                 model_class,
                 rank_expr.label("rank"),
             )
@@ -371,7 +375,7 @@ class SearchService:
         # Get total count
         count_stmt = (
             select(func.count())
-            .select_from(model_class) # type: ignore
+            .select_from(model_class)  # type: ignore
             .where(search_vector.op("@@")(ts_query))
             .where(rank_expr >= request.min_rank)
         )
@@ -395,14 +399,18 @@ class SearchService:
                 snippet = await self._get_highlighted_snippet(
                     entity,
                     request.query,
-                    config.get("snippet_field"), # type: ignore
+                    config.get("snippet_field"),  # type: ignore
                     ts_config,
                     request.highlight_tag,
                 )
             elif config.get("snippet_field"):
                 snippet_text = getattr(entity, config["snippet_field"], None)
                 if snippet_text:
-                    snippet = snippet_text[:200] + "..." if len(snippet_text) > 200 else snippet_text
+                    snippet = (
+                        snippet_text[:200] + "..."
+                        if len(snippet_text) > 200
+                        else snippet_text
+                    )
 
             # Build entity data
             entity_id = str(getattr(entity, config.get("id_field", "id")))
@@ -412,7 +420,9 @@ class SearchService:
             if hasattr(entity, "model_dump"):
                 data = entity.model_dump()
             elif hasattr(entity, "__dict__"):
-                data = {k: v for k, v in entity.__dict__.items() if not k.startswith("_")}
+                data = {
+                    k: v for k, v in entity.__dict__.items() if not k.startswith("_")
+                }
             else:
                 data = {}
 
@@ -482,7 +492,9 @@ class SearchService:
             return []
 
         # Get max similarity across fields
-        max_sim = similarities[0] if len(similarities) == 1 else func.greatest(*similarities)
+        max_sim = (
+            similarities[0] if len(similarities) == 1 else func.greatest(*similarities)
+        )
 
         stmt = (
             select(model_class, max_sim.label("rank"))
@@ -494,9 +506,9 @@ class SearchService:
 
         try:
             result = await self.session.execute(stmt)
-            return result.all() # type: ignore
+            return result.all()  # type: ignore
         except Exception as e:
-            logger.warning(f"Fuzzy search failed: {e}")
+            logger.warning("Fuzzy search failed: %s", e)
             return []
 
     async def _get_facets(
@@ -538,7 +550,10 @@ class SearchService:
             try:
                 result = await self.session.execute(stmt)
                 values = [
-                    FacetValue(value=str(row[0]) if row[0] is not None else "null", count=row[1])
+                    FacetValue(
+                        value=str(row[0]) if row[0] is not None else "null",
+                        count=row[1],
+                    )
                     for row in result.all()
                 ]
 
@@ -551,7 +566,7 @@ class SearchService:
                         )
                     )
             except Exception as e:
-                logger.warning(f"Facet query failed for {field_name}: {e}")
+                logger.warning("Facet query failed for %s: %s", field_name, e)
 
         return facets
 
@@ -604,7 +619,7 @@ class SearchService:
                         best_similarity = row[1]
                         best_suggestion = str(row[0])
                 except Exception as e:
-                    logger.debug(f"Did you mean query failed: {e}")
+                    logger.debug("Did you mean query failed: %s", e)
 
         if best_suggestion and best_suggestion.lower() != query.lower():
             return DidYouMeanSuggestion(
@@ -687,7 +702,7 @@ class SearchService:
                             )
                         )
             except Exception as e:
-                logger.warning(f"Suggestion query failed for {entity_type}: {e}")
+                logger.warning("Suggestion query failed for %s: %s", entity_type, e)
                 continue
 
         # Sort by count and limit
@@ -761,10 +776,10 @@ class SearchService:
             )
             result = await self.session.execute(stmt)
             snippet = result.scalar()
-            return snippet if snippet else text_value[:200] # type: ignore
+            return snippet if snippet else text_value[:200]  # type: ignore
         except Exception as e:
-            logger.debug(f"Highlighting failed: {e}")
-            return text_value[:200] + "..." if len(text_value) > 200 else text_value # type: ignore
+            logger.debug("Highlighting failed: %s", e)
+            return text_value[:200] + "..." if len(text_value) > 200 else text_value  # type: ignore
 
     async def _generate_suggestions(self, query: str) -> list[str]:
         """Generate query suggestions for low-result queries.
@@ -800,7 +815,7 @@ class SearchService:
         module_path, class_name = parts
 
         module = importlib.import_module(module_path)
-        return getattr(module, class_name) # type: ignore
+        return getattr(module, class_name)  # type: ignore
 
     # ──────────────────────────────────────────────────────────────
     # Analytics Methods

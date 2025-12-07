@@ -93,7 +93,7 @@ async def initiate_file_upload_mutation(
 
         await ctx.session.commit()
 
-        logger.info(f"Presigned upload initiated: {result['file_id']}")
+        logger.info("Presigned upload initiated: %s", result["file_id"])
 
         # Fetch file record for event publishing
         from example_service.features.files.repository import get_file_repository
@@ -116,7 +116,7 @@ async def initiate_file_upload_mutation(
         )
 
     except StorageNotConfiguredError as e:
-        logger.exception(f"Storage not configured: {e}")
+        logger.exception("Storage not configured: %s", e)
         await ctx.session.rollback()
         return FileError(
             code=FileErrorCode.STORAGE_ERROR,
@@ -125,7 +125,7 @@ async def initiate_file_upload_mutation(
     except Exception as e:
         # Catch validation errors from service (InvalidFileError, etc.)
         error_msg = str(e)
-        logger.exception(f"Error initiating file upload: {e}")
+        logger.exception("Error initiating file upload: %s", e)
         await ctx.session.rollback()
 
         # Determine error code based on exception type
@@ -179,7 +179,7 @@ async def confirm_file_upload_mutation(
 
         await ctx.session.commit()
 
-        logger.info(f"File upload confirmed: {file_uuid}")
+        logger.info("File upload confirmed: %s", file_uuid)
 
         # Publish event for real-time subscriptions
         await publish_file_event(
@@ -208,7 +208,7 @@ async def confirm_file_upload_mutation(
         )
     except StorageError as e:
         # File not found in storage
-        logger.exception(f"Storage error confirming upload: {e}")
+        logger.exception("Storage error confirming upload: %s", e)
         await ctx.session.rollback()
 
         # Publish FAILED event
@@ -223,7 +223,7 @@ async def confirm_file_upload_mutation(
             message="File not found in storage. Upload may have failed.",
         )
     except Exception as e:
-        logger.exception(f"Error confirming file upload: {e}")
+        logger.exception("Error confirming file upload: %s", e)
         await ctx.session.rollback()
         return FileError(
             code=FileErrorCode.INTERNAL_ERROR,
@@ -281,9 +281,7 @@ async def delete_file_mutation(
         await service.delete_file(file_id=file_uuid, hard_delete=hard_delete)
         await ctx.session.commit()
 
-        logger.info(
-            f"File {'hard' if hard_delete else 'soft'} deleted: {file_uuid}"
-        )
+        logger.info(f"File {'hard' if hard_delete else 'soft'} deleted: {file_uuid}")
 
         # Publish event for real-time subscriptions
         await publish_file_event(
@@ -304,7 +302,7 @@ async def delete_file_mutation(
             message=str(e),
         )
     except Exception as e:
-        logger.exception(f"Error deleting file: {e}")
+        logger.exception("Error deleting file: %s", e)
         await ctx.session.rollback()
         return DeletePayload(
             success=False,

@@ -23,7 +23,7 @@ Example:
     >>>
     >>> # Set up SQLAlchemy event listeners
     >>> from example_service.app.middleware.n_plus_one_detection import (
-    ...     setup_n_plus_one_monitoring
+    ...     setup_n_plus_one_monitoring,
     ... )
     >>> set_request_context = setup_n_plus_one_monitoring(engine, middleware)
 
@@ -438,7 +438,9 @@ class NPlusOneDetectionMiddleware(BaseHTTPMiddleware):
             response.headers["X-Query-Count"] = str(total_queries)
             response.headers["X-Request-Time"] = f"{request_time:.3f}"
             if n_plus_one_patterns:
-                response.headers["X-N-Plus-One-Detected"] = str(len(n_plus_one_patterns))
+                response.headers["X-N-Plus-One-Detected"] = str(
+                    len(n_plus_one_patterns)
+                )
 
     async def _log_n_plus_one_patterns(
         self,
@@ -557,7 +559,9 @@ class NPlusOneDetectionMiddleware(BaseHTTPMiddleware):
             if query_patterns[normalized_query] is not None:
                 query_patterns[normalized_query].add_execution(execution_time)
         else:
-            query_patterns[normalized_query] = QueryPattern(normalized_query, execution_time)
+            query_patterns[normalized_query] = QueryPattern(
+                normalized_query, execution_time
+            )
 
         # Log slow queries if enabled
         if self.log_slow_queries and execution_time > self.slow_query_threshold:
@@ -627,10 +631,13 @@ def setup_n_plus_one_monitoring(
         return lambda _request: None
 
     # Context variable to track current request
-    current_request: ContextVar[Any | None] = ContextVar("current_request", default=None)
+    current_request: ContextVar[Any | None] = ContextVar(
+        "current_request", default=None
+    )
 
     # Try to register event listeners, skip if engine is a mock (used in tests)
     try:
+
         @event.listens_for(engine.sync_engine, "before_cursor_execute")
         def receive_before_cursor_execute(
             _conn: Any,
@@ -682,6 +689,7 @@ def setup_n_plus_one_monitoring(
             if start_time is not None:
                 execution_time = time.time() - start_time
                 middleware.record_query(request, statement, execution_time)
+
     except Exception as exc:
         # Skip event registration for mock engines or if event system fails
         logger.debug("Skipping event registration: %s", exc)

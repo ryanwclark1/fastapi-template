@@ -62,19 +62,17 @@ async def _publish_reminder_event(
         redis = Redis.from_url(str(redis_settings.url))
         try:
             channel = "graphql:reminders"
-            payload = json.dumps(
-                {
-                    "event_type": event_type,
-                    **reminder_data,
-                }
-            )
+            payload = json.dumps({
+                "event_type": event_type,
+                **reminder_data,
+            })
             await redis.publish(channel, payload)
-            logger.debug(f"Published {event_type} event to {channel}")
+            logger.debug("Published %s event to %s", event_type, channel)
         finally:
             await redis.close()
     except Exception as e:
         # Don't fail mutations if publish fails
-        logger.warning(f"Failed to publish reminder event: {e}")
+        logger.warning("Failed to publish reminder event: %s", e)
 
 
 def _reminder_to_dict(reminder: Reminder) -> dict:
@@ -137,7 +135,7 @@ class Mutation:
             await ctx.session.commit()
             await ctx.session.refresh(reminder)
 
-            logger.info(f"Created reminder: {reminder.id}")
+            logger.info("Created reminder: %s", reminder.id)
 
             # Publish event for subscriptions
             await _publish_reminder_event("CREATED", _reminder_to_dict(reminder))
@@ -145,7 +143,7 @@ class Mutation:
             return ReminderSuccess(reminder=ReminderType.from_model(reminder))
 
         except Exception as e:
-            logger.exception(f"Error creating reminder: {e}")
+            logger.exception("Error creating reminder: %s", e)
             await ctx.session.rollback()
             return ReminderError(
                 code=ErrorCode.INTERNAL_ERROR,
@@ -206,7 +204,9 @@ class Mutation:
                 reminder.title = input.title.strip()
 
             if input.description is not None:
-                reminder.description = input.description.strip() if input.description else None
+                reminder.description = (
+                    input.description.strip() if input.description else None
+                )
 
             if input.remind_at is not None:
                 reminder.remind_at = input.remind_at
@@ -214,7 +214,7 @@ class Mutation:
             await ctx.session.commit()
             await ctx.session.refresh(reminder)
 
-            logger.info(f"Updated reminder: {reminder.id}")
+            logger.info("Updated reminder: %s", reminder.id)
 
             # Publish event for subscriptions
             await _publish_reminder_event("UPDATED", _reminder_to_dict(reminder))
@@ -222,7 +222,7 @@ class Mutation:
             return ReminderSuccess(reminder=ReminderType.from_model(reminder))
 
         except Exception as e:
-            logger.exception(f"Error updating reminder: {e}")
+            logger.exception("Error updating reminder: %s", e)
             await ctx.session.rollback()
             return ReminderError(
                 code=ErrorCode.INTERNAL_ERROR,
@@ -266,7 +266,7 @@ class Mutation:
 
             await ctx.session.commit()
 
-            logger.info(f"Completed reminder: {reminder.id}")
+            logger.info("Completed reminder: %s", reminder.id)
 
             # Publish event for subscriptions
             await _publish_reminder_event("COMPLETED", _reminder_to_dict(reminder))
@@ -274,7 +274,7 @@ class Mutation:
             return ReminderSuccess(reminder=ReminderType.from_model(reminder))
 
         except Exception as e:
-            logger.exception(f"Error completing reminder: {e}")
+            logger.exception("Error completing reminder: %s", e)
             await ctx.session.rollback()
             return ReminderError(
                 code=ErrorCode.INTERNAL_ERROR,
@@ -318,7 +318,7 @@ class Mutation:
             await repo.delete(ctx.session, reminder)
             await ctx.session.commit()
 
-            logger.info(f"Deleted reminder: {reminder_uuid}")
+            logger.info("Deleted reminder: %s", reminder_uuid)
 
             # Publish event for subscriptions
             await _publish_reminder_event("DELETED", {"id": str(reminder_uuid)})
@@ -329,7 +329,7 @@ class Mutation:
             )
 
         except Exception as e:
-            logger.exception(f"Error deleting reminder: {e}")
+            logger.exception("Error deleting reminder: %s", e)
             await ctx.session.rollback()
             return DeletePayload(
                 success=False,

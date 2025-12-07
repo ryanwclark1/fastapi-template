@@ -33,7 +33,7 @@ Example:
     ...     name="payment_service",
     ...     failure_threshold=5,
     ...     recovery_timeout=60.0,
-    ...     success_threshold=2
+    ...     success_threshold=2,
     ... )
     >>>
     >>> # Use as decorator
@@ -138,10 +138,7 @@ class CircuitBreaker:
     Example:
         >>> # Create circuit breaker
         >>> breaker = CircuitBreaker(
-        ...     name="external_api",
-        ...     failure_threshold=5,
-        ...     recovery_timeout=60.0,
-        ...     success_threshold=2
+        ...     name="external_api", failure_threshold=5, recovery_timeout=60.0, success_threshold=2
         ... )
         >>>
         >>> # Decorator pattern
@@ -231,7 +228,8 @@ class CircuitBreaker:
         update_circuit_breaker_state(self.name, self._state.value)
 
         logger.info(
-            f"Circuit breaker '{name}' initialized",
+            "Circuit breaker '%s' initialized",
+            name,
             extra={
                 "circuit_breaker": name,
                 "failure_threshold": failure_threshold,
@@ -285,7 +283,9 @@ class CircuitBreaker:
         """
         return self._state == CircuitState.HALF_OPEN
 
-    async def call(self, func: Callable[P, Awaitable[T]], *args: P.args, **kwargs: P.kwargs) -> T:
+    async def call(
+        self, func: Callable[P, Awaitable[T]], *args: P.args, **kwargs: P.kwargs
+    ) -> T:
         """Execute function with circuit breaker protection.
 
         This method wraps the provided async function with circuit breaker logic.
@@ -357,7 +357,8 @@ class CircuitBreaker:
         except Exception as e:
             # Unexpected exceptions don't affect circuit state
             logger.warning(
-                f"Circuit breaker '{self.name}' caught unexpected exception",
+                "Circuit breaker '%s' caught unexpected exception",
+                self.name,
                 extra={
                     "circuit_breaker": self.name,
                     "exception_type": type(e).__name__,
@@ -393,7 +394,8 @@ class CircuitBreaker:
             if self.is_half_open:
                 self._success_count += 1
                 logger.info(
-                    f"Circuit breaker '{self.name}' success in HALF_OPEN",
+                    "Circuit breaker '%s' success in HALF_OPEN",
+                    self.name,
                     extra={
                         "circuit_breaker": self.name,
                         "state": "half_open",
@@ -408,7 +410,8 @@ class CircuitBreaker:
                 # Reset failure count on success
                 if self._failure_count > 0:
                     logger.debug(
-                        f"Circuit breaker '{self.name}' resetting failure count",
+                        "Circuit breaker '%s' resetting failure count",
+                        self.name,
                         extra={
                             "circuit_breaker": self.name,
                             "previous_failures": self._failure_count,
@@ -434,7 +437,8 @@ class CircuitBreaker:
             track_circuit_breaker_failure(self.name)
 
             logger.warning(
-                f"Circuit breaker '{self.name}' recorded failure",
+                "Circuit breaker '%s' recorded failure",
+                self.name,
                 extra={
                     "circuit_breaker": self.name,
                     "failure_count": self._failure_count,
@@ -447,7 +451,8 @@ class CircuitBreaker:
             if self.is_half_open:
                 # Any failure in HALF_OPEN immediately reopens the circuit
                 logger.warning(
-                    f"Circuit breaker '{self.name}' failed in HALF_OPEN, reopening",
+                    "Circuit breaker '%s' failed in HALF_OPEN, reopening",
+                    self.name,
                     extra={"circuit_breaker": self.name, "state": "half_open"},
                 )
                 await self._transition_to_open()
@@ -471,7 +476,8 @@ class CircuitBreaker:
         update_circuit_breaker_state(self.name, self._state.value)
 
         logger.error(
-            f"Circuit breaker '{self.name}' opened",
+            "Circuit breaker '%s' opened",
+            self.name,
             extra={
                 "circuit_breaker": self.name,
                 "old_state": old_state,
@@ -498,7 +504,8 @@ class CircuitBreaker:
         update_circuit_breaker_state(self.name, self._state.value)
 
         logger.info(
-            f"Circuit breaker '{self.name}' transitioned to HALF_OPEN",
+            "Circuit breaker '%s' transitioned to HALF_OPEN",
+            self.name,
             extra={
                 "circuit_breaker": self.name,
                 "old_state": old_state,
@@ -525,7 +532,8 @@ class CircuitBreaker:
         update_circuit_breaker_state(self.name, self._state.value)
 
         logger.info(
-            f"Circuit breaker '{self.name}' closed",
+            "Circuit breaker '%s' closed",
+            self.name,
             extra={
                 "circuit_breaker": self.name,
                 "old_state": old_state,
@@ -665,10 +673,7 @@ class CircuitBreaker:
             >>> metrics = breaker.get_metrics()
             >>> if metrics["failure_rate"] > 0.5:
             ...     logger.warning(f"High failure rate: {metrics['failure_rate']:.2%}")
-            >>> logger.info(
-            ...     f"Circuit state: {metrics['state']}, "
-            ...     f"Failures: {metrics['total_failures']}"
-            ... )
+            >>> logger.info(f"Circuit state: {metrics['state']}, Failures: {metrics['total_failures']}")
 
         """
         total_calls = self.total_failures + self.total_successes
@@ -728,7 +733,8 @@ class CircuitBreaker:
             self.total_successes = 0
             self.total_rejections = 0
             logger.info(
-                f"Circuit breaker '{self.name}' manually reset",
+                "Circuit breaker '%s' manually reset",
+                self.name,
                 extra={"circuit_breaker": self.name},
             )
 

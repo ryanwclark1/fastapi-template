@@ -122,7 +122,7 @@ class SearchCache:
             Dictionary of parameters.
         """
         if hasattr(request, "model_dump"):
-            return request.model_dump() # type: ignore[no-any-return]
+            return request.model_dump()  # type: ignore[no-any-return]
         if hasattr(request, "__dict__"):
             return {k: v for k, v in request.__dict__.items() if not k.startswith("_")}
         return {}
@@ -153,10 +153,10 @@ class SearchCache:
         try:
             cached = await self.redis.get(cache_key)
             if cached:
-                logger.debug(f"Search cache hit for key: {cache_key}")
-                return cached # type: ignore[no-any-return]
+                logger.debug("Search cache hit for key: %s", cache_key)
+                return cached  # type: ignore[no-any-return]
         except Exception as e:
-            logger.warning(f"Failed to get search cache: {e}")
+            logger.warning("Failed to get search cache: %s", e)
 
         return None
 
@@ -200,10 +200,10 @@ class SearchCache:
 
         try:
             await self.redis.set(cache_key, results_dict, ttl=cache_ttl)
-            logger.debug(f"Cached search results for key: {cache_key}")
+            logger.debug("Cached search results for key: %s", cache_key)
             return True
         except Exception as e:
-            logger.warning(f"Failed to set search cache: {e}")
+            logger.warning("Failed to set search cache: %s", e)
             return False
 
     async def get_suggestions(
@@ -229,10 +229,10 @@ class SearchCache:
         try:
             cached = await self.redis.get(cache_key)
             if cached:
-                logger.debug(f"Suggestion cache hit for key: {cache_key}")
-                return cached # type: ignore[no-any-return]
+                logger.debug("Suggestion cache hit for key: %s", cache_key)
+                return cached  # type: ignore[no-any-return]
         except Exception as e:
-            logger.warning(f"Failed to get suggestion cache: {e}")
+            logger.warning("Failed to get suggestion cache: %s", e)
 
         return None
 
@@ -264,10 +264,10 @@ class SearchCache:
         try:
             suggestions_dict = self._request_to_params(suggestions)
             await self.redis.set(cache_key, suggestions_dict, ttl=cache_ttl)
-            logger.debug(f"Cached suggestions for key: {cache_key}")
+            logger.debug("Cached suggestions for key: %s", cache_key)
             return True
         except Exception as e:
-            logger.warning(f"Failed to set suggestion cache: {e}")
+            logger.warning("Failed to set suggestion cache: %s", e)
             return False
 
     async def invalidate_search(
@@ -291,10 +291,10 @@ class SearchCache:
 
         try:
             deleted = await self.redis.delete_pattern(pattern)
-            logger.info(f"Invalidated {deleted} search cache entries")
+            logger.info("Invalidated %s search cache entries", deleted)
             return deleted
         except Exception as e:
-            logger.warning(f"Failed to invalidate search cache: {e}")
+            logger.warning("Failed to invalidate search cache: %s", e)
             return 0
 
     async def invalidate_suggestions(self) -> int:
@@ -307,10 +307,10 @@ class SearchCache:
 
         try:
             deleted = await self.redis.delete_pattern(pattern)
-            logger.info(f"Invalidated {deleted} suggestion cache entries")
+            logger.info("Invalidated %s suggestion cache entries", deleted)
             return deleted
         except Exception as e:
-            logger.warning(f"Failed to invalidate suggestion cache: {e}")
+            logger.warning("Failed to invalidate suggestion cache: %s", e)
             return 0
 
     async def invalidate_all(self) -> int:
@@ -323,10 +323,10 @@ class SearchCache:
 
         try:
             deleted = await self.redis.delete_pattern(pattern)
-            logger.info(f"Invalidated {deleted} total search cache entries")
+            logger.info("Invalidated %s total search cache entries", deleted)
             return deleted
         except Exception as e:
-            logger.warning(f"Failed to invalidate all search cache: {e}")
+            logger.warning("Failed to invalidate all search cache: %s", e)
             return 0
 
     async def get_cache_stats(self) -> dict[str, Any]:
@@ -361,8 +361,8 @@ class SearchCache:
             stats["total_cached_keys"] = len(search_keys) + len(suggest_keys)
 
         except Exception as e:
-            logger.warning(f"Failed to get cache stats: {e}")
-            stats["error"] = str(e) # type: ignore[assignment]
+            logger.warning("Failed to get cache stats: %s", e)
+            stats["error"] = str(e)  # type: ignore[assignment]
 
         return stats
 

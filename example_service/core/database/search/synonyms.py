@@ -329,6 +329,7 @@ class SynonymDictionary:
         # Try JSON first
         if path.suffix == ".json":
             import json
+
             data = json.loads(content)
             return cls.from_dict(data, name=name)
 

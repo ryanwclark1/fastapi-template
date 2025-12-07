@@ -237,11 +237,11 @@ class LifecycleRegistry:
         for name in order:
             hook = self._startup_hooks[name]
             try:
-                logger.debug(f"Starting {name}...")
+                logger.debug("Starting %s...", name)
                 await hook.execute(**kwargs)
-                logger.debug(f"Started {name}")
+                logger.debug("Started %s", name)
             except Exception as e:
-                logger.error(f"Failed to start {name}: {e}", exc_info=True)
+                logger.error("Failed to start %s: %s", name, e, exc_info=True)
                 raise
 
     async def shutdown(self, **kwargs: Any) -> None:
@@ -255,11 +255,11 @@ class LifecycleRegistry:
         for name in order:
             hook = self._shutdown_hooks[name]
             try:
-                logger.debug(f"Shutting down {name}...")
+                logger.debug("Shutting down %s...", name)
                 await hook.execute(**kwargs)
-                logger.debug(f"Shut down {name}")
+                logger.debug("Shut down %s", name)
             except Exception as e:
-                logger.warning(f"Error shutting down {name}: {e}", exc_info=True)
+                logger.warning("Error shutting down %s: %s", name, e, exc_info=True)
                 # Continue shutdown even if one hook fails
 
     def clear(self) -> None:

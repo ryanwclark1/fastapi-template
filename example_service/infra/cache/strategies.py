@@ -136,7 +136,7 @@ class CacheManager:
                 tracking.track_token_cache(False)
                 return None
             except Exception as e:
-                logger.error(f"Cache get failed for key {key}: {e}", exc_info=True)
+                logger.error("Cache get failed for key %s: %s", key, e, exc_info=True)
                 return None
 
     async def set(self, key: str, value: Any, ttl: int | None = None) -> bool:
@@ -159,7 +159,7 @@ class CacheManager:
                 await cache.set(cache_key, serialized, ttl=ttl)
                 return True
             except Exception as e:
-                logger.error(f"Cache set failed for key {key}: {e}", exc_info=True)
+                logger.error("Cache set failed for key %s: %s", key, e, exc_info=True)
                 return False
 
     async def delete(self, key: str) -> bool:
@@ -178,7 +178,9 @@ class CacheManager:
                 await cache.delete(cache_key)
                 return True
             except Exception as e:
-                logger.error(f"Cache delete failed for key {key}: {e}", exc_info=True)
+                logger.error(
+                    "Cache delete failed for key %s: %s", key, e, exc_info=True
+                )
                 return False
 
     # ============================================================================
@@ -218,7 +220,11 @@ class CacheManager:
 
         # Cache miss - fetch from source
         try:
-            value = await fetch_func() if asyncio.iscoroutinefunction(fetch_func) else fetch_func()
+            value = (
+                await fetch_func()
+                if asyncio.iscoroutinefunction(fetch_func)
+                else fetch_func()
+            )
 
             # Populate cache
             if value is not None:
@@ -226,7 +232,7 @@ class CacheManager:
 
             return value
         except Exception as e:
-            logger.error(f"Failed to fetch value for key {key}: {e}", exc_info=True)
+            logger.error("Failed to fetch value for key %s: %s", key, e, exc_info=True)
             raise
 
     # ============================================================================
@@ -273,7 +279,7 @@ class CacheManager:
 
             return True
         except Exception as e:
-            logger.error(f"Write-through failed for key {key}: {e}", exc_info=True)
+            logger.error("Write-through failed for key %s: %s", key, e, exc_info=True)
             # Invalidate cache on write failure to maintain consistency
             await self.delete(key)
             raise
@@ -338,7 +344,7 @@ class CacheManager:
                     else:
                         write_func(value)
 
-                    logger.debug(f"Write-behind completed for key: {key}")
+                    logger.debug("Write-behind completed for key: %s", key)
                 except Exception as e:
                     logger.error(
                         f"Write-behind failed for key {key}: {e}",
@@ -353,7 +359,7 @@ class CacheManager:
                 if self._write_queue.empty():
                     break
             except Exception as e:
-                logger.error(f"Write queue processing error: {e}", exc_info=True)
+                logger.error("Write queue processing error: %s", e, exc_info=True)
 
     # ============================================================================
     # Refresh-Ahead Pattern
@@ -402,7 +408,9 @@ class CacheManager:
                     # Refresh if below threshold
                     if 0 < remaining_ttl < (ttl * self.config.refresh_threshold):
                         # Trigger async refresh (fire-and-forget)
-                        refresh_task = asyncio.create_task(self._refresh_cache(key, fetch_func, ttl))
+                        refresh_task = asyncio.create_task(
+                            self._refresh_cache(key, fetch_func, ttl)
+                        )
                         # Store reference to prevent garbage collection
                         # Task errors are handled within _refresh_cache
                         _ = refresh_task
@@ -413,13 +421,19 @@ class CacheManager:
                 return await self.get_or_fetch(key, fetch_func, ttl)
 
             except Exception as e:
-                logger.error(f"Refresh-ahead get failed for key {key}: {e}", exc_info=True)
+                logger.error(
+                    "Refresh-ahead get failed for key %s: %s", key, e, exc_info=True
+                )
                 # Fall back to fetch
                 return (
-                    await fetch_func() if asyncio.iscoroutinefunction(fetch_func) else fetch_func()
+                    await fetch_func()
+                    if asyncio.iscoroutinefunction(fetch_func)
+                    else fetch_func()
                 )
 
-    async def _refresh_cache(self, key: str, fetch_func: Callable[[], Any], ttl: int) -> None:
+    async def _refresh_cache(
+        self, key: str, fetch_func: Callable[[], Any], ttl: int
+    ) -> None:
         """Refresh cache in background.
 
         Args:
@@ -428,12 +442,16 @@ class CacheManager:
             ttl: Time to live
         """
         try:
-            value = await fetch_func() if asyncio.iscoroutinefunction(fetch_func) else fetch_func()
+            value = (
+                await fetch_func()
+                if asyncio.iscoroutinefunction(fetch_func)
+                else fetch_func()
+            )
             if value is not None:
                 await self.set(key, value, ttl)
-                logger.debug(f"Cache refreshed for key: {key}")
+                logger.debug("Cache refreshed for key: %s", key)
         except Exception as e:
-            logger.error(f"Cache refresh failed for key {key}: {e}", exc_info=True)
+            logger.error("Cache refresh failed for key %s: %s", key, e, exc_info=True)
 
     # ============================================================================
     # Batch Operations
@@ -470,7 +488,7 @@ class CacheManager:
 
                 return output
             except Exception as e:
-                logger.error(f"Batch get failed: {e}", exc_info=True)
+                logger.error("Batch get failed: %s", e, exc_info=True)
                 return {}
 
     async def set_many(self, items: dict[str, Any], ttl: int | None = None) -> bool:
@@ -504,7 +522,7 @@ class CacheManager:
                 await pipe.execute()
                 return True
             except Exception as e:
-                logger.error(f"Batch set failed: {e}", exc_info=True)
+                logger.error("Batch set failed: %s", e, exc_info=True)
                 return False
 
     # ============================================================================
@@ -535,11 +553,15 @@ class CacheManager:
 
                 if keys:
                     await cache.delete(*keys)
-                    logger.info(f"Invalidated {len(keys)} keys matching pattern: {pattern}")
+                    logger.info(
+                        "Invalidated %s keys matching pattern: %s", len(keys), pattern
+                    )
 
                 return len(keys)
             except Exception as e:
-                logger.error(f"Pattern invalidation failed for {pattern}: {e}", exc_info=True)
+                logger.error(
+                    "Pattern invalidation failed for %s: %s", pattern, e, exc_info=True
+                )
                 return 0
 
 
@@ -579,7 +601,9 @@ def cached(
         async def get_user_with_posts(user_id: int, include_posts: bool = False):
             # ...
     """
-    cache_manager = CacheManager(CacheConfig(key_prefix=key_prefix, ttl=ttl, strategy=strategy))
+    cache_manager = CacheManager(
+        CacheConfig(key_prefix=key_prefix, ttl=ttl, strategy=strategy)
+    )
 
     def decorator(func: Callable) -> Callable:
         @wraps(func)

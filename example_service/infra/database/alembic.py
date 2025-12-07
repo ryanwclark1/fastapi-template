@@ -175,7 +175,7 @@ class AlembicCommands:
             # Generate SQL without executing
             sql = await commands.upgrade(sql=True)
         """
-        logger.info(f"Upgrading database to revision: {revision}")
+        logger.info("Upgrading database to revision: %s", revision)
         output = io.StringIO()
         alembic_config = self.config.get_alembic_config(output)
 
@@ -184,7 +184,7 @@ class AlembicCommands:
 
         await asyncio.to_thread(_run)
         result = output.getvalue()
-        logger.info(f"Upgrade completed to: {revision}")
+        logger.info("Upgrade completed to: %s", revision)
         return result
 
     async def downgrade(
@@ -214,7 +214,7 @@ class AlembicCommands:
             # Rollback all migrations
             output = await commands.downgrade("base")
         """
-        logger.warning(f"Downgrading database to revision: {revision}")
+        logger.warning("Downgrading database to revision: %s", revision)
         output = io.StringIO()
         alembic_config = self.config.get_alembic_config(output)
 
@@ -223,7 +223,7 @@ class AlembicCommands:
 
         await asyncio.to_thread(_run)
         result = output.getvalue()
-        logger.info(f"Downgrade completed to: {revision}")
+        logger.info("Downgrade completed to: %s", revision)
         return result
 
     async def revision(
@@ -262,7 +262,7 @@ class AlembicCommands:
             # Create empty migration
             output = await commands.revision("Custom migration", autogenerate=False)
         """
-        logger.info(f"Creating migration: {message}")
+        logger.info("Creating migration: %s", message)
         output = io.StringIO()
         alembic_config = self.config.get_alembic_config(output)
 
@@ -282,7 +282,7 @@ class AlembicCommands:
 
         await asyncio.to_thread(_run)
         result = output.getvalue()
-        logger.info(f"Migration created: {message}")
+        logger.info("Migration created: %s", message)
         return result
 
     # =========================================================================
@@ -338,7 +338,9 @@ class AlembicCommands:
         await asyncio.to_thread(_run)
         return output.getvalue()
 
-    async def heads(self, *, verbose: bool = False, resolve_dependencies: bool = False) -> str:
+    async def heads(
+        self, *, verbose: bool = False, resolve_dependencies: bool = False
+    ) -> str:
         """Show available migration heads.
 
         Args:
@@ -353,7 +355,9 @@ class AlembicCommands:
 
         def _run() -> None:
             command.heads(
-                alembic_config, verbose=verbose, resolve_dependencies=resolve_dependencies
+                alembic_config,
+                verbose=verbose,
+                resolve_dependencies=resolve_dependencies,
             )
 
         await asyncio.to_thread(_run)
@@ -425,7 +429,7 @@ class AlembicCommands:
             # Clear and re-stamp
             await commands.stamp("head", purge=True)
         """
-        logger.info(f"Stamping database with revision: {revision}")
+        logger.info("Stamping database with revision: %s", revision)
         output = io.StringIO()
         alembic_config = self.config.get_alembic_config(output)
 
@@ -434,7 +438,7 @@ class AlembicCommands:
 
         await asyncio.to_thread(_run)
         result = output.getvalue()
-        logger.info(f"Database stamped with: {revision}")
+        logger.info("Database stamped with: %s", revision)
         return result
 
     async def merge(
@@ -456,7 +460,7 @@ class AlembicCommands:
         Returns:
             Output including path to merge revision file
         """
-        logger.info(f"Creating merge migration for: {revisions}")
+        logger.info("Creating merge migration for: %s", revisions)
         output = io.StringIO()
         alembic_config = self.config.get_alembic_config(output)
 

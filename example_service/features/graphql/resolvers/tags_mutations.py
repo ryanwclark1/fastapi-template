@@ -89,13 +89,15 @@ async def create_tag_mutation(
         tag = Tag(
             name=create_data.name.strip().lower(),
             color=create_data.color,
-            description=create_data.description.strip() if create_data.description else None,
+            description=create_data.description.strip()
+            if create_data.description
+            else None,
         )
         ctx.session.add(tag)
         await ctx.session.commit()
         await ctx.session.refresh(tag)
 
-        logger.info(f"Created tag: {tag.id} ({tag.name})")
+        logger.info("Created tag: %s (%s)", tag.id, tag.name)
 
         # Publish event for real-time subscriptions
         await publish_tag_event(
@@ -115,13 +117,13 @@ async def create_tag_mutation(
                 message=f"Tag with name '{create_data.name}' already exists",
                 field="name",
             )
-        logger.exception(f"Error creating tag: {e}")
+        logger.exception("Error creating tag: %s", e)
         return TagError(
             code=TagErrorCode.INTERNAL_ERROR,
             message="Failed to create tag",
         )
     except Exception as e:
-        logger.exception(f"Error creating tag: {e}")
+        logger.exception("Error creating tag: %s", e)
         await ctx.session.rollback()
         return TagError(
             code=TagErrorCode.INTERNAL_ERROR,
@@ -196,12 +198,14 @@ async def update_tag_mutation(
             tag.color = update_data.color
 
         if update_data.description is not None:
-            tag.description = update_data.description.strip() if update_data.description else None
+            tag.description = (
+                update_data.description.strip() if update_data.description else None
+            )
 
         await ctx.session.commit()
         await ctx.session.refresh(tag)
 
-        logger.info(f"Updated tag: {tag.id} ({tag.name})")
+        logger.info("Updated tag: %s (%s)", tag.id, tag.name)
 
         # Publish event for real-time subscriptions
         await publish_tag_event(
@@ -221,13 +225,13 @@ async def update_tag_mutation(
                 message=f"Tag with name '{update_data.name}' already exists",
                 field="name",
             )
-        logger.exception(f"Error updating tag: {e}")
+        logger.exception("Error updating tag: %s", e)
         return TagError(
             code=TagErrorCode.INTERNAL_ERROR,
             message="Failed to update tag",
         )
     except Exception as e:
-        logger.exception(f"Error updating tag: {e}")
+        logger.exception("Error updating tag: %s", e)
         await ctx.session.rollback()
         return TagError(
             code=TagErrorCode.INTERNAL_ERROR,
@@ -276,7 +280,7 @@ async def delete_tag_mutation(
         await repo.delete(ctx.session, tag)
         await ctx.session.commit()
 
-        logger.info(f"Deleted tag: {tag_uuid} ({tag.name})")
+        logger.info("Deleted tag: %s (%s)", tag_uuid, tag.name)
 
         # Publish event for real-time subscriptions
         await publish_tag_event(
@@ -290,7 +294,7 @@ async def delete_tag_mutation(
         )
 
     except Exception as e:
-        logger.exception(f"Error deleting tag: {e}")
+        logger.exception("Error deleting tag: %s", e)
         await ctx.session.rollback()
         return DeletePayload(
             success=False,
@@ -354,7 +358,7 @@ async def add_tags_to_reminder_mutation(
 
         await ctx.session.commit()
 
-        logger.info(f"Added {len(tags)} tags to reminder: {reminder_uuid}")
+        logger.info("Added %s tags to reminder: %s", len(tags), reminder_uuid)
 
         return DeletePayload(
             success=True,
@@ -362,7 +366,7 @@ async def add_tags_to_reminder_mutation(
         )
 
     except Exception as e:
-        logger.exception(f"Error adding tags to reminder: {e}")
+        logger.exception("Error adding tags to reminder: %s", e)
         await ctx.session.rollback()
         return DeletePayload(
             success=False,
@@ -417,7 +421,7 @@ async def remove_tags_from_reminder_mutation(
 
         await ctx.session.commit()
 
-        logger.info(f"Removed {removed_count} tags from reminder: {reminder_uuid}")
+        logger.info("Removed %s tags from reminder: %s", removed_count, reminder_uuid)
 
         return DeletePayload(
             success=True,
@@ -425,7 +429,7 @@ async def remove_tags_from_reminder_mutation(
         )
 
     except Exception as e:
-        logger.exception(f"Error removing tags from reminder: {e}")
+        logger.exception("Error removing tags from reminder: %s", e)
         await ctx.session.rollback()
         return DeletePayload(
             success=False,

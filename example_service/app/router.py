@@ -49,7 +49,9 @@ def setup_routers(app: FastAPI) -> None:
     # Include feature routers
     app.include_router(reminders_router, prefix=api_prefix, tags=["reminders"])
     app.include_router(tags_router, prefix=api_prefix, tags=["tags"])
-    app.include_router(reminder_tags_router, prefix=api_prefix, tags=["reminders", "tags"])
+    app.include_router(
+        reminder_tags_router, prefix=api_prefix, tags=["reminders", "tags"]
+    )
     app.include_router(health_router, prefix=api_prefix, tags=["health"])
     app.include_router(files_router, prefix=api_prefix, tags=["files"])
     app.include_router(webhooks_router, prefix=api_prefix, tags=["webhooks"])
@@ -63,7 +65,9 @@ def setup_routers(app: FastAPI) -> None:
     # Email configuration management (Phase 4)
     app.include_router(email_router, prefix=api_prefix, tags=["email-configuration"])
     app.include_router(admin_email_router, prefix=api_prefix, tags=["admin-email"])
-    logger.info("Email configuration endpoints registered at /api/v1/email and /api/v1/admin/email")
+    logger.info(
+        "Email configuration endpoints registered at /api/v1/email and /api/v1/admin/email"
+    )
 
     # AI pipeline endpoints (capability-based API with observability)
     app.include_router(ai_pipeline_router, prefix=api_prefix, tags=["AI Pipelines"])
@@ -80,15 +84,21 @@ def setup_routers(app: FastAPI) -> None:
             from example_service.features.graphql.router import router as graphql_router
 
             if graphql_router is not None:
-                app.include_router(graphql_router, prefix=graphql_prefix, tags=["graphql"])
-                playground_status = "enabled" if graphql_settings.playground_enabled else "disabled"
+                app.include_router(
+                    graphql_router, prefix=graphql_prefix, tags=["graphql"]
+                )
+                playground_status = (
+                    "enabled" if graphql_settings.playground_enabled else "disabled"
+                )
                 logger.info(
                     "GraphQL endpoint enabled at %s (playground: %s)",
                     graphql_prefix,
                     playground_status,
                 )
         except ImportError as exc:  # pragma: no cover - optional dependency
-            logger.warning("GraphQL endpoint disabled (strawberry not available): %s", exc)
+            logger.warning(
+                "GraphQL endpoint disabled (strawberry not available): %s", exc
+            )
         except Exception as exc:  # pragma: no cover - optional dependency
             logger.warning("GraphQL endpoint disabled: %s", exc)
 

@@ -75,7 +75,9 @@ class ProviderFactory:
             ValueError: If provider not found or misconfigured
         """
         # Get configuration
-        config = await self.config_manager.get_transcription_config(tenant_id, provider_name)
+        config = await self.config_manager.get_transcription_config(
+            tenant_id, provider_name
+        )
 
         # Get provider class
         provider_class = self._transcription_registry.get(config.provider_name)
@@ -205,7 +207,7 @@ class ProviderFactory:
             provider_class: Provider class implementing TranscriptionProvider
         """
         self._transcription_registry[name] = provider_class
-        logger.debug(f"Registered transcription provider: {name}")
+        logger.debug("Registered transcription provider: %s", name)
 
     def register_llm_provider(
         self,
@@ -219,7 +221,7 @@ class ProviderFactory:
             provider_class: Provider class implementing LLMProvider
         """
         self._llm_registry[name] = provider_class
-        logger.debug(f"Registered LLM provider: {name}")
+        logger.debug("Registered LLM provider: %s", name)
 
     def register_pii_provider(
         self,
@@ -233,7 +235,7 @@ class ProviderFactory:
             provider_class: Provider class implementing PIIRedactionProvider
         """
         self._pii_registry[name] = provider_class
-        logger.debug(f"Registered PII provider: {name}")
+        logger.debug("Registered PII provider: %s", name)
 
     def _register_builtin_providers(self) -> None:
         """Register all built-in provider implementations.
@@ -253,7 +255,7 @@ class ProviderFactory:
 
             self.register_transcription_provider("openai", OpenAITranscriptionProvider)
         except ImportError as e:
-            logger.debug(f"OpenAI transcription provider not available: {e}")
+            logger.debug("OpenAI transcription provider not available: %s", e)
 
         try:
             from example_service.infra.ai.providers.deepgram_provider import (
@@ -262,7 +264,7 @@ class ProviderFactory:
 
             self.register_transcription_provider("deepgram", DeepgramProvider)
         except ImportError as e:
-            logger.debug(f"Deepgram provider not available: {e}")
+            logger.debug("Deepgram provider not available: %s", e)
 
         try:
             from example_service.infra.ai.providers.assemblyai_provider import (
@@ -271,7 +273,7 @@ class ProviderFactory:
 
             self.register_transcription_provider("assemblyai", AssemblyAIProvider)
         except ImportError as e:
-            logger.debug(f"AssemblyAI provider not available: {e}")
+            logger.debug("AssemblyAI provider not available: %s", e)
 
         # LLM providers
         try:
@@ -281,7 +283,7 @@ class ProviderFactory:
 
             self.register_llm_provider("openai", OpenAILLMProvider)
         except ImportError as e:
-            logger.debug(f"OpenAI LLM provider not available: {e}")
+            logger.debug("OpenAI LLM provider not available: %s", e)
 
         try:
             from example_service.infra.ai.providers.anthropic_provider import (
@@ -290,7 +292,7 @@ class ProviderFactory:
 
             self.register_llm_provider("anthropic", AnthropicProvider)
         except ImportError as e:
-            logger.debug(f"Anthropic provider not available: {e}")
+            logger.debug("Anthropic provider not available: %s", e)
 
         # PII providers
         try:
@@ -300,7 +302,7 @@ class ProviderFactory:
 
             self.register_pii_provider("accent_redaction", AccentRedactionProvider)
         except ImportError as e:
-            logger.debug(f"Accent redaction provider not available: {e}")
+            logger.debug("Accent redaction provider not available: %s", e)
 
     def get_available_providers(self) -> dict[str, list[str]]:
         """Get list of available providers by type.

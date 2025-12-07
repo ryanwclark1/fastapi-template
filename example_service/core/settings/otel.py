@@ -143,7 +143,9 @@ class OtelSettings(BaseSettings):
         description="Trace sampling rate (0.0-1.0, where 1.0 = 100%)",
     )
 
-    sampler_type: Literal["always_on", "always_off", "trace_id_ratio", "parent_based"] = Field(
+    sampler_type: Literal[
+        "always_on", "always_off", "trace_id_ratio", "parent_based"
+    ] = Field(
         default="parent_based",
         description="Sampling strategy type (parent_based recommended for production)",
     )
@@ -204,9 +206,7 @@ class OtelSettings(BaseSettings):
         """Validate that tls_enabled and insecure are mutually exclusive."""
         if self.tls_enabled and self.insecure:
             msg = "Cannot use both tls_enabled=True and insecure=True - they are mutually exclusive"
-            raise ValueError(
-                msg
-            )
+            raise ValueError(msg)
         return self
 
     @computed_field  # type: ignore[prop-decorator]
@@ -239,10 +239,14 @@ class OtelSettings(BaseSettings):
 
         # Add compression if enabled
         if self.compression != "none":
-            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import Compression  # type: ignore[attr-defined]  # noqa: I001
+            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+                Compression,
+            )  # type: ignore[attr-defined]  # noqa: I001
 
             kwargs["compression"] = (
-                Compression.Gzip if self.compression == "gzip" else Compression.NoCompression
+                Compression.Gzip
+                if self.compression == "gzip"
+                else Compression.NoCompression
             )
 
         # Add authentication headers if provided
@@ -378,7 +382,8 @@ class OtelSettings(BaseSettings):
             import logging
 
             logging.getLogger(__name__).warning(
-                f"Failed to build TLS credentials: {e}. Falling back to insecure connection."
+                "Failed to build TLS credentials: %s. Falling back to insecure connection.",
+                e,
             )
             return None
 

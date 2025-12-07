@@ -96,8 +96,12 @@ async def create_feature_flag_mutation(
         flag = FeatureFlag(
             key=create_data.key.strip().lower(),
             name=create_data.name.strip(),
-            description=create_data.description.strip() if create_data.description else None,
-            status=create_data.status.value if create_data.status else FlagStatus.DISABLED.value,
+            description=create_data.description.strip()
+            if create_data.description
+            else None,
+            status=create_data.status.value
+            if create_data.status
+            else FlagStatus.DISABLED.value,
             enabled=create_data.enabled,
             percentage=create_data.percentage,
             targeting_rules=[r.model_dump() for r in create_data.targeting_rules]
@@ -112,7 +116,7 @@ async def create_feature_flag_mutation(
         await ctx.session.commit()
         await ctx.session.refresh(flag)
 
-        logger.info(f"Created feature flag: {flag.id} ({flag.key})")
+        logger.info("Created feature flag: %s (%s)", flag.id, flag.key)
 
         # Publish event for real-time subscriptions
         await publish_feature_flag_event(
@@ -132,13 +136,13 @@ async def create_feature_flag_mutation(
                 message=f"Flag with key '{create_data.key}' already exists",
                 field="key",
             )
-        logger.exception(f"Error creating feature flag: {e}")
+        logger.exception("Error creating feature flag: %s", e)
         return FeatureFlagError(
             code=FeatureFlagErrorCode.INTERNAL_ERROR,
             message="Failed to create feature flag",
         )
     except Exception as e:
-        logger.exception(f"Error creating feature flag: {e}")
+        logger.exception("Error creating feature flag: %s", e)
         await ctx.session.rollback()
         return FeatureFlagError(
             code=FeatureFlagErrorCode.INTERNAL_ERROR,
@@ -205,7 +209,9 @@ async def update_feature_flag_mutation(
 
         if "description" in update_dict:
             flag.description = (
-                update_dict["description"].strip() if update_dict["description"] else None
+                update_dict["description"].strip()
+                if update_dict["description"]
+                else None
             )
 
         if update_dict.get("status"):
@@ -240,7 +246,7 @@ async def update_feature_flag_mutation(
         await ctx.session.commit()
         await ctx.session.refresh(flag)
 
-        logger.info(f"Updated feature flag: {flag.id} ({flag.key})")
+        logger.info("Updated feature flag: %s (%s)", flag.id, flag.key)
 
         # Publish event for real-time subscriptions
         await publish_feature_flag_event(
@@ -254,13 +260,13 @@ async def update_feature_flag_mutation(
 
     except IntegrityError as e:
         await ctx.session.rollback()
-        logger.exception(f"Error updating feature flag: {e}")
+        logger.exception("Error updating feature flag: %s", e)
         return FeatureFlagError(
             code=FeatureFlagErrorCode.INTERNAL_ERROR,
             message="Failed to update feature flag",
         )
     except Exception as e:
-        logger.exception(f"Error updating feature flag: {e}")
+        logger.exception("Error updating feature flag: %s", e)
         await ctx.session.rollback()
         return FeatureFlagError(
             code=FeatureFlagErrorCode.INTERNAL_ERROR,
@@ -312,7 +318,9 @@ async def toggle_feature_flag_mutation(
         await ctx.session.commit()
         await ctx.session.refresh(flag)
 
-        logger.info(f"Toggled feature flag: {flag.id} ({flag.key}) -> {flag.enabled}")
+        logger.info(
+            "Toggled feature flag: %s (%s) -> %s", flag.id, flag.key, flag.enabled
+        )
 
         # Publish event for real-time subscriptions
         flag_data = serialize_model_for_event(flag)
@@ -327,7 +335,7 @@ async def toggle_feature_flag_mutation(
         return FeatureFlagSuccess(flag=FeatureFlagType.from_pydantic(flag_pydantic))
 
     except Exception as e:
-        logger.exception(f"Error toggling feature flag: {e}")
+        logger.exception("Error toggling feature flag: %s", e)
         await ctx.session.rollback()
         return FeatureFlagError(
             code=FeatureFlagErrorCode.INTERNAL_ERROR,
@@ -387,8 +395,10 @@ async def delete_feature_flag_mutation(
         await ctx.session.commit()
 
         logger.info(
-            f"Deleted feature flag: {flag_uuid} ({flag_key}), "
-            f"removed {deleted_overrides} associated overrides"
+            "Deleted feature flag: %s (%s), removed %s associated overrides",
+            flag_uuid,
+            flag_key,
+            deleted_overrides,
         )
 
         # Publish event for real-time subscriptions
@@ -403,7 +413,7 @@ async def delete_feature_flag_mutation(
         )
 
     except Exception as e:
-        logger.exception(f"Error deleting feature flag: {e}")
+        logger.exception("Error deleting feature flag: %s", e)
         await ctx.session.rollback()
         return DeletePayload(
             success=False,

@@ -125,7 +125,7 @@ class SMTPClient(BaseEmailClient):
             await smtp.quit()
             return True
         except Exception as e:
-            logger.warning(f"SMTP health check failed: {e}")
+            logger.warning("SMTP health check failed: %s", e)
             return False
 
     @retry(
@@ -212,28 +212,28 @@ class SMTPClient(BaseEmailClient):
             )
 
         except aiosmtplib.SMTPAuthenticationError as e:
-            logger.error(f"SMTP authentication failed: {e}")
+            logger.error("SMTP authentication failed: %s", e)
             return EmailResult.failure_result(
                 error=str(e),
                 error_code="AUTH_FAILED",
                 backend="smtp",
             )
         except aiosmtplib.SMTPRecipientsRefused as e:
-            logger.error(f"All recipients refused: {e}")
+            logger.error("All recipients refused: %s", e)
             return EmailResult.failure_result(
                 error=str(e),
                 error_code="RECIPIENTS_REFUSED",
                 backend="smtp",
             )
         except aiosmtplib.SMTPException as e:
-            logger.error(f"SMTP error: {e}")
+            logger.error("SMTP error: %s", e)
             return EmailResult.failure_result(
                 error=str(e),
                 error_code="SMTP_ERROR",
                 backend="smtp",
             )
         except Exception as e:
-            logger.exception(f"Unexpected error sending email: {e}")
+            logger.exception("Unexpected error sending email: %s", e)
             return EmailResult.failure_result(
                 error=str(e),
                 error_code="UNEXPECTED_ERROR",
@@ -297,11 +297,15 @@ class SMTPClient(BaseEmailClient):
                     content = f.read()
 
             if content is None:
-                logger.warning(f"Skipping attachment {attachment.filename}: no content available")
+                logger.warning(
+                    "Skipping attachment %s: no content available", attachment.filename
+                )
                 continue
 
             part = MIMEApplication(content, Name=attachment.filename)
-            part["Content-Disposition"] = f'attachment; filename="{attachment.filename}"'
+            part["Content-Disposition"] = (
+                f'attachment; filename="{attachment.filename}"'
+            )
             if attachment.content_id:
                 part["Content-ID"] = f"<{attachment.content_id}>"
             mime_msg.attach(part)
@@ -397,7 +401,7 @@ class FileClient(BaseEmailClient):
         """Initialize file client."""
         self.settings = settings
         self.output_dir = Path(settings.file_path)
-        logger.info(f"File email client initialized (output: {self.output_dir})")
+        logger.info("File email client initialized (output: %s)", self.output_dir)
 
     async def connect(self) -> None:
         """Ensure output directory exists."""
@@ -479,7 +483,7 @@ class FileClient(BaseEmailClient):
                 backend="file",
             )
         except Exception as e:
-            logger.error(f"Failed to write email to file: {e}")
+            logger.error("Failed to write email to file: %s", e)
             return EmailResult.failure_result(
                 error=str(e),
                 error_code="FILE_WRITE_ERROR",

@@ -275,14 +275,18 @@ class EnhancedEmailService:
             ).inc(message.recipient_count)
 
             # Phase 3: Log usage and audit trail
-            await self._log_usage(message, result, config, effective_tenant_id, duration_seconds)
+            await self._log_usage(
+                message, result, config, effective_tenant_id, duration_seconds
+            )
             await self._log_audit(message, result, config, effective_tenant_id)
 
             return result
 
         except ValueError as e:
             # Provider not available
-            logger.error(f"Provider error: {e}", extra={"tenant_id": effective_tenant_id})
+            logger.error(
+                "Provider error: %s", e, extra={"tenant_id": effective_tenant_id}
+            )
 
             # Record provider error metrics
             metrics.email_provider_errors_total.labels(
@@ -370,7 +374,7 @@ class EnhancedEmailService:
         try:
             html_content, text_content = self._renderer.render(template, **full_context)
         except TemplateNotFoundError:
-            logger.error(f"Email template not found: {template}")
+            logger.error("Email template not found: %s", template)
             raise
 
         # Extract subject from context if not provided
@@ -620,7 +624,9 @@ class EnhancedEmailService:
     # Phase 3: Rate Limiting, Usage Logging, and Audit Logging
     # =========================================================================
 
-    async def _check_rate_limits(self, config: ResolvedEmailConfig, tenant_id: str) -> None:
+    async def _check_rate_limits(
+        self, config: ResolvedEmailConfig, tenant_id: str
+    ) -> None:
         """Check rate limits before sending email.
 
         Args:
@@ -634,7 +640,9 @@ class EnhancedEmailService:
             return
 
         # Get rate limit from tenant config or system settings
-        rate_limit = config.rate_limit_per_minute or self._settings.rate_limit_per_minute
+        rate_limit = (
+            config.rate_limit_per_minute or self._settings.rate_limit_per_minute
+        )
 
         # Skip if no rate limit configured
         if rate_limit <= 0:
@@ -673,7 +681,11 @@ class EnhancedEmailService:
         try:
             # Calculate provider cost (rough estimates, adjust per actual pricing)
             cost_per_recipient = self._estimate_cost_per_recipient(config.provider_type)
-            total_cost = cost_per_recipient * message.recipient_count if cost_per_recipient else None
+            total_cost = (
+                cost_per_recipient * message.recipient_count
+                if cost_per_recipient
+                else None
+            )
 
             usage_log = EmailUsageLog(
                 tenant_id=tenant_id if tenant_id != "system" else None,
@@ -739,7 +751,8 @@ class EnhancedEmailService:
             # Hash all recipients for privacy
             all_recipients = message.all_recipients
             recipient_hashes = [
-                hashlib.sha256(email.encode("utf-8")).hexdigest()[:16] for email in all_recipients
+                hashlib.sha256(email.encode("utf-8")).hexdigest()[:16]
+                for email in all_recipients
             ]
 
             # Determine error category
@@ -842,9 +855,7 @@ def get_enhanced_email_service() -> EnhancedEmailService:
             "Enhanced email service not initialized. "
             "Call initialize_enhanced_email_service() during app startup."
         )
-        raise RuntimeError(
-            msg
-        )
+        raise RuntimeError(msg)
     return _service
 
 

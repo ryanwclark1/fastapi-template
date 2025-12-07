@@ -84,9 +84,7 @@ class StorageClient:
         >>> # Upload a file
         >>> with open("photo.jpg", "rb") as f:
         ...     result = await client.upload_file(
-        ...         file_obj=f,
-        ...         key="uploads/photo.jpg",
-        ...         content_type="image/jpeg"
+        ...         file_obj=f, key="uploads/photo.jpg", content_type="image/jpeg"
         ...     )
         >>>
         >>> # Get presigned download URL
@@ -104,15 +102,11 @@ class StorageClient:
         """
         if not AIOBOTO3_AVAILABLE:
             msg = "aioboto3 is required for storage support. Install with: pip install aioboto3"
-            raise StorageNotConfiguredError(
-                msg
-            )
+            raise StorageNotConfiguredError(msg)
 
         if not settings.is_configured:
             msg = "Storage is not configured. Set STORAGE_ENABLED=true and provide credentials."
-            raise StorageNotConfiguredError(
-                msg
-            )
+            raise StorageNotConfiguredError(msg)
 
         self.settings = settings
         self._session = aioboto3.Session()
@@ -387,10 +381,14 @@ class StorageClient:
             }
 
         except ClientError as e:
-            logger.exception("Failed to upload file to storage", extra={"error": str(e)})
+            logger.exception(
+                "Failed to upload file to storage", extra={"error": str(e)}
+            )
             raise map_boto_error(e, operation="upload", key=key) from e
         except Exception as e:
-            logger.exception("Unexpected error during file upload", extra={"error": str(e)})
+            logger.exception(
+                "Unexpected error during file upload", extra={"error": str(e)}
+            )
             raise StorageUploadError(
                 f"Failed to upload {key}: {e}",
                 metadata={"key": key, "bucket": bucket, "error": str(e)},
@@ -417,7 +415,9 @@ class StorageClient:
             response = await s3.get_object(Bucket=bucket, Key=key)
             file_data_raw = await response["Body"].read()
             file_data: bytes = (
-                bytes(file_data_raw) if not isinstance(file_data_raw, bytes) else file_data_raw
+                bytes(file_data_raw)
+                if not isinstance(file_data_raw, bytes)
+                else file_data_raw
             )
 
             logger.info(
@@ -427,10 +427,14 @@ class StorageClient:
             return file_data
 
         except ClientError as e:
-            logger.exception("Failed to download file from storage", extra={"error": str(e)})
+            logger.exception(
+                "Failed to download file from storage", extra={"error": str(e)}
+            )
             raise map_boto_error(e, operation="download", key=key) from e
         except Exception as e:
-            logger.exception("Unexpected error during file download", extra={"error": str(e)})
+            logger.exception(
+                "Unexpected error during file download", extra={"error": str(e)}
+            )
             raise StorageDownloadError(
                 f"Failed to download {key}: {e}",
                 metadata={"key": key, "bucket": bucket, "error": str(e)},
@@ -455,14 +459,20 @@ class StorageClient:
             s3 = await self.ensure_client()
             await s3.delete_object(Bucket=bucket, Key=key)
 
-            logger.info("File deleted from storage", extra={"key": key, "bucket": bucket})
+            logger.info(
+                "File deleted from storage", extra={"key": key, "bucket": bucket}
+            )
             return True
 
         except ClientError as e:
-            logger.exception("Failed to delete file from storage", extra={"error": str(e)})
+            logger.exception(
+                "Failed to delete file from storage", extra={"error": str(e)}
+            )
             raise map_boto_error(e, operation="delete", key=key) from e
         except Exception as e:
-            logger.exception("Unexpected error during file deletion", extra={"error": str(e)})
+            logger.exception(
+                "Unexpected error during file deletion", extra={"error": str(e)}
+            )
             raise StorageError(
                 f"Failed to delete {key}: {e}",
                 code="STORAGE_DELETE_ERROR",
@@ -500,14 +510,22 @@ class StorageClient:
             )
             url: str = str(url_raw)
 
-            logger.debug("Generated presigned download URL for %s (expires in %ss)", key, expires_in)
+            logger.debug(
+                "Generated presigned download URL for %s (expires in %ss)",
+                key,
+                expires_in,
+            )
             return url
 
         except ClientError as e:
-            logger.exception("Failed to generate presigned URL", extra={"error": str(e)})
+            logger.exception(
+                "Failed to generate presigned URL", extra={"error": str(e)}
+            )
             raise map_boto_error(e, operation="presigned_url", key=key) from e
         except Exception as e:
-            logger.exception("Unexpected error generating presigned URL", extra={"error": str(e)})
+            logger.exception(
+                "Unexpected error generating presigned URL", extra={"error": str(e)}
+            )
             raise StorageError(
                 f"Failed to generate presigned URL for {key}: {e}",
                 code="STORAGE_PRESIGNED_URL_ERROR",
@@ -573,7 +591,9 @@ class StorageClient:
             return presigned_post
 
         except ClientError as e:
-            logger.exception("Failed to generate presigned upload", extra={"error": str(e)})
+            logger.exception(
+                "Failed to generate presigned upload", extra={"error": str(e)}
+            )
             raise map_boto_error(e, operation="presigned_upload", key=key) from e
         except Exception as e:
             logger.exception(
@@ -604,7 +624,9 @@ class StorageClient:
         except ClientError as e:
             # NoSuchKey means file doesn't exist - return False
             error_code = (
-                e.response.get("Error", {}).get("Code", "") if hasattr(e, "response") else ""
+                e.response.get("Error", {}).get("Code", "")
+                if hasattr(e, "response")
+                else ""
             )
             if error_code in {"NoSuchKey", "404", "NotFound"}:
                 return False
@@ -612,7 +634,9 @@ class StorageClient:
             logger.exception("Error checking file existence", extra={"error": str(e)})
             raise map_boto_error(e, operation="file_exists", key=key) from e
         except Exception as e:
-            logger.exception("Unexpected error checking file existence", extra={"error": str(e)})
+            logger.exception(
+                "Unexpected error checking file existence", extra={"error": str(e)}
+            )
             return False
 
     async def get_file_info(self, key: str, bucket: str | None = None) -> dict | None:
@@ -651,14 +675,20 @@ class StorageClient:
 
         except ClientError as e:
             error_code = (
-                e.response.get("Error", {}).get("Code", "") if hasattr(e, "response") else ""
+                e.response.get("Error", {}).get("Code", "")
+                if hasattr(e, "response")
+                else ""
             )
             if error_code in {"NoSuchKey", "404", "NotFound"}:
                 return None
-            logger.exception("Failed to get file info from storage", extra={"error": str(e)})
+            logger.exception(
+                "Failed to get file info from storage", extra={"error": str(e)}
+            )
             raise map_boto_error(e, operation="get_file_info", key=key) from e
         except Exception as e:
-            logger.exception("Unexpected error getting file info", extra={"error": str(e)})
+            logger.exception(
+                "Unexpected error getting file info", extra={"error": str(e)}
+            )
             raise StorageError(
                 f"Failed to get file info for {key}: {e}",
                 code="STORAGE_FILE_INFO_ERROR",
@@ -743,7 +773,10 @@ class StorageClient:
                     }
 
         # Execute all uploads concurrently with error handling
-        tasks = [upload_one(key, file_obj, content_type) for key, file_obj, content_type in files]
+        tasks = [
+            upload_one(key, file_obj, content_type)
+            for key, file_obj, content_type in files
+        ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Convert any exceptions to error results
@@ -753,14 +786,12 @@ class StorageClient:
                 key = files[i][0]
                 error_msg = str(result)
                 logger.error("Unexpected error uploading %s: %s", key, error_msg)
-                processed_results.append(
-                    {
-                        "key": key,
-                        "success": False,
-                        "url": None,
-                        "error": error_msg,
-                    }
-                )
+                processed_results.append({
+                    "key": key,
+                    "success": False,
+                    "url": None,
+                    "error": error_msg,
+                })
             else:
                 # Type narrowing: result is dict[str, Any] here
                 processed_results.append(result)  # type: ignore[arg-type]
@@ -856,14 +887,12 @@ class StorageClient:
                 key = keys[i]
                 error_msg = str(result)
                 logger.error("Unexpected error downloading %s: %s", key, error_msg)
-                processed_results.append(
-                    {
-                        "key": key,
-                        "success": False,
-                        "data": None,
-                        "error": error_msg,
-                    }
-                )
+                processed_results.append({
+                    "key": key,
+                    "success": False,
+                    "data": None,
+                    "error": error_msg,
+                })
             else:
                 # Type narrowing: result is dict[str, Any] here
                 processed_results.append(result)  # type: ignore[arg-type]
@@ -911,8 +940,7 @@ class StorageClient:
             >>>
             >>> # Actually delete the files
             >>> result = await client.delete_files(
-            ...     ["uploads/old1.jpg", "uploads/old2.jpg"],
-            ...     dry_run=False
+            ...     ["uploads/old1.jpg", "uploads/old2.jpg"], dry_run=False
             ... )
         """
         if dry_run:
@@ -1017,10 +1045,7 @@ class StorageClient:
             >>>
             >>> # Copy between buckets
             >>> await client.copy_file(
-            ...     "file.jpg",
-            ...     "file.jpg",
-            ...     source_bucket="bucket-a",
-            ...     dest_bucket="bucket-b"
+            ...     "file.jpg", "file.jpg", source_bucket="bucket-a", dest_bucket="bucket-b"
             ... )
         """
         source_bucket = source_bucket or self.settings.bucket
@@ -1060,7 +1085,9 @@ class StorageClient:
             )
             raise map_boto_error(e, operation="copy", key=source_key) from e
         except Exception as e:
-            logger.exception("Unexpected error during file copy", extra={"error": str(e)})
+            logger.exception(
+                "Unexpected error during file copy", extra={"error": str(e)}
+            )
             raise StorageError(
                 f"Failed to copy {source_key} to {dest_key}: {e}",
                 code="STORAGE_COPY_ERROR",
@@ -1100,10 +1127,7 @@ class StorageClient:
             >>>
             >>> # Move between buckets
             >>> await client.move_file(
-            ...     "file.jpg",
-            ...     "file.jpg",
-            ...     source_bucket="temp-bucket",
-            ...     dest_bucket="permanent-bucket"
+            ...     "file.jpg", "file.jpg", source_bucket="temp-bucket", dest_bucket="permanent-bucket"
             ... )
         """
         source_bucket = source_bucket or self.settings.bucket
@@ -1177,16 +1201,10 @@ class StorageClient:
             >>> files = await client.list_files(prefix="uploads/2024/")
             >>>
             >>> # List only JPEG files
-            >>> jpg_files = await client.list_files(
-            ...     prefix="uploads/",
-            ...     pattern="*.jpg"
-            ... )
+            >>> jpg_files = await client.list_files(prefix="uploads/", pattern="*.jpg")
             >>>
             >>> # List all images recursively
-            >>> images = await client.list_files(
-            ...     prefix="uploads/",
-            ...     pattern="**/*.{jpg,png,gif}"
-            ... )
+            >>> images = await client.list_files(prefix="uploads/", pattern="**/*.{jpg,png,gif}")
         """
         bucket = self.settings.bucket
 
@@ -1210,14 +1228,12 @@ class StorageClient:
                     if pattern and not fnmatch.fnmatch(key, pattern):
                         continue
 
-                    files.append(
-                        {
-                            "key": key,
-                            "size": obj["Size"],
-                            "last_modified": obj["LastModified"],
-                            "etag": obj.get("ETag", "").strip('"'),
-                        }
-                    )
+                    files.append({
+                        "key": key,
+                        "size": obj["Size"],
+                        "last_modified": obj["LastModified"],
+                        "etag": obj.get("ETag", "").strip('"'),
+                    })
 
             logger.info(
                 "Listed %s files",
@@ -1233,7 +1249,9 @@ class StorageClient:
             return files
 
         except ClientError as e:
-            logger.exception("Failed to list files from storage", extra={"error": str(e)})
+            logger.exception(
+                "Failed to list files from storage", extra={"error": str(e)}
+            )
             raise map_boto_error(e, operation="list_files", key=prefix) from e
         except Exception as e:
             logger.exception("Unexpected error listing files", extra={"error": str(e)})

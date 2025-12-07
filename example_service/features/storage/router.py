@@ -75,7 +75,7 @@ async def create_bucket(
             detail=str(e),
         ) from e
     except StorageError as e:
-        logger.error(f"Failed to create bucket: {e}")
+        logger.error("Failed to create bucket: %s", e)
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e),
@@ -112,7 +112,7 @@ async def delete_bucket(
             detail=str(e),
         ) from e
     except StorageError as e:
-        logger.error(f"Failed to delete bucket: {e}")
+        logger.error("Failed to delete bucket: %s", e)
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e),
@@ -153,7 +153,7 @@ async def list_buckets(
         )
 
     except StorageError as e:
-        logger.error(f"Failed to list buckets: {e}")
+        logger.error("Failed to list buckets: %s", e)
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e),
@@ -209,7 +209,7 @@ async def get_bucket_info(
             detail=str(e),
         ) from e
     except StorageError as e:
-        logger.error(f"Failed to get bucket info: {e}")
+        logger.error("Failed to get bucket info: %s", e)
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e),
@@ -235,8 +235,12 @@ async def list_objects(
     bucket: Annotated[
         str | None, Query(description="Bucket name (uses default if not specified)")
     ] = None,
-    max_keys: Annotated[int, Query(ge=1, le=10000, description="Maximum keys to return")] = 1000,
-    continuation_token: Annotated[str | None, Query(description="Token for next page")] = None,
+    max_keys: Annotated[
+        int, Query(ge=1, le=10000, description="Maximum keys to return")
+    ] = 1000,
+    continuation_token: Annotated[
+        str | None, Query(description="Token for next page")
+    ] = None,
 ) -> ObjectListResponse:
     """List objects in a bucket.
 
@@ -281,7 +285,7 @@ async def list_objects(
         )
 
     except StorageError as e:
-        logger.error(f"Failed to list objects: {e}")
+        logger.error("Failed to list objects: %s", e)
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e),
@@ -304,7 +308,9 @@ async def upload_object(
     bucket: Annotated[
         str | None, Query(description="Bucket name (uses default if not specified)")
     ] = None,
-    content_type: Annotated[str | None, Query(description="Content type override")] = None,
+    content_type: Annotated[
+        str | None, Query(description="Content type override")
+    ] = None,
     acl: Annotated[str | None, Query(description="ACL setting")] = None,
     storage_class: Annotated[str | None, Query(description="Storage class")] = None,
 ) -> ObjectUploadResponse:
@@ -336,7 +342,7 @@ async def upload_object(
         )
 
     except StorageError as e:
-        logger.error(f"Failed to upload object: {e}")
+        logger.error("Failed to upload object: %s", e)
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e),
@@ -387,7 +393,7 @@ async def set_object_acl(
             detail=str(e),
         ) from e
     except StorageError as e:
-        logger.error(f"Failed to set object ACL: {e}")
+        logger.error("Failed to set object ACL: %s", e)
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e),
@@ -431,7 +437,7 @@ async def get_object_acl(
             detail=str(e),
         ) from e
     except StorageError as e:
-        logger.error(f"Failed to get object ACL: {e}")
+        logger.error("Failed to get object ACL: %s", e)
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e),
@@ -469,7 +475,9 @@ async def download_object(
 
         # Ensure data is bytes
         if not isinstance(data, bytes):
-            data = bytes(data) if hasattr(data, "__bytes__") else str(data).encode("utf-8")
+            data = (
+                bytes(data) if hasattr(data, "__bytes__") else str(data).encode("utf-8")
+            )
 
         return StreamingResponse(
             BytesIO(data),
@@ -485,7 +493,7 @@ async def download_object(
             detail=str(e),
         ) from e
     except StorageError as e:
-        logger.error(f"Failed to download object: {e}")
+        logger.error("Failed to download object: %s", e)
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e),
@@ -525,7 +533,7 @@ async def delete_object(
             detail=str(e),
         ) from e
     except StorageError as e:
-        logger.error(f"Failed to delete object: {e}")
+        logger.error("Failed to delete object: %s", e)
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e),

@@ -260,7 +260,9 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
     # Adds security headers to all responses (production-aware)
     # Use strict CSP only when docs are disabled; docs need inline/eval for bundles
     docs_enabled = not app_settings.disable_docs
-    use_strict_csp = not docs_enabled and app_settings.strict_csp and not app_settings.debug
+    use_strict_csp = (
+        not docs_enabled and app_settings.strict_csp and not app_settings.debug
+    )
     csp_directives = (
         SecurityHeadersMiddleware._strict_csp_directives()
         if use_strict_csp
@@ -294,7 +296,9 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
     # Collects HTTP request metrics for observability
     if otel_settings.is_configured:
         app.add_middleware(MetricsMiddleware)
-        logger.info("MetricsMiddleware enabled with trace correlation and timing header")
+        logger.info(
+            "MetricsMiddleware enabled with trace correlation and timing header"
+        )
 
     # 5. CORS Middleware (development only)
     # Configure CORS for development environments
@@ -308,7 +312,9 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
             allow_headers=app_settings.cors_allow_headers,
             max_age=app_settings.cors_max_age,
         )
-        logger.info("CORSMiddleware enabled for development with origins: %s", cors_origins)
+        logger.info(
+            "CORSMiddleware enabled for development with origins: %s", cors_origins
+        )
 
     # 6. Trusted Host Middleware (production only)
     # Validates host headers to prevent host header attacks
@@ -318,7 +324,8 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
             allowed_hosts=app_settings.allowed_hosts,
         )
         logger.info(
-            "TrustedHostMiddleware enabled for production with hosts: %s", app_settings.allowed_hosts
+            "TrustedHostMiddleware enabled for production with hosts: %s",
+            app_settings.allowed_hosts,
         )
 
     # 7. Rate Limiting Middleware (optional, requires Redis)

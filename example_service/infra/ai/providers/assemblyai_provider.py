@@ -117,7 +117,7 @@ class AssemblyAIProvider(BaseProvider):
                     operation="file_upload",
                 )
 
-            logger.debug(f"Uploaded file to AssemblyAI: {upload_url}")
+            logger.debug("Uploaded file to AssemblyAI: %s", upload_url)
             return upload_url
 
         except httpx.HTTPStatusError as e:
@@ -207,7 +207,7 @@ class AssemblyAIProvider(BaseProvider):
                     operation="create_transcript",
                 )
 
-            logger.debug(f"Created AssemblyAI transcript: {transcript_id}")
+            logger.debug("Created AssemblyAI transcript: %s", transcript_id)
             return transcript_id
 
         except httpx.HTTPStatusError as e:
@@ -272,7 +272,7 @@ class AssemblyAIProvider(BaseProvider):
                 data = response.json()
 
                 status = data.get("status")
-                logger.debug(f"Transcript {transcript_id} status: {status}")
+                logger.debug("Transcript %s status: %s", transcript_id, status)
 
                 if status == "completed":
                     return data
@@ -349,7 +349,7 @@ class AssemblyAIProvider(BaseProvider):
             else:
                 # Assume it's a URL
                 audio_url = audio
-                logger.info(f"Using audio URL: {audio_url}")
+                logger.info("Using audio URL: %s", audio_url)
 
             # Step 2: Create transcription job
             logger.info("Creating AssemblyAI transcription job")
@@ -358,7 +358,7 @@ class AssemblyAIProvider(BaseProvider):
             )
 
             # Step 3: Poll for completion
-            logger.info(f"Polling for transcription completion: {transcript_id}")
+            logger.info("Polling for transcription completion: %s", transcript_id)
             data = await self._poll_transcript(transcript_id)
 
             # Step 4: Parse results
@@ -411,7 +411,8 @@ class AssemblyAIProvider(BaseProvider):
                 segments.append(
                     TranscriptionSegment(
                         text=utterance.get("text", ""),
-                        start=utterance.get("start", 0) / 1000.0,  # Convert ms to seconds
+                        start=utterance.get("start", 0)
+                        / 1000.0,  # Convert ms to seconds
                         end=utterance.get("end", 0) / 1000.0,
                         speaker=speaker_label,
                         confidence=utterance.get("confidence"),
@@ -455,7 +456,9 @@ class AssemblyAIProvider(BaseProvider):
                         )
                     )
                     if word_speaker is not None:
-                        speakers_info[f"Speaker {word_speaker}"] = f"Speaker {word_speaker}"
+                        speakers_info[f"Speaker {word_speaker}"] = (
+                            f"Speaker {word_speaker}"
+                        )
                     current_segment = {
                         "text": word_text,
                         "start": word_start,
@@ -472,7 +475,9 @@ class AssemblyAIProvider(BaseProvider):
                     current_segment["end"] = word_end
                     current_segment["words"].append(word)
                     if word_speaker is not None:
-                        speakers_info[f"Speaker {word_speaker}"] = f"Speaker {word_speaker}"
+                        speakers_info[f"Speaker {word_speaker}"] = (
+                            f"Speaker {word_speaker}"
+                        )
 
             # Add final segment
             if current_segment["text"]:

@@ -116,7 +116,10 @@ class HealthService(BaseService):
             return
 
         # Database provider
-        if self._db_settings.health_checks_enabled and self._health_settings.database.enabled:
+        if (
+            self._db_settings.health_checks_enabled
+            and self._health_settings.database.enabled
+        ):
             try:
                 from example_service.features.health.providers import (
                     DatabaseHealthProvider,
@@ -141,10 +144,13 @@ class HealthService(BaseService):
                     )
                 )
             except Exception as e:
-                logger.warning(f"Could not configure database health provider: {e}")
+                logger.warning("Could not configure database health provider: %s", e)
 
         # Redis provider
-        if self._redis_settings.health_checks_enabled and self._health_settings.cache.enabled:
+        if (
+            self._redis_settings.health_checks_enabled
+            and self._health_settings.cache.enabled
+        ):
             try:
                 from example_service.features.health.providers import (
                     RedisHealthProvider,
@@ -159,10 +165,13 @@ class HealthService(BaseService):
                         )
                     )
             except Exception as e:
-                logger.warning(f"Could not configure Redis health provider: {e}")
+                logger.warning("Could not configure Redis health provider: %s", e)
 
         # RabbitMQ provider
-        if self._rabbit_settings.is_configured and self._health_settings.rabbitmq.enabled:
+        if (
+            self._rabbit_settings.is_configured
+            and self._health_settings.rabbitmq.enabled
+        ):
             try:
                 from example_service.features.health.providers import (
                     RabbitMQHealthProvider,
@@ -172,7 +181,7 @@ class HealthService(BaseService):
                     RabbitMQHealthProvider(),
                 )
             except Exception as e:
-                logger.warning(f"Could not configure RabbitMQ health provider: {e}")
+                logger.warning("Could not configure RabbitMQ health provider: %s", e)
 
         # External auth service provider
         if (
@@ -192,7 +201,9 @@ class HealthService(BaseService):
                     )
                 )
             except Exception as e:
-                logger.warning(f"Could not configure auth service health provider: {e}")
+                logger.warning(
+                    "Could not configure auth service health provider: %s", e
+                )
 
         # S3 storage provider
         if self._backup_settings.is_s3_configured and self._health_settings.s3.enabled:
@@ -209,7 +220,7 @@ class HealthService(BaseService):
                     )
                 )
             except Exception as e:
-                logger.warning(f"Could not configure S3 health provider: {e}")
+                logger.warning("Could not configure S3 health provider: %s", e)
 
         # Consul provider (if discovery configured)
         if self._consul_settings.is_configured and self._health_settings.consul.enabled:
@@ -222,7 +233,10 @@ class HealthService(BaseService):
 
                 # Get the Consul service (may be None if not started yet)
                 discovery_service = get_discovery_service()
-                if discovery_service is not None and discovery_service._client is not None:
+                if (
+                    discovery_service is not None
+                    and discovery_service._client is not None
+                ):
                     # Convert health settings to ProviderConfig
                     config = ProviderConfig(
                         enabled=self._health_settings.consul.enabled,
@@ -243,7 +257,7 @@ class HealthService(BaseService):
                         "Consul health provider not configured: discovery service not started"
                     )
             except Exception as e:
-                logger.warning(f"Could not configure Consul health provider: {e}")
+                logger.warning("Could not configure Consul health provider: %s", e)
 
     async def check_health(self) -> dict[str, Any]:
         """Perform comprehensive health check.
@@ -287,11 +301,14 @@ class HealthService(BaseService):
             "service": self._app_settings.service_name,
             "version": "0.1.0",
             "checks": {
-                name: check.status == HealthStatus.HEALTHY for name, check in result.checks.items()
+                name: check.status == HealthStatus.HEALTHY
+                for name, check in result.checks.items()
             },
         }
 
-    async def check_health_detailed(self, force_refresh: bool = False) -> dict[str, Any]:
+    async def check_health_detailed(
+        self, force_refresh: bool = False
+    ) -> dict[str, Any]:
         """Perform health check with detailed provider information.
 
         Returns extended health information including latency and

@@ -127,7 +127,7 @@ class EmailProviderFactory:
         self._registry[provider_type] = provider_class
         # Remove from unavailable if it was there
         self._unavailable.pop(provider_type, None)
-        logger.debug(f"Registered email provider: {provider_type}")
+        logger.debug("Registered email provider: %s", provider_type)
 
     def unregister(self, provider_type: str) -> bool:
         """Unregister a provider.
@@ -142,7 +142,7 @@ class EmailProviderFactory:
             del self._registry[provider_type]
             # Also clear any cached instances
             self._clear_cache_for_provider(provider_type)
-            logger.debug(f"Unregistered email provider: {provider_type}")
+            logger.debug("Unregistered email provider: %s", provider_type)
             return True
         return False
 
@@ -230,7 +230,10 @@ class EmailProviderFactory:
             parts.extend([
                 config.aws_region or "",
             ])
-        elif config.provider_type in (EmailProviderType.SENDGRID, EmailProviderType.MAILGUN):
+        elif config.provider_type in (
+            EmailProviderType.SENDGRID,
+            EmailProviderType.MAILGUN,
+        ):
             parts.extend([
                 config.api_endpoint or "",
             ])
@@ -266,7 +269,7 @@ class EmailProviderFactory:
         if tenant_id is None:
             count = len(self._provider_cache)
             self._provider_cache.clear()
-            logger.info(f"Cleared all provider cache ({count} entries)")
+            logger.info("Cleared all provider cache (%s entries)", count)
             return count
 
         # Clear only entries for this tenant
@@ -348,9 +351,7 @@ def get_provider_factory() -> EmailProviderFactory:
             "Email provider factory not initialized. "
             "Call initialize_provider_factory() during app startup."
         )
-        raise RuntimeError(
-            msg
-        )
+        raise RuntimeError(msg)
     return _factory
 
 

@@ -157,7 +157,9 @@ class SearchManager:
         """
         for target, event_name, callback in self._listeners:
             with contextlib.suppress(Exception):
-                event.remove(target, event_name, callback)  # Listener may already be removed
+                event.remove(
+                    target, event_name, callback
+                )  # Listener may already be removed
         self._listeners.clear()
         self._processed_tables.clear()
         logger.debug("SearchManager listeners removed")
@@ -250,7 +252,11 @@ class SearchManager:
             if hasattr(table, "_mapper"):
                 return table._mapper.class_
         except Exception as e:
-            logger.debug("Could not find model for table: %s", str(e), extra={"table": table.name})
+            logger.debug(
+                "Could not find model for table: %s",
+                str(e),
+                extra={"table": table.name},
+            )
 
         return None
 
@@ -283,12 +289,15 @@ class SearchManager:
             )
 
         vector_expr = (
-            " || ".join(vector_parts) if vector_parts else f"to_tsvector('{search_config}', '')"
+            " || ".join(vector_parts)
+            if vector_parts
+            else f"to_tsvector('{search_config}', '')"
         )
 
         # Build field change conditions for UPDATE optimization
         field_conditions = " OR ".join(
-            f"OLD.{field_name} IS DISTINCT FROM NEW.{field_name}" for field_name in search_fields
+            f"OLD.{field_name} IS DISTINCT FROM NEW.{field_name}"
+            for field_name in search_fields
         )
 
         function_name = self.config.function_name_template.format(table=table_name)

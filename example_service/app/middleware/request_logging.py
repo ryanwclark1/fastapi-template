@@ -173,7 +173,9 @@ class PIIMasker:
 
         if self.preserve_domain:
             masked_local = (
-                local[0] + self.mask_char * (len(local) - 1) if len(local) > 1 else self.mask_char
+                local[0] + self.mask_char * (len(local) - 1)
+                if len(local) > 1
+                else self.mask_char
             )
             return f"{masked_local}@{domain}"
         return f"{self.mask_char * 3}@{self.mask_char * 3}.com"
@@ -199,7 +201,9 @@ class PIIMasker:
         digit_idx = 0
         for char in phone:
             if char.isdigit():
-                result += masked[digit_idx] if digit_idx < len(masked) else self.mask_char
+                result += (
+                    masked[digit_idx] if digit_idx < len(masked) else self.mask_char
+                )
                 digit_idx += 1
             else:
                 result += char
@@ -227,7 +231,9 @@ class PIIMasker:
         digit_idx = 0
         for char in card:
             if char.isdigit():
-                result += masked[digit_idx] if digit_idx < len(masked) else self.mask_char
+                result += (
+                    masked[digit_idx] if digit_idx < len(masked) else self.mask_char
+                )
                 digit_idx += 1
             else:
                 result += char
@@ -247,7 +253,9 @@ class PIIMasker:
         value = self.EMAIL_PATTERN.sub(lambda m: self.mask_email(m.group()), value)
 
         # Mask credit cards (before phone to avoid false positives)
-        value = self.CREDIT_CARD_PATTERN.sub(lambda m: self.mask_credit_card(m.group()), value)
+        value = self.CREDIT_CARD_PATTERN.sub(
+            lambda m: self.mask_credit_card(m.group()), value
+        )
 
         # Mask phone numbers
         value = self.PHONE_PATTERN.sub(lambda m: self.mask_phone(m.group()), value)
@@ -371,7 +379,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
         # Add custom sensitive fields to masker
         if sensitive_fields:
-            self.masker.sensitive_fields = self.masker.sensitive_fields | set(sensitive_fields)
+            self.masker.sensitive_fields = self.masker.sensitive_fields | set(
+                sensitive_fields
+            )
 
         self.exempt_paths = exempt_paths or [
             "/health",
@@ -762,7 +772,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 success=True,
             )
 
-        if duration >= SLOW_REQUEST_THRESHOLD and hasattr(tracking, "track_slow_request"):
+        if duration >= SLOW_REQUEST_THRESHOLD and hasattr(
+            tracking, "track_slow_request"
+        ):
             tracking.track_slow_request(
                 path=request.url.path,
                 method=request.method,

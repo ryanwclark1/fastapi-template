@@ -141,7 +141,9 @@ class AuditService:
         await self.session.refresh(audit_log)
 
         logger.debug(
-            f"Audit log created: {action.value} on {entity_type}",
+            "Audit log created: %s on %s",
+            action.value,
+            entity_type,
             extra={
                 "audit_id": str(audit_log.id),
                 "action": action.value,
@@ -218,7 +220,9 @@ class AuditService:
         for data in entries:
             changes = AuditLog.compute_changes(data.old_values, data.new_values)
             audit_log = AuditLog(
-                action=data.action.value if hasattr(data.action, "value") else data.action,
+                action=data.action.value
+                if hasattr(data.action, "value")
+                else data.action,
                 entity_type=data.entity_type,
                 entity_id=data.entity_id,
                 user_id=data.user_id,
@@ -246,7 +250,8 @@ class AuditService:
             await self.session.refresh(audit_log)
 
         logger.debug(
-            f"Bulk created {len(audit_logs)} audit log entries",
+            "Bulk created %s audit log entries",
+            len(audit_logs),
             extra={"count": len(audit_logs)},
         )
 
@@ -409,7 +414,9 @@ class AuditService:
         subquery = base_stmt.subquery()
 
         # Total entries
-        total_result = await self.session.execute(select(func.count()).select_from(subquery))
+        total_result = await self.session.execute(
+            select(func.count()).select_from(subquery)
+        )
         total_entries = total_result.scalar() or 0
 
         # Action counts
@@ -433,7 +440,9 @@ class AuditService:
             select(func.count()).select_from(subquery).where(subquery.c.success == True)  # noqa: E712
         )
         success_count = success_result.scalar() or 0
-        success_rate = (success_count / total_entries * 100) if total_entries > 0 else 100.0
+        success_rate = (
+            (success_count / total_entries * 100) if total_entries > 0 else 100.0
+        )
 
         # Unique users
         users_result = await self.session.execute(
@@ -443,16 +452,18 @@ class AuditService:
 
         # Time range
         time_result = await self.session.execute(
-            select(func.min(subquery.c.timestamp), func.max(subquery.c.timestamp)).select_from(
-                subquery
-            )
+            select(
+                func.min(subquery.c.timestamp), func.max(subquery.c.timestamp)
+            ).select_from(subquery)
         )
         time_row = time_result.one_or_none()
         time_range_start = time_row[0] if time_row else None
         time_range_end = time_row[1] if time_row else None
 
         # Count dangerous actions
-        dangerous_count = await self._count_dangerous_actions(tenant_id, start_time, end_time)
+        dangerous_count = await self._count_dangerous_actions(
+            tenant_id, start_time, end_time
+        )
 
         return AuditSummary(
             total_entries=total_entries,
@@ -475,7 +486,9 @@ class AuditService:
         dangerous_patterns = ["%.deleted", "%.revoked", "%.suspended", "%.disconnected"]
         dangerous_exact = ["delete", "bulk_delete", "purge"]
 
-        action_filters = [AuditLog.action.like(pattern) for pattern in dangerous_patterns]
+        action_filters = [
+            AuditLog.action.like(pattern) for pattern in dangerous_patterns
+        ]
         action_filters.extend([AuditLog.action == exact for exact in dangerous_exact])
 
         stmt = select(func.count(AuditLog.id)).where(or_(*action_filters))
@@ -516,7 +529,9 @@ class AuditService:
         dangerous_patterns = ["%.deleted", "%.revoked", "%.suspended", "%.disconnected"]
         dangerous_exact = ["delete", "bulk_delete", "purge"]
 
-        action_filters = [AuditLog.action.like(pattern) for pattern in dangerous_patterns]
+        action_filters = [
+            AuditLog.action.like(pattern) for pattern in dangerous_patterns
+        ]
         action_filters.extend([AuditLog.action == exact for exact in dangerous_exact])
 
         stmt = (
@@ -576,7 +591,8 @@ class AuditService:
 
         deleted_count = result.rowcount  # type: ignore[attr-defined]
         logger.info(
-            f"Deleted {deleted_count} old audit logs",
+            "Deleted %s old audit logs",
+            deleted_count,
             extra={"before": before.isoformat(), "tenant_id": tenant_id},
         )
 

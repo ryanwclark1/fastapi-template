@@ -45,7 +45,7 @@ def compose_query() -> type:
 
     for feature_name, feature in registry._features.items():
         if not features.is_enabled(feature_name) or not feature.enabled:
-            logger.debug(f"Skipping disabled feature: {feature_name}")
+            logger.debug("Skipping disabled feature: %s", feature_name)
             continue
 
         # Add all query resolvers from this feature
@@ -100,7 +100,8 @@ def compose_query() -> type:
     Query = strawberry.type(Query, description="Root query type")
 
     enabled_features = [
-        name for name, f in registry._features.items()
+        name
+        for name, f in registry._features.items()
         if features.is_enabled(name) and f.enabled
     ]
     logger.info(
@@ -183,7 +184,8 @@ def compose_mutation() -> type:
     Mutation = strawberry.type(Mutation, description="Root mutation type")
 
     enabled_features = [
-        name for name, f in registry._features.items()
+        name
+        for name, f in registry._features.items()
         if features.is_enabled(name) and f.enabled and f.mutations
     ]
     logger.info(
@@ -220,7 +222,9 @@ def compose_subscription() -> type | None:
             # Use the function name as the GraphQL field name
             field_name = resolver.__name__
             # Remove common suffixes for cleaner API
-            field_name = field_name.replace("_subscription", "").replace("_resolver", "")
+            field_name = field_name.replace("_subscription", "").replace(
+                "_resolver", ""
+            )
 
             if field_name in subscription_methods:
                 logger.warning(
@@ -257,7 +261,8 @@ def compose_subscription() -> type | None:
     Subscription = strawberry.type(Subscription, description="Root subscription type")
 
     enabled_features = [
-        name for name, f in registry._features.items()
+        name
+        for name, f in registry._features.items()
         if features.is_enabled(name) and f.enabled and f.subscriptions
     ]
     logger.info(

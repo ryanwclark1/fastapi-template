@@ -85,7 +85,7 @@ async def create_or_update_config(
                 setattr(existing_config, field, value)
 
         config = existing_config
-        logger.info(f"Updated email config for tenant: {tenant_id}")
+        logger.info("Updated email config for tenant: %s", tenant_id)
     else:
         # Create new config
         config = EmailConfig(
@@ -93,7 +93,7 @@ async def create_or_update_config(
             **config_data.model_dump(exclude_unset=True),
         )
         session.add(config)
-        logger.info(f"Created email config for tenant: {tenant_id}")
+        logger.info("Created email config for tenant: %s", tenant_id)
 
     await session.commit()
     await session.refresh(config)
@@ -163,7 +163,7 @@ async def update_config(
     # Invalidate cache
     email_service.invalidate_config_cache(tenant_id)
 
-    logger.info(f"Updated email config for tenant: {tenant_id}")
+    logger.info("Updated email config for tenant: %s", tenant_id)
 
     return _to_response(config)
 
@@ -196,7 +196,7 @@ async def delete_config(
     # Invalidate cache
     email_service.invalidate_config_cache(tenant_id)
 
-    logger.info(f"Deleted email config for tenant: {tenant_id}")
+    logger.info("Deleted email config for tenant: %s", tenant_id)
 
 
 # =============================================================================
@@ -252,7 +252,7 @@ async def test_config(
 
     except Exception as e:
         duration_ms = int((time.perf_counter() - start_time) * 1000)
-        logger.exception(f"Test email failed for tenant {tenant_id}: {e}")
+        logger.exception("Test email failed for tenant %s: %s", tenant_id, e)
 
         return TestEmailResponse(
             success=False,
@@ -301,7 +301,7 @@ async def check_health(
         )
 
     except Exception as e:
-        logger.exception(f"Health check failed for tenant {tenant_id}: {e}")
+        logger.exception("Health check failed for tenant %s: %s", tenant_id, e)
 
         from .schemas import EmailHealthCheck
 
@@ -338,7 +338,9 @@ async def get_usage_stats(
     start_date: Annotated[
         datetime | None, Query(description="Start date (default: 30 days ago)")
     ] = None,
-    end_date: Annotated[datetime | None, Query(description="End date (default: now)")] = None,
+    end_date: Annotated[
+        datetime | None, Query(description="End date (default: now)")
+    ] = None,
 ) -> EmailUsageStats:
     """Get email usage statistics for a tenant."""
     # Default date range: last 30 days
@@ -376,7 +378,9 @@ async def get_usage_stats(
         emails_by_provider[provider] = emails_by_provider.get(provider, 0) + 1
 
         if log.cost_usd:
-            cost_by_provider[provider] = cost_by_provider.get(provider, 0.0) + log.cost_usd
+            cost_by_provider[provider] = (
+                cost_by_provider.get(provider, 0.0) + log.cost_usd
+            )
 
         total_recipients += log.recipients_count
 
@@ -396,7 +400,7 @@ async def get_usage_stats(
                 if sample.labels.get("tenant_id") == tenant_id:
                     rate_limit_hits += int(sample.value)
     except Exception as e:
-        logger.warning(f"Failed to query rate limit metrics: {e}")
+        logger.warning("Failed to query rate limit metrics: %s", e)
         # Continue with 0 if metrics query fails
 
     return EmailUsageStats(
@@ -435,7 +439,9 @@ async def get_audit_logs(
     """Get audit logs for a tenant."""
     # Count total logs
     count_stmt = (
-        select(func.count()).select_from(EmailAuditLog).where(EmailAuditLog.tenant_id == tenant_id)
+        select(func.count())
+        .select_from(EmailAuditLog)
+        .where(EmailAuditLog.tenant_id == tenant_id)
     )
     total_result = await session.execute(count_stmt)
     total = total_result.scalar_one()
@@ -472,7 +478,9 @@ async def get_audit_logs(
     description="Get information about all available email providers and their requirements.",
 )
 async def list_providers(
-    _email_service: Annotated[EnhancedEmailService, Depends(get_enhanced_email_service)],
+    _email_service: Annotated[
+        EnhancedEmailService, Depends(get_enhanced_email_service)
+    ],
 ) -> ProvidersListResponse:
     """List all available email providers."""
     providers_info = [
@@ -481,7 +489,12 @@ async def list_providers(
             name="SMTP",
             description="Standard SMTP/SMTPS email delivery",
             required_fields=["smtp_host", "smtp_port"],
-            optional_fields=["smtp_username", "smtp_password", "smtp_use_tls", "smtp_use_ssl"],
+            optional_fields=[
+                "smtp_username",
+                "smtp_password",
+                "smtp_use_tls",
+                "smtp_use_ssl",
+            ],
             supports_attachments=True,
             supports_html=True,
             supports_templates=False,
