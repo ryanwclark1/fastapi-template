@@ -541,7 +541,8 @@ class TestGetTaskService:
         with patch.dict("sys.modules", {"example_service.workers.scheduler": None}):
             # Force ImportError by patching the import
             def raise_import_error(*args, **kwargs):
-                raise ImportError("No module")
+                msg = "No module"
+                raise ImportError(msg)
 
             with patch("example_service.features.tasks.service.get_task_service") as mock_factory:
                 mock_factory.return_value = TaskManagementService()

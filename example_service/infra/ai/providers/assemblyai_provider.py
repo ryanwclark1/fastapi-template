@@ -110,8 +110,9 @@ class AssemblyAIProvider(BaseProvider):
             upload_url = data.get("upload_url")
 
             if not upload_url:
+                msg = "No upload URL returned from AssemblyAI"
                 raise ProviderError(
-                    "No upload URL returned from AssemblyAI",
+                    msg,
                     provider="assemblyai",
                     operation="file_upload",
                 )
@@ -121,15 +122,17 @@ class AssemblyAIProvider(BaseProvider):
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 401:
+                msg = "Invalid AssemblyAI API key"
                 raise ProviderAuthenticationError(
-                    "Invalid AssemblyAI API key",
+                    msg,
                     provider="assemblyai",
                     operation="file_upload",
                     original_error=e,
                 ) from e
             if e.response.status_code == 429:
+                msg = "AssemblyAI rate limit exceeded during upload"
                 raise ProviderRateLimitError(
-                    "AssemblyAI rate limit exceeded during upload",
+                    msg,
                     provider="assemblyai",
                     operation="file_upload",
                     original_error=e,
@@ -141,8 +144,9 @@ class AssemblyAIProvider(BaseProvider):
                 original_error=e,
             ) from e
         except httpx.TimeoutException as e:
+            msg = "AssemblyAI upload timed out"
             raise ProviderTimeoutError(
-                "AssemblyAI upload timed out",
+                msg,
                 provider="assemblyai",
                 operation="file_upload",
                 original_error=e,
@@ -196,8 +200,9 @@ class AssemblyAIProvider(BaseProvider):
             transcript_id = data.get("id")
 
             if not transcript_id:
+                msg = "No transcript ID returned from AssemblyAI"
                 raise ProviderError(
-                    "No transcript ID returned from AssemblyAI",
+                    msg,
                     provider="assemblyai",
                     operation="create_transcript",
                 )
@@ -207,15 +212,17 @@ class AssemblyAIProvider(BaseProvider):
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 401:
+                msg = "Invalid AssemblyAI API key"
                 raise ProviderAuthenticationError(
-                    "Invalid AssemblyAI API key",
+                    msg,
                     provider="assemblyai",
                     operation="create_transcript",
                     original_error=e,
                 ) from e
             if e.response.status_code == 429:
+                msg = "AssemblyAI rate limit exceeded"
                 raise ProviderRateLimitError(
-                    "AssemblyAI rate limit exceeded",
+                    msg,
                     provider="assemblyai",
                     operation="create_transcript",
                     original_error=e,
@@ -289,8 +296,9 @@ class AssemblyAIProvider(BaseProvider):
 
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 401:
+                    msg = "Invalid AssemblyAI API key"
                     raise ProviderAuthenticationError(
-                        "Invalid AssemblyAI API key",
+                        msg,
                         provider="assemblyai",
                         operation="poll_transcript",
                         original_error=e,

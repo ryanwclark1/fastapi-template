@@ -145,9 +145,12 @@ class AccentAuthClient:
             RuntimeError: If accent-auth-client is not installed
         """
         if not ACCENT_AUTH_CLIENT_AVAILABLE:
-            raise RuntimeError(
+            msg = (
                 "accent-auth-client library is required but not installed. "
                 "Install with: pip install accent-auth-client"
+            )
+            raise RuntimeError(
+                msg
             )
 
         settings = get_auth_settings()
@@ -229,7 +232,8 @@ class AccentAuthClient:
             MissingPermissionsTokenException: If token lacks required ACL
         """
         if not self._client:
-            raise RuntimeError("Client not initialized. Use 'async with' context manager.")
+            msg = "Client not initialized. Use 'async with' context manager."
+            raise RuntimeError(msg)
 
         # Use official client in thread pool (it's synchronous)
         token_dict = await asyncio.to_thread(
@@ -272,7 +276,8 @@ class AccentAuthClient:
             MissingPermissionsTokenException: If token lacks required ACL
         """
         if not self._client:
-            raise RuntimeError("Client not initialized. Use 'async with' context manager.")
+            msg = "Client not initialized. Use 'async with' context manager."
+            raise RuntimeError(msg)
 
         return await asyncio.to_thread(
             self._client.token.check,
@@ -314,7 +319,8 @@ class AccentAuthClient:
             token: Token to revoke
         """
         if not self._client:
-            raise RuntimeError("Client not initialized. Use 'async with' context manager.")
+            msg = "Client not initialized. Use 'async with' context manager."
+            raise RuntimeError(msg)
 
         await asyncio.to_thread(self._client.token.revoke, token)
 
@@ -357,17 +363,23 @@ def get_accent_auth_client() -> AccentAuthClient:
         RuntimeError: If accent-auth-client is not installed
     """
     if not ACCENT_AUTH_CLIENT_AVAILABLE:
-        raise RuntimeError(
+        msg = (
             "accent-auth-client library is required but not installed. "
             "Install with: pip install accent-auth-client"
+        )
+        raise RuntimeError(
+            msg
         )
 
     settings = get_auth_settings()
 
     if not settings.service_url:
-        raise ValueError(
+        msg = (
             "AUTH_SERVICE_URL must be configured for Accent-Auth. "
             "Set AUTH_SERVICE_URL environment variable or configure in settings."
+        )
+        raise ValueError(
+            msg
         )
 
     return AccentAuthClient()

@@ -267,7 +267,8 @@ class JSONImporter(BaseImporter[T]):
             if not isinstance(records_list, list):
                 raise ImportError(f"Expected '{self.records_key}' to be an array")
         else:
-            raise ImportError("JSON must be an array or object with records")
+            msg = "JSON must be an array or object with records"
+            raise ImportError(msg)
 
         records = []
         for row_num, row in enumerate(records_list, start=1):
@@ -320,7 +321,8 @@ class ExcelImporter(BaseImporter[T]):
         try:
             from openpyxl import load_workbook
         except ImportError as err:
-            raise ImportError("openpyxl is required for Excel import") from err
+            msg = "openpyxl is required for Excel import"
+            raise ImportError(msg) from err
 
         wb = load_workbook(file_path, read_only=True, data_only=True)
         ws = wb[self.sheet_name] if self.sheet_name else wb.active
@@ -332,7 +334,8 @@ class ExcelImporter(BaseImporter[T]):
         try:
             from openpyxl import load_workbook
         except ImportError as err:
-            raise ImportError("openpyxl is required for Excel import") from err
+            msg = "openpyxl is required for Excel import"
+            raise ImportError(msg) from err
 
         wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
         ws = wb[self.sheet_name] if self.sheet_name else wb.active

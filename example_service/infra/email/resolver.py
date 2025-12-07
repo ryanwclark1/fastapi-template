@@ -378,9 +378,12 @@ def get_email_config_resolver() -> EmailConfigResolver:
     """
     global _resolver
     if _resolver is None:
-        raise RuntimeError(
+        msg = (
             "Email config resolver not initialized. "
             "Call initialize_email_config_resolver() during app startup."
+        )
+        raise RuntimeError(
+            msg
         )
     return _resolver
 

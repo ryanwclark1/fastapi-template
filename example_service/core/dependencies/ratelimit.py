@@ -104,7 +104,9 @@ def rate_limit(
             key = f"ip:{client_ip}:{request.url.path}"
 
         # Check rate limit
-        metadata = await check_rate_limit(limiter, key, limit, window, endpoint=request.url.path)
+        metadata = await check_rate_limit(
+            limiter, key, limit, window, endpoint=request.url.path
+        )
 
         # Store metadata in request state for access in route handler
         request.state.rate_limit = metadata
@@ -150,7 +152,8 @@ def per_user_rate_limit(limit: int, window: int = 60) -> DependsParam:
         """
         user = getattr(request.state, "user", None)
         if not user:
-            raise ValueError("User not authenticated for per-user rate limit")
+            msg = "User not authenticated for per-user rate limit"
+            raise ValueError(msg)
         return f"user:{user.id}:{request.url.path}"
 
     return rate_limit(limit=limit, window=window, key_func=user_key_func)
@@ -192,7 +195,8 @@ def per_api_key_rate_limit(limit: int, window: int = 60) -> DependsParam:
         """
         api_key = getattr(request.state, "api_key", None)
         if not api_key:
-            raise ValueError("API key not present for API key rate limit")
+            msg = "API key not present for API key rate limit"
+            raise ValueError(msg)
         return f"apikey:{api_key}:{request.url.path}"
 
     return rate_limit(limit=limit, window=window, key_func=api_key_func)

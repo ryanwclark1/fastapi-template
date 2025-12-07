@@ -103,13 +103,15 @@ class StorageClient:
             StorageClientError: If aioboto3 is not installed or storage is not configured.
         """
         if not AIOBOTO3_AVAILABLE:
+            msg = "aioboto3 is required for storage support. Install with: pip install aioboto3"
             raise StorageNotConfiguredError(
-                "aioboto3 is required for storage support. Install with: pip install aioboto3"
+                msg
             )
 
         if not settings.is_configured:
+            msg = "Storage is not configured. Set STORAGE_ENABLED=true and provide credentials."
             raise StorageNotConfiguredError(
-                "Storage is not configured. Set STORAGE_ENABLED=true and provide credentials."
+                msg
             )
 
         self.settings = settings
@@ -273,8 +275,9 @@ class StorageClient:
 
             # Enter the context manager
             if self._client_context is None:
+                msg = "Failed to create S3 client context"
                 raise StorageError(
-                    "Failed to create S3 client context",
+                    msg,
                     code="STORAGE_CLIENT_ERROR",
                 )
             self._client = await self._client_context.__aenter__()
@@ -300,7 +303,7 @@ class StorageClient:
             try:
                 await self._client_context.__aexit__(None, None, None)
             except Exception as e:
-                logger.warning(f"Error closing storage client: {e}")
+                logger.warning("Error closing storage client: %s", e)
             finally:
                 self._client = None
                 self._client_context = None
@@ -497,7 +500,7 @@ class StorageClient:
             )
             url: str = str(url_raw)
 
-            logger.debug(f"Generated presigned download URL for {key} (expires in {expires_in}s)")
+            logger.debug("Generated presigned download URL for %s (expires in %ss)", key, expires_in)
             return url
 
         except ClientError as e:
@@ -710,7 +713,7 @@ class StorageClient:
                     if on_progress:
                         on_progress(key, True, None)
 
-                    logger.debug(f"Successfully uploaded file in batch: {key}")
+                    logger.debug("Successfully uploaded file in batch: %s", key)
                     return {
                         "key": key,
                         "success": True,
@@ -723,7 +726,8 @@ class StorageClient:
                 except Exception as e:
                     error_msg = str(e)
                     logger.warning(
-                        f"Failed to upload file in batch: {key}",
+                        "Failed to upload file in batch: %s",
+                        key,
                         extra={"error": error_msg},
                     )
 
@@ -748,7 +752,7 @@ class StorageClient:
             if isinstance(result, Exception):
                 key = files[i][0]
                 error_msg = str(result)
-                logger.error(f"Unexpected error uploading {key}: {error_msg}")
+                logger.error("Unexpected error uploading %s: %s", key, error_msg)
                 processed_results.append(
                     {
                         "key": key,
@@ -763,7 +767,9 @@ class StorageClient:
 
         successful_count = sum(1 for r in processed_results if r["success"])
         logger.info(
-            f"Batch upload completed: {successful_count}/{len(files)} successful",
+            "Batch upload completed: %s/%s successful",
+            successful_count,
+            len(files),
             extra={
                 "total": len(files),
                 "successful": successful_count,
@@ -811,7 +817,7 @@ class StorageClient:
                     if on_progress:
                         on_progress(key, True, None)
 
-                    logger.debug(f"Successfully downloaded file in batch: {key}")
+                    logger.debug("Successfully downloaded file in batch: %s", key)
                     return {
                         "key": key,
                         "success": True,
@@ -823,7 +829,8 @@ class StorageClient:
                 except Exception as e:
                     error_msg = str(e)
                     logger.warning(
-                        f"Failed to download file in batch: {key}",
+                        "Failed to download file in batch: %s",
+                        key,
                         extra={"error": error_msg},
                     )
 
@@ -848,7 +855,7 @@ class StorageClient:
             if isinstance(result, Exception):
                 key = keys[i]
                 error_msg = str(result)
-                logger.error(f"Unexpected error downloading {key}: {error_msg}")
+                logger.error("Unexpected error downloading %s: %s", key, error_msg)
                 processed_results.append(
                     {
                         "key": key,
@@ -863,7 +870,9 @@ class StorageClient:
 
         successful_count = sum(1 for r in processed_results if r["success"])
         logger.info(
-            f"Batch download completed: {successful_count}/{len(keys)} successful",
+            "Batch download completed: %s/%s successful",
+            successful_count,
+            len(keys),
             extra={
                 "total": len(keys),
                 "successful": successful_count,
@@ -908,7 +917,8 @@ class StorageClient:
         """
         if dry_run:
             logger.info(
-                f"DRY RUN: Would delete {len(keys)} files",
+                "DRY RUN: Would delete %s files",
+                len(keys),
                 extra={"keys": keys[:10]},  # Log first 10 keys
             )
             return {
@@ -927,13 +937,14 @@ class StorageClient:
             async with semaphore:
                 try:
                     await self.delete_file(key=key)
-                    logger.debug(f"Successfully deleted file in batch: {key}")
+                    logger.debug("Successfully deleted file in batch: %s", key)
                     return (key, True, None)
 
                 except Exception as e:
                     error_msg = str(e)
                     logger.warning(
-                        f"Failed to delete file in batch: {key}",
+                        "Failed to delete file in batch: %s",
+                        key,
                         extra={"error": error_msg},
                     )
                     return (key, False, error_msg)
@@ -947,7 +958,7 @@ class StorageClient:
             if isinstance(result, Exception):
                 key = keys[i]
                 error_msg = str(result)
-                logger.error(f"Unexpected error deleting {key}: {error_msg}")
+                logger.error("Unexpected error deleting %s: %s", key, error_msg)
                 failed.append({"key": key, "error": error_msg})
             # Type narrowing: result is tuple[str, bool, str | None] here
             elif isinstance(result, tuple) and len(result) == 3:
@@ -958,11 +969,13 @@ class StorageClient:
                     failed.append({"key": key, "error": error or "Unknown error"})
             else:
                 # Fallback for unexpected result type
-                logger.warning(f"Unexpected result type: {type(result)}")
+                logger.warning("Unexpected result type: %s", type(result))
                 failed.append({"key": keys[i], "error": "Unexpected result format"})
 
         logger.info(
-            f"Batch deletion completed: {len(deleted)}/{len(keys)} deleted",
+            "Batch deletion completed: %s/%s deleted",
+            len(deleted),
+            len(keys),
             extra={
                 "total": len(keys),
                 "deleted": len(deleted),
@@ -1024,7 +1037,11 @@ class StorageClient:
             )
 
             logger.info(
-                f"File copied: {source_bucket}/{source_key} -> {dest_bucket}/{dest_key}",
+                "File copied: %s/%s -> %s/%s",
+                source_bucket,
+                source_key,
+                dest_bucket,
+                dest_key,
                 extra={
                     "source_bucket": source_bucket,
                     "source_key": source_key,
@@ -1036,7 +1053,9 @@ class StorageClient:
 
         except ClientError as e:
             logger.exception(
-                f"Failed to copy file from {source_key} to {dest_key}",
+                "Failed to copy file from %s to %s",
+                source_key,
+                dest_key,
                 extra={"error": str(e)},
             )
             raise map_boto_error(e, operation="copy", key=source_key) from e
@@ -1103,7 +1122,11 @@ class StorageClient:
             await self.delete_file(key=source_key, bucket=source_bucket)
 
             logger.info(
-                f"File moved: {source_bucket}/{source_key} -> {dest_bucket}/{dest_key}",
+                "File moved: %s/%s -> %s/%s",
+                source_bucket,
+                source_key,
+                dest_bucket,
+                dest_key,
                 extra={
                     "source_bucket": source_bucket,
                     "source_key": source_key,
@@ -1115,7 +1138,9 @@ class StorageClient:
 
         except Exception as e:
             logger.exception(
-                f"Failed to move file from {source_key} to {dest_key}",
+                "Failed to move file from %s to %s",
+                source_key,
+                dest_key,
                 extra={"error": str(e)},
             )
             raise StorageError(
@@ -1195,7 +1220,8 @@ class StorageClient:
                     )
 
             logger.info(
-                f"Listed {len(files)} files",
+                "Listed %s files",
+                len(files),
                 extra={
                     "bucket": bucket,
                     "prefix": prefix,

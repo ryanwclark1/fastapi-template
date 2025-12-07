@@ -195,15 +195,17 @@ class OtelSettings(BaseSettings):
     def validate_enabled_requires_endpoint(self) -> OtelSettings:
         """Validate that if tracing is enabled, an endpoint must be provided."""
         if self.enabled and not self.endpoint:
-            raise ValueError("OTEL endpoint must be provided when tracing is enabled")
+            msg = "OTEL endpoint must be provided when tracing is enabled"
+            raise ValueError(msg)
         return self
 
     @model_validator(mode="after")
     def validate_tls_or_insecure(self) -> OtelSettings:
         """Validate that tls_enabled and insecure are mutually exclusive."""
         if self.tls_enabled and self.insecure:
+            msg = "Cannot use both tls_enabled=True and insecure=True - they are mutually exclusive"
             raise ValueError(
-                "Cannot use both tls_enabled=True and insecure=True - they are mutually exclusive"
+                msg
             )
         return self
 

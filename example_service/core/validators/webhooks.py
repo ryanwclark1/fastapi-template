@@ -37,7 +37,8 @@ def validate_event_types(values: list[str]) -> list[str]:
         ValueError: If any event type is empty after stripping.
     """
     if not all(event_type.strip() for event_type in values):
-        raise ValueError("Event types cannot be empty strings")
+        msg = "Event types cannot be empty strings"
+        raise ValueError(msg)
     return [event_type.strip() for event_type in values]
 
 

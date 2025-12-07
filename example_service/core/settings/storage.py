@@ -374,9 +374,12 @@ class StorageSettings(BaseSettings):
         has_secret_key = self.secret_key is not None
 
         if has_access_key != has_secret_key:
-            raise ValueError(
+            msg = (
                 "Both access_key and secret_key must be provided together when using "
                 "static credentials. Provide both or neither (for IAM role authentication)."
+            )
+            raise ValueError(
+                msg
             )
 
         return self
@@ -440,7 +443,8 @@ class StorageSettings(BaseSettings):
             Includes credentials (if provided), endpoint, SSL settings, and region.
         """
         if not self.is_configured:
-            raise ValueError("Storage not configured")
+            msg = "Storage not configured"
+            raise ValueError(msg)
 
         config: dict[str, Any] = {
             "region_name": self.region,

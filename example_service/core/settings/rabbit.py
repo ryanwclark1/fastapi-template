@@ -343,7 +343,8 @@ class RabbitSettings(BaseSettings):
             ValueError: If RabbitMQ is not enabled.
         """
         if not self.enabled:
-            raise ValueError("RabbitMQ is not enabled")
+            msg = "RabbitMQ is not enabled"
+            raise ValueError(msg)
         return self.url
 
     def get_prefixed_queue(self, queue_name: str) -> str:

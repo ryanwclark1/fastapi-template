@@ -237,7 +237,8 @@ async def complete_presigned_upload(
         return FileRead.model_validate(completed_file)
 
     except NotFoundError:
-        raise NotFoundError("File", {"id": str(file_id)}) from None
+        msg = "File"
+        raise NotFoundError(msg, {"id": str(file_id)}) from None
     except ValueError as e:
         raise BadRequestException(
             detail=str(e),
@@ -322,7 +323,8 @@ async def get_file(
     file = await service.get_file(file_id)
 
     if file is None:
-        raise NotFoundError("File", {"id": str(file_id)})
+        msg = "File"
+        raise NotFoundError(msg, {"id": str(file_id)})
 
     return FileRead.model_validate(file)
 
@@ -361,7 +363,8 @@ async def get_download_url(
         return FileDownloadResponse(**download_data)
 
     except NotFoundError as err:
-        raise NotFoundError("File", {"id": str(file_id)}) from err
+        msg = "File"
+        raise NotFoundError(msg, {"id": str(file_id)}) from err
     except ValueError as e:
         raise BadRequestException(
             detail=str(e),
@@ -406,7 +409,8 @@ async def delete_file(
         )
 
     except NotFoundError as err:
-        raise NotFoundError("File", {"id": str(file_id)}) from err
+        msg = "File"
+        raise NotFoundError(msg, {"id": str(file_id)}) from err
 
 
 @router.get(
@@ -437,7 +441,8 @@ async def get_processing_status(
         return FileStatusResponse(**status_data)
 
     except NotFoundError as err:
-        raise NotFoundError("File", {"id": str(file_id)}) from err
+        msg = "File"
+        raise NotFoundError(msg, {"id": str(file_id)}) from err
 
 
 # Batch Operations
@@ -642,7 +647,8 @@ async def copy_file(
         return FileRead.model_validate(copied_file)
 
     except NotFoundError as err:
-        raise NotFoundError("File", {"id": str(file_id)}) from err
+        msg = "File"
+        raise NotFoundError(msg, {"id": str(file_id)}) from err
     except ValueError as e:
         raise BadRequestException(
             detail=str(e),
@@ -693,4 +699,5 @@ async def move_file(
         return FileRead.model_validate(moved_file)
 
     except NotFoundError as err:
-        raise NotFoundError("File", {"id": str(file_id)}) from err
+        msg = "File"
+        raise NotFoundError(msg, {"id": str(file_id)}) from err

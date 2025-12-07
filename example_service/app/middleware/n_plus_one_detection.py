@@ -684,7 +684,7 @@ def setup_n_plus_one_monitoring(
                 middleware.record_query(request, statement, execution_time)
     except Exception as exc:
         # Skip event registration for mock engines or if event system fails
-        logger.debug(f"Skipping event registration: {exc}")
+        logger.debug("Skipping event registration: %s", exc)
 
     # Function to set request context
     def set_request_context(request: Any) -> None:

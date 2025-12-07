@@ -77,15 +77,19 @@ class MailgunProvider(BaseEmailProvider):
         super().__init__(config)
 
         if not config.api_key:
-            raise ValueError("Mailgun provider requires api_key")
+            msg = "Mailgun provider requires api_key"
+            raise ValueError(msg)
 
         # Get domain from config_json
         config_json = config.config_json or {}
         self._domain = config_json.get("domain")
         if not self._domain:
-            raise ValueError(
+            msg = (
                 "Mailgun provider requires domain in config_json: "
                 '{"domain": "mail.example.com"}'
+            )
+            raise ValueError(
+                msg
             )
 
         self._api_key = config.api_key

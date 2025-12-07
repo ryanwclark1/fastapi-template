@@ -207,15 +207,17 @@ class AppSettings(BaseSettings):
     def validate_production_settings(self) -> AppSettings:
         """Validate settings for production environment."""
         if self.environment == "production" and self.debug:
-            raise ValueError("Debug mode cannot be enabled in production environment")
+            msg = "Debug mode cannot be enabled in production environment"
+            raise ValueError(msg)
         return self
 
     @model_validator(mode="after")
     def validate_port_range(self) -> AppSettings:
         """Validate port is not using privileged range in production."""
         if self.environment == "production" and self.port < 1024:
+            msg = "Cannot use privileged port (<1024) in production without proper setup"
             raise ValueError(
-                "Cannot use privileged port (<1024) in production without proper setup"
+                msg
             )
         return self
 

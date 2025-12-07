@@ -135,7 +135,8 @@ class RedisCache:
             RuntimeError: If not connected.
         """
         if self._client is None:
-            raise RuntimeError("Redis client not connected. Call connect() first.")
+            msg = "Redis client not connected. Call connect() first."
+            raise RuntimeError(msg)
         return self._client
 
     def get_client(self) -> Redis:
@@ -278,26 +279,30 @@ class RedisCache:
     async def ttl(self, key: str) -> int:
         """Get the time-to-live for a key in seconds."""
         if self._client is None:
-            raise RuntimeError("Redis client not connected. Call connect() first.")
+            msg = "Redis client not connected. Call connect() first."
+            raise RuntimeError(msg)
         ttl_value = await self._client.ttl(key)
         return int(ttl_value) if ttl_value is not None else -1
 
     def pipeline(self) -> Any:
         """Return a Redis pipeline for batch operations."""
         if self._client is None:
-            raise RuntimeError("Redis client not connected. Call connect() first.")
+            msg = "Redis client not connected. Call connect() first."
+            raise RuntimeError(msg)
         return self._client.pipeline()
 
     def scan_iter(self, match: str | None = None, count: int | None = None) -> Any:
         """Iterate over keys matching a pattern."""
         if self._client is None:
-            raise RuntimeError("Redis client not connected. Call connect() first.")
+            msg = "Redis client not connected. Call connect() first."
+            raise RuntimeError(msg)
         return self._client.scan_iter(match=match, count=count)
 
     async def delete_pattern(self, pattern: str) -> int:
         """Delete all keys matching a pattern."""
         if self._client is None:
-            raise RuntimeError("Redis client not connected. Call connect() first.")
+            msg = "Redis client not connected. Call connect() first."
+            raise RuntimeError(msg)
 
         keys = [key async for key in self.scan_iter(match=pattern)]
         if not keys:

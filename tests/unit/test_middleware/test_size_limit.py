@@ -17,7 +17,8 @@ async def test_size_limit_blocks_large_requests():
         send_messages.append(message)
 
     async def dummy_app(scope, receive, send):  # pragma: no cover - should not be reached
-        raise AssertionError("App should not be called for oversized requests")
+        msg = "App should not be called for oversized requests"
+        raise AssertionError(msg)
 
     middleware = RequestSizeLimitMiddleware(dummy_app, max_size=5)
     scope = {"type": "http", "headers": [(b"content-length", b"10")]}

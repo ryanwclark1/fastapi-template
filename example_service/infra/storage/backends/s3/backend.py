@@ -75,14 +75,12 @@ class S3Backend:
             StorageNotConfiguredError: If aioboto3 not installed or settings invalid
         """
         if not AIOBOTO3_AVAILABLE:
-            raise StorageNotConfiguredError(
-                "aioboto3 is required for S3 backend. Install with: pip install aioboto3"
-            )
+            msg = "aioboto3 is required for S3 backend. Install with: pip install aioboto3"
+            raise StorageNotConfiguredError(msg)
 
         if not settings.is_configured:
-            raise StorageNotConfiguredError(
-                "S3 backend not configured. Set STORAGE_ENABLED=true and provide credentials."
-            )
+            msg = "S3 backend not configured. Set STORAGE_ENABLED=true and provide credentials."
+            raise StorageNotConfiguredError(msg)
 
         self.settings = settings
         self._session = aioboto3.Session()
@@ -142,8 +140,9 @@ class S3Backend:
 
             # Enter the context manager
             if self._client_context is None:
+                msg = "Failed to create S3 client context"
                 raise StorageError(
-                    "Failed to create S3 client context",
+                    msg,
                     code="STORAGE_CLIENT_ERROR",
                 )
             self._client = await self._client_context.__aenter__()
@@ -204,9 +203,14 @@ class S3Backend:
         }
 
         # Add credentials if provided (static auth)
-        if self.settings.access_key is not None and self.settings.secret_key is not None:
+        if (
+            self.settings.access_key is not None
+            and self.settings.secret_key is not None
+        ):
             config["aws_access_key_id"] = self.settings.access_key.get_secret_value()
-            config["aws_secret_access_key"] = self.settings.secret_key.get_secret_value()
+            config["aws_secret_access_key"] = (
+                self.settings.secret_key.get_secret_value()
+            )
 
         # Add endpoint for MinIO/LocalStack
         if self.settings.endpoint:
@@ -224,7 +228,8 @@ class S3Backend:
             StorageNotConfiguredError: If client not initialized
         """
         if self._client is None:
-            raise StorageNotConfiguredError("S3 backend not initialized. Call startup() first.")
+            msg = "S3 backend not initialized. Call startup() first."
+            raise StorageNotConfiguredError(msg)
         return self._client
 
     # ========================================================================
@@ -317,7 +322,9 @@ class S3Backend:
             logger.exception("Failed to upload object to S3", extra={"error": str(e)})
             raise map_boto_error(e, operation="upload", key=key) from e
         except Exception as e:
-            logger.exception("Unexpected error during S3 upload", extra={"error": str(e)})
+            logger.exception(
+                "Unexpected error during S3 upload", extra={"error": str(e)}
+            )
             raise StorageUploadError(
                 f"Failed to upload {key}: {e}",
                 metadata={"key": key, "bucket": bucket, "error": str(e)},
@@ -348,7 +355,9 @@ class S3Backend:
             response = await client.get_object(Bucket=bucket, Key=key)
             file_data_raw = await response["Body"].read()
             file_data: bytes = (
-                bytes(file_data_raw) if not isinstance(file_data_raw, bytes) else file_data_raw
+                bytes(file_data_raw)
+                if not isinstance(file_data_raw, bytes)
+                else file_data_raw
             )
 
             logger.info(
@@ -358,10 +367,14 @@ class S3Backend:
             return file_data
 
         except ClientError as e:
-            logger.exception("Failed to download object from S3", extra={"error": str(e)})
+            logger.exception(
+                "Failed to download object from S3", extra={"error": str(e)}
+            )
             raise map_boto_error(e, operation="download", key=key) from e
         except Exception as e:
-            logger.exception("Unexpected error during S3 download", extra={"error": str(e)})
+            logger.exception(
+                "Unexpected error during S3 download", extra={"error": str(e)}
+            )
             raise StorageDownloadError(
                 f"Failed to download {key}: {e}",
                 metadata={"key": key, "bucket": bucket, "error": str(e)},
@@ -397,7 +410,9 @@ class S3Backend:
             logger.exception("Failed to delete object from S3", extra={"error": str(e)})
             raise map_boto_error(e, operation="delete", key=key) from e
         except Exception as e:
-            logger.exception("Unexpected error during S3 deletion", extra={"error": str(e)})
+            logger.exception(
+                "Unexpected error during S3 deletion", extra={"error": str(e)}
+            )
             raise StorageError(
                 f"Failed to delete {key}: {e}",
                 code="STORAGE_DELETE_ERROR",
@@ -426,7 +441,9 @@ class S3Backend:
             return True
         except ClientError as e:
             error_code = (
-                e.response.get("Error", {}).get("Code", "") if hasattr(e, "response") else ""
+                e.response.get("Error", {}).get("Code", "")
+                if hasattr(e, "response")
+                else ""
             )
             if error_code in {"NoSuchKey", "404", "NotFound"}:
                 return False
@@ -469,14 +486,20 @@ class S3Backend:
 
         except ClientError as e:
             error_code = (
-                e.response.get("Error", {}).get("Code", "") if hasattr(e, "response") else ""
+                e.response.get("Error", {}).get("Code", "")
+                if hasattr(e, "response")
+                else ""
             )
             if error_code in {"NoSuchKey", "404", "NotFound"}:
                 return None
-            logger.exception("Failed to get object metadata from S3", extra={"error": str(e)})
+            logger.exception(
+                "Failed to get object metadata from S3", extra={"error": str(e)}
+            )
             raise map_boto_error(e, operation="get_object_metadata", key=key) from e
         except Exception as e:
-            logger.exception("Unexpected error getting object metadata", extra={"error": str(e)})
+            logger.exception(
+                "Unexpected error getting object metadata", extra={"error": str(e)}
+            )
             raise StorageError(
                 f"Failed to get metadata for {key}: {e}",
                 code="STORAGE_METADATA_ERROR",
@@ -543,7 +566,9 @@ class S3Backend:
 
         except ClientError as e:
             error_code = (
-                e.response.get("Error", {}).get("Code", "") if hasattr(e, "response") else ""
+                e.response.get("Error", {}).get("Code", "")
+                if hasattr(e, "response")
+                else ""
             )
             if error_code in {"NoSuchKey", "404", "NotFound"}:
                 raise StorageFileNotFoundError(
@@ -753,10 +778,14 @@ class S3Backend:
             return cast("str", url)
 
         except ClientError as e:
-            logger.exception("Failed to generate presigned URL", extra={"error": str(e)})
+            logger.exception(
+                "Failed to generate presigned URL", extra={"error": str(e)}
+            )
             raise map_boto_error(e, operation="generate_presigned_url", key=key) from e
         except Exception as e:
-            logger.exception("Unexpected error generating presigned URL", extra={"error": str(e)})
+            logger.exception(
+                "Unexpected error generating presigned URL", extra={"error": str(e)}
+            )
             raise StorageError(
                 f"Failed to generate presigned URL for {key}: {e}",
                 code="STORAGE_PRESIGNED_URL_ERROR",
@@ -815,10 +844,14 @@ class S3Backend:
             return cast("dict[str, Any]", response)
 
         except ClientError as e:
-            logger.exception("Failed to generate presigned POST", extra={"error": str(e)})
+            logger.exception(
+                "Failed to generate presigned POST", extra={"error": str(e)}
+            )
             raise map_boto_error(e, operation="generate_presigned_post", key=key) from e
         except Exception as e:
-            logger.exception("Unexpected error generating presigned POST", extra={"error": str(e)})
+            logger.exception(
+                "Unexpected error generating presigned POST", extra={"error": str(e)}
+            )
             raise StorageError(
                 f"Failed to generate presigned POST for {key}: {e}",
                 code="STORAGE_PRESIGNED_POST_ERROR",
@@ -871,7 +904,9 @@ class S3Backend:
 
         except ClientError as e:
             error_code = (
-                e.response.get("Error", {}).get("Code", "") if hasattr(e, "response") else ""
+                e.response.get("Error", {}).get("Code", "")
+                if hasattr(e, "response")
+                else ""
             )
             if error_code == "BucketAlreadyOwnedByYou":
                 logger.warning(f"Bucket {bucket} already exists and is owned by you")
@@ -879,7 +914,9 @@ class S3Backend:
             logger.exception("Failed to create bucket in S3", extra={"error": str(e)})
             raise map_boto_error(e, operation="create_bucket", key=bucket) from e
         except Exception as e:
-            logger.exception("Unexpected error creating bucket", extra={"error": str(e)})
+            logger.exception(
+                "Unexpected error creating bucket", extra={"error": str(e)}
+            )
             raise StorageError(
                 f"Failed to create bucket {bucket}: {e}",
                 code="STORAGE_CREATE_BUCKET_ERROR",
@@ -919,12 +956,16 @@ class S3Backend:
 
             await client.delete_bucket(Bucket=bucket)
 
-            logger.info("Bucket deleted from S3", extra={"bucket": bucket, "force": force})
+            logger.info(
+                "Bucket deleted from S3", extra={"bucket": bucket, "force": force}
+            )
             return True
 
         except ClientError as e:
             error_code = (
-                e.response.get("Error", {}).get("Code", "") if hasattr(e, "response") else ""
+                e.response.get("Error", {}).get("Code", "")
+                if hasattr(e, "response")
+                else ""
             )
             if error_code == "BucketNotEmpty":
                 raise StorageError(
@@ -935,7 +976,9 @@ class S3Backend:
             logger.exception("Failed to delete bucket from S3", extra={"error": str(e)})
             raise map_boto_error(e, operation="delete_bucket", key=bucket) from e
         except Exception as e:
-            logger.exception("Unexpected error deleting bucket", extra={"error": str(e)})
+            logger.exception(
+                "Unexpected error deleting bucket", extra={"error": str(e)}
+            )
             raise StorageError(
                 f"Failed to delete bucket {bucket}: {e}",
                 code="STORAGE_DELETE_BUCKET_ERROR",
@@ -961,7 +1004,9 @@ class S3Backend:
                 # Try to get bucket location (region)
                 region = None
                 try:
-                    location_response = await client.get_bucket_location(Bucket=bucket["Name"])
+                    location_response = await client.get_bucket_location(
+                        Bucket=bucket["Name"]
+                    )
                     region = location_response.get("LocationConstraint") or "us-east-1"
                 except Exception as e:
                     logger.debug(
@@ -972,7 +1017,9 @@ class S3Backend:
                 # Try to get versioning status
                 versioning_enabled = False
                 try:
-                    versioning_response = await client.get_bucket_versioning(Bucket=bucket["Name"])
+                    versioning_response = await client.get_bucket_versioning(
+                        Bucket=bucket["Name"]
+                    )
                     versioning_enabled = versioning_response.get("Status") == "Enabled"
                 except Exception as e:
                     logger.debug(
@@ -996,7 +1043,9 @@ class S3Backend:
             logger.exception("Failed to list buckets from S3", extra={"error": str(e)})
             raise map_boto_error(e, operation="list_buckets", key="") from e
         except Exception as e:
-            logger.exception("Unexpected error listing buckets", extra={"error": str(e)})
+            logger.exception(
+                "Unexpected error listing buckets", extra={"error": str(e)}
+            )
             raise StorageError(
                 f"Failed to list buckets: {e}",
                 code="STORAGE_LIST_BUCKETS_ERROR",
@@ -1019,7 +1068,9 @@ class S3Backend:
             return True
         except ClientError as e:
             error_code = (
-                e.response.get("Error", {}).get("Code", "") if hasattr(e, "response") else ""
+                e.response.get("Error", {}).get("Code", "")
+                if hasattr(e, "response")
+                else ""
             )
             if error_code in {"NoSuchBucket", "404", "NotFound"}:
                 return False
@@ -1067,7 +1118,9 @@ class S3Backend:
 
         except ClientError as e:
             error_code = (
-                e.response.get("Error", {}).get("Code", "") if hasattr(e, "response") else ""
+                e.response.get("Error", {}).get("Code", "")
+                if hasattr(e, "response")
+                else ""
             )
             if error_code in {"NoSuchKey", "404", "NotFound"}:
                 raise StorageFileNotFoundError(
@@ -1077,7 +1130,9 @@ class S3Backend:
             logger.exception("Failed to set object ACL in S3", extra={"error": str(e)})
             raise map_boto_error(e, operation="set_object_acl", key=key) from e
         except Exception as e:
-            logger.exception("Unexpected error setting object ACL", extra={"error": str(e)})
+            logger.exception(
+                "Unexpected error setting object ACL", extra={"error": str(e)}
+            )
             raise StorageError(
                 f"Failed to set ACL for {key}: {e}",
                 code="STORAGE_SET_ACL_ERROR",
@@ -1114,22 +1169,30 @@ class S3Backend:
                 "grants": response.get("Grants", []),
             }
 
-            logger.info("Retrieved object ACL from S3", extra={"key": key, "bucket": bucket})
+            logger.info(
+                "Retrieved object ACL from S3", extra={"key": key, "bucket": bucket}
+            )
             return acl_data
 
         except ClientError as e:
             error_code = (
-                e.response.get("Error", {}).get("Code", "") if hasattr(e, "response") else ""
+                e.response.get("Error", {}).get("Code", "")
+                if hasattr(e, "response")
+                else ""
             )
             if error_code in {"NoSuchKey", "404", "NotFound"}:
                 raise StorageFileNotFoundError(
                     f"Object not found: {key}",
                     metadata={"key": key, "bucket": bucket},
                 ) from e
-            logger.exception("Failed to get object ACL from S3", extra={"error": str(e)})
+            logger.exception(
+                "Failed to get object ACL from S3", extra={"error": str(e)}
+            )
             raise map_boto_error(e, operation="get_object_acl", key=key) from e
         except Exception as e:
-            logger.exception("Unexpected error getting object ACL", extra={"error": str(e)})
+            logger.exception(
+                "Unexpected error getting object ACL", extra={"error": str(e)}
+            )
             raise StorageError(
                 f"Failed to get ACL for {key}: {e}",
                 code="STORAGE_GET_ACL_ERROR",
@@ -1163,7 +1226,11 @@ class S3Backend:
 
         logger.info(
             "Generated storage class summary",
-            extra={"prefix": prefix, "bucket": bucket or self.settings.bucket, "summary": summary},
+            extra={
+                "prefix": prefix,
+                "bucket": bucket or self.settings.bucket,
+                "summary": summary,
+            },
         )
         return summary
 

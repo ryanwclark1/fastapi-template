@@ -179,7 +179,8 @@ class TestConsulHealthProvider:
 
         # Mock connection error
         async def mock_get(path):
-            raise httpx.ConnectError("Connection refused")
+            msg = "Connection refused"
+            raise httpx.ConnectError(msg)
 
         mock_client._client.get = mock_get
 
@@ -338,9 +339,11 @@ class TestConsulHealthProvider:
             if path == "/v1/agent/self":
                 return mock_agent_response
             if path == "/v1/status/leader":
-                raise httpx.HTTPError("Leader endpoint error")
+                msg = "Leader endpoint error"
+                raise httpx.HTTPError(msg)
             if path == "/v1/agent/services":
-                raise httpx.HTTPError("Services endpoint error")
+                msg = "Services endpoint error"
+                raise httpx.HTTPError(msg)
             raise ValueError(f"Unexpected path: {path}")
 
         mock_client._client.get = mock_get
@@ -420,7 +423,8 @@ class TestConsulHealthProvider:
 
         # Mock an unexpected exception
         async def mock_get(path):
-            raise RuntimeError("Unexpected internal error")
+            msg = "Unexpected internal error"
+            raise RuntimeError(msg)
 
         mock_client._client.get = mock_get
 

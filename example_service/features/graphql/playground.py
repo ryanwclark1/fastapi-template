@@ -62,7 +62,8 @@ def register_playground_routes(
 def _load_assets() -> dict[str, tuple[bytes, str]]:
     base = resources.files("example_service") / "static" / "graphql"
     if not base.is_dir():
-        raise RuntimeError("GraphQL Playground assets are missing. Reinstall the package.")
+        msg = "GraphQL Playground assets are missing. Reinstall the package."
+        raise RuntimeError(msg)
 
     assets: dict[str, tuple[bytes, str]] = {}
     for name, media_type in _ASSET_MEDIA_TYPES.items():

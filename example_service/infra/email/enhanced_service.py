@@ -838,9 +838,12 @@ def get_enhanced_email_service() -> EnhancedEmailService:
     """
     global _service
     if _service is None:
-        raise RuntimeError(
+        msg = (
             "Enhanced email service not initialized. "
             "Call initialize_enhanced_email_service() during app startup."
+        )
+        raise RuntimeError(
+            msg
         )
     return _service
 

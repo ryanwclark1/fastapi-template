@@ -145,7 +145,8 @@ async def get_webhook(
     webhook = await service.get_webhook(webhook_id)
 
     if webhook is None:
-        raise NotFoundError("Webhook", {"id": str(webhook_id)})
+        msg = "Webhook"
+        raise NotFoundError(msg, {"id": str(webhook_id)})
 
     return WebhookRead.model_validate(webhook)
 
@@ -183,7 +184,8 @@ async def update_webhook(
     try:
         webhook = await service.update_webhook(webhook_id, payload)
         if webhook is None:
-            raise NotFoundError("Webhook", {"id": str(webhook_id)})
+            msg = "Webhook"
+            raise NotFoundError(msg, {"id": str(webhook_id)})
 
         await session.commit()
         return WebhookRead.model_validate(webhook)
@@ -221,7 +223,8 @@ async def delete_webhook(
     deleted = await service.delete_webhook(webhook_id)
 
     if not deleted:
-        raise NotFoundError("Webhook", {"id": str(webhook_id)})
+        msg = "Webhook"
+        raise NotFoundError(msg, {"id": str(webhook_id)})
 
     await session.commit()
 
@@ -261,7 +264,8 @@ async def test_webhook(
     webhook = await service.get_webhook(webhook_id)
 
     if webhook is None:
-        raise NotFoundError("Webhook", {"id": str(webhook_id)})
+        msg = "Webhook"
+        raise NotFoundError(msg, {"id": str(webhook_id)})
 
     # Create test delivery record
     delivery = WebhookDelivery(
@@ -351,7 +355,8 @@ async def regenerate_secret(
     webhook = await service.regenerate_secret(webhook_id)
 
     if webhook is None:
-        raise NotFoundError("Webhook", {"id": str(webhook_id)})
+        msg = "Webhook"
+        raise NotFoundError(msg, {"id": str(webhook_id)})
 
     await session.commit()
 
@@ -392,7 +397,8 @@ async def list_deliveries(
     webhook = await service.get_webhook(webhook_id)
 
     if webhook is None:
-        raise NotFoundError("Webhook", {"id": str(webhook_id)})
+        msg = "Webhook"
+        raise NotFoundError(msg, {"id": str(webhook_id)})
 
     deliveries, total = await service.list_deliveries(
         webhook_id,
@@ -438,17 +444,20 @@ async def retry_delivery(
     # Verify webhook exists
     webhook = await service.get_webhook(webhook_id)
     if webhook is None:
-        raise NotFoundError("Webhook", {"id": str(webhook_id)})
+        msg = "Webhook"
+        raise NotFoundError(msg, {"id": str(webhook_id)})
 
     # Get and retry delivery
     delivery = await service.retry_delivery(delivery_id)
     if delivery is None:
-        raise NotFoundError("WebhookDelivery", {"id": str(delivery_id)})
+        msg = "WebhookDelivery"
+        raise NotFoundError(msg, {"id": str(delivery_id)})
 
     # Verify delivery belongs to this webhook
     if delivery.webhook_id != webhook_id:
+        msg = "WebhookDelivery"
         raise NotFoundError(
-            "WebhookDelivery",
+            msg,
             {"id": str(delivery_id), "webhook_id": str(webhook_id)},
         )
 

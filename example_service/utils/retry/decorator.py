@@ -113,7 +113,8 @@ def retry(
 
                     await asyncio.sleep(delay)
 
-            raise RuntimeError("Retry logic error: exhausted all attempts")
+            msg = "Retry logic error: exhausted all attempts"
+            raise RuntimeError(msg)
 
         return async_wrapper
 

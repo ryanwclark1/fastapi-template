@@ -205,7 +205,8 @@ class ConsulSettings(BaseSettings):
         if self.health_check_mode == HealthCheckMode.HTTP and not self.http_check_path.startswith(
             "/"
         ):
-            raise ValueError("http_check_path must start with '/'")
+            msg = "http_check_path must start with '/'"
+            raise ValueError(msg)
         return self
 
     @field_validator("tags", mode="before")

@@ -33,7 +33,6 @@ class S3ClientError(Exception):
     """S3 client operation error."""
 
 
-
 class S3Client:
     """Async S3-compatible storage client.
 
@@ -68,15 +67,15 @@ class S3Client:
             S3ClientError: If aioboto3 is not installed or S3 is not configured.
         """
         if not AIOBOTO3_AVAILABLE:
-            raise S3ClientError(
-                "aioboto3 is required for S3 support. Install with: pip install aioboto3"
-            )
+            msg = "aioboto3 is required for S3 support. Install with: pip install aioboto3"
+            raise S3ClientError(msg)
 
         if not settings.is_s3_configured:
-            raise S3ClientError(
+            msg = (
                 "S3 is not configured. Set BACKUP_S3_BUCKET, "
                 "BACKUP_S3_ACCESS_KEY, and BACKUP_S3_SECRET_KEY."
             )
+            raise S3ClientError(msg)
 
         self.settings = settings
         self._session = aioboto3.Session()
@@ -84,10 +83,14 @@ class S3Client:
     def _get_client_config(self) -> dict[str, str]:
         """Get boto3 client configuration."""
         access_key = (
-            self.settings.s3_access_key.get_secret_value() if self.settings.s3_access_key else ""
+            self.settings.s3_access_key.get_secret_value()
+            if self.settings.s3_access_key
+            else ""
         )
         secret_key = (
-            self.settings.s3_secret_key.get_secret_value() if self.settings.s3_secret_key else ""
+            self.settings.s3_secret_key.get_secret_value()
+            if self.settings.s3_secret_key
+            else ""
         )
         config: dict[str, str] = {
             "aws_access_key_id": access_key,

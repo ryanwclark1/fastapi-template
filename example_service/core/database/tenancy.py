@@ -266,7 +266,7 @@ def register_tenant_events(base_class: type) -> None:
             # Register update event
             event.listen(model_class, "before_update", validate_tenant_on_update)
 
-            logger.debug(f"Registered tenant events for {model_class.__name__}")
+            logger.debug("Registered tenant events for %s", model_class.__name__)
 
 
 async def create_tenant_schema(tenant_id: str, session: AsyncSession) -> None:
@@ -288,19 +288,21 @@ async def create_tenant_schema(tenant_id: str, session: AsyncSession) -> None:
 
     # Check if schema exists
     result = await session.execute(
-        text("SELECT 1 FROM information_schema.schemata WHERE schema_name = :schema_name"),
+        text(
+            "SELECT 1 FROM information_schema.schemata WHERE schema_name = :schema_name"
+        ),
         {"schema_name": schema_name},
     )
 
     if result.scalar():
-        logger.info(f"Schema {schema_name} already exists")
+        logger.info("Schema %s already exists", schema_name)
         return
 
     # Create schema
     await session.execute(text(f"CREATE SCHEMA {schema_name}"))
     await session.commit()
 
-    logger.info(f"Created tenant schema: {schema_name}")
+    logger.info("Created tenant schema: %s", schema_name)
 
 
 async def drop_tenant_schema(tenant_id: str, session: AsyncSession) -> None:
@@ -317,7 +319,7 @@ async def drop_tenant_schema(tenant_id: str, session: AsyncSession) -> None:
     await session.execute(text(f"DROP SCHEMA IF EXISTS {schema_name} CASCADE"))
     await session.commit()
 
-    logger.warning(f"Dropped tenant schema: {schema_name}")
+    logger.warning("Dropped tenant schema: %s", schema_name)
 
 
 def get_tenant_filter(model_class: type, tenant_id: str | None = None) -> Any:
@@ -343,7 +345,8 @@ def get_tenant_filter(model_class: type, tenant_id: str | None = None) -> Any:
     if not tenant_id:
         context = get_tenant_context()
         if not context:
-            raise ValueError("No tenant context available and tenant_id not provided")
+            msg = "No tenant context available and tenant_id not provided"
+            raise ValueError(msg)
         tenant_id = context.tenant_id
 
     return model_class.tenant_id == tenant_id
@@ -351,4 +354,3 @@ def get_tenant_filter(model_class: type, tenant_id: str | None = None) -> Any:
 
 class TenantIsolationError(Exception):
     """Raised when tenant isolation is violated."""
-

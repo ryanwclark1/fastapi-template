@@ -126,7 +126,9 @@ class PaginatedResponse[T](BaseModel):
     total_pages: int = Field(ge=0, description="Total number of pages")
 
     @classmethod
-    def create(cls, items: list[T], total: int, page: int, page_size: int) -> PaginatedResponse[T]:
+    def create(
+        cls, items: list[T], total: int, page: int, page_size: int
+    ) -> PaginatedResponse[T]:
         """Create paginated response with calculated total pages.
 
         Args:
@@ -142,11 +144,14 @@ class PaginatedResponse[T](BaseModel):
             ValueError: If total, page, or page_size are invalid.
         """
         if total < 0:
-            raise ValueError("Total must be non-negative")
+            msg = "Total must be non-negative"
+            raise ValueError(msg)
         if page < 1:
-            raise ValueError("Page must be at least 1")
+            msg = "Page must be at least 1"
+            raise ValueError(msg)
         if page_size < 1 or page_size > 1000:
-            raise ValueError("Page size must be between 1 and 1000")
+            msg = "Page size must be between 1 and 1000"
+            raise ValueError(msg)
 
         total_pages = (total + page_size - 1) // page_size if total > 0 else 0
         return cls(

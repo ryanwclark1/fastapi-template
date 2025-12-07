@@ -83,7 +83,9 @@ def setup_routers(app: FastAPI) -> None:
                 app.include_router(graphql_router, prefix=graphql_prefix, tags=["graphql"])
                 playground_status = "enabled" if graphql_settings.playground_enabled else "disabled"
                 logger.info(
-                    f"GraphQL endpoint enabled at {graphql_prefix} (playground: {playground_status})"
+                    "GraphQL endpoint enabled at %s (playground: %s)",
+                    graphql_prefix,
+                    playground_status,
                 )
         except ImportError as exc:  # pragma: no cover - optional dependency
             logger.warning("GraphQL endpoint disabled (strawberry not available): %s", exc)

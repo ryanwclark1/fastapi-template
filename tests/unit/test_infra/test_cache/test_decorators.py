@@ -857,7 +857,8 @@ class TestCacheEdgeCases:
         @cached(key_prefix="data", ttl=300)
         async def failing_function(value: int) -> int:
             if value < 0:
-                raise ValueError("Negative value not allowed")
+                msg = "Negative value not allowed"
+                raise ValueError(msg)
             return value * 2
 
         # Should propagate exception

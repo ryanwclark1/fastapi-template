@@ -247,7 +247,8 @@ async def list_objects(
         # Get backend directly to use list_objects method
         backend = storage._backend
         if not backend:
-            raise StorageNotConfiguredError("Storage backend not initialized")
+            msg = "Storage backend not initialized"
+            raise StorageNotConfiguredError(msg)
 
         # Resolve bucket with tenant context
         resolved_bucket = storage._resolve_bucket(_tenant, bucket)

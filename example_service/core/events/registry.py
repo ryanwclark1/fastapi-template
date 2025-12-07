@@ -211,7 +211,8 @@ class EventRegistry:
             event = event_registry.deserialize(payload)
         """
         if "event_type" not in payload:
-            raise ValueError("Payload missing 'event_type'")
+            msg = "Payload missing 'event_type'"
+            raise ValueError(msg)
 
         event_type = payload["event_type"]
         event_version = payload.get("event_version", 1)

@@ -616,7 +616,8 @@ class ReminderRepository(TenantAwareRepository[Reminder]):
 
         reminder = await self.get_with_tags(session, reminder_id, tenant_id=tenant_id)
         if reminder is None:
-            raise NotFoundError("Reminder", {"id": reminder_id})
+            msg = "Reminder"
+            raise NotFoundError(msg, {"id": reminder_id})
         return reminder
 
     async def find_by_tag_id(

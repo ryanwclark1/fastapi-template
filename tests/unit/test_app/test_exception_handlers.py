@@ -144,7 +144,8 @@ def test_configure_exception_handlers_registers_handlers() -> None:
 
     @app.get("/validate")
     def raise_validation() -> None:
-        raise ValueError("boom")
+        msg = "boom"
+        raise ValueError(msg)
 
     client = TestClient(app)
     resp = client.get("/app-exc")

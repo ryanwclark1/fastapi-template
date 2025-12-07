@@ -98,7 +98,8 @@ async def test_audited_decorator_handles_errors(monkeypatch: pytest.MonkeyPatch,
 
     @decorators.audited("thing")
     async def update_item():
-        raise RuntimeError("boom")
+        msg = "boom"
+        raise RuntimeError(msg)
 
     with pytest.raises(RuntimeError):
         await update_item()

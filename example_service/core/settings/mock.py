@@ -311,10 +311,13 @@ class MockModeSettings(BaseSettings):
 
             app_settings = get_app_settings()
             if app_settings.environment == "production":
-                raise ValueError(
+                msg = (
                     "CRITICAL SECURITY ERROR: Mock mode (MOCK_MODE=true) "
                     "is enabled in production environment. This bypasses all authentication "
                     "and MUST NOT be used in production. Set MOCK_MODE=false."
+                )
+                raise ValueError(
+                    msg
                 )
         return self
 

@@ -89,18 +89,18 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             # Record metrics with exemplar linking
             # Exemplars enable click-through from Prometheus/Grafana to Tempo
             if trace_id:
-                http_request_duration_seconds.labels(method=method, endpoint=endpoint).observe(
-                    duration, exemplar={"trace_id": trace_id}
-                )
+                http_request_duration_seconds.labels(
+                    method=method, endpoint=endpoint
+                ).observe(duration, exemplar={"trace_id": trace_id})
 
                 http_requests_total.labels(
                     method=method, endpoint=endpoint, status=status_code
                 ).inc(exemplar={"trace_id": trace_id})
             else:
                 # Fallback without exemplar if tracing unavailable
-                http_request_duration_seconds.labels(method=method, endpoint=endpoint).observe(
-                    duration
-                )
+                http_request_duration_seconds.labels(
+                    method=method, endpoint=endpoint
+                ).observe(duration)
 
                 http_requests_total.labels(
                     method=method, endpoint=endpoint, status=status_code
@@ -157,7 +157,8 @@ def _patch_fastapi_middleware_ordering() -> None:
         self: FastAPI, middleware_class: type[Any], *args: Any, **kwargs: Any
     ) -> None:
         if self.middleware_stack is not None:
-            raise RuntimeError("Cannot add middleware after an application has started")
+            msg = "Cannot add middleware after an application has started"
+            raise RuntimeError(msg)
 
         validator = getattr(middleware_class, "__validate_middleware__", None)
         if callable(validator):
@@ -170,8 +171,14 @@ def _patch_fastapi_middleware_ordering() -> None:
         # Default FastAPI behavior: last added runs first
         self.user_middleware.insert(0, middleware)
 
-        known = [m for m in self.user_middleware if getattr(m, "cls", None) in priority_map]
-        unknown = [m for m in self.user_middleware if getattr(m, "cls", None) not in priority_map]
+        known = [
+            m for m in self.user_middleware if getattr(m, "cls", None) in priority_map
+        ]
+        unknown = [
+            m
+            for m in self.user_middleware
+            if getattr(m, "cls", None) not in priority_map
+        ]
 
         def _get_priority(m: Any) -> int:
             cls = getattr(m, "cls", None)

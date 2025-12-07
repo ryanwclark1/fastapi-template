@@ -43,7 +43,8 @@ async def test_ensure_event_outbox_table_is_idempotent(monkeypatch, postgres_con
     from example_service.infra.events.outbox.models import EventOutbox
 
     def fail_if_called(*args, **kwargs):  # pragma: no cover - only used on failure
-        raise AssertionError("EventOutbox table creation should not be invoked twice")
+        msg = "EventOutbox table creation should not be invoked twice"
+        raise AssertionError(msg)
 
     monkeypatch.setattr(EventOutbox.__table__, "create", fail_if_called)
 

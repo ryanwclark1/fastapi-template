@@ -129,7 +129,8 @@ async def get_flag(
     flag = await service.get_by_key(key)
 
     if not flag:
-        raise NotFoundError("FeatureFlag", {"key": key})
+        msg = "FeatureFlag"
+        raise NotFoundError(msg, {"key": key})
 
     return FeatureFlagResponse.model_validate(flag)
 
@@ -159,7 +160,8 @@ async def update_flag(
     flag = await service.update(key, data)
 
     if not flag:
-        raise NotFoundError("FeatureFlag", {"key": key})
+        msg = "FeatureFlag"
+        raise NotFoundError(msg, {"key": key})
 
     return FeatureFlagResponse.model_validate(flag)
 
@@ -184,7 +186,8 @@ async def delete_flag(
     deleted = await service.delete(key)
 
     if not deleted:
-        raise NotFoundError("FeatureFlag", {"key": key})
+        msg = "FeatureFlag"
+        raise NotFoundError(msg, {"key": key})
 
 
 @router.post(
@@ -213,7 +216,8 @@ async def enable_flag(
     )
 
     if not flag:
-        raise NotFoundError("FeatureFlag", {"key": key})
+        msg = "FeatureFlag"
+        raise NotFoundError(msg, {"key": key})
 
     return FeatureFlagResponse.model_validate(flag)
 
@@ -244,7 +248,8 @@ async def disable_flag(
     )
 
     if not flag:
-        raise NotFoundError("FeatureFlag", {"key": key})
+        msg = "FeatureFlag"
+        raise NotFoundError(msg, {"key": key})
 
     return FeatureFlagResponse.model_validate(flag)
 
@@ -277,7 +282,8 @@ async def create_override(
     # Verify flag exists
     flag = await service.get_by_key(data.flag_key)
     if not flag:
-        raise NotFoundError("FeatureFlag", {"key": data.flag_key})
+        msg = "FeatureFlag"
+        raise NotFoundError(msg, {"key": data.flag_key})
 
     override = await service.create_override(data)
     return FlagOverrideResponse.model_validate(override)
@@ -339,8 +345,9 @@ async def delete_override(
     deleted = await service.delete_override(flag_key, entity_type, entity_id)
 
     if not deleted:
+        msg = "FlagOverride"
         raise NotFoundError(
-            "FlagOverride",
+            msg,
             {"flag_key": flag_key, "entity_type": entity_type, "entity_id": entity_id},
         )
 

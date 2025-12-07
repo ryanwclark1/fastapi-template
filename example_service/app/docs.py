@@ -57,7 +57,9 @@ def configure_documentation(app: FastAPI) -> None:
         _register_oauth_redirect(app, oauth_redirect_url)
 
 
-def _register_swagger_ui(app: FastAPI, docs_url: str, oauth_redirect: str | None) -> None:
+def _register_swagger_ui(
+    app: FastAPI, docs_url: str, oauth_redirect: str | None
+) -> None:
     settings = get_app_settings()
     path = _normalize_path(docs_url)
     config_url = _path_join(path, "swagger-config.json")
@@ -271,7 +273,8 @@ def _resolve_static_directory() -> str:
     try:
         next(static_dir.iterdir(), None)
     except (OSError, FileNotFoundError) as e:
-        raise RuntimeError("Documentation assets are missing. Reinstall the application.") from e
+        msg = "Documentation assets are missing. Reinstall the application."
+        raise RuntimeError(msg) from e
     return str(static_dir)
 
 

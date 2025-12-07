@@ -71,7 +71,8 @@ def create_openai_adapter(
         ValueError: If api_key is not provided
     """
     if not api_key:
-        raise ValueError("OpenAI API key is required")
+        msg = "OpenAI API key is required"
+        raise ValueError(msg)
 
     from example_service.infra.ai.capabilities.adapters.openai import OpenAIAdapter
 
@@ -107,7 +108,8 @@ def create_anthropic_adapter(
         ValueError: If api_key is not provided
     """
     if not api_key:
-        raise ValueError("Anthropic API key is required")
+        msg = "Anthropic API key is required"
+        raise ValueError(msg)
 
     from example_service.infra.ai.capabilities.adapters.anthropic import (
         AnthropicAdapter,
@@ -144,7 +146,8 @@ def create_deepgram_adapter(
         ValueError: If api_key is not provided
     """
     if not api_key:
-        raise ValueError("Deepgram API key is required")
+        msg = "Deepgram API key is required"
+        raise ValueError(msg)
 
     from example_service.infra.ai.capabilities.adapters.deepgram import DeepgramAdapter
 
@@ -363,8 +366,12 @@ def register_builtin_providers(
     # Extract configuration from settings if provided
     if settings:
         openai_api_key = openai_api_key or getattr(settings, "openai_api_key", None)
-        anthropic_api_key = anthropic_api_key or getattr(settings, "anthropic_api_key", None)
-        deepgram_api_key = deepgram_api_key or getattr(settings, "deepgram_api_key", None)
+        anthropic_api_key = anthropic_api_key or getattr(
+            settings, "anthropic_api_key", None
+        )
+        deepgram_api_key = deepgram_api_key or getattr(
+            settings, "deepgram_api_key", None
+        )
         accent_redaction_url = accent_redaction_url or getattr(
             settings, "accent_redaction_url", "http://accent-redaction:8502"
         )
@@ -424,7 +431,9 @@ def register_builtin_providers(
             _register_deepgram(
                 registry,
                 api_key=deepgram_api_key,
-                model_name=getattr(settings, "deepgram_model", "nova-2") if settings else "nova-2",
+                model_name=getattr(settings, "deepgram_model", "nova-2")
+                if settings
+                else "nova-2",
             )
             results["deepgram"] = True
         except Exception as e:

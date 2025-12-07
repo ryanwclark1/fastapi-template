@@ -137,7 +137,8 @@ class AIMetrics:
         from prometheus_client import REGISTRY
 
         if metric_class is None:
-            raise RuntimeError("Prometheus client not available")
+            msg = "Prometheus client not available"
+            raise RuntimeError(msg)
 
         # Check if metric already exists in registry
         for collector in list(REGISTRY._names_to_collectors.values()):

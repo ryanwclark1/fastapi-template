@@ -322,9 +322,11 @@ class AISettings(BaseSettings):
         default=True,
         description="Enable dual-channel audio processing for call recordings",
     )
-    dual_channel_merge_strategy: Literal["timestamp", "sequential", "interleaved"] = Field(
-        default="timestamp",
-        description="Strategy for merging dual-channel transcripts (timestamp|sequential|interleaved)",
+    dual_channel_merge_strategy: Literal["timestamp", "sequential", "interleaved"] = (
+        Field(
+            default="timestamp",
+            description="Strategy for merging dual-channel transcripts (timestamp|sequential|interleaved)",
+        )
     )
 
     # ===== PII Redaction Configuration =====
@@ -503,27 +505,23 @@ class AISettings(BaseSettings):
     @property
     def has_llm_provider(self) -> bool:
         """Check if any LLM provider is configured."""
-        return any(
-            [
-                self.openai_api_key,
-                self.anthropic_api_key,
-                self.google_api_key,
-                self.azure_openai_api_key,
-                self.ollama_base_url,
-            ]
-        )
+        return any([
+            self.openai_api_key,
+            self.anthropic_api_key,
+            self.google_api_key,
+            self.azure_openai_api_key,
+            self.ollama_base_url,
+        ])
 
     @property
     def has_transcription_provider(self) -> bool:
         """Check if any transcription provider is configured."""
-        return any(
-            [
-                self.openai_api_key,
-                self.deepgram_api_key,
-                self.assemblyai_api_key,
-                self.accent_stt_url,
-            ]
-        )
+        return any([
+            self.openai_api_key,
+            self.deepgram_api_key,
+            self.assemblyai_api_key,
+            self.accent_stt_url,
+        ])
 
     @property
     def has_embedding_provider(self) -> bool:
@@ -627,7 +625,8 @@ class AISettings(BaseSettings):
 
         if provider == "openai":
             if not self.openai_api_key:
-                raise ValueError("OpenAI API key not configured")
+                msg = "OpenAI API key not configured"
+                raise ValueError(msg)
             return LLMSettings(
                 provider="openai",
                 api_key=self.openai_api_key,
@@ -639,7 +638,8 @@ class AISettings(BaseSettings):
             )
         if provider == "anthropic":
             if not self.anthropic_api_key:
-                raise ValueError("Anthropic API key not configured")
+                msg = "Anthropic API key not configured"
+                raise ValueError(msg)
             return LLMSettings(
                 provider="anthropic",
                 api_key=self.anthropic_api_key,
@@ -651,7 +651,8 @@ class AISettings(BaseSettings):
             )
         if provider == "google":
             if not self.google_api_key:
-                raise ValueError("Google AI API key not configured")
+                msg = "Google AI API key not configured"
+                raise ValueError(msg)
             return LLMSettings(
                 provider="google",
                 api_key=self.google_api_key,
@@ -667,9 +668,8 @@ class AISettings(BaseSettings):
                 or not self.azure_openai_endpoint
                 or not self.azure_openai_deployment_name
             ):
-                raise ValueError(
-                    "Azure OpenAI not fully configured (requires api_key, endpoint, and deployment_name)"
-                )
+                msg = "Azure OpenAI not fully configured (requires api_key, endpoint, and deployment_name)"
+                raise ValueError(msg)
             return LLMSettings(
                 provider="azure_openai",
                 api_key=self.azure_openai_api_key,
@@ -714,7 +714,8 @@ class AISettings(BaseSettings):
 
         if provider == "openai":
             if not self.openai_api_key:
-                raise ValueError("OpenAI API key not configured for transcription")
+                msg = "OpenAI API key not configured for transcription"
+                raise ValueError(msg)
             return TranscriptionSettings(
                 provider="openai",
                 api_key=self.openai_api_key,
@@ -724,7 +725,8 @@ class AISettings(BaseSettings):
             )
         if provider == "deepgram":
             if not self.deepgram_api_key:
-                raise ValueError("Deepgram API key not configured")
+                msg = "Deepgram API key not configured"
+                raise ValueError(msg)
             return TranscriptionSettings(
                 provider="deepgram",
                 api_key=self.deepgram_api_key,
@@ -734,7 +736,8 @@ class AISettings(BaseSettings):
             )
         if provider == "assemblyai":
             if not self.assemblyai_api_key:
-                raise ValueError("AssemblyAI API key not configured")
+                msg = "AssemblyAI API key not configured"
+                raise ValueError(msg)
             return TranscriptionSettings(
                 provider="assemblyai",
                 api_key=self.assemblyai_api_key,
@@ -772,7 +775,8 @@ class AISettings(BaseSettings):
 
         if provider == "openai":
             if not self.openai_api_key:
-                raise ValueError("OpenAI API key not configured for embeddings")
+                msg = "OpenAI API key not configured for embeddings"
+                raise ValueError(msg)
             return EmbeddingSettings(
                 provider="openai",
                 api_key=self.openai_api_key,
@@ -782,7 +786,8 @@ class AISettings(BaseSettings):
             )
         if provider == "cohere":
             if not self.cohere_api_key:
-                raise ValueError("Cohere API key not configured")
+                msg = "Cohere API key not configured"
+                raise ValueError(msg)
             return EmbeddingSettings(
                 provider="cohere",
                 api_key=self.cohere_api_key,

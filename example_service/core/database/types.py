@@ -141,9 +141,8 @@ class EncryptedString(TypeDecorator):
             return None
 
         if self._fernet is None:
-            raise ValueError(
-                "EncryptedString encryption key not set. Pass key parameter or call mount_vault()."
-            )
+            msg = "EncryptedString encryption key not set. Pass key parameter or call mount_vault()."
+            raise ValueError(msg)
 
         # Encrypt and return as string
         encrypted_bytes = self._fernet.encrypt(value.encode("utf-8"))
@@ -164,7 +163,8 @@ class EncryptedString(TypeDecorator):
             return None
 
         if self._fernet is None:
-            raise ValueError("EncryptedString encryption key not set. Cannot decrypt without key.")
+            msg = "EncryptedString encryption key not set. Cannot decrypt without key."
+            raise ValueError(msg)
 
         # Decrypt and return as string
         decrypted_bytes = self._fernet.decrypt(value.encode("utf-8"))
@@ -184,9 +184,7 @@ def encrypt_value(value: str, key: str | bytes) -> str:
     try:
         from cryptography.fernet import Fernet
     except ImportError as e:
-        msg = (
-            "encrypt_value requires 'cryptography' package. Install with: pip install cryptography"
-        )
+        msg = "encrypt_value requires 'cryptography' package. Install with: pip install cryptography"
         raise ImportError(msg) from e
 
     if isinstance(key, str):
@@ -210,9 +208,7 @@ def decrypt_value(value: str, key: str | bytes) -> str:
     try:
         from cryptography.fernet import Fernet
     except ImportError as e:
-        msg = (
-            "decrypt_value requires 'cryptography' package. Install with: pip install cryptography"
-        )
+        msg = "decrypt_value requires 'cryptography' package. Install with: pip install cryptography"
         raise ImportError(msg) from e
 
     if isinstance(key, str):
@@ -234,9 +230,7 @@ class EncryptedText(EncryptedString):
         >>> class Document(TimestampedBase):
         ...     __tablename__ = "documents"
         ...     title: Mapped[str]
-        ...     sensitive_content: Mapped[str] = mapped_column(
-        ...         EncryptedText(key="your-secret-key")
-        ...     )
+        ...     sensitive_content: Mapped[str] = mapped_column(EncryptedText(key="your-secret-key"))
     """
 
     impl = Text
@@ -277,16 +271,14 @@ class XMLType(types.UserDefinedType[str]):
         ...     sp_metadata: Mapped[str] = mapped_column(XMLType(validate=True))
         >>>
         >>> # Usage:
-        >>> config = SAMLConfig(
-        ...     idp_metadata='<?xml version="1.0"?><metadata>...</metadata>'
-        ... )
+        >>> config = SAMLConfig(idp_metadata='<?xml version="1.0"?><metadata>...</metadata>')
         >>> session.add(config)
         >>> await session.commit()
         >>>
         >>> # Query with XPath (raw SQL):
-        >>> result = await session.execute(text(
-        ...     "SELECT xpath('//EntityDescriptor/@entityID', idp_metadata) FROM saml_configs"
-        ... ))
+        >>> result = await session.execute(
+        ...     text("SELECT xpath('//EntityDescriptor/@entityID', idp_metadata) FROM saml_configs")
+        ... )
 
     Note:
         - **PostgreSQL only**: This type uses PostgreSQL's native XML type.
@@ -347,7 +339,9 @@ class XMLType(types.UserDefinedType[str]):
 
         return process
 
-    def result_processor(self, dialect: Any, coltype: Any) -> Callable[[Any], Any] | None:
+    def result_processor(
+        self, dialect: Any, coltype: Any
+    ) -> Callable[[Any], Any] | None:
         """Process value received from database.
 
         Returns XML as string (pass-through).
@@ -419,9 +413,9 @@ class INETType(types.UserDefinedType[str]):
         >>> session.add(log)
         >>>
         >>> # Query logs from a subnet (raw SQL):
-        >>> result = await session.execute(text(
-        ...     "SELECT * FROM audit_logs WHERE client_ip << '192.168.1.0/24'"
-        ... ))
+        >>> result = await session.execute(
+        ...     text("SELECT * FROM audit_logs WHERE client_ip << '192.168.1.0/24'")
+        ... )
 
     Note:
         - **PostgreSQL only**: Other databases will store as VARCHAR.
@@ -478,7 +472,9 @@ class INETType(types.UserDefinedType[str]):
 
         return process
 
-    def result_processor(self, dialect: Any, coltype: Any) -> Callable[[Any], Any] | None:
+    def result_processor(
+        self, dialect: Any, coltype: Any
+    ) -> Callable[[Any], Any] | None:
         """Process value received from database.
 
         Returns IP address as string (pass-through).
@@ -551,7 +547,9 @@ class CIDRType(types.UserDefinedType[str]):
         _ = dialect
         return None
 
-    def result_processor(self, dialect: Any, coltype: Any) -> Callable[[Any], Any] | None:
+    def result_processor(
+        self, dialect: Any, coltype: Any
+    ) -> Callable[[Any], Any] | None:
         """Pass-through processor."""
         _ = dialect, coltype
         return None
@@ -590,7 +588,9 @@ class MACAddrType(types.UserDefinedType[str]):
         _ = dialect
         return None
 
-    def result_processor(self, dialect: Any, coltype: Any) -> Callable[[Any], Any] | None:
+    def result_processor(
+        self, dialect: Any, coltype: Any
+    ) -> Callable[[Any], Any] | None:
         """Pass-through processor."""
         _ = dialect, coltype
         return None
@@ -634,14 +634,10 @@ class LtreeType(types.UserDefinedType[str]):
         >>> laptops = Category(name="Laptops", path="electronics.computers.laptops")
         >>>
         >>> # Query descendants of electronics
-        >>> stmt = select(Category).where(
-        ...     Category.path.descendant_of("electronics")
-        ... )
+        >>> stmt = select(Category).where(Category.path.descendant_of("electronics"))
         >>>
         >>> # Query with lquery pattern
-        >>> stmt = select(Category).where(
-        ...     Category.path.match("*.computers.*")
-        ... )
+        >>> stmt = select(Category).where(Category.path.match("*.computers.*"))
 
     Note:
         - **PostgreSQL only**: Requires ltree extension
@@ -671,7 +667,9 @@ class LtreeType(types.UserDefinedType[str]):
 
         return process
 
-    def result_processor(self, dialect: Any, coltype: Any) -> Callable[[Any], Any] | None:
+    def result_processor(
+        self, dialect: Any, coltype: Any
+    ) -> Callable[[Any], Any] | None:
         """Process value received from database - wrap in LtreePath."""
         _ = dialect, coltype
 
@@ -945,7 +943,8 @@ class URLType(TypeDecorator[str]):
             raise ValueError(f"Invalid URL format: {e}") from e
 
         if not parsed.scheme:
-            raise ValueError("URL must include a scheme (e.g., https://)")
+            msg = "URL must include a scheme (e.g., https://)"
+            raise ValueError(msg)
 
         if parsed.scheme.lower() not in [s.lower() for s in self.allowed_schemes]:
             raise ValueError(
@@ -954,7 +953,8 @@ class URLType(TypeDecorator[str]):
             )
 
         if self._require_host and not parsed.netloc:
-            raise ValueError("URL must include a host")
+            msg = "URL must include a host"
+            raise ValueError(msg)
 
         return value
 
@@ -984,8 +984,8 @@ class PhoneNumberType(TypeDecorator[str]):
         ...     )
         >>>
         >>> # Various input formats accepted:
-        >>> contact.phone = "(212) 555-1234"      # -> +12125551234
-        >>> contact.phone = "+44 20 7946 0958"    # -> +442079460958
+        >>> contact.phone = "(212) 555-1234"  # -> +12125551234
+        >>> contact.phone = "+44 20 7946 0958"  # -> +442079460958
 
     Note:
         - Requires `phonenumbers` package: pip install phonenumbers
@@ -1053,10 +1053,13 @@ class PhoneNumberType(TypeDecorator[str]):
             raise ValueError(f"Invalid phone number: {e}") from e
 
         if self._validate and self._strict and not phonenumbers.is_valid_number(parsed):
-            raise ValueError("Phone number is not valid for region")
+            msg = "Phone number is not valid for region"
+            raise ValueError(msg)
 
         # Return E.164 format
-        return str(phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164))
+        return str(
+            phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+        )
 
     def process_result_value(self, value: str | None, dialect: Dialect) -> str | None:
         """Pass-through on read (returns E.164 format)."""
@@ -1086,7 +1089,9 @@ def format_phone_national(e164: str, region: str = "US") -> str:
     import phonenumbers
 
     parsed = phonenumbers.parse(e164, region)
-    return str(phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.NATIONAL))
+    return str(
+        phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.NATIONAL)
+    )
 
 
 def format_phone_international(e164: str) -> str:
@@ -1105,7 +1110,9 @@ def format_phone_international(e164: str) -> str:
     import phonenumbers
 
     parsed = phonenumbers.parse(e164)
-    return str(phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL))
+    return str(
+        phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL)
+    )
 
 
 __all__ = [

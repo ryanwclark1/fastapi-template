@@ -91,7 +91,8 @@ class TagService:
         """
         tag = await self._repo.get(self._session, tag_id)
         if tag is None:
-            raise NotFoundError("Tag", {"id": str(tag_id)})
+            msg = "Tag"
+            raise NotFoundError(msg, {"id": str(tag_id)})
 
         lazy_logger.debug(lambda: f"service.get_tag({tag_id}) -> found")
         return tag
@@ -234,6 +235,7 @@ class TagService:
             found_ids = {tag.id for tag in tags}
             missing = set(tag_ids) - found_ids
             if missing:
-                raise NotFoundError("Tag", {"ids": [str(id) for id in missing]})
+                msg = "Tag"
+                raise NotFoundError(msg, {"ids": [str(id) for id in missing]})
 
         return tags

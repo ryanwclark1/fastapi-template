@@ -120,10 +120,11 @@ def search[T](
     if vector is None:
         vector = _detect_search_vector(statement)
         if vector is None:
-            raise ValueError(
+            msg = (
                 "Could not auto-detect search_vector column. "
                 "Please provide the 'vector' parameter explicitly."
             )
+            raise ValueError(msg)
 
     # Use FullTextSearchFilter with appropriate settings
     search_filter = FullTextSearchFilter(
@@ -336,7 +337,8 @@ class SearchableSelect[T]:
             vector = _detect_search_vector(self._statement)
 
         if vector is None:
-            raise ValueError("No search_vector found. Use .using_vector() to specify one.")
+            msg = "No search_vector found. Use .using_vector() to specify one."
+            raise ValueError(msg)
 
         search_filter = FullTextSearchFilter(
             search_column=vector,

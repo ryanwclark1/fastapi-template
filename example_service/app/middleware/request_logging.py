@@ -552,7 +552,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                         form_data[param] = ""
                 return body_bytes, self.masker.mask_dict(form_data)
         except Exception as e:
-            logger.debug(f"Failed to parse request body: {e}")
+            logger.debug("Failed to parse request body: %s", e)
 
         return body_bytes, None
 

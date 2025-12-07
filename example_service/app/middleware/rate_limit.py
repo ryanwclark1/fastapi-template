@@ -86,7 +86,8 @@ class RateLimitMiddleware:
         self.key_func = key_func or self._default_key_func
 
         if self.enabled and self.limiter is None:
-            raise ValueError("limiter is required when rate limiting is enabled")
+            msg = "limiter is required when rate limiting is enabled"
+            raise ValueError(msg)
 
     @staticmethod
     def __validate_middleware__(*args: Any, **kwargs: Any) -> None:
@@ -94,7 +95,8 @@ class RateLimitMiddleware:
         enabled = kwargs.get("enabled", True)
         limiter = kwargs.get("limiter")
         if enabled and limiter is None:
-            raise ValueError("limiter is required when rate limiting is enabled")
+            msg = "limiter is required when rate limiting is enabled"
+            raise ValueError(msg)
 
     @staticmethod
     def _default_key_func(request: Request) -> str:
@@ -151,7 +153,8 @@ class RateLimitMiddleware:
 
         # Validate limiter is set (should be checked in __init__, but type narrowing)
         if self.limiter is None:
-            raise RuntimeError("RateLimitMiddleware.limiter must be set when enabled=True")
+            msg = "RateLimitMiddleware.limiter must be set when enabled=True"
+            raise RuntimeError(msg)
 
         # Construct Request object to use key_func
         # This is lightweight - only parses what we need
@@ -222,7 +225,9 @@ class RateLimitMiddleware:
                 if tracker:
                     tracker.record_failure(str(e))
             except Exception as tracker_error:
-                logger.debug("Failed to record rate limit failure", exc_info=tracker_error)
+                logger.debug(
+                    "Failed to record rate limit failure", exc_info=tracker_error
+                )
 
             logger.error(
                 "Rate limit check failed, allowing request (fail-open)",
@@ -247,13 +252,14 @@ class RateLimitMiddleware:
             if message["type"] == "http.response.start" and rate_limit_metadata:
                 # Inject rate limit headers into response
                 headers = list(message.get("headers", []))
-                headers.extend(
-                    [
-                        (b"x-ratelimit-limit", str(rate_limit_metadata["limit"]).encode()),
-                        (b"x-ratelimit-remaining", str(rate_limit_metadata["remaining"]).encode()),
-                        (b"x-ratelimit-reset", str(rate_limit_metadata["reset"]).encode()),
-                    ]
-                )
+                headers.extend([
+                    (b"x-ratelimit-limit", str(rate_limit_metadata["limit"]).encode()),
+                    (
+                        b"x-ratelimit-remaining",
+                        str(rate_limit_metadata["remaining"]).encode(),
+                    ),
+                    (b"x-ratelimit-reset", str(rate_limit_metadata["reset"]).encode()),
+                ])
                 message["headers"] = headers
 
             await send(message)

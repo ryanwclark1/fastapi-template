@@ -88,7 +88,8 @@ if router is not None:
             entity_name = event.data.get("name")
 
             if not entity_id:
-                raise ValueError("Missing required field 'id' in event data")
+                msg = "Missing required field 'id' in event data"
+                raise ValueError(msg)
 
             # Example: Persist to cache or trigger downstream processing
             # In a real application, you might:
@@ -158,7 +159,8 @@ if router is not None:
             changes = event.data.get("changes", {})
 
             if not entity_id:
-                raise ValueError("Missing required field 'id' in event data")
+                msg = "Missing required field 'id' in event data"
+                raise ValueError(msg)
 
             # Example: Apply changes to read model
             # In a real application, you might:
@@ -222,7 +224,8 @@ if router is not None:
             entity_id = event.data.get("id")
 
             if not entity_id:
-                raise ValueError("Missing required field 'id' in event data")
+                msg = "Missing required field 'id' in event data"
+                raise ValueError(msg)
 
             # Example: Clean up related resources
             # In a real application, you might:

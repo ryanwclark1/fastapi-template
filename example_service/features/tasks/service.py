@@ -408,8 +408,9 @@ class TaskManagementService:
             TaskServiceError: If the task fails to trigger.
         """
         if broker is None:
+            msg = "Task broker not configured. Ensure RabbitMQ and Redis are available."
             raise BrokerNotConfiguredError(
-                "Task broker not configured. Ensure RabbitMQ and Redis are available."
+                msg
             )
 
         params = params or {}

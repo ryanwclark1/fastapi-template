@@ -149,7 +149,8 @@ class RecurrenceRule:
         # Extract frequency (required)
         freq_str = parts.get("FREQ")
         if not freq_str:
-            raise ValueError("RRULE must have FREQ component")
+            msg = "RRULE must have FREQ component"
+            raise ValueError(msg)
 
         try:
             frequency = Frequency(freq_str)

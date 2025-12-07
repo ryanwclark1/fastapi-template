@@ -469,7 +469,8 @@ class StepBuilder:
             ValueError: If not building within a pipeline
         """
         if not self._pipeline_builder:
-            raise ValueError("done() can only be called when building within a pipeline")
+            msg = "done() can only be called when building within a pipeline"
+            raise ValueError(msg)
 
         step = self.build()
         self._pipeline_builder._steps.append(step)

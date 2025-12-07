@@ -71,7 +71,8 @@ class SMTPProvider(BaseEmailProvider):
 
         # Validate SMTP-specific config
         if not config.smtp_host:
-            raise ValueError("SMTP host is required for SMTP provider")
+            msg = "SMTP host is required for SMTP provider"
+            raise ValueError(msg)
 
         self._host = config.smtp_host
         self._port = config.smtp_port or 587

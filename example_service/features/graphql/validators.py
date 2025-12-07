@@ -229,7 +229,8 @@ def validate_url(url: str, allowed_schemes: list[str] | None = None) -> str:
         ValueError: URL scheme 'data' not allowed
     """
     if not url or not isinstance(url, str):
-        raise ValueError("URL must be a non-empty string")
+        msg = "URL must be a non-empty string"
+        raise ValueError(msg)
 
     # Strip whitespace
     url = url.strip()
@@ -245,7 +246,8 @@ def validate_url(url: str, allowed_schemes: list[str] | None = None) -> str:
         allowed_schemes = ["http", "https"]
 
     if not parsed.scheme:
-        raise ValueError("URL must include a protocol (http:// or https://)")
+        msg = "URL must include a protocol (http:// or https://)"
+        raise ValueError(msg)
 
     if parsed.scheme.lower() not in allowed_schemes:
         raise ValueError(
@@ -291,7 +293,8 @@ def validate_email(email: str) -> str:
         ValueError: The email address is not valid...
     """
     if not email or not isinstance(email, str):
-        raise ValueError("Email must be a non-empty string")
+        msg = "Email must be a non-empty string"
+        raise ValueError(msg)
 
     email = email.strip()
 
@@ -465,9 +468,12 @@ def validate_username(username: str) -> str:
         ValueError: If username format is invalid
     """
     if not USERNAME_PATTERN.match(username):
-        raise ValueError(
+        msg = (
             "Username must be 3-32 characters and contain only "
             "letters, numbers, underscores, and hyphens"
+        )
+        raise ValueError(
+            msg
         )
     return username
 
@@ -485,7 +491,8 @@ def validate_slug(slug: str) -> str:
         ValueError: If slug format is invalid
     """
     if not SLUG_PATTERN.match(slug):
-        raise ValueError("Slug must contain only lowercase letters, numbers, and hyphens")
+        msg = "Slug must contain only lowercase letters, numbers, and hyphens"
+        raise ValueError(msg)
     return slug
 
 
@@ -509,7 +516,8 @@ def validate_hex_color(color: str) -> str:
         ValueError: Color must be in hex format (#RRGGBB)
     """
     if not HEX_COLOR_PATTERN.match(color):
-        raise ValueError("Color must be in hex format (#RRGGBB)")
+        msg = "Color must be in hex format (#RRGGBB)"
+        raise ValueError(msg)
     return color.upper()
 
 

@@ -526,7 +526,8 @@ class AlembicCommands:
             alembic_config = self.config.get_alembic_config()
             url = alembic_config.get_main_option("sqlalchemy.url")
             if url is None:
-                raise ValueError("sqlalchemy.url is not configured")
+                msg = "sqlalchemy.url is not configured"
+                raise ValueError(msg)
             sync_engine = create_engine(url)
 
             try:
@@ -588,7 +589,8 @@ class AlembicCommands:
             # psycopg3 supports both async and sync operations with the same URL
             url = alembic_config.get_main_option("sqlalchemy.url")
             if url is None:
-                raise ValueError("sqlalchemy.url is not configured")
+                msg = "sqlalchemy.url is not configured"
+                raise ValueError(msg)
             sync_engine = create_engine(url)
 
             try:

@@ -219,7 +219,8 @@ class OutboxProcessor:
             Exception: If publishing fails
         """
         if self._broker is None:
-            raise RuntimeError("Broker not initialized")
+            msg = "Broker not initialized"
+            raise RuntimeError(msg)
 
         # Parse the payload
         payload = json.loads(event.payload)

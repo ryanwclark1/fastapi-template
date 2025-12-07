@@ -92,7 +92,9 @@ class SearchableMixin:
     __search_fields__: ClassVar[list[str]] = []
     __search_config__: ClassVar[str] = "english"
     __search_weights__: ClassVar[dict[str, str]] = {}  # field -> A/B/C/D
-    __search_field_configs__: ClassVar[dict[str, str]] = {}  # field -> config (for multi-lang)
+    __search_field_configs__: ClassVar[
+        dict[str, str]
+    ] = {}  # field -> config (for multi-lang)
     __trigram_fields__: ClassVar[list[str]] = []  # fields with trigram indexes
     __search_vector_name__: ClassVar[str] = "search_vector"
 
@@ -209,7 +211,8 @@ class SearchableMixin:
         """
         table_name = table_name or getattr(cls, "__tablename__", None)
         if not table_name:
-            raise ValueError("Table name is required")
+            msg = "Table name is required"
+            raise ValueError(msg)
 
         # Build the vector expression with NEW. prefix for trigger
         vector_parts = []
@@ -228,7 +231,8 @@ class SearchableMixin:
 
         # Build list of fields to watch for changes
         field_conditions = " OR ".join(
-            f"OLD.{field} IS DISTINCT FROM NEW.{field}" for field in cls.__search_fields__
+            f"OLD.{field} IS DISTINCT FROM NEW.{field}"
+            for field in cls.__search_fields__
         )
 
         return f"""
@@ -263,7 +267,8 @@ CREATE TRIGGER {table_name}_search_update
         """
         table_name = table_name or getattr(cls, "__tablename__", None)
         if not table_name:
-            raise ValueError("Table name is required")
+            msg = "Table name is required"
+            raise ValueError(msg)
 
         # Validate and quote table name for safety
         safe_table = safe_table_reference(table_name)
@@ -299,7 +304,8 @@ CREATE TRIGGER {table_name}_search_update
         """
         table_name = table_name or getattr(cls, "__tablename__", None)
         if not table_name:
-            raise ValueError("Table name is required")
+            msg = "Table name is required"
+            raise ValueError(msg)
 
         statements = []
         for field in cls.__trigram_fields__:
@@ -322,7 +328,8 @@ CREATE TRIGGER {table_name}_search_update
         """
         table_name = table_name or getattr(cls, "__tablename__", None)
         if not table_name:
-            raise ValueError("Table name is required")
+            msg = "Table name is required"
+            raise ValueError(msg)
 
         return f"""
 DROP TRIGGER IF EXISTS {table_name}_search_update ON {table_name};
@@ -349,7 +356,8 @@ DROP FUNCTION IF EXISTS {table_name}_search_vector_update();
         """
         table_name = getattr(cls, "__tablename__", None)
         if not table_name:
-            raise ValueError("Table name is required")
+            msg = "Table name is required"
+            raise ValueError(msg)
 
         sql = cls.get_backfill_sql(table_name)
         result = await session.execute(text(sql))
@@ -377,7 +385,8 @@ DROP FUNCTION IF EXISTS {table_name}_search_vector_update();
         """
         table_name = table_name or getattr(cls, "__tablename__", None)
         if not table_name:
-            raise ValueError("Table name is required")
+            msg = "Table name is required"
+            raise ValueError(msg)
 
         # Validate table name for safety
         from example_service.core.database.validation import validate_identifier
@@ -449,7 +458,8 @@ class MultiLanguageSearchMixin(SearchableMixin):
         """
         table_name = table_name or getattr(cls, "__tablename__", None)
         if not table_name:
-            raise ValueError("Table name is required")
+            msg = "Table name is required"
+            raise ValueError(msg)
 
         # Build CASE expression for language selection
         lang_cases = []
@@ -461,7 +471,9 @@ class MultiLanguageSearchMixin(SearchableMixin):
         )
         lang_cases.append(f"ELSE '{default_config}'")
 
-        lang_case = f"CASE NEW.{cls.__language_column__} " + " ".join(lang_cases) + " END"
+        lang_case = (
+            f"CASE NEW.{cls.__language_column__} " + " ".join(lang_cases) + " END"
+        )
 
         # Build vector parts with dynamic config
         vector_parts = []
@@ -471,7 +483,11 @@ class MultiLanguageSearchMixin(SearchableMixin):
                 f"setweight(to_tsvector({lang_case}, coalesce(NEW.{field}, '')), '{weight}')"
             )
 
-        vector_expr = " || ".join(vector_parts) if vector_parts else f"to_tsvector({lang_case}, '')"
+        vector_expr = (
+            " || ".join(vector_parts)
+            if vector_parts
+            else f"to_tsvector({lang_case}, '')"
+        )
 
         return f"""
 -- Create language-aware trigger function for {table_name}

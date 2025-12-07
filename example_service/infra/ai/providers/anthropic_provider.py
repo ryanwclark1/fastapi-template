@@ -66,9 +66,12 @@ class AnthropicProvider(BaseProvider):
                 max_retries=self.max_retries,
             )
         except ImportError as e:
-            raise ImportError(
+            msg = (
                 "anthropic package is required for Anthropic provider. "
                 "Install with: pip install anthropic"
+            )
+            raise ImportError(
+                msg
             ) from e
 
     def get_provider_name(self) -> str:
@@ -172,8 +175,9 @@ class AnthropicProvider(BaseProvider):
         except Exception as e:
             error_msg = str(e)
             if "401" in error_msg or "authentication" in error_msg.lower() or "api_key" in error_msg.lower():
+                msg = "Invalid Anthropic API key"
                 raise ProviderAuthenticationError(
-                    "Invalid Anthropic API key",
+                    msg,
                     provider="anthropic",
                     operation="llm_generation",
                     original_error=e,
@@ -252,9 +256,12 @@ class AnthropicProvider(BaseProvider):
             return result  # type: ignore[no-any-return]
 
         except ImportError as e:
-            raise ImportError(
+            msg = (
                 "instructor package is required for structured output. "
                 "Install with: pip install instructor"
+            )
+            raise ImportError(
+                msg
             ) from e
         except Exception as e:
             raise ProviderError(

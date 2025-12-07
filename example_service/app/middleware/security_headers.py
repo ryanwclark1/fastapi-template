@@ -132,13 +132,17 @@ class SecurityHeadersMiddleware:
         self._environment = environment or "development"
 
         # HSTS configuration - auto-enable in production if not explicitly set
-        self.enable_hsts = enable_hsts if enable_hsts is not None else (self._is_production or True)
+        self.enable_hsts = (
+            enable_hsts if enable_hsts is not None else (self._is_production or True)
+        )
         self.hsts_max_age = hsts_max_age
         self.hsts_include_subdomains = hsts_include_subdomains
         self.hsts_preload = hsts_preload
 
         # CSP configuration - auto-enable in production if not explicitly set
-        self.enable_csp = enable_csp if enable_csp is not None else (self._is_production or True)
+        self.enable_csp = (
+            enable_csp if enable_csp is not None else (self._is_production or True)
+        )
         self.csp_directives = csp_directives or self._get_default_csp()
 
         # Frame options
@@ -151,7 +155,9 @@ class SecurityHeadersMiddleware:
         self.enable_referrer_policy = enable_referrer_policy
         self.referrer_policy = referrer_policy
         self.enable_permissions_policy = enable_permissions_policy
-        self.permissions_policy = permissions_policy or self._default_permissions_policy()
+        self.permissions_policy = (
+            permissions_policy or self._default_permissions_policy()
+        )
 
         # Server header handling
         self.server_header = server_header
@@ -253,8 +259,12 @@ class SecurityHeadersMiddleware:
         return {
             "default-src": "'self'",
             # Allow Swagger docs (jsDelivr) + AsyncAPI docs (unpkg) to load bundled assets
-            "script-src": (f"'self' 'unsafe-inline' 'unsafe-eval' {swagger_cdn} {unpkg_cdn}"),
-            "style-src": (f"'self' 'unsafe-inline' {swagger_cdn} {unpkg_cdn} {google_fonts_css}"),
+            "script-src": (
+                f"'self' 'unsafe-inline' 'unsafe-eval' {swagger_cdn} {unpkg_cdn}"
+            ),
+            "style-src": (
+                f"'self' 'unsafe-inline' {swagger_cdn} {unpkg_cdn} {google_fonts_css}"
+            ),
             "img-src": "'self' data: https:",
             "font-src": f"'self' data: {swagger_cdn} {google_fonts_assets}",
             "connect-src": f"'self' {swagger_cdn}",
@@ -418,7 +428,8 @@ class SecurityHeadersMiddleware:
         """
         # Validate app is set
         if self.app is None:
-            raise RuntimeError("SecurityHeadersMiddleware.app must be set before use")
+            msg = "SecurityHeadersMiddleware.app must be set before use"
+            raise RuntimeError(msg)
 
         # Only process HTTP requests
         if scope["type"] != "http":
@@ -454,7 +465,9 @@ class SecurityHeadersMiddleware:
                 elif self.server_header is not False:
                     # String = set custom Server header
                     # Type narrowing: at this point server_header must be str
-                    assert isinstance(self.server_header, str), "server_header must be str here"
+                    assert isinstance(self.server_header, str), (
+                        "server_header must be str here"
+                    )
                     headers["server"] = self.server_header
                 # False = keep default Server header (do nothing)
 

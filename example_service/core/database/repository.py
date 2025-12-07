@@ -303,7 +303,9 @@ class BaseRepository[T]:
         result = await session.execute(paginated)
         items = result.scalars().all()
 
-        search_result = SearchResult(items=items, total=total, limit=limit, offset=offset)
+        search_result = SearchResult(
+            items=items, total=total, limit=limit, offset=offset
+        )
         self._lazy.debug(
             lambda: f"db.search: {self.model.__name__}(limit={limit}, offset={offset}) -> {len(items)}/{total} items, page {search_result.page}/{search_result.pages}"
         )
@@ -330,7 +332,9 @@ class BaseRepository[T]:
         self._lazy.debug(lambda: f"db.create: {self.model.__name__}(id={entity_id})")
         return instance
 
-    async def create_many(self, session: AsyncSession, instances: Iterable[T]) -> Sequence[T]:
+    async def create_many(
+        self, session: AsyncSession, instances: Iterable[T]
+    ) -> Sequence[T]:
         """Persist multiple entities.
 
         Args:
@@ -364,7 +368,11 @@ class BaseRepository[T]:
 
         self._logger.info(
             "Entity deleted",
-            extra={"entity": self.model.__name__, "id": str(entity_id), "operation": "db.delete"},
+            extra={
+                "entity": self.model.__name__,
+                "id": str(entity_id),
+                "operation": "db.delete",
+            },
         )
 
     async def update_many(
@@ -489,9 +497,11 @@ class BaseRepository[T]:
             appropriate error handling.
         """
         if not conflict_columns:
-            raise ValueError("conflict_columns must not be empty")
+            msg = "conflict_columns must not be empty"
+            raise ValueError(msg)
         if not update_columns:
-            raise ValueError("update_columns must not be empty")
+            msg = "update_columns must not be empty"
+            raise ValueError(msg)
 
         instances_list = list(instances)
         if not instances_list:
@@ -748,11 +758,14 @@ class BaseRepository[T]:
         try:
             mapper = sa_inspect(self.model)
             if mapper is None:
-                raise AttributeError("No mapper found")
+                msg = "No mapper found"
+                raise AttributeError(msg)
             pk_cols = getattr(mapper, "primary_key", None)
             if pk_cols and len(pk_cols) > 0:
                 # Return the first primary key column's attribute
-                return cast("InstrumentedAttribute[Any]", getattr(self.model, pk_cols[0].name))
+                return cast(
+                    "InstrumentedAttribute[Any]", getattr(self.model, pk_cols[0].name)
+                )
         except Exception as e:
             self._logger.debug("Failed to get primary key column", exc_info=e)
 

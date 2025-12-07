@@ -22,7 +22,9 @@ from example_service.core.schemas.tenant import TenantContext
 logger = logging.getLogger(__name__)
 
 # Context variable for storing tenant information
-_tenant_context: ContextVar[TenantContext | None] = ContextVar("tenant_context", default=None)
+_tenant_context: ContextVar[TenantContext | None] = ContextVar(
+    "tenant_context", default=None
+)
 
 
 def get_tenant_context() -> TenantContext | None:
@@ -63,5 +65,6 @@ def require_tenant() -> TenantContext:
     """
     context = get_tenant_context()
     if not context:
-        raise RuntimeError("No tenant context available")
+        msg = "No tenant context available"
+        raise RuntimeError(msg)
     return context

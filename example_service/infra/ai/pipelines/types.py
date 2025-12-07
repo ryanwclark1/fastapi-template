@@ -421,7 +421,8 @@ class PipelineDefinition:
     def __post_init__(self) -> None:
         """Validate pipeline definition."""
         if not self.name:
-            raise ValueError("Pipeline name is required")
+            msg = "Pipeline name is required"
+            raise ValueError(msg)
 
         step_names = set()
         for step in self.steps:

@@ -141,7 +141,8 @@ class SagaCoordinator:
         self.event_store = event_store or get_event_store()
         # EventPublisher requires a non-None store, so ensure we have one
         if self.event_store is None:
-            raise ValueError("EventStore is required for SagaCoordinator")
+            msg = "EventStore is required for SagaCoordinator"
+            raise ValueError(msg)
         self.publisher = EventPublisher(self.event_store)
         self.api_keys = api_keys or {}
         self.model_overrides = model_overrides or {}

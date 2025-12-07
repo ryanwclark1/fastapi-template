@@ -125,7 +125,8 @@ class PostgresTaskTracker(BaseTaskTracker):
     def _get_session(self) -> AsyncSession:
         """Get a new database session."""
         if self._session_factory is None:
-            raise RuntimeError("Task tracker not connected. Call connect() first.")
+            msg = "Task tracker not connected. Call connect() first."
+            raise RuntimeError(msg)
         return self._session_factory()
 
     async def on_task_start(
@@ -214,7 +215,9 @@ class PostgresTaskTracker(BaseTaskTracker):
         if error is not None:
             error_type = type(error).__name__
             error_message = str(error)
-            error_tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+            error_tb = "".join(
+                traceback.format_exception(type(error), error, error.__traceback__)
+            )
 
         try:
             async with self._get_session() as session, session.begin():
@@ -267,19 +270,19 @@ class PostgresTaskTracker(BaseTaskTracker):
                 for execution in executions:
                     running_for_ms = 0
                     if execution.started_at:
-                        running_for_ms = int((now - execution.started_at).total_seconds() * 1000)
+                        running_for_ms = int(
+                            (now - execution.started_at).total_seconds() * 1000
+                        )
 
-                    tasks.append(
-                        {
-                            "task_id": execution.task_id,
-                            "task_name": execution.task_name,
-                            "started_at": execution.started_at.isoformat()
-                            if execution.started_at
-                            else "",
-                            "running_for_ms": running_for_ms,
-                            "worker_id": execution.worker_id,
-                        }
-                    )
+                    tasks.append({
+                        "task_id": execution.task_id,
+                        "task_name": execution.task_name,
+                        "started_at": execution.started_at.isoformat()
+                        if execution.started_at
+                        else "",
+                        "running_for_ms": running_for_ms,
+                        "worker_id": execution.worker_id,
+                    })
 
                 return tasks
         except Exception as e:
@@ -368,8 +371,12 @@ class PostgresTaskTracker(BaseTaskTracker):
                         "task_id": e.task_id,
                         "task_name": e.task_name,
                         "status": e.status,
-                        "started_at": e.started_at.isoformat() if e.started_at else None,
-                        "finished_at": e.finished_at.isoformat() if e.finished_at else None,
+                        "started_at": e.started_at.isoformat()
+                        if e.started_at
+                        else None,
+                        "finished_at": e.finished_at.isoformat()
+                        if e.finished_at
+                        else None,
                         "duration_ms": e.duration_ms,
                         "return_value": e.return_value,
                         "error_message": e.error_message,

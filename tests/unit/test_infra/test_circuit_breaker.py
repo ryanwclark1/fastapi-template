@@ -59,7 +59,8 @@ def fast_failing_func() -> Callable[[], None]:
     """Create a function that always raises ServiceError."""
 
     async def func() -> None:
-        raise ServiceError("Service unavailable")
+        msg = "Service unavailable"
+        raise ServiceError(msg)
 
     return func
 
@@ -269,7 +270,8 @@ class TestCircuitBreakerCallProtection:
         """Test unexpected exceptions don't affect circuit state."""
 
         async def unexpected_error_func() -> None:
-            raise UnexpectedError("Unexpected issue")
+            msg = "Unexpected issue"
+            raise UnexpectedError(msg)
 
         initial_state = breaker.state
 
@@ -301,7 +303,8 @@ class TestCircuitBreakerDecoratorPattern:
 
         @breaker.protected
         async def fetch_data() -> None:
-            raise ServiceError("API error")
+            msg = "API error"
+            raise ServiceError(msg)
 
         with pytest.raises(ServiceError):
             await fetch_data()
@@ -345,7 +348,8 @@ class TestCircuitBreakerContextManager:
         """Test async with context manager with failing operation."""
         with pytest.raises(ServiceError):
             async with breaker:
-                raise ServiceError("Operation failed")
+                msg = "Operation failed"
+                raise ServiceError(msg)
 
         assert breaker.total_failures == 1
 
@@ -549,7 +553,8 @@ class TestCircuitBreakerEdgeCases:
 
         @breaker.protected
         async def failing_function() -> None:
-            raise ServiceError("Expected failure")
+            msg = "Expected failure"
+            raise ServiceError(msg)
 
         with pytest.raises(ServiceError, match="Expected failure"):
             await failing_function()
@@ -612,7 +617,8 @@ class TestCircuitBreakerIntegration:
 
             # Simulate intermittent failures
             if call_count <= 5:
-                raise ServiceError("Service degraded")
+                msg = "Service degraded"
+                raise ServiceError(msg)
             return "Payment processed"
 
         # Calls 1-5: Failures that open the circuit

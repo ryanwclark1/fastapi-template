@@ -77,8 +77,9 @@ class OpenAITranscriptionProvider(BaseProvider):
                 max_retries=self.max_retries,
             )
         except ImportError as e:
+            msg = "openai package is required for OpenAI provider. Install with: pip install openai"
             raise ImportError(
-                "openai package is required for OpenAI provider. Install with: pip install openai"
+                msg
             ) from e
 
     def get_provider_name(self) -> str:
@@ -164,8 +165,9 @@ class OpenAITranscriptionProvider(BaseProvider):
         except Exception as e:
             error_msg = str(e)
             if "401" in error_msg or "authentication" in error_msg.lower():
+                msg = "Invalid OpenAI API key"
                 raise ProviderAuthenticationError(
-                    "Invalid OpenAI API key",
+                    msg,
                     provider="openai",
                     operation="transcription",
                     original_error=e,
@@ -309,8 +311,9 @@ class OpenAILLMProvider(BaseProvider):
                 max_retries=self.max_retries,
             )
         except ImportError as e:
+            msg = "openai package is required for OpenAI provider. Install with: pip install openai"
             raise ImportError(
-                "openai package is required for OpenAI provider. Install with: pip install openai"
+                msg
             ) from e
 
     def get_provider_name(self) -> str:
@@ -397,8 +400,9 @@ class OpenAILLMProvider(BaseProvider):
         except Exception as e:
             error_msg = str(e)
             if "401" in error_msg or "authentication" in error_msg.lower():
+                msg = "Invalid OpenAI API key"
                 raise ProviderAuthenticationError(
-                    "Invalid OpenAI API key",
+                    msg,
                     provider="openai",
                     operation="llm_generation",
                     original_error=e,
@@ -468,9 +472,12 @@ class OpenAILLMProvider(BaseProvider):
             return result
 
         except ImportError as e:
-            raise ImportError(
+            msg = (
                 "instructor package is required for structured output. "
                 "Install with: pip install instructor"
+            )
+            raise ImportError(
+                msg
             ) from e
         except Exception as e:
             raise ProviderError(
@@ -553,8 +560,9 @@ class OpenAIEmbeddingProvider(BaseProvider):
                 max_retries=self.max_retries,
             )
         except ImportError as e:
+            msg = "openai package is required for OpenAI provider. Install with: pip install openai"
             raise ImportError(
-                "openai package is required for OpenAI provider. Install with: pip install openai"
+                msg
             ) from e
 
         logger.info(
@@ -598,7 +606,8 @@ class OpenAIEmbeddingProvider(BaseProvider):
             texts = [text] if isinstance(text, str) else text
 
             if not texts:
-                raise ValueError("Text list cannot be empty")
+                msg = "Text list cannot be empty"
+                raise ValueError(msg)
 
             # Call OpenAI embeddings API
             response = await self.client.embeddings.create(
@@ -626,8 +635,9 @@ class OpenAIEmbeddingProvider(BaseProvider):
         except Exception as e:
             error_msg = str(e)
             if "401" in error_msg or "authentication" in error_msg.lower():
+                msg = "Invalid OpenAI API key"
                 raise ProviderAuthenticationError(
-                    "Invalid OpenAI API key",
+                    msg,
                     provider="openai",
                     operation="embeddings",
                     original_error=e,
@@ -666,7 +676,8 @@ class OpenAIEmbeddingProvider(BaseProvider):
             ProviderError: If embedding generation fails
         """
         if not texts:
-            raise ValueError("Text list cannot be empty")
+            msg = "Text list cannot be empty"
+            raise ValueError(msg)
 
         # OpenAI supports up to 2048 texts per request, but we cap at 100 for safety
         batch_size = min(batch_size, 100)

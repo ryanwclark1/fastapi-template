@@ -133,7 +133,8 @@ class OrderBy(StatementFilter):
         else:
             self.sort_orders = list(sort_order)
             if len(self.sort_orders) != len(self.fields):
-                raise ValueError("sort_order length must match fields length")
+                msg = "sort_order length must match fields length"
+                raise ValueError(msg)
 
     def apply(self, statement: Select[Any]) -> Select[Any]:
         """Apply ordering to statement."""

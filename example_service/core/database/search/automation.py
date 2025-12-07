@@ -204,7 +204,7 @@ class SearchManager:
         # Get the model class to access search configuration
         model_class = self._get_model_for_table(target)
         if model_class is None:
-            logger.warning(f"Could not find model class for table {table_name}")
+            logger.warning("Could not find model class for table %s", table_name)
             return
 
         # Check if model has search fields defined
@@ -212,17 +212,17 @@ class SearchManager:
         if not search_fields:
             return
 
-        logger.info(f"Setting up full-text search for table: {table_name}")
+        logger.info("Setting up full-text search for table: %s", table_name)
 
         try:
             if self.config.auto_trigger:
                 self._create_trigger(connection, model_class, table_name)
 
             self._processed_tables.add(table_name)
-            logger.info(f"Full-text search configured for {table_name}")
+            logger.info("Full-text search configured for %s", table_name)
 
         except Exception as e:
-            logger.error(f"Failed to setup FTS for {table_name}: {e}")
+            logger.error("Failed to setup FTS for %s: %s", table_name, e)
 
     def _get_model_for_table(self, table: Table) -> Any:
         """Find the model class associated with a table.
@@ -317,7 +317,7 @@ CREATE TRIGGER {trigger_name}
 """
         connection.execute(text(trigger_sql))
 
-        logger.debug(f"Created trigger {trigger_name} for {table_name}")
+        logger.debug("Created trigger %s for %s", trigger_name, table_name)
 
 
 # Global manager instance

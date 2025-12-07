@@ -218,7 +218,9 @@ async def show_connections() -> None:
             connections = result.fetchall()
 
             click.echo()
-            click.echo(f"  {'PID':<8} {'User':<15} {'State':<12} {'Client':<18} {'Query'}")
+            click.echo(
+                f"  {'PID':<8} {'User':<15} {'State':<12} {'Client':<18} {'Query'}"
+            )
             click.echo("  " + "-" * 80)
 
             for conn in connections:
@@ -333,8 +335,12 @@ async def redis_info() -> None:
 
         section("Statistics")
         click.echo(f"  Total Keys:     {db_size}")
-        click.echo(f"  Connected:      {info_clients.get('connected_clients', 0)} clients")
-        click.echo(f"  Total Commands: {info_stats.get('total_commands_processed', 0):,}")
+        click.echo(
+            f"  Connected:      {info_clients.get('connected_clients', 0)} clients"
+        )
+        click.echo(
+            f"  Total Commands: {info_stats.get('total_commands_processed', 0):,}"
+        )
         click.echo(f"  Keyspace Hits:  {info_stats.get('keyspace_hits', 0):,}")
         click.echo(f"  Keyspace Misses:{info_stats.get('keyspace_misses', 0):,}")
 
@@ -378,7 +384,9 @@ async def show_metrics() -> None:
             total_reminders = result.scalar_one()
 
             result = await session.execute(
-                select(func.count()).select_from(Reminder).where(Reminder.is_completed == True)  # noqa: E712
+                select(func.count())
+                .select_from(Reminder)
+                .where(Reminder.is_completed == True)  # noqa: E712
             )
             completed_reminders = result.scalar_one()
 
@@ -481,9 +489,11 @@ def view_logs(lines: int, follow: bool, level: str | None) -> None:
         grep_path = shutil.which("grep")
 
         if not tail_path:
-            raise FileNotFoundError("tail command not found")
+            msg = "tail command not found"
+            raise FileNotFoundError(msg)
         if level and not grep_path:
-            raise FileNotFoundError("grep command not found")
+            msg = "grep command not found"
+            raise FileNotFoundError(msg)
 
         cmd = [tail_path]
 
@@ -498,7 +508,8 @@ def view_logs(lines: int, follow: bool, level: str | None) -> None:
             # Pipe through grep for level filtering
             # tail_path and grep_path are resolved via shutil.which(), level is validated enum
             if grep_path is None:
-                raise FileNotFoundError("grep command not found")
+                msg = "grep command not found"
+                raise FileNotFoundError(msg)
             tail_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)  # noqa: S603
             if tail_proc.stdout is None:
                 error("Failed to create tail process")

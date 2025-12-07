@@ -77,7 +77,7 @@ class Range[T: (date, datetime, int, Decimal)]:
         >>>
         >>> # Check containment
         >>> date(2024, 1, 15) in r  # True
-        >>> date(2024, 2, 1) in r   # False (exclusive upper)
+        >>> date(2024, 2, 1) in r  # False (exclusive upper)
         >>>
         >>> # Integer range: 1-10 inclusive
         >>> r = Range(1, 10, bounds="[]")
@@ -99,8 +99,13 @@ class Range[T: (date, datetime, int, Decimal)]:
         if self.bounds not in ("[]", "[)", "(]", "()"):
             raise ValueError(f"Invalid bounds: {self.bounds}. Use [], [), (], or ()")
 
-        if self.lower is not None and self.upper is not None and self.lower > self.upper:
-            raise ValueError("Lower bound cannot be greater than upper bound")
+        if (
+            self.lower is not None
+            and self.upper is not None
+            and self.lower > self.upper
+        ):
+            msg = "Lower bound cannot be greater than upper bound"
+            raise ValueError(msg)
 
     @property
     def lower_inc(self) -> bool:
@@ -357,7 +362,9 @@ class BaseRangeType(types.UserDefinedType[Range[T]]):
 
         return process
 
-    def result_processor(self, dialect: Any, coltype: Any) -> Callable[[Any], Any] | None:
+    def result_processor(
+        self, dialect: Any, coltype: Any
+    ) -> Callable[[Any], Any] | None:
         """Process value received from database."""
         _ = dialect, coltype
 
@@ -405,15 +412,11 @@ class DateRangeType(BaseRangeType[date]):
         ...     )
         >>>
         >>> # Query events active on a specific date
-        >>> stmt = select(Event).where(
-        ...     Event.active_period.op("@>")(date(2024, 6, 15))
-        ... )
+        >>> stmt = select(Event).where(Event.active_period.op("@>")(date(2024, 6, 15)))
         >>>
         >>> # Query events that overlap a date range
         >>> stmt = select(Event).where(
-        ...     Event.active_period.op("&&")(
-        ...         Range(date(2024, 1, 1), date(2024, 12, 31))
-        ...     )
+        ...     Event.active_period.op("&&")(Range(date(2024, 1, 1), date(2024, 12, 31)))
         ... )
     """
 
@@ -489,9 +492,7 @@ class IntRangeType(BaseRangeType[int]):
         ...     price: Mapped[Decimal]
         >>>
         >>> # Find tier for quantity
-        >>> stmt = select(PriceTier).where(
-        ...     PriceTier.quantity_range.op("@>")(50)
-        ... )
+        >>> stmt = select(PriceTier).where(PriceTier.quantity_range.op("@>")(50))
     """
 
     pg_type: type = INT4RANGE

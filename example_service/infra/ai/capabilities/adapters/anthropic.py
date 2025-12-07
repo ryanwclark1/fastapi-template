@@ -71,12 +71,30 @@ class AnthropicAdapter(ProviderAdapter):
 
     # Pricing per million tokens (2025-01)
     MODEL_PRICING: ClassVar[dict[str, dict[str, Decimal]]] = {
-        "claude-sonnet-4-5-20250929": {"input": Decimal("3.00"), "output": Decimal("15.00")},
-        "claude-3-5-sonnet-20241022": {"input": Decimal("3.00"), "output": Decimal("15.00")},
-        "claude-3-5-haiku-20241022": {"input": Decimal("0.80"), "output": Decimal("4.00")},
-        "claude-3-opus-20240229": {"input": Decimal("15.00"), "output": Decimal("75.00")},
-        "claude-3-sonnet-20240229": {"input": Decimal("3.00"), "output": Decimal("15.00")},
-        "claude-3-haiku-20240307": {"input": Decimal("0.25"), "output": Decimal("1.25")},
+        "claude-sonnet-4-5-20250929": {
+            "input": Decimal("3.00"),
+            "output": Decimal("15.00"),
+        },
+        "claude-3-5-sonnet-20241022": {
+            "input": Decimal("3.00"),
+            "output": Decimal("15.00"),
+        },
+        "claude-3-5-haiku-20241022": {
+            "input": Decimal("0.80"),
+            "output": Decimal("4.00"),
+        },
+        "claude-3-opus-20240229": {
+            "input": Decimal("15.00"),
+            "output": Decimal("75.00"),
+        },
+        "claude-3-sonnet-20240229": {
+            "input": Decimal("3.00"),
+            "output": Decimal("15.00"),
+        },
+        "claude-3-haiku-20240307": {
+            "input": Decimal("0.25"),
+            "output": Decimal("1.25"),
+        },
     }
 
     # Model aliases for convenience
@@ -126,10 +144,11 @@ class AnthropicAdapter(ProviderAdapter):
                     max_retries=self.max_retries,
                 )
             except ImportError as e:
-                raise ImportError(
+                msg = (
                     "anthropic package is required for Anthropic provider. "
                     "Install with: pip install anthropic"
-                ) from e
+                )
+                raise ImportError(msg) from e
         return self._client
 
     def get_registration(self) -> ProviderRegistration:
@@ -306,12 +325,10 @@ class AnthropicAdapter(ProviderAdapter):
                         system_message = content
                     else:
                         # Anthropic uses "user" and "assistant" roles
-                        anthropic_messages.append(
-                            {
-                                "role": role if role in ("user", "assistant") else "user",
-                                "content": content,
-                            }
-                        )
+                        anthropic_messages.append({
+                            "role": role if role in ("user", "assistant") else "user",
+                            "content": content,
+                        })
 
                 client = self._get_client()
 
@@ -386,7 +403,9 @@ class AnthropicAdapter(ProviderAdapter):
         async with TimedExecution() as timer:
             try:
                 messages = input_data.get("messages", [])
-                response_model: type[BaseModel] | None = input_data.get("response_model")
+                response_model: type[BaseModel] | None = input_data.get(
+                    "response_model"
+                )
                 system_message = input_data.get("system")
 
                 if not messages or not response_model:
@@ -425,12 +444,10 @@ class AnthropicAdapter(ProviderAdapter):
                     if role == "system":
                         system_message = content
                     else:
-                        anthropic_messages.append(
-                            {
-                                "role": role if role in ("user", "assistant") else "user",
-                                "content": content,
-                            }
-                        )
+                        anthropic_messages.append({
+                            "role": role if role in ("user", "assistant") else "user",
+                            "content": content,
+                        })
 
                 client = self._get_client()
 

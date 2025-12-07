@@ -249,14 +249,16 @@ class ExcelExporter(BaseExporter[T]):
             from openpyxl import Workbook
             from openpyxl.utils import get_column_letter
         except ImportError as err:
+            msg = "openpyxl is required for Excel export. Install with: pip install openpyxl"
             raise ImportError(
-                "openpyxl is required for Excel export. Install with: pip install openpyxl",
+                msg,
             ) from err
 
         wb = Workbook()
         ws = wb.active
         if ws is None:
-            raise RuntimeError("Workbook has no active worksheet")
+            msg = "Workbook has no active worksheet"
+            raise RuntimeError(msg)
         ws.title = "Export"
 
         if not records:
@@ -296,12 +298,14 @@ class ExcelExporter(BaseExporter[T]):
             from openpyxl import Workbook
             from openpyxl.utils import get_column_letter
         except ImportError as err:
-            raise ImportError("openpyxl is required for Excel export") from err
+            msg = "openpyxl is required for Excel export"
+            raise ImportError(msg) from err
 
         wb = Workbook()
         ws = wb.active
         if ws is None:
-            raise RuntimeError("Workbook has no active worksheet")
+            msg = "Workbook has no active worksheet"
+            raise RuntimeError(msg)
         ws.title = "Export"
 
         if not records:

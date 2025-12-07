@@ -36,59 +36,53 @@ ESCAPE_MAP: Final[dict[str, str]] = {
 UNESCAPE_MAP: Final[dict[str, str]] = {v: k for k, v in ESCAPE_MAP.items()}
 
 # Forbidden format string keys that could enable injection attacks
-FORBIDDEN_FORMAT_KEYS: Final[frozenset[str]] = frozenset(
-    {
-        # Object introspection (dangerous)
-        "__class__",
-        "__dict__",
-        "__doc__",
-        "__module__",
-        "__qualname__",
-        "__annotations__",
-        "__bases__",
-        "__mro__",
-        # Object lifecycle
-        "__init__",
-        "__new__",
-        "__del__",
-        # Attribute access
-        "__getattr__",
-        "__getattribute__",
-        "__setattr__",
-        "__delattr__",
-        # Call and item access
-        "__call__",
-        "__getitem__",
-        "__setitem__",
-        "__delitem__",
-        # Representation
-        "__repr__",
-        "__str__",
-        "__format__",
-        # Other dangerous attributes
-        "__reduce__",
-        "__reduce_ex__",
-        "__subclasshook__",
-        "__init_subclass__",
-        "__set_name__",
-        "__slots__",
-        "__weakref__",
-    }
-)
+FORBIDDEN_FORMAT_KEYS: Final[frozenset[str]] = frozenset({
+    # Object introspection (dangerous)
+    "__class__",
+    "__dict__",
+    "__doc__",
+    "__module__",
+    "__qualname__",
+    "__annotations__",
+    "__bases__",
+    "__mro__",
+    # Object lifecycle
+    "__init__",
+    "__new__",
+    "__del__",
+    # Attribute access
+    "__getattr__",
+    "__getattribute__",
+    "__setattr__",
+    "__delattr__",
+    # Call and item access
+    "__call__",
+    "__getitem__",
+    "__setitem__",
+    "__delitem__",
+    # Representation
+    "__repr__",
+    "__str__",
+    "__format__",
+    # Other dangerous attributes
+    "__reduce__",
+    "__reduce_ex__",
+    "__subclasshook__",
+    "__init_subclass__",
+    "__set_name__",
+    "__slots__",
+    "__weakref__",
+})
 
 # ============================================================================
 # Compiled Regex Patterns (Module-Level for Performance)
 # ============================================================================
 
 # Pattern to detect already-escaped strings (prevents double-escaping)
-_ALREADY_ESCAPED_PATTERN: Final[re.Pattern[str]] = re.compile(
-    r"__(?:DOT|HASH|STAR)__"
-)
+_ALREADY_ESCAPED_PATTERN: Final[re.Pattern[str]] = re.compile(r"__(?:DOT|HASH|STAR)__")
 
 # Pattern to detect non-printable characters (security risk)
-_NON_PRINTABLE_PATTERN: Final[re.Pattern[str]] = re.compile(
-    r"[\x00-\x1f\x7f-\x9f]"
-)
+_NON_PRINTABLE_PATTERN: Final[re.Pattern[str]] = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 
 # Pattern for valid format string field names
 _FORMAT_FIELD_PATTERN: Final[re.Pattern[str]] = re.compile(
@@ -133,7 +127,8 @@ def validate_routing_key_input(value: str) -> None:
         ValueError: Routing key exceeds maximum length of 255 (got 300)
     """
     if not value:
-        raise ValueError("Routing key cannot be empty")
+        msg = "Routing key cannot be empty"
+        raise ValueError(msg)
 
     if len(value) > MAX_ROUTING_KEY_LENGTH:
         raise ValueError(
@@ -143,17 +138,18 @@ def validate_routing_key_input(value: str) -> None:
 
     # Prevent double-escaping
     if _ALREADY_ESCAPED_PATTERN.search(value):
-        raise ValueError(
-            "String appears already escaped (contains __DOT__, __HASH__, or __STAR__)"
-        )
+        msg = "String appears already escaped (contains __DOT__, __HASH__, or __STAR__)"
+        raise ValueError(msg)
 
     # Critical: NULL byte injection
     if "\x00" in value:
-        raise ValueError("Routing key contains NULL byte")
+        msg = "Routing key contains NULL byte"
+        raise ValueError(msg)
 
     # Non-printable characters
     if _NON_PRINTABLE_PATTERN.search(value):
-        raise ValueError("Routing key contains non-printable characters")
+        msg = "Routing key contains non-printable characters"
+        raise ValueError(msg)
 
 
 def is_escaped(value: str) -> bool:
@@ -206,9 +202,7 @@ def escape_routing_key(value: str) -> str:
 
     # Optimized string.replace() chain (benchmark-proven fastest)
     return (
-        value.replace(".", "__DOT__")
-        .replace("#", "__HASH__")
-        .replace("*", "__STAR__")
+        value.replace(".", "__DOT__").replace("#", "__HASH__").replace("*", "__STAR__")
     )
 
 
@@ -228,9 +222,7 @@ def unescape_routing_key(value: str) -> str:
         'user.john'
     """
     return (
-        value.replace("__DOT__", ".")
-        .replace("__HASH__", "#")
-        .replace("__STAR__", "*")
+        value.replace("__DOT__", ".").replace("__HASH__", "#").replace("__STAR__", "*")
     )
 
 
@@ -365,9 +357,8 @@ def safe_format_routing_key(
         )
 
     if _NON_PRINTABLE_PATTERN.search(result):
-        raise RoutingKeySecurityError(
-            "Formatted routing key contains non-printable characters"
-        )
+        msg = "Formatted routing key contains non-printable characters"
+        raise RoutingKeySecurityError(msg)
 
     return result
 
@@ -387,7 +378,6 @@ class RoutingKeySecurityError(ValueError):
     - Output exceeding length limits
     - Non-printable character injection
     """
-
 
 
 __all__ = [

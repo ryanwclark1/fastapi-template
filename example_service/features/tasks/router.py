@@ -196,7 +196,8 @@ async def get_task_details(
     """
     result = await service.get_task_details(task_id)
     if not result:
-        raise NotFoundError("TaskExecution", {"task_id": task_id})
+        msg = "TaskExecution"
+        raise NotFoundError(msg, {"task_id": task_id})
     return result
 
 
@@ -313,7 +314,8 @@ async def get_scheduled_job(
     """
     result = service.get_scheduled_job(job_id)
     if not result:
-        raise NotFoundError("ScheduledJob", {"job_id": job_id})
+        msg = "ScheduledJob"
+        raise NotFoundError(msg, {"job_id": job_id})
     return result
 
 
@@ -333,7 +335,8 @@ async def pause_scheduled_job(
     """
     success = service.pause_job(job_id)
     if not success:
-        raise NotFoundError("ScheduledJob", {"job_id": job_id})
+        msg = "ScheduledJob"
+        raise NotFoundError(msg, {"job_id": job_id})
     return {"job_id": job_id, "paused": True, "message": "Job paused successfully"}
 
 
@@ -353,5 +356,6 @@ async def resume_scheduled_job(
     """
     success = service.resume_job(job_id)
     if not success:
-        raise NotFoundError("ScheduledJob", {"job_id": job_id})
+        msg = "ScheduledJob"
+        raise NotFoundError(msg, {"job_id": job_id})
     return {"job_id": job_id, "resumed": True, "message": "Job resumed successfully"}

@@ -66,9 +66,12 @@ class DeepgramProvider(BaseProvider):
             self.client = DeepgramClient(api_key=self.api_key)
             self.options_class = PrerecordedOptions
         except ImportError as e:
-            raise ImportError(
+            msg = (
                 "deepgram-sdk package is required for Deepgram provider. "
                 "Install with: pip install deepgram-sdk"
+            )
+            raise ImportError(
+                msg
             ) from e
 
     def get_provider_name(self) -> str:
@@ -212,8 +215,9 @@ class DeepgramProvider(BaseProvider):
         except Exception as e:
             error_msg = str(e)
             if "401" in error_msg or "unauthorized" in error_msg.lower():
+                msg = "Invalid Deepgram API key"
                 raise ProviderAuthenticationError(
-                    "Invalid Deepgram API key",
+                    msg,
                     provider="deepgram",
                     operation="transcription",
                     original_error=e,

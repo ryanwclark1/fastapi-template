@@ -94,7 +94,8 @@ class TestTracedHandler:
 
         @traced_handler()
         async def failing_handler(event):
-            raise ValueError("Test error")
+            msg = "Test error"
+            raise ValueError(msg)
 
         with pytest.raises(ValueError, match=r"Test error"):
             await failing_handler(mock_event)
@@ -140,7 +141,8 @@ class TestTracedHandler:
 
         @traced_handler()
         async def failing_handler(event):
-            raise RuntimeError("Crash")
+            msg = "Crash"
+            raise RuntimeError(msg)
 
         with pytest.raises(RuntimeError):
             await failing_handler(mock_event)

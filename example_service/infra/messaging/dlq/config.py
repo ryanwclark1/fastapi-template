@@ -218,7 +218,8 @@ class DLQConfig(BaseSettings):
         """Ensure jitter range is valid (min < max, both positive)."""
         min_jitter, max_jitter = self.jitter_range
         if min_jitter < 0 or max_jitter < 0:
-            raise ValueError("Jitter range values must be positive")
+            msg = "Jitter range values must be positive"
+            raise ValueError(msg)
         if min_jitter >= max_jitter:
             raise ValueError(
                 f"Jitter range min ({min_jitter}) must be < max ({max_jitter})"

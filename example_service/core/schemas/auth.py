@@ -14,12 +14,16 @@ class TokenPayload(BaseModel):
     after validating a token.
     """
 
-    sub: str = Field(min_length=1, max_length=255, description="Subject (user ID or service ID)")
+    sub: str = Field(
+        min_length=1, max_length=255, description="Subject (user ID or service ID)"
+    )
     user_id: str | None = Field(
         default=None, max_length=255, description="User ID if authenticated as user"
     )
     service_id: str | None = Field(
-        default=None, max_length=255, description="Service ID if authenticated as service"
+        default=None,
+        max_length=255,
+        description="Service ID if authenticated as service",
     )
     email: EmailStr | None = Field(default=None, description="User email")
     roles: list[str] = Field(
@@ -32,7 +36,9 @@ class TokenPayload(BaseModel):
         default_factory=dict,
         description="Access Control List with resource permissions",
     )
-    exp: int | None = Field(default=None, ge=0, description="Token expiration timestamp")
+    exp: int | None = Field(
+        default=None, ge=0, description="Token expiration timestamp"
+    )
     iat: int | None = Field(default=None, ge=0, description="Token issued at timestamp")
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="Additional user/service metadata"
@@ -43,7 +49,8 @@ class TokenPayload(BaseModel):
     def validate_roles(cls, v: list[str]) -> list[str]:
         """Validate role names are not empty."""
         if any(not role.strip() for role in v):
-            raise ValueError("Role names cannot be empty or whitespace")
+            msg = "Role names cannot be empty or whitespace"
+            raise ValueError(msg)
         return v
 
     @field_validator("permissions", mode="after")
@@ -51,7 +58,8 @@ class TokenPayload(BaseModel):
     def validate_permissions(cls, v: list[str]) -> list[str]:
         """Validate permission names are not empty."""
         if any(not perm.strip() for perm in v):
-            raise ValueError("Permission names cannot be empty or whitespace")
+            msg = "Permission names cannot be empty or whitespace"
+            raise ValueError(msg)
         return v
 
     model_config = ConfigDict(
@@ -67,7 +75,9 @@ class AuthUser(BaseModel):
     """
 
     user_id: str | None = Field(default=None, max_length=255, description="User ID")
-    service_id: str | None = Field(default=None, max_length=255, description="Service ID")
+    service_id: str | None = Field(
+        default=None, max_length=255, description="Service ID"
+    )
     email: EmailStr | None = Field(default=None, description="User email")
     roles: list[str] = Field(
         default_factory=list, max_length=50, description="User or service roles"
@@ -88,7 +98,8 @@ class AuthUser(BaseModel):
     def validate_roles(cls, v: list[str]) -> list[str]:
         """Validate role names are not empty."""
         if any(not role.strip() for role in v):
-            raise ValueError("Role names cannot be empty or whitespace")
+            msg = "Role names cannot be empty or whitespace"
+            raise ValueError(msg)
         return v
 
     @field_validator("permissions", mode="after")
@@ -96,7 +107,8 @@ class AuthUser(BaseModel):
     def validate_permissions(cls, v: list[str]) -> list[str]:
         """Validate permission names are not empty."""
         if any(not perm.strip() for perm in v):
-            raise ValueError("Permission names cannot be empty or whitespace")
+            msg = "Permission names cannot be empty or whitespace"
+            raise ValueError(msg)
         return v
 
     model_config = ConfigDict(

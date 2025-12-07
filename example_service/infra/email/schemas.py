@@ -76,7 +76,8 @@ class EmailAttachment(BaseModel):
     def model_post_init(self, __context: Any) -> None:
         """Validate that either content or path is provided."""
         if self.content is None and self.path is None:
-            raise ValueError("Either content or path must be provided")
+            msg = "Either content or path must be provided"
+            raise ValueError(msg)
 
 
 class EmailMessage(BaseModel):
@@ -170,7 +171,8 @@ class EmailMessage(BaseModel):
     def model_post_init(self, __context: Any) -> None:
         """Validate that at least one body type is provided."""
         if self.body_text is None and self.body_html is None:
-            raise ValueError("Either body_text or body_html must be provided")
+            msg = "Either body_text or body_html must be provided"
+            raise ValueError(msg)
 
     @property
     def all_recipients(self) -> list[str]:

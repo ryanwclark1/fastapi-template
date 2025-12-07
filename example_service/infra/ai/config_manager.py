@@ -306,7 +306,8 @@ class AIConfigManager:
         if tenant_config.encrypted_api_key:
             key = _get_ai_encryption_key()
             if not key:
-                raise ValueError("AI_ENCRYPTION_KEY environment variable not set")
+                msg = "AI_ENCRYPTION_KEY environment variable not set"
+                raise ValueError(msg)
             api_key = decrypt_value(tenant_config.encrypted_api_key, key)
 
         return ProviderConfig(
@@ -382,7 +383,8 @@ async def encrypt_api_key(api_key: str) -> str:
     """
     key = _get_ai_encryption_key()
     if not key:
-        raise ValueError("AI_ENCRYPTION_KEY environment variable not set")
+        msg = "AI_ENCRYPTION_KEY environment variable not set"
+        raise ValueError(msg)
     return encrypt_value(api_key, key)
 
 
@@ -413,7 +415,8 @@ async def create_tenant_ai_config(
     """
     key = _get_ai_encryption_key()
     if not key:
-        raise ValueError("AI_ENCRYPTION_KEY environment variable not set")
+        msg = "AI_ENCRYPTION_KEY environment variable not set"
+        raise ValueError(msg)
     encrypted_key = encrypt_value(api_key, key)
 
     config = TenantAIConfig(

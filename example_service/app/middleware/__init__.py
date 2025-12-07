@@ -288,7 +288,7 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
         if use_strict_csp
         else "relaxed (docs-compatible, AsyncAPI/Swagger)"
     )
-    logger.info(f"SecurityHeadersMiddleware enabled with {csp_mode} CSP")
+    logger.info("SecurityHeadersMiddleware enabled with %s CSP", csp_mode)
 
     # 4. Metrics Middleware
     # Collects HTTP request metrics for observability
@@ -308,7 +308,7 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
             allow_headers=app_settings.cors_allow_headers,
             max_age=app_settings.cors_max_age,
         )
-        logger.info(f"CORSMiddleware enabled for development with origins: {cors_origins}")
+        logger.info("CORSMiddleware enabled for development with origins: %s", cors_origins)
 
     # 6. Trusted Host Middleware (production only)
     # Validates host headers to prevent host header attacks
@@ -318,7 +318,7 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
             allowed_hosts=app_settings.allowed_hosts,
         )
         logger.info(
-            f"TrustedHostMiddleware enabled for production with hosts: {app_settings.allowed_hosts}"
+            "TrustedHostMiddleware enabled for production with hosts: %s", app_settings.allowed_hosts
         )
 
     # 7. Rate Limiting Middleware (optional, requires Redis)
@@ -352,9 +352,11 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
             RequestSizeLimitMiddleware,
             max_size=app_settings.request_size_limit,
         )
+        size_mb = app_settings.request_size_limit / (1024 * 1024)
         logger.info(
-            f"RequestSizeLimitMiddleware enabled: {app_settings.request_size_limit} bytes "
-            f"({app_settings.request_size_limit / (1024 * 1024):.1f}MB)"
+            "RequestSizeLimitMiddleware enabled: %s bytes (%.1fMB)",
+            app_settings.request_size_limit,
+            size_mb,
         )
 
     # 10. Correlation ID Middleware (for distributed tracing across services)

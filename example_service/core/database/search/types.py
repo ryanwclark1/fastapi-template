@@ -111,7 +111,8 @@ def combine_vectors(
         stmt = filter.apply(stmt)
     """
     if not vectors:
-        raise ValueError("At least one vector is required")
+        msg = "At least one vector is required"
+        raise ValueError(msg)
 
     if len(vectors) == 1:
         return vectors[0]  # type: ignore[return-value]

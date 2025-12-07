@@ -87,13 +87,15 @@ else:
     # Dummy function to avoid NameError, but it won't be used
     async def get_graphql_context(*_args: Any, **_kwargs: Any) -> Any:
         """Dummy function when GraphQL is not available."""
-        raise ImportError("strawberry is required for GraphQL support")
+        msg = "strawberry is required for GraphQL support"
+        raise ImportError(msg)
 
 
 def create_graphql_router() -> APIRouter:
     """Create GraphQL router with settings-based configuration."""
     if GraphQLRouter is None:
-        raise ImportError("strawberry is required for GraphQL support")
+        msg = "strawberry is required for GraphQL support"
+        raise ImportError(msg)
 
     settings = get_graphql_settings()
 

@@ -80,17 +80,21 @@ class SESProvider(BaseEmailProvider):
             ValueError: If required AWS credentials missing
         """
         if not AIOBOTO3_AVAILABLE:
-            raise ImportError(
+            msg = (
                 "AWS SES provider requires aioboto3. "
                 "Install with: pip install aioboto3"
+            )
+            raise ImportError(
+                msg
             )
 
         super().__init__(config)
 
         # Validate AWS-specific config
         if not config.aws_access_key or not config.aws_secret_key:
+            msg = "AWS SES provider requires aws_access_key and aws_secret_key"
             raise ValueError(
-                "AWS SES provider requires aws_access_key and aws_secret_key"
+                msg
             )
 
         self._region = config.aws_region or self.DEFAULT_REGION

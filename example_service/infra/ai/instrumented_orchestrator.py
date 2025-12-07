@@ -178,7 +178,8 @@ class InstrumentedOrchestrator:
 
         # Initialize saga coordinator (requires non-None event_store)
         if self.event_store is None:
-            raise ValueError("EventStore is required for InstrumentedOrchestrator")
+            msg = "EventStore is required for InstrumentedOrchestrator"
+            raise ValueError(msg)
         self._saga = SagaCoordinator(
             registry=self.registry,
             event_store=self.event_store,

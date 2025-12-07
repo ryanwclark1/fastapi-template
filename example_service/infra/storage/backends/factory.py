@@ -33,9 +33,10 @@ def create_storage_backend(settings: StorageSettings) -> StorageBackend:
         await backend.shutdown()
     """
     if not settings.is_configured:
-        raise StorageNotConfiguredError(
+        msg = (
             "Storage not configured. Set STORAGE_ENABLED=true and provide credentials."
         )
+        raise StorageNotConfiguredError(msg)
 
     backend_type = settings.backend
 

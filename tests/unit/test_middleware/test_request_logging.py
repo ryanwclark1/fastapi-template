@@ -281,7 +281,8 @@ class TestRequestLoggingMiddleware:
 
         @app.get("/error")
         async def error_endpoint() -> None:
-            raise ValueError("Test error")
+            msg = "Test error"
+            raise ValueError(msg)
 
         with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
             app.add_middleware(RequestLoggingMiddleware)
@@ -598,7 +599,8 @@ class TestRequestLoggingMiddleware:
 
         @app.get("/error")
         async def error_endpoint() -> dict:
-            raise ValueError("Test error")
+            msg = "Test error"
+            raise ValueError(msg)
 
         app.add_middleware(RequestLoggingMiddleware)
 

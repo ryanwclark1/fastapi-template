@@ -70,7 +70,8 @@ async def test_rate_limit_returns_json_when_exceeded():
         return {"type": "http.request"}
 
     async def app(scope, receive, send):  # pragma: no cover - not reached
-        raise AssertionError("Should not call downstream app on limit")
+        msg = "Should not call downstream app on limit"
+        raise AssertionError(msg)
 
     exc = RateLimitException(
         detail="nope",

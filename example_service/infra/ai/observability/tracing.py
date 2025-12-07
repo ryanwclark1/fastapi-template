@@ -119,7 +119,8 @@ class AITracer:
 
         if self.enabled:
             if trace is None:
-                raise RuntimeError("OpenTelemetry trace module not available")
+                msg = "OpenTelemetry trace module not available"
+                raise RuntimeError(msg)
             self._tracer = trace.get_tracer(tracer_name)
         else:
             self._tracer = None  # type: ignore[assignment]
@@ -152,7 +153,8 @@ class AITracer:
         span_name = f"{self.PIPELINE_PREFIX}.{pipeline.name}"
 
         if self._tracer is None:
-            raise RuntimeError("Tracer not initialized")
+            msg = "Tracer not initialized"
+            raise RuntimeError(msg)
         with self._tracer.start_as_current_span(
             span_name,
             kind=SpanKind.INTERNAL,
@@ -195,7 +197,8 @@ class AITracer:
         span_name = f"{self.STEP_PREFIX}.{step.name}"
 
         if self._tracer is None:
-            raise RuntimeError("Tracer not initialized")
+            msg = "Tracer not initialized"
+            raise RuntimeError(msg)
         with self._tracer.start_as_current_span(
             span_name,
             kind=SpanKind.INTERNAL,
@@ -241,7 +244,8 @@ class AITracer:
         span_name = f"{self.PROVIDER_PREFIX}.{provider_name}"
 
         if self._tracer is None:
-            raise RuntimeError("Tracer not initialized")
+            msg = "Tracer not initialized"
+            raise RuntimeError(msg)
         with self._tracer.start_as_current_span(
             span_name,
             kind=SpanKind.CLIENT,  # External API call

@@ -252,7 +252,8 @@ async def get_reminder_tags(
     reminder = result.scalar_one_or_none()
 
     if reminder is None:
-        raise NotFoundError("Reminder", {"id": str(reminder_id)})
+        msg = "Reminder"
+        raise NotFoundError(msg, {"id": str(reminder_id)})
 
     return [TagResponse.model_validate(tag) for tag in reminder.tags]
 
@@ -276,7 +277,8 @@ async def set_reminder_tags(
     reminder = result.scalar_one_or_none()
 
     if reminder is None:
-        raise NotFoundError("Reminder", {"id": str(reminder_id)})
+        msg = "Reminder"
+        raise NotFoundError(msg, {"id": str(reminder_id)})
 
     # Fetch and validate tags using service
     tag_service = TagService(session)
@@ -320,7 +322,8 @@ async def add_reminder_tags(
     reminder = result.scalar_one_or_none()
 
     if reminder is None:
-        raise NotFoundError("Reminder", {"id": str(reminder_id)})
+        msg = "Reminder"
+        raise NotFoundError(msg, {"id": str(reminder_id)})
 
     # Fetch and validate tags using service
     tag_service = TagService(session)
@@ -357,7 +360,8 @@ async def remove_reminder_tags(
     reminder = result.scalar_one_or_none()
 
     if reminder is None:
-        raise NotFoundError("Reminder", {"id": str(reminder_id)})
+        msg = "Reminder"
+        raise NotFoundError(msg, {"id": str(reminder_id)})
 
     # Remove specified tags
     remove_ids = set(payload.tag_ids)

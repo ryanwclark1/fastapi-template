@@ -69,7 +69,8 @@ class SendGridProvider(BaseEmailProvider):
         super().__init__(config)
 
         if not config.api_key:
-            raise ValueError("SendGrid provider requires api_key")
+            msg = "SendGrid provider requires api_key"
+            raise ValueError(msg)
 
         self._api_key = config.api_key
         self._base_url = config.api_endpoint or self.API_BASE_URL

@@ -149,7 +149,8 @@ class PostgresAsyncResultBackend(AsyncResultBackend[_ReturnType]):
             RuntimeError: If backend not started (startup() not called).
         """
         if self._session_factory is None:
-            raise RuntimeError("PostgresAsyncResultBackend not started. Call startup() first.")
+            msg = "PostgresAsyncResultBackend not started. Call startup() first."
+            raise RuntimeError(msg)
         return self._session_factory()
 
     async def set_result(

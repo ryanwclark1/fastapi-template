@@ -344,9 +344,12 @@ def get_provider_factory() -> EmailProviderFactory:
     """
     global _factory
     if _factory is None:
-        raise RuntimeError(
+        msg = (
             "Email provider factory not initialized. "
             "Call initialize_provider_factory() during app startup."
+        )
+        raise RuntimeError(
+            msg
         )
     return _factory
 

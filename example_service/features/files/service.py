@@ -128,7 +128,8 @@ class FileService(BaseService):
             )
 
         if size_bytes <= 0:
-            raise InvalidFileError("File size must be greater than 0")
+            msg = "File size must be greater than 0"
+            raise InvalidFileError(msg)
 
     def _generate_storage_key(
         self,

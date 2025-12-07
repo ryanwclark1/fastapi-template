@@ -115,7 +115,8 @@ class I18nSettings(BaseSettings):
             ValueError: If any locale code is invalid
         """
         if not v:
-            raise ValueError("At least one supported locale is required")
+            msg = "At least one supported locale is required"
+            raise ValueError(msg)
 
         # Validate each locale format (e.g., 'en', 'es', 'en-US')
         locale_pattern = r"^[a-z]{2}(-[A-Z]{2})?$"

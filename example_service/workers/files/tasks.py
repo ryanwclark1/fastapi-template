@@ -33,7 +33,6 @@ class FileProcessingError(Exception):
     """File processing operation error."""
 
 
-
 async def get_file_from_storage(file_id: str) -> dict[str, Any]:
     """Retrieve file metadata and content from storage.
 
@@ -85,7 +84,9 @@ async def update_file_status(
         result = await session.execute(select(File).where(File.id == file_id))
         file = result.scalar_one_or_none()
         if not file:
-            logger.warning("File not found while updating status", extra={"file_id": file_id})
+            logger.warning(
+                "File not found while updating status", extra={"file_id": file_id}
+            )
             return
 
         # Update status and timestamps
@@ -115,7 +116,10 @@ def _validate_file_metadata(file_data: dict[str, Any]) -> None:
     settings = get_storage_settings()
 
     content_type = file_data.get("content_type") or ""
-    if settings.allowed_content_types and content_type not in settings.allowed_content_types:
+    if (
+        settings.allowed_content_types
+        and content_type not in settings.allowed_content_types
+    ):
         raise InvalidFileError(f"Content type '{content_type}' not allowed")
 
     size_bytes = file_data.get("size_bytes")
@@ -124,7 +128,8 @@ def _validate_file_metadata(file_data: dict[str, Any]) -> None:
             f"File size {size_bytes} exceeds max {settings.max_file_size_bytes} bytes"
         )
     if size_bytes is not None and size_bytes <= 0:
-        raise InvalidFileError("File size must be greater than 0")
+        msg = "File size must be greater than 0"
+        raise InvalidFileError(msg)
 
 
 async def download_from_s3(s3_key: str) -> bytes:
@@ -141,7 +146,8 @@ async def download_from_s3(s3_key: str) -> bytes:
     """
     storage = get_storage_service()
     if not storage.is_ready:
-        raise FileProcessingError("Storage not available for downloads")
+        msg = "Storage not available for downloads"
+        raise FileProcessingError(msg)
 
     try:
         return await storage.download_file(s3_key)
@@ -165,7 +171,8 @@ async def upload_to_s3(s3_key: str, content: bytes, content_type: str) -> str:
     """
     storage = get_storage_service()
     if not storage.is_ready:
-        raise FileProcessingError("Storage not available for uploads")
+        msg = "Storage not available for uploads"
+        raise FileProcessingError(msg)
 
     try:
         result = await storage.upload_file(
@@ -234,7 +241,10 @@ async def find_expired_files(expiry_days: int = 30) -> list[dict[str, Any]]:
             .options(selectinload(File.thumbnails))
             .where(
                 (
-                    (File.expires_at.is_not(None) & (File.expires_at < datetime.now(UTC)))
+                    (
+                        File.expires_at.is_not(None)
+                        & (File.expires_at < datetime.now(UTC))
+                    )
                     | (File.expires_at.is_(None) & (File.created_at < cutoff))
                 ),
                 File.status == FileStatus.READY,
@@ -261,7 +271,9 @@ async def delete_file_from_storage(s3_key: str) -> None:
     """
     storage = get_storage_service()
     if not storage.is_ready:
-        logger.warning("Storage not available; skipping delete", extra={"s3_key": s3_key})
+        logger.warning(
+            "Storage not available; skipping delete", extra={"s3_key": s3_key}
+        )
         return
 
     try:
@@ -269,7 +281,8 @@ async def delete_file_from_storage(s3_key: str) -> None:
         logger.info("File deleted from storage", extra={"s3_key": s3_key})
     except StorageClientError as e:
         logger.warning(
-            "Failed to delete file from storage", extra={"s3_key": s3_key, "error": str(e)}
+            "Failed to delete file from storage",
+            extra={"s3_key": s3_key, "error": str(e)},
         )
 
 
@@ -291,7 +304,9 @@ async def delete_thumbnails(thumbnail_keys: list[str]) -> None:
             await storage.delete_file(key)
             logger.debug("Deleted thumbnail", extra={"s3_key": key})
         except StorageClientError as e:
-            logger.warning("Failed to delete thumbnail", extra={"s3_key": key, "error": str(e)})
+            logger.warning(
+                "Failed to delete thumbnail", extra={"s3_key": key, "error": str(e)}
+            )
 
 
 async def delete_file_record(file_id: str) -> None:
@@ -450,7 +465,9 @@ if broker is not None:
 
             # Step 2: Validate it's an image
             if not file_data["content_type"].startswith("image/"):
-                raise FileProcessingError(f"File is not an image: {file_data['content_type']}")
+                raise FileProcessingError(
+                    f"File is not an image: {file_data['content_type']}"
+                )
 
             # Step 3: Download image from S3
             image_bytes = await download_from_s3(file_data["s3_key"])
@@ -513,15 +530,13 @@ if broker is not None:
                     s3_key=s3_key,
                 )
 
-                generated_thumbnails.append(
-                    {
-                        "size": size,
-                        "s3_key": s3_key,
-                        "s3_uri": s3_uri,
-                        "dimensions": thumbnail.size,
-                        "size_bytes": len(thumbnail_bytes),
-                    }
-                )
+                generated_thumbnails.append({
+                    "size": size,
+                    "s3_key": s3_key,
+                    "s3_uri": s3_uri,
+                    "dimensions": thumbnail.size,
+                    "size_bytes": len(thumbnail_bytes),
+                })
 
                 logger.info(
                     "Thumbnail generated",
@@ -551,7 +566,8 @@ if broker is not None:
                 "Pillow not installed",
                 extra={"file_id": file_id, "error": str(e)},
             )
-            raise FileProcessingError("Pillow library required for thumbnail generation") from e
+            msg = "Pillow library required for thumbnail generation"
+            raise FileProcessingError(msg) from e
 
         except Exception as e:
             logger.exception(

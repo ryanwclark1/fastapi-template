@@ -85,7 +85,10 @@ if broker is not None:
 
         logger.info(
             "Data collection completed",
-            extra={"rows": len(data["rows"]), "total_revenue": data["summary"]["total_revenue"]},
+            extra={
+                "rows": len(data["rows"]),
+                "total_revenue": data["summary"]["total_revenue"],
+            },
         )
 
         return data
@@ -124,7 +127,9 @@ if broker is not None:
         await asyncio.sleep(1.0)  # Simulate formatting time
 
         # In production: use libraries like ReportLab (PDF), xlsxwriter (Excel)
-        report_filename = f"report_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}.{output_format}"
+        report_filename = (
+            f"report_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}.{output_format}"
+        )
         report_path = f"/tmp/reports/{report_filename}"  # noqa: S108
 
         # Simulate file generation
@@ -188,13 +193,11 @@ if broker is not None:
         delivery_results = []
         for recipient in recipients:
             # In production: send email with attachment, upload to S3, etc.
-            delivery_results.append(
-                {
-                    "recipient": recipient,
-                    "status": "delivered",
-                    "delivered_at": datetime.now(UTC).isoformat(),
-                }
-            )
+            delivery_results.append({
+                "recipient": recipient,
+                "status": "delivered",
+                "delivered_at": datetime.now(UTC).isoformat(),
+            })
 
         result = {
             "status": "success",
@@ -440,7 +443,11 @@ if broker is not None:
 
         logger.info(
             "Starting batch report generation",
-            extra={"batch_id": batch_id, "count": len(report_specs), "parallel": parallel},
+            extra={
+                "batch_id": batch_id,
+                "count": len(report_specs),
+                "parallel": parallel,
+            },
         )
 
         batch_result: dict[str, Any] = {
@@ -469,24 +476,20 @@ if broker is not None:
             for idx, task in tasks:
                 try:
                     result = await task.wait_result(timeout=120)
-                    batch_result["reports"].append(
-                        {
-                            "index": idx,
-                            "task_id": task.task_id,
-                            "status": "success" if not result.is_err else "failed",
-                            "result": result.return_value if not result.is_err else None,
-                            "error": str(result.error) if result.is_err else None,
-                        }
-                    )
+                    batch_result["reports"].append({
+                        "index": idx,
+                        "task_id": task.task_id,
+                        "status": "success" if not result.is_err else "failed",
+                        "result": result.return_value if not result.is_err else None,
+                        "error": str(result.error) if result.is_err else None,
+                    })
                 except Exception as e:
-                    batch_result["reports"].append(
-                        {
-                            "index": idx,
-                            "task_id": task.task_id,
-                            "status": "failed",
-                            "error": str(e),
-                        }
-                    )
+                    batch_result["reports"].append({
+                        "index": idx,
+                        "task_id": task.task_id,
+                        "status": "failed",
+                        "error": str(e),
+                    })
         else:
             # Sequential execution
             for idx, spec in enumerate(report_specs):
@@ -501,23 +504,19 @@ if broker is not None:
                     )
 
                     result = await task.wait_result(timeout=120)
-                    batch_result["reports"].append(
-                        {
-                            "index": idx,
-                            "task_id": task.task_id,
-                            "status": "success" if not result.is_err else "failed",
-                            "result": result.return_value if not result.is_err else None,
-                            "error": str(result.error) if result.is_err else None,
-                        }
-                    )
+                    batch_result["reports"].append({
+                        "index": idx,
+                        "task_id": task.task_id,
+                        "status": "success" if not result.is_err else "failed",
+                        "result": result.return_value if not result.is_err else None,
+                        "error": str(result.error) if result.is_err else None,
+                    })
                 except Exception as e:
-                    batch_result["reports"].append(
-                        {
-                            "index": idx,
-                            "status": "failed",
-                            "error": str(e),
-                        }
-                    )
+                    batch_result["reports"].append({
+                        "index": idx,
+                        "status": "failed",
+                        "error": str(e),
+                    })
 
         # Calculate summary statistics
         successful = sum(1 for r in batch_result["reports"] if r["status"] == "success")
@@ -527,7 +526,9 @@ if broker is not None:
         batch_result["summary"] = {
             "successful": successful,
             "failed": failed,
-            "success_rate": (successful / len(report_specs) * 100) if report_specs else 0,
+            "success_rate": (successful / len(report_specs) * 100)
+            if report_specs
+            else 0,
         }
 
         logger.info(
@@ -601,7 +602,8 @@ if broker is not None:
 
             data_result = await data_task.wait_result(timeout=30)
             if data_result.is_err:
-                raise Exception("Data collection failed")
+                msg = "Data collection failed"
+                raise Exception(msg)
 
             data = data_result.return_value
             total_revenue = data["summary"]["total_revenue"]
@@ -618,7 +620,8 @@ if broker is not None:
                 format_result = await format_task.wait_result(timeout=60)
 
                 if format_result.is_err:
-                    raise Exception("Report formatting failed")
+                    msg = "Report formatting failed"
+                    raise Exception(msg)
 
                 report = format_result.return_value
 
@@ -643,7 +646,8 @@ if broker is not None:
                 format_result = await format_task.wait_result(timeout=60)
 
                 if format_result.is_err:
-                    raise Exception("Report formatting failed")
+                    msg = "Report formatting failed"
+                    raise Exception(msg)
 
                 report = format_result.return_value
 
@@ -659,7 +663,8 @@ if broker is not None:
 
             delivery_result = await delivery_task.wait_result(timeout=30)
             if delivery_result.is_err:
-                raise Exception("Report delivery failed")
+                msg = "Report delivery failed"
+                raise Exception(msg)
 
             result = {
                 "workflow_id": workflow_id,

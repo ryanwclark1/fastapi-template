@@ -77,7 +77,8 @@ def test_app_minimal() -> FastAPI:
 
     @app.get("/error")
     async def error_endpoint():
-        raise ValueError("Test error")
+        msg = "Test error"
+        raise ValueError(msg)
 
     @app.post("/echo")
     async def echo_endpoint(request: Request):

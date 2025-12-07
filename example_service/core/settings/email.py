@@ -140,7 +140,8 @@ class EmailSettings(BaseSettings):
     def validate_tls_ssl_exclusive(self) -> EmailSettings:
         """Ensure TLS and SSL are mutually exclusive."""
         if self.use_tls and self.use_ssl:
-            raise ValueError("use_tls and use_ssl are mutually exclusive")
+            msg = "use_tls and use_ssl are mutually exclusive"
+            raise ValueError(msg)
         return self
 
     @model_validator(mode="after")
@@ -149,7 +150,8 @@ class EmailSettings(BaseSettings):
         has_username = self.smtp_username is not None
         has_password = self.smtp_password is not None
         if has_username != has_password:
-            raise ValueError("Both smtp_username and smtp_password must be provided together")
+            msg = "Both smtp_username and smtp_password must be provided together"
+            raise ValueError(msg)
         return self
 
     model_config = SettingsConfigDict(

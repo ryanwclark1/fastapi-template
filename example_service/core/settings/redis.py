@@ -389,7 +389,8 @@ class RedisSettings(BaseSettings):
             ValueError: If Redis is not configured.
         """
         if not self.is_configured:
-            raise ValueError("Redis URL not configured")
+            msg = "Redis URL not configured"
+            raise ValueError(msg)
         return self.url
 
     def get_prefixed_key(self, key: str) -> str:

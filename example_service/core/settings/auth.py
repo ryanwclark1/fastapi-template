@@ -104,7 +104,8 @@ class AuthSettings(BaseSettings):
     def get_validation_url(self) -> str:
         """Get full token validation URL."""
         if not self.service_url:
-            raise ValueError("Auth service URL not configured")
+            msg = "Auth service URL not configured"
+            raise ValueError(msg)
         base = str(self.service_url).rstrip("/")
         endpoint = self.token_validation_endpoint.lstrip("/")
         return f"{base}/{endpoint}"

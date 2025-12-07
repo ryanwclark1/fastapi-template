@@ -386,7 +386,8 @@ class TestMiddlewareOrdering:
 
         @app.get("/error")
         async def error_endpoint():
-            raise ValueError("Test error")
+            msg = "Test error"
+            raise ValueError(msg)
 
         from httpx import ASGITransport
 

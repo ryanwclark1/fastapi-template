@@ -275,7 +275,7 @@ class SynonymDictionary:
                         lines.append(f"{term} : {canonical}")
 
         path.write_text("\n".join(lines))
-        logger.info(f"Written thesaurus file to {path}")
+        logger.info("Written thesaurus file to %s", path)
 
     @classmethod
     def from_dict(

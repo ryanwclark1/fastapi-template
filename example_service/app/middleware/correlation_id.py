@@ -102,12 +102,14 @@ class CorrelationIDMiddleware(HeaderContextMiddleware):
         _ = scope
         if was_generated:
             logger.debug(
-                f"Generated new correlation ID: {value}",
+                "Generated new correlation ID: %s",
+                value,
                 extra={"correlation_id": value},
             )
         else:
             logger.debug(
-                f"Correlation ID received from upstream: {value}",
+                "Correlation ID received from upstream: %s",
+                value,
                 extra={"correlation_id": value},
             )
 
@@ -120,7 +122,8 @@ class CorrelationIDMiddleware(HeaderContextMiddleware):
         """
         _ = scope
         logger.debug(
-            f"Added correlation ID to response: {value}",
+            "Added correlation ID to response: %s",
+            value,
             extra={"correlation_id": value},
         )
 

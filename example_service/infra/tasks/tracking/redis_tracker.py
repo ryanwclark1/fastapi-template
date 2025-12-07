@@ -144,7 +144,8 @@ class RedisTaskTracker(BaseTaskTracker):
     def client(self) -> Redis:
         """Get the Redis client instance."""
         if self._client is None:
-            raise RuntimeError("Task tracker not connected. Call connect() first.")
+            msg = "Task tracker not connected. Call connect() first."
+            raise RuntimeError(msg)
         return self._client
 
     async def on_task_start(
@@ -362,15 +363,13 @@ class RedisTaskTracker(BaseTaskTracker):
                         except ValueError:
                             pass
 
-                    tasks.append(
-                        {
-                            "task_id": task_data.get("task_id", task_id),
-                            "task_name": task_data.get("task_name", "unknown"),
-                            "started_at": started_at,
-                            "running_for_ms": running_for_ms,
-                            "worker_id": task_data.get("worker_id", "") or None,
-                        }
-                    )
+                    tasks.append({
+                        "task_id": task_data.get("task_id", task_id),
+                        "task_name": task_data.get("task_name", "unknown"),
+                        "started_at": started_at,
+                        "running_for_ms": running_for_ms,
+                        "worker_id": task_data.get("worker_id", "") or None,
+                    })
 
             return tasks
         except (RedisConnectionError, RedisTimeoutError) as e:
@@ -404,9 +403,13 @@ class RedisTaskTracker(BaseTaskTracker):
             with contextlib.suppress(ValueError):
                 duration_ms = int(duration_str)
 
-        if min_duration_ms is not None and (duration_ms is None or duration_ms < min_duration_ms):
+        if min_duration_ms is not None and (
+            duration_ms is None or duration_ms < min_duration_ms
+        ):
             return False, duration_ms
-        if max_duration_ms is not None and (duration_ms is None or duration_ms > max_duration_ms):
+        if max_duration_ms is not None and (
+            duration_ms is None or duration_ms > max_duration_ms
+        ):
             return False, duration_ms
 
         started_at = task_data.get("started_at", "")
@@ -497,20 +500,18 @@ class RedisTaskTracker(BaseTaskTracker):
                     except (json.JSONDecodeError, TypeError):
                         return_value = return_value_str
 
-                tasks.append(
-                    {
-                        "task_id": task_data.get("task_id", task_id),
-                        "task_name": task_data.get("task_name", "unknown"),
-                        "status": task_data.get("status", "unknown"),
-                        "started_at": started_at,
-                        "finished_at": task_data.get("finished_at", "") or None,
-                        "duration_ms": duration_ms,
-                        "return_value": return_value,
-                        "error_message": task_data.get("error_message", "") or None,
-                        "error_type": task_data.get("error_type", "") or None,
-                        "worker_id": task_data.get("worker_id", "") or None,
-                    }
-                )
+                tasks.append({
+                    "task_id": task_data.get("task_id", task_id),
+                    "task_name": task_data.get("task_name", "unknown"),
+                    "status": task_data.get("status", "unknown"),
+                    "started_at": started_at,
+                    "finished_at": task_data.get("finished_at", "") or None,
+                    "duration_ms": duration_ms,
+                    "return_value": return_value,
+                    "error_message": task_data.get("error_message", "") or None,
+                    "error_type": task_data.get("error_type", "") or None,
+                    "worker_id": task_data.get("worker_id", "") or None,
+                })
 
                 if len(tasks) >= limit:
                     break
@@ -675,12 +676,16 @@ class RedisTaskTracker(BaseTaskTracker):
             running_count = await self.client.zcard(self._index_status_key("running"))
             success_count = await self.client.zcard(self._index_status_key("success"))
             failure_count = await self.client.zcard(self._index_status_key("failure"))
-            cancelled_count = await self.client.zcard(self._index_status_key("cancelled"))
+            cancelled_count = await self.client.zcard(
+                self._index_status_key("cancelled")
+            )
             total = await self.client.zcard(self._index_all_key())
 
             # Get counts by task name
             by_task_name: dict[str, int] = {}
-            async for key in self.client.scan_iter(match=f"{self.key_prefix}:index:name:*"):
+            async for key in self.client.scan_iter(
+                match=f"{self.key_prefix}:index:name:*"
+            ):
                 task_name = key.replace(f"{self.key_prefix}:index:name:", "")
                 count = await self.client.zcard(key)
                 if count > 0:

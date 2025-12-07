@@ -54,7 +54,8 @@ class WebhookService(BaseService):
         hostname = parsed.hostname
 
         if not hostname:
-            raise ValueError("Invalid URL: missing hostname")
+            msg = "Invalid URL: missing hostname"
+            raise ValueError(msg)
 
         # Try to resolve hostname to IP
         try:

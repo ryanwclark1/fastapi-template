@@ -196,7 +196,8 @@ class ConnectionManager:
                 "Connection refused: max connections reached",
                 extra={"max": self._settings.max_connections},
             )
-            raise ConnectionRefusedError("Maximum connections reached")
+            msg = "Maximum connections reached"
+            raise ConnectionRefusedError(msg)
 
         # Accept the WebSocket connection
         await websocket.accept()
@@ -557,8 +558,9 @@ def get_connection_manager() -> ConnectionManager:
         RuntimeError: If manager not initialized
     """
     if _manager is None:
+        msg = "Connection manager not initialized. Call start_connection_manager() first."
         raise RuntimeError(
-            "Connection manager not initialized. Call start_connection_manager() first."
+            msg
         )
     return _manager
 

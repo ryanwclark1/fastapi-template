@@ -199,7 +199,8 @@ class TestCircuitBreakerIntegration:
             await asyncio.sleep(0.01)  # Simulate network delay
 
             if should_fail:
-                raise Exception("Flaky service failed")
+                msg = "Flaky service failed"
+                raise Exception(msg)
             return {"status": "ok"}
 
         # Make concurrent requests - 60% failure rate
@@ -235,7 +236,8 @@ class TestCircuitBreakerIntegration:
 
         @breaker_a.protected
         async def service_a():
-            raise Exception("Service A failed")
+            msg = "Service A failed"
+            raise Exception(msg)
 
         @breaker_b.protected
         async def service_b():
@@ -276,7 +278,8 @@ class TestCircuitBreakerIntegration:
         for _ in range(3):
             try:
                 async with breaker:
-                    raise Exception("Operation failed")
+                    msg = "Operation failed"
+                    raise Exception(msg)
             except Exception:
                 pass
 
@@ -296,7 +299,8 @@ class TestCircuitBreakerIntegration:
         @breaker.protected
         async def operation(should_fail: bool):
             if should_fail:
-                raise Exception("Failed")
+                msg = "Failed"
+                raise Exception(msg)
             return "success"
 
         # Mix of success and failure
@@ -611,7 +615,8 @@ class TestDebugMiddlewareIntegration:
 
         @app.get("/error")
         async def error_endpoint():
-            raise ValueError("Test error")
+            msg = "Test error"
+            raise ValueError(msg)
 
         return app
 
@@ -1445,7 +1450,8 @@ class TestFullMiddlewareStackIntegration:
 
         @app.get("/error")
         async def error_endpoint():
-            raise ValueError("Test error")
+            msg = "Test error"
+            raise ValueError(msg)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             with pytest.raises(ValueError, match=r"Test error"):
