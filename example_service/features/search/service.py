@@ -71,6 +71,47 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Threshold for triggering suggestions and "did you mean" features
+LOW_RESULT_THRESHOLD = 3
+
+# Registry of searchable entities
+# Maps entity type to configuration
+SEARCHABLE_ENTITIES: dict[str, dict[str, Any]] = {
+    "reminders": {
+        "display_name": "Reminders",
+        "model_path": "example_service.features.reminders.models.Reminder",
+        "search_fields": ["title", "description"],
+        "title_field": "title",
+        "snippet_field": "description",
+        "id_field": "id",
+        "config": "english",
+        "fuzzy_fields": ["title"],  # Fields for fuzzy matching
+        "facet_fields": ["is_completed"],  # Fields for faceted search
+    },
+    "posts": {
+        "display_name": "Posts",
+        "model_path": "example_service.core.models.post.Post",
+        "search_fields": ["title", "content", "slug"],
+        "title_field": "title",
+        "snippet_field": "content",
+        "id_field": "id",
+        "config": "english",
+        "fuzzy_fields": ["title"],
+        "facet_fields": ["is_published", "author_id"],
+    },
+    "users": {
+        "display_name": "Users",
+        "model_path": "example_service.core.models.user.User",
+        "search_fields": ["email", "username", "full_name"],
+        "title_field": "username",
+        "snippet_field": "full_name",
+        "id_field": "id",
+        "config": "simple",  # Use simple for identifiers
+        "fuzzy_fields": ["username", "full_name"],
+        "facet_fields": ["is_active"],
+    },
+}
+
 
 class SearchService:
     """Unified search service for full-text search.
@@ -402,14 +443,14 @@ class SearchService:
 
         # Generate "Did you mean?" suggestions for low/no results
         did_you_mean = None
-        if total_hits < 3 and self.enable_fuzzy_fallback:
+        if total_hits < LOW_RESULT_THRESHOLD and self.enable_fuzzy_fallback:
             did_you_mean = await self._generate_did_you_mean(
                 request.query, entity_types
             )
 
         # Generate suggestions if few results
         suggestions = []
-        if total_hits < 3:
+        if total_hits < LOW_RESULT_THRESHOLD:
             suggestions = await self._generate_suggestions(request.query)
 
         took_ms = int((time.monotonic() - start_time) * 1000)

@@ -632,8 +632,8 @@ async def test_get_summary_stats(db_session: AsyncSession, repository: AuditRepo
     stats = await repository.get_summary_stats(db_session, tenant_id="tenant-123")
 
     assert stats["total_entries"] == 9
-    assert stats["actions_count"][AuditAction.CREATE] == 6
-    assert stats["actions_count"][AuditAction.UPDATE] == 3
+    assert stats["actions_count"][AuditAction.CREATE.value] == 6
+    assert stats["actions_count"][AuditAction.UPDATE.value] == 3
     assert stats["entity_types_count"]["reminder"] == 8
     assert stats["entity_types_count"]["task"] == 1
     assert stats["success_count"] == 8

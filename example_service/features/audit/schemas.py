@@ -6,7 +6,7 @@ Provides request/response schemas for the audit logging API.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, TypedDict
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -247,3 +247,20 @@ class EntityAuditHistory(BaseModel):
     last_modified_at: datetime | None = Field(description="Last modification time")
     last_modified_by: str | None = Field(description="Who last modified")
     total_changes: int = Field(description="Total number of changes")
+
+
+class AuditSummaryStats(TypedDict):
+    """TypedDict for audit repository summary statistics.
+
+    This represents the raw statistics returned by the repository layer,
+    which differs from AuditSummary (used in the service/API layer) in that
+    it includes success_count and time_range tuple instead of success_rate
+    and separate time_range fields.
+    """
+
+    total_entries: int
+    actions_count: dict[str, int]
+    entity_types_count: dict[str, int]
+    success_count: int
+    unique_users: int
+    time_range: tuple[datetime | None, datetime | None]

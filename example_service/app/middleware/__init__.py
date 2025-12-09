@@ -20,11 +20,9 @@ documents and enforces the correct order.
 
 Example Usage:
     from example_service.app.middleware import configure_middleware
-    from example_service.core.settings import get_settings
 
     # In FastAPI application setup
-    settings = get_settings()
-    configure_middleware(app, settings)
+    configure_middleware(app)
 """
 
 from __future__ import annotations
@@ -60,11 +58,10 @@ from example_service.app.middleware.tenant import (
     require_tenant,
     set_tenant_context,
 )
+from example_service.core.settings import get_settings
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
-
-    from example_service.core.settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -86,17 +83,17 @@ __all__ = [
     "SecurityHeadersMiddleware",
     # Tenant context helpers (for database tenancy layer)
     "clear_tenant_context",
-    "get_tenant_context",
-    "require_tenant",
-    "set_tenant_context",
     # Configuration
     "configure_middleware",
     "create_i18n_middleware",
+    "get_tenant_context",
+    "require_tenant",
+    "set_tenant_context",
     "setup_n_plus_one_monitoring",
 ]
 
 
-def configure_middleware(app: FastAPI, settings: Settings) -> None:
+def configure_middleware(app: FastAPI) -> None:
     """Configure all middleware for the FastAPI application.
 
     This function centralizes middleware configuration and ensures
@@ -191,7 +188,6 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
 
     Args:
         app: FastAPI application instance
-        settings: Unified settings instance with all configuration domains
 
     Raises:
         Exception: If rate limiting is enabled but Redis connection fails
@@ -199,12 +195,10 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
 
     Example:
         >>> from fastapi import FastAPI
-        >>> from example_service.core.settings import get_settings
         >>> from example_service.app.middleware import configure_middleware
         >>>
         >>> app = FastAPI()
-        >>> settings = get_settings()
-        >>> configure_middleware(app, settings)
+        >>> configure_middleware(app)
 
     Notes:
         - Authentication is handled at endpoint level via dependency injection
@@ -212,8 +206,10 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
         - Tracing is handled automatically via FastAPIInstrumentor in lifespan
           (see example_service.app.lifespan)
         - N+1 detection requires separate setup via setup_n_plus_one_monitoring()
+        - Settings are loaded internally via get_settings() (cached for performance)
     """
-    # Extract domain settings from unified settings
+    # Load unified settings (cached via LRU cache)
+    settings = get_settings()
     app_settings = settings.app
     log_settings = settings.logging
     otel_settings = settings.otel

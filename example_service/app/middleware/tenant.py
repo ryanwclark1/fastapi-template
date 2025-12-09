@@ -16,8 +16,10 @@ from __future__ import annotations
 
 from contextvars import ContextVar
 import logging
+from typing import TYPE_CHECKING
 
-from example_service.core.schemas.tenant import TenantContext
+if TYPE_CHECKING:
+    from example_service.core.schemas.tenant import TenantContext
 
 logger = logging.getLogger(__name__)
 

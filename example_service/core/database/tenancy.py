@@ -203,9 +203,12 @@ def set_tenant_on_insert(mapper: Any, connection: Any, target: Any) -> None:  # 
                 },
             )
         else:
-            raise ValueError(
+            msg = (
                 f"Cannot insert {target.__class__.__name__} without tenant context. "
                 "Either set tenant_id manually or ensure tenant middleware is active."
+            )
+            raise ValueError(
+                msg
             )
 
 
@@ -229,9 +232,12 @@ def validate_tenant_on_update(mapper: Any, connection: Any, target: Any) -> None
             current_tenant_id = target.tenant_id
 
             if original_tenant_id != current_tenant_id:
-                raise ValueError(
+                msg = (
                     f"Cannot change tenant_id from {original_tenant_id} to {current_tenant_id}. "
                     "Tenant changes are not allowed for data integrity."
+                )
+                raise ValueError(
+                    msg
                 )
 
 
@@ -339,7 +345,8 @@ def get_tenant_filter(model_class: type, tenant_id: str | None = None) -> Any:
         )
     """
     if not hasattr(model_class, "tenant_id"):
-        raise ValueError(f"{model_class.__name__} does not have tenant_id column")
+        msg = f"{model_class.__name__} does not have tenant_id column"
+        raise ValueError(msg)
 
     # Get tenant ID from context if not provided
     if not tenant_id:

@@ -16,7 +16,7 @@ from redis.asyncio import ConnectionPool, Redis
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
-from example_service.infra.tasks.tracking.base import BaseTaskTracker
+from example_service.infra.tasks.tracking.base import BaseTaskTracker, TaskExecutionDetails
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -575,7 +575,7 @@ class RedisTaskTracker(BaseTaskTracker):
             logger.warning("Failed to count task history", extra={"error": str(e)})
             return 0
 
-    async def get_task_details(self, task_id: str) -> dict[str, Any] | None:
+    async def get_task_details(self, task_id: str) -> TaskExecutionDetails | None:
         """Get full details for a specific task execution."""
         if not self.is_connected:
             return None
