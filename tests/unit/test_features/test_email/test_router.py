@@ -9,20 +9,32 @@ from unittest.mock import AsyncMock, MagicMock
 from fastapi import FastAPI, status
 from httpx import ASGITransport, AsyncClient
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from example_service.core.models.email_config import EmailConfig, EmailProviderType
+from example_service.features.email.models import (
+    EmailAuditLog,
+    EmailConfig,
+    EmailProviderType,
+    EmailUsageLog,
+)
 from example_service.features.email.router import router
+from example_service.features.email.dependencies import (
+    get_email_config_service,
+)
+from example_service.features.email.service import EmailConfigService
+from example_service.core.dependencies.database import get_async_session
+from example_service.infra.email import get_enhanced_email_service
 
 
 @pytest.fixture
 def mock_session() -> AsyncMock:
     """Create a mock database session."""
-    session = AsyncMock(spec=AsyncSession)
+    session = AsyncMock()
     session.execute = AsyncMock()
     session.commit = AsyncMock()
     session.refresh = AsyncMock()
     session.delete = AsyncMock()
+    session.flush = AsyncMock()
+    session.add = MagicMock()
     return session
 
 
@@ -30,33 +42,77 @@ def mock_session() -> AsyncMock:
 def mock_email_service() -> AsyncMock:
     """Create a mock email service."""
     service = AsyncMock()
-    service.invalidate_config_cache = MagicMock()
+    service.invalidate_config_cache = MagicMock(return_value=1)
     service.send = AsyncMock()
     service.health_check = AsyncMock(return_value=True)
     return service
 
 
 @pytest.fixture
+def mock_config_repository() -> MagicMock:
+    """Create a mock config repository."""
+    repo = MagicMock()
+    repo.get_by_tenant_id = AsyncMock(return_value=None)
+    repo.create = AsyncMock()
+    repo.update_config = AsyncMock()
+    repo.delete = AsyncMock()
+    return repo
+
+
+@pytest.fixture
+def mock_usage_repository() -> MagicMock:
+    """Create a mock usage log repository."""
+    repo = MagicMock()
+    repo.get_usage_stats = AsyncMock(return_value={
+        "total_emails": 0,
+        "successful_emails": 0,
+        "failed_emails": 0,
+        "success_rate": 0.0,
+        "total_recipients": 0,
+        "total_cost_usd": None,
+    })
+    repo.get_usage_by_provider = AsyncMock(return_value={})
+    return repo
+
+
+@pytest.fixture
+def mock_audit_repository() -> MagicMock:
+    """Create a mock audit log repository."""
+    repo = MagicMock()
+    repo.get_audit_logs = AsyncMock()
+    return repo
+
+
+@pytest.fixture
 async def email_client(
-    mock_session: AsyncMock, mock_email_service: AsyncMock
+    mock_session: AsyncMock,
+    mock_email_service: AsyncMock,
+    mock_config_repository: MagicMock,
+    mock_usage_repository: MagicMock,
+    mock_audit_repository: MagicMock,
 ) -> AsyncGenerator[AsyncClient]:
     """Create HTTP client with email router and mocked dependencies."""
     app = FastAPI()
     app.include_router(router)
 
-    # Override dependencies using string paths (more reliable for FastAPI)
-    async def override_get_async_session() -> AsyncSession:
-        return mock_session
+    # Create a mock service with our mock dependencies
+    mock_service = EmailConfigService(
+        session=mock_session,
+        email_service=mock_email_service,
+        config_repository=mock_config_repository,
+        usage_repository=mock_usage_repository,
+        audit_repository=mock_audit_repository,
+    )
+
+    # Override the service dependency
+    async def override_get_email_config_service():
+        yield mock_service
 
     async def override_get_enhanced_email_service():
         return mock_email_service
 
-    app.dependency_overrides["example_service.core.dependencies.database.get_async_session"] = (
-        override_get_async_session
-    )
-    app.dependency_overrides["example_service.infra.email.get_enhanced_email_service"] = (
-        override_get_enhanced_email_service
-    )
+    app.dependency_overrides[get_email_config_service] = override_get_email_config_service
+    app.dependency_overrides[get_enhanced_email_service] = override_get_enhanced_email_service
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client
@@ -70,14 +126,30 @@ class TestCreateOrUpdateConfig:
 
     @pytest.mark.asyncio
     async def test_create_new_config(
-        self, email_client: AsyncClient, mock_session: AsyncMock, mock_email_service: AsyncMock
+        self,
+        email_client: AsyncClient,
+        mock_session: AsyncMock,
+        mock_email_service: AsyncMock,
+        mock_config_repository: MagicMock,
     ) -> None:
         """Test creating a new email configuration."""
         # Mock no existing config
-        result_mock = MagicMock()
-        result_mock.scalar_one_or_none.return_value = None
-        mock_session.execute.return_value = result_mock
-        mock_session.refresh = AsyncMock()
+        mock_config_repository.get_by_tenant_id.return_value = None
+
+        # Mock create to return a new config
+        created_config = EmailConfig(
+            id="config-123",
+            tenant_id="tenant-123",
+            provider_type=EmailProviderType.SMTP,
+            smtp_host="smtp.example.com",
+            smtp_port=587,
+            smtp_username="user@example.com",
+            is_active=True,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+            encryption_version=1,
+        )
+        mock_config_repository.create.return_value = created_config
 
         response = await email_client.post(
             "/email/configs/tenant-123",
@@ -94,13 +166,17 @@ class TestCreateOrUpdateConfig:
         data = response.json()
         assert data["tenant_id"] == "tenant-123"
         assert data["provider_type"] == "smtp"
-        mock_session.add.assert_called_once()
+        mock_config_repository.create.assert_awaited_once()
         mock_session.commit.assert_awaited_once()
         mock_email_service.invalidate_config_cache.assert_called_once_with("tenant-123")
 
     @pytest.mark.asyncio
     async def test_update_existing_config(
-        self, email_client: AsyncClient, mock_session: AsyncMock, mock_email_service: AsyncMock
+        self,
+        email_client: AsyncClient,
+        mock_session: AsyncMock,
+        mock_email_service: AsyncMock,
+        mock_config_repository: MagicMock,
     ) -> None:
         """Test updating an existing email configuration."""
         # Mock existing config
@@ -113,11 +189,10 @@ class TestCreateOrUpdateConfig:
             is_active=True,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
+            encryption_version=1,
         )
-
-        result_mock = MagicMock()
-        result_mock.scalar_one_or_none.return_value = existing_config
-        mock_session.execute.return_value = result_mock
+        mock_config_repository.get_by_tenant_id.return_value = existing_config
+        mock_config_repository.update_config.return_value = existing_config
 
         response = await email_client.post(
             "/email/configs/tenant-123",
@@ -140,7 +215,7 @@ class TestGetConfig:
 
     @pytest.mark.asyncio
     async def test_get_config_success(
-        self, email_client: AsyncClient, mock_session: AsyncMock
+        self, email_client: AsyncClient, mock_config_repository: MagicMock
     ) -> None:
         """Test successfully retrieving email configuration."""
         config = EmailConfig(
@@ -152,11 +227,9 @@ class TestGetConfig:
             is_active=True,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
+            encryption_version=1,
         )
-
-        result_mock = MagicMock()
-        result_mock.scalar_one_or_none.return_value = config
-        mock_session.execute.return_value = result_mock
+        mock_config_repository.get_by_tenant_id.return_value = config
 
         response = await email_client.get("/email/configs/tenant-123")
 
@@ -171,12 +244,10 @@ class TestGetConfig:
 
     @pytest.mark.asyncio
     async def test_get_config_not_found(
-        self, email_client: AsyncClient, mock_session: AsyncMock
+        self, email_client: AsyncClient, mock_config_repository: MagicMock
     ) -> None:
         """Test retrieving non-existent configuration."""
-        result_mock = MagicMock()
-        result_mock.scalar_one_or_none.return_value = None
-        mock_session.execute.return_value = result_mock
+        mock_config_repository.get_by_tenant_id.return_value = None
 
         response = await email_client.get("/email/configs/tenant-123")
 
@@ -189,7 +260,11 @@ class TestUpdateConfig:
 
     @pytest.mark.asyncio
     async def test_update_config_success(
-        self, email_client: AsyncClient, mock_session: AsyncMock, mock_email_service: AsyncMock
+        self,
+        email_client: AsyncClient,
+        mock_session: AsyncMock,
+        mock_email_service: AsyncMock,
+        mock_config_repository: MagicMock,
     ) -> None:
         """Test successfully updating configuration."""
         config = EmailConfig(
@@ -201,11 +276,10 @@ class TestUpdateConfig:
             is_active=True,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
+            encryption_version=1,
         )
-
-        result_mock = MagicMock()
-        result_mock.scalar_one_or_none.return_value = config
-        mock_session.execute.return_value = result_mock
+        mock_config_repository.get_by_tenant_id.return_value = config
+        mock_config_repository.update_config.return_value = config
 
         response = await email_client.put(
             "/email/configs/tenant-123",
@@ -218,12 +292,10 @@ class TestUpdateConfig:
 
     @pytest.mark.asyncio
     async def test_update_config_not_found(
-        self, email_client: AsyncClient, mock_session: AsyncMock
+        self, email_client: AsyncClient, mock_config_repository: MagicMock
     ) -> None:
         """Test updating non-existent configuration."""
-        result_mock = MagicMock()
-        result_mock.scalar_one_or_none.return_value = None
-        mock_session.execute.return_value = result_mock
+        mock_config_repository.get_by_tenant_id.return_value = None
 
         response = await email_client.put(
             "/email/configs/tenant-123",
@@ -238,7 +310,11 @@ class TestDeleteConfig:
 
     @pytest.mark.asyncio
     async def test_delete_config_success(
-        self, email_client: AsyncClient, mock_session: AsyncMock, mock_email_service: AsyncMock
+        self,
+        email_client: AsyncClient,
+        mock_session: AsyncMock,
+        mock_email_service: AsyncMock,
+        mock_config_repository: MagicMock,
     ) -> None:
         """Test successfully deleting configuration."""
         config = EmailConfig(
@@ -247,27 +323,23 @@ class TestDeleteConfig:
             provider_type=EmailProviderType.SMTP,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
+            encryption_version=1,
         )
-
-        result_mock = MagicMock()
-        result_mock.scalar_one_or_none.return_value = config
-        mock_session.execute.return_value = result_mock
+        mock_config_repository.get_by_tenant_id.return_value = config
 
         response = await email_client.delete("/email/configs/tenant-123")
 
         assert response.status_code == status.HTTP_204_NO_CONTENT
-        mock_session.delete.assert_called_once_with(config)
+        mock_config_repository.delete.assert_awaited_once()
         mock_session.commit.assert_awaited_once()
         mock_email_service.invalidate_config_cache.assert_called_once_with("tenant-123")
 
     @pytest.mark.asyncio
     async def test_delete_config_not_found(
-        self, email_client: AsyncClient, mock_session: AsyncMock
+        self, email_client: AsyncClient, mock_config_repository: MagicMock
     ) -> None:
         """Test deleting non-existent configuration."""
-        result_mock = MagicMock()
-        result_mock.scalar_one_or_none.return_value = None
-        mock_session.execute.return_value = result_mock
+        mock_config_repository.get_by_tenant_id.return_value = None
 
         response = await email_client.delete("/email/configs/tenant-123")
 
@@ -435,28 +507,20 @@ class TestGetUsageStats:
 
     @pytest.mark.asyncio
     async def test_get_usage_stats(
-        self, email_client: AsyncClient, mock_session: AsyncMock
+        self, email_client: AsyncClient, mock_usage_repository: MagicMock
     ) -> None:
         """Test getting usage statistics."""
-        from example_service.core.models.email_config import EmailUsageLog
-
-        # Mock usage logs
-        logs = [
-            EmailUsageLog(
-                id=f"log-{i}",
-                tenant_id="tenant-123",
-                provider="smtp",
-                success=True,
-                recipients_count=1,
-                cost_usd=0.001 if i % 2 == 0 else None,
-                created_at=datetime.now(UTC) - timedelta(days=i),
-            )
-            for i in range(5)
-        ]
-
-        result_mock = MagicMock()
-        result_mock.scalars.return_value.all.return_value = logs
-        mock_session.execute.return_value = result_mock
+        mock_usage_repository.get_usage_stats.return_value = {
+            "total_emails": 5,
+            "successful_emails": 5,
+            "failed_emails": 0,
+            "success_rate": 100.0,
+            "total_recipients": 5,
+            "total_cost_usd": 0.003,
+        }
+        mock_usage_repository.get_usage_by_provider.return_value = {
+            "smtp": {"count": 5, "cost": 0.003}
+        }
 
         response = await email_client.get("/email/configs/tenant-123/usage")
 
@@ -473,28 +537,22 @@ class TestGetUsageStats:
 
     @pytest.mark.asyncio
     async def test_get_usage_stats_with_date_range(
-        self, email_client: AsyncClient, mock_session: AsyncMock
+        self, email_client: AsyncClient, mock_usage_repository: MagicMock
     ) -> None:
         """Test getting usage statistics with custom date range."""
-        from example_service.core.models.email_config import EmailUsageLog
+        mock_usage_repository.get_usage_stats.return_value = {
+            "total_emails": 1,
+            "successful_emails": 1,
+            "failed_emails": 0,
+            "success_rate": 100.0,
+            "total_recipients": 1,
+            "total_cost_usd": None,
+        }
+        mock_usage_repository.get_usage_by_provider.return_value = {}
 
-        logs = [
-            EmailUsageLog(
-                id="log-1",
-                tenant_id="tenant-123",
-                provider="smtp",
-                success=True,
-                recipients_count=1,
-                created_at=datetime.now(UTC) - timedelta(days=5),
-            )
-        ]
-
-        result_mock = MagicMock()
-        result_mock.scalars.return_value.all.return_value = logs
-        mock_session.execute.return_value = result_mock
-
-        start_date = (datetime.now(UTC) - timedelta(days=10)).isoformat()
-        end_date = datetime.now(UTC).isoformat()
+        # Use URL-safe format without timezone (FastAPI handles UTC naively)
+        start_date = (datetime.now(UTC) - timedelta(days=10)).strftime("%Y-%m-%dT%H:%M:%S")
+        end_date = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S")
 
         response = await email_client.get(
             f"/email/configs/tenant-123/usage?start_date={start_date}&end_date={end_date}"
@@ -507,10 +565,10 @@ class TestGetAuditLogs:
     """Test GET /email/configs/{tenant_id}/audit-logs endpoint."""
 
     @pytest.mark.asyncio
-    async def test_get_audit_logs(self, email_client: AsyncClient, mock_session: AsyncMock) -> None:
+    async def test_get_audit_logs(
+        self, email_client: AsyncClient, mock_audit_repository: MagicMock
+    ) -> None:
         """Test getting audit logs."""
-        from example_service.core.models.email_config import EmailAuditLog
-
         # Mock audit logs
         logs = [
             EmailAuditLog(
@@ -524,21 +582,14 @@ class TestGetAuditLogs:
             for i in range(3)
         ]
 
-        # Mock count query
-        count_result = MagicMock()
-        count_result.scalar_one.return_value = 3
-
-        # Mock logs query
-        logs_result = MagicMock()
-        logs_result.scalars.return_value.all.return_value = logs
-
-        def execute_side_effect(stmt):
-            # Return count result for count query, logs result for select query
-            if "count" in str(stmt).lower():
-                return count_result
-            return logs_result
-
-        mock_session.execute.side_effect = execute_side_effect
+        # Mock SearchResult
+        from example_service.core.database.repository import SearchResult
+        mock_audit_repository.get_audit_logs.return_value = SearchResult(
+            items=logs,
+            total=3,
+            limit=50,
+            offset=0,
+        )
 
         response = await email_client.get("/email/configs/tenant-123/audit-logs")
 
@@ -552,11 +603,9 @@ class TestGetAuditLogs:
 
     @pytest.mark.asyncio
     async def test_get_audit_logs_pagination(
-        self, email_client: AsyncClient, mock_session: AsyncMock
+        self, email_client: AsyncClient, mock_audit_repository: MagicMock
     ) -> None:
         """Test getting audit logs with pagination."""
-        from example_service.core.models.email_config import EmailAuditLog
-
         logs = [
             EmailAuditLog(
                 id=f"audit-{i}",
@@ -569,18 +618,13 @@ class TestGetAuditLogs:
             for i in range(5)
         ]
 
-        count_result = MagicMock()
-        count_result.scalar_one.return_value = 10
-
-        logs_result = MagicMock()
-        logs_result.scalars.return_value.all.return_value = logs
-
-        def execute_side_effect(stmt):
-            if "count" in str(stmt).lower():
-                return count_result
-            return logs_result
-
-        mock_session.execute.side_effect = execute_side_effect
+        from example_service.core.database.repository import SearchResult
+        mock_audit_repository.get_audit_logs.return_value = SearchResult(
+            items=logs,
+            total=10,
+            limit=5,
+            offset=5,
+        )
 
         response = await email_client.get("/email/configs/tenant-123/audit-logs?page=2&page_size=5")
 
