@@ -196,14 +196,6 @@ class DataTransferService:
             )
         return ENTITY_REGISTRY[entity_type]
 
-    def _raise_not_importable(self, entity_type: str) -> None:
-        """Raise error for non-importable entity."""
-        raise ValueError(f"Entity '{entity_type}' is not importable")
-
-    def _raise_not_exportable(self, entity_type: str) -> None:
-        """Raise error for non-exportable entity."""
-        raise ValueError(f"Entity '{entity_type}' is not exportable")
-
     def _import_model(self, model_path: str) -> type[Any]:
         """Dynamically import a model class.
 
@@ -375,26 +367,13 @@ class DataTransferService:
         started_at = datetime.now(UTC)
 
         try:
-            # Get entity configuration
-            config = self._get_entity_config(request.entity_type)
-            if not config.get("exportable", True):
-                self._raise_not_exportable(request.entity_type)
-
-            # Import the model
-            model_class = self._import_model(config["model_path"])
-
-            # Build query
-            stmt = select(model_class)
-
-            # Apply filters if provided
-            if request.filters:
-                for field, value in request.filters.items():
-                    if hasattr(model_class, field):
-                        stmt = stmt.where(getattr(model_class, field) == value)
-
-            # Execute query
-            result = await self.session.execute(stmt)
-            records = result.scalars().all()
+            # Fetch records using shared helper
+            records, config = await self._fetch_export_records(
+                request.entity_type,
+                request.filters,
+                request.filter_conditions,
+                tenant_id,
+            )
 
             # Get exporter
             exporter = get_exporter(
@@ -566,7 +545,7 @@ class DataTransferService:
         """
         config = self._get_entity_config(entity_type=request.entity_type)
         if not config.get("exportable", True):
-            self._raise_not_exportable(request.entity_type)
+            raise ValueError(f"Entity '{request.entity_type}' is not exportable")
 
         model_class = self._import_model(config["model_path"])
 
@@ -693,7 +672,7 @@ class DataTransferService:
             # Get entity configuration
             config = self._get_entity_config(entity_type)
             if not config.get("importable", True):
-                self._raise_not_importable(entity_type)
+                raise ValueError(f"Entity '{entity_type}' is not importable")
 
             # Get importer
             importer = get_importer(
