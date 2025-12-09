@@ -542,5 +542,53 @@ class ExecutionNotFoundError(BaseModel):
     execution_id: str = Field(description="Execution ID that was not found")
 
 
+class RateLimitExceededError(BaseModel):
+    """Error response when rate limit is exceeded."""
+
+    error: str = Field(default="rate_limit_exceeded")
+    message: str = Field(description="Human-readable message")
+    tenant_id: str = Field(description="Tenant that was rate limited")
+    limit: int = Field(description="Rate limit value")
+    window_seconds: int = Field(description="Rate limit window in seconds")
+    retry_after_seconds: int = Field(description="Seconds until rate limit resets")
+
+
+class CostEstimateResponse(BaseModel):
+    """Response for cost estimation endpoint."""
+
+    pipeline_name: str = Field(description="Pipeline to estimate")
+    estimated_cost_usd: str = Field(description="Estimated cost in USD")
+    estimated_duration_seconds: int | None = Field(
+        default=None,
+        description="Estimated duration",
+    )
+    step_estimates: dict[str, str] = Field(
+        default_factory=dict,
+        description="Cost estimate per step",
+    )
+    budget_status: BudgetStatusResponse | None = Field(
+        default=None,
+        description="Current budget status if available",
+    )
+    can_execute: bool = Field(
+        default=True,
+        description="Whether execution is allowed based on budget",
+    )
+    warning: str | None = Field(
+        default=None,
+        description="Warning message if budget is close to limit",
+    )
+
+
+class CostEstimateRequest(BaseModel):
+    """Request for cost estimation."""
+
+    pipeline_name: str = Field(description="Name of pipeline to estimate")
+    input_data: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Input data (used for more accurate estimates)",
+    )
+
+
 # Rebuild models that use forward references
 SpendSummaryResponse.model_rebuild()

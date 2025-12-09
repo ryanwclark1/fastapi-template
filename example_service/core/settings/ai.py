@@ -443,6 +443,30 @@ class AISettings(BaseSettings):
         description="Enable Prometheus metrics for pipelines",
     )
 
+    # ===== Rate Limiting =====
+    enable_rate_limiting: bool = Field(
+        default=True,
+        description="Enable per-tenant rate limiting for AI pipelines",
+    )
+    rate_limit_requests_per_minute: int = Field(
+        default=60,
+        ge=1,
+        le=1000,
+        description="Maximum pipeline execution requests per tenant per minute",
+    )
+    rate_limit_concurrent_executions: int = Field(
+        default=10,
+        ge=1,
+        le=100,
+        description="Maximum concurrent pipeline executions per tenant",
+    )
+    rate_limit_window_seconds: int = Field(
+        default=60,
+        ge=10,
+        le=3600,
+        description="Rate limit window size in seconds",
+    )
+
     @field_validator("default_llm_provider", "default_transcription_provider")
     @classmethod
     def validate_provider(cls, v: str) -> str:
