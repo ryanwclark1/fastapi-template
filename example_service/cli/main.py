@@ -3,11 +3,15 @@
 import click
 
 from example_service.cli.commands import (
+    ai,
+    audit,
     cache,
     config,
     data,
     database,
     dev,
+    email,
+    featureflags,
     generate,
     monitor,
     scheduler,
@@ -17,6 +21,7 @@ from example_service.cli.commands import (
     tasks,
     users,
     utils,
+    webhooks,
 )
 from example_service.infra.logging.config import setup_logging
 
@@ -46,6 +51,11 @@ def cli(ctx: click.Context) -> None:
       monitor    Monitoring and observability
       generate   Code generation and scaffolding
       dev        Development workflow commands
+      ai         AI operations and pipeline management
+      webhooks   Webhook endpoint management
+      audit      Audit log viewing and export
+      email      Email configuration and testing
+      flags      Feature flag management
 
     \b
     Quick Start:
@@ -55,6 +65,9 @@ def cli(ctx: click.Context) -> None:
       example-service health-check      # Check service health
       example-service generate resource Product --all  # Generate CRUD resource
       example-service dev quality       # Run all quality checks
+      example-service ai jobs -t tenant-123  # List AI jobs
+      example-service flags list        # List feature flags
+      example-service webhooks list     # List webhooks
     """
     ctx.ensure_object(dict)
 
@@ -81,6 +94,13 @@ cli.add_command(monitor.monitor)
 # Register command groups - Development tools
 cli.add_command(generate.generate)
 cli.add_command(dev.dev)
+
+# Register command groups - Feature management
+cli.add_command(ai.ai)
+cli.add_command(webhooks.webhooks)
+cli.add_command(audit.audit)
+cli.add_command(email.email)
+cli.add_command(featureflags.flags)
 
 # Register standalone utility commands
 cli.add_command(utils.shell)
