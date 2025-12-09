@@ -132,7 +132,7 @@ async def test_lifespan_initializes_database_and_cache(
         lambda: record("tracker_stop"),
     )
     monkeypatch.setattr(
-        "example_service.app.lifespan.tasks._initialize_taskiq_and_scheduler",
+        "example_service.app.lifespan._initialize_taskiq_and_scheduler",
         lambda *_, **__: (None, None),
     )
 
@@ -208,7 +208,7 @@ async def test_lifespan_warns_when_database_optional(
         warnings.append("close")
 
     monkeypatch.setattr(
-        "example_service.app.lifespan.database.logger.warning",
+        "example_service.app.lifespan.logger.warning",
         lambda msg, *_, **__: warnings.append(msg),
     )
     monkeypatch.setattr(
@@ -372,7 +372,7 @@ def _patch_common_dependencies(
         "example_service.infra.tracing.opentelemetry.setup_tracing", lambda: None
     )
     monkeypatch.setattr(
-        "example_service.app.lifespan.tasks._initialize_taskiq_and_scheduler",
+        "example_service.app.lifespan._initialize_taskiq_and_scheduler",
         lambda *_, **__: overrides.get("taskiq_result", (None, None)),
     )
     monkeypatch.setattr(
