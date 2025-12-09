@@ -132,14 +132,16 @@ class IsSuperuser(BasePermission):
         if not user:
             return False
 
-        # Get session ID from metadata if available
+        # Get context IDs from metadata
         session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
+        tenant_id = user.metadata.get("tenant_uuid")
 
-        # Create ACL checker with user context
+        # Create ACL checker with full user context
         acl = AccentAuthACL(
             user.permissions,
             auth_id=user.user_id,
             session_id=session_id,
+            tenant_id=tenant_id,
         )
 
         is_superuser = acl.is_superuser()
@@ -199,14 +201,16 @@ class HasACL(BasePermission):
         if not user:
             return False
 
-        # Get session ID from metadata if available
+        # Get context IDs from metadata
         session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
+        tenant_id = user.metadata.get("tenant_uuid")
 
-        # Create ACL checker with user context for reserved word substitution
+        # Create ACL checker with full user context for reserved word substitution
         acl = AccentAuthACL(
             user.permissions,
             auth_id=user.user_id,
             session_id=session_id,
+            tenant_id=tenant_id,
         )
 
         has_acl = acl.has_permission(self.acl_pattern)
@@ -264,11 +268,13 @@ class HasAnyACL(BasePermission):
             return False
 
         session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
+        tenant_id = user.metadata.get("tenant_uuid")
 
         acl = AccentAuthACL(
             user.permissions,
             auth_id=user.user_id,
             session_id=session_id,
+            tenant_id=tenant_id,
         )
 
         has_any = acl.has_any_permission(*self.acl_patterns)
@@ -325,11 +331,13 @@ class HasAllACLs(BasePermission):
             return False
 
         session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
+        tenant_id = user.metadata.get("tenant_uuid")
 
         acl = AccentAuthACL(
             user.permissions,
             auth_id=user.user_id,
             session_id=session_id,
+            tenant_id=tenant_id,
         )
 
         has_all = acl.has_all_permissions(*self.acl_patterns)
@@ -395,11 +403,13 @@ class CanAccessResource(BasePermission):
         resource_id = _kwargs.get("id") or _kwargs.get("resource_id")
 
         session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
+        tenant_id = user.metadata.get("tenant_uuid")
 
         acl = AccentAuthACL(
             user.permissions,
             auth_id=user.user_id,
             session_id=session_id,
+            tenant_id=tenant_id,
         )
 
         can_access = acl.has_permission(self.acl_pattern)

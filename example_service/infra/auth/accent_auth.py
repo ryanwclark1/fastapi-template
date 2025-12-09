@@ -392,7 +392,7 @@ class AccentAuthACL:
     - service.resource.action (e.g., "confd.users.read")
     - Wildcards: * (single level), # (multi-level)
     - Negation: ! prefix (e.g., "!confd.users.delete")
-    - Reserved: me, my_session (dynamic substitution)
+    - Reserved: me, my_session, my_tenant (dynamic substitution)
 
     This class delegates to the core ACL module which provides:
     - Full regex-based pattern matching
@@ -412,6 +412,16 @@ class AccentAuthACL:
             session_id="sess-456",
         )
         acl.has_permission("users.user-123.read")  # True
+
+        # With tenant context (enables 'my_tenant' substitution)
+        acl = AccentAuthACL(
+            ["storage.my_tenant.#", "confd.my_tenant.users.read"],
+            auth_id="user-123",
+            session_id="sess-456",
+            tenant_id="tenant-789",
+        )
+        acl.has_permission("storage.tenant-789.buckets.list")  # True
+        acl.has_permission("confd.tenant-789.users.read")  # True
     """
 
     def __init__(
@@ -419,6 +429,7 @@ class AccentAuthACL:
         acls: list[str],
         auth_id: str | None = None,
         session_id: str | None = None,
+        tenant_id: str | None = None,
     ):
         """Initialize with list of ACL patterns.
 
@@ -426,16 +437,19 @@ class AccentAuthACL:
             acls: List of ACL patterns
             auth_id: User auth ID for 'me' reserved word substitution
             session_id: Session ID for 'my_session' reserved word substitution
+            tenant_id: Tenant ID for 'my_tenant' reserved word substitution
         """
         self.acls = acls
         self.auth_id = auth_id
         self.session_id = session_id
+        self.tenant_id = tenant_id
 
         # Use the full ACL implementation with caching
         self._checker = get_cached_access_check(
             auth_id=auth_id,
             session_id=session_id,
             acl=acls,
+            tenant_id=tenant_id,
         )
 
     def has_permission(self, required: str) -> bool:

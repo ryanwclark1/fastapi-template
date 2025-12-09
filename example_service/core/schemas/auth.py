@@ -7,7 +7,7 @@ ACL Pattern Syntax:
     - service.resource.action (e.g., "confd.users.read")
     - Wildcards: * (single level), # (multi-level/recursive)
     - Negation: ! prefix for explicit deny
-    - Reserved words: me (current user), my_session (current session)
+    - Reserved words: me (current user), my_session (current session), my_tenant (current tenant)
 """
 
 from __future__ import annotations
@@ -165,7 +165,8 @@ class AuthUser(BaseModel):
         """Get an ACL checker instance for this user.
 
         Returns:
-            AccentAuthACL instance configured with user's permissions and context.
+            AccentAuthACL instance configured with user's permissions and context,
+            including tenant context for 'my_tenant' reserved word substitution.
         """
         from example_service.infra.auth.accent_auth import AccentAuthACL
 
@@ -173,6 +174,7 @@ class AuthUser(BaseModel):
             self.permissions,
             auth_id=self.user_id,
             session_id=self.session_id,
+            tenant_id=self.tenant_id,
         )
 
     def has_acl(self, acl_pattern: str) -> bool:
@@ -182,7 +184,7 @@ class AuthUser(BaseModel):
         - Dot-notation patterns (e.g., "confd.users.read")
         - Wildcards (* for single level, # for recursive)
         - Negation (! prefix for explicit deny)
-        - Reserved word substitution (me, my_session)
+        - Reserved word substitution (me, my_session, my_tenant)
 
         Args:
             acl_pattern: ACL pattern to check (e.g., "confd.users.read", "storage.#")
@@ -193,6 +195,11 @@ class AuthUser(BaseModel):
         Example:
             if user.has_acl("confd.users.read"):
                 # User can read users
+                pass
+
+            # Tenant-scoped pattern
+            if user.has_acl("storage.my_tenant.buckets.list"):
+                # User can list buckets in their tenant
                 pass
         """
         if not acl_pattern or not acl_pattern.strip():

@@ -23,7 +23,7 @@ from example_service.app.middleware.tenant import (
 from example_service.core.schemas.tenant import TenantContext as SchemaTenantContext
 from example_service.infra.storage.backends import TenantContext
 
-from .auth import get_current_user
+from .accent_auth import get_current_user
 from .database import get_db_session
 
 if TYPE_CHECKING:

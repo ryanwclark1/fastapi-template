@@ -24,7 +24,10 @@ __all__ = ["AccessCheck", "ReservedWord", "get_cached_access_check"]
 
 
 def get_cached_access_check(
-    auth_id: str | None, session_id: str | None, acl: Iterable[str]
+    auth_id: str | None,
+    session_id: str | None,
+    acl: Iterable[str],
+    tenant_id: str | None = None,
 ) -> AccessCheck:
     """Create a cached AccessCheck instance for ACL evaluation.
 
@@ -35,6 +38,7 @@ def get_cached_access_check(
         auth_id: User authentication ID (for 'me' reserved word substitution)
         session_id: Session ID (for 'my_session' substitution)
         acl: List of ACL patterns the user has been granted
+        tenant_id: Tenant ID (for 'my_tenant' substitution)
 
     Returns:
         Cached or newly created AccessCheck instance
@@ -43,16 +47,19 @@ def get_cached_access_check(
         >>> checker = get_cached_access_check(
         ...     "user-123",
         ...     "sess-456",
-        ...     ["users.*.read", "users.me.update"]
+        ...     ["users.*.read", "users.me.update", "storage.my_tenant.#"],
+        ...     "tenant-789",
         ... )
         >>> checker.matches_required_access("users.789.read")
         True
         >>> checker.matches_required_access("users.me.update")
         True  # 'me' matches 'user-123'
+        >>> checker.matches_required_access("storage.tenant-789.buckets.list")
+        True  # 'my_tenant' matches 'tenant-789'
     """
     # Convert to tuple for hashability (required for LRU cache)
     acl_tuple = tuple(acl)
-    return _get_cached_access_check(auth_id or "", session_id or "", acl_tuple)
+    return _get_cached_access_check(auth_id or "", session_id or "", acl_tuple, tenant_id or "")
 
 
 @dataclass(frozen=True)
@@ -84,7 +91,7 @@ class ReservedWord:
 
 @lru_cache(maxsize=2048)
 def _substitute_reserved_words(
-    expression: str, auth_id: str, session_id: str
+    expression: str, auth_id: str, session_id: str, tenant_id: str
 ) -> str:
     """Substitute reserved words in ACL pattern with actual values.
 
@@ -95,14 +102,22 @@ def _substitute_reserved_words(
         expression: Escaped ACL pattern (with wildcards already converted)
         auth_id: User authentication ID for 'me' substitution
         session_id: Session ID for 'my_session' substitution
+        tenant_id: Tenant ID for 'my_tenant' substitution
 
     Returns:
         Pattern with reserved words substituted as regex alternations
+
+    Reserved words:
+        - me: Current user's auth_id
+        - my_session: Current session_id
+        - my_tenant: Current tenant_id (for tenant-scoped patterns)
+        - edit: Alias for 'update'
     """
     pieces = expression.split("\\.")
     substitutions = (
         ReservedWord("me", auth_id),
         ReservedWord("my_session", session_id),
+        ReservedWord("my_tenant", tenant_id),
         ReservedWord("edit", "update"),
     )
     for reserved in substitutions:
@@ -112,12 +127,12 @@ def _substitute_reserved_words(
 
 @lru_cache(maxsize=2048)
 def _compile_acl_pattern(
-    access: str, auth_id: str, session_id: str
+    access: str, auth_id: str, session_id: str, tenant_id: str
 ) -> re.Pattern[str]:
     """Compile ACL pattern to regex with caching.
 
     This is performance-critical - compiles ACL patterns into regex.
-    By caching with (pattern, auth_id, session_id) as key, we avoid
+    By caching with (pattern, auth_id, session_id, tenant_id) as key, we avoid
     recompiling on every request.
 
     Cache size of 2048 supports:
@@ -129,6 +144,7 @@ def _compile_acl_pattern(
         access: Raw ACL pattern (e.g., 'users.*.read', 'me.profile.edit')
         auth_id: User authentication ID for reserved word substitution
         session_id: Session ID for reserved word substitution
+        tenant_id: Tenant ID for reserved word substitution
 
     Returns:
         Compiled regex pattern ready for matching
@@ -142,7 +158,7 @@ def _compile_acl_pattern(
     regex = re.escape(access).replace("\\*", "[^.#]*?").replace("\\#", ".*?")
 
     # Substitute reserved words with cached function
-    regex = _substitute_reserved_words(regex, auth_id, session_id)
+    regex = _substitute_reserved_words(regex, auth_id, session_id, tenant_id)
 
     # Compile and return the final pattern
     return re.compile(f"^{regex}$")
@@ -150,7 +166,7 @@ def _compile_acl_pattern(
 
 @lru_cache(maxsize=512)
 def _get_cached_access_check(
-    auth_id: str, session_id: str, acl_tuple: tuple[str, ...]
+    auth_id: str, session_id: str, acl_tuple: tuple[str, ...], tenant_id: str
 ) -> AccessCheck:
     """Create and cache AccessCheck instances.
 
@@ -163,11 +179,12 @@ def _get_cached_access_check(
         auth_id: User authentication ID
         session_id: Session ID
         acl_tuple: Tuple of ACL patterns (must be tuple for hashability)
+        tenant_id: Tenant ID for tenant-scoped pattern matching
 
     Returns:
         Cached or newly created AccessCheck instance
     """
-    return AccessCheck(auth_id, session_id, acl_tuple)
+    return AccessCheck(auth_id, session_id, acl_tuple, tenant_id)
 
 
 class AccessCheck:
@@ -182,19 +199,32 @@ class AccessCheck:
     3. If any positive pattern matches, access is GRANTED
     4. If nothing matches, access is DENIED
 
+    Reserved words for context-aware patterns:
+    - 'me': Replaced with the current user's auth_id
+    - 'my_session': Replaced with the current session_id
+    - 'my_tenant': Replaced with the current tenant_id
+    - 'edit': Alias for 'update'
+
     Example:
         >>> checker = AccessCheck(
         ...     "user-123", "sess-456",
-        ...     ["users.*.read", "!users.admin.*"]
+        ...     ["users.*.read", "!users.admin.*", "storage.my_tenant.#"],
+        ...     "tenant-789",
         ... )
         >>> checker.matches_required_access("users.789.read")
         True  # Matches users.*.read
         >>> checker.matches_required_access("users.admin.read")
         False  # Blocked by !users.admin.*
+        >>> checker.matches_required_access("storage.tenant-789.buckets.list")
+        True  # 'my_tenant' matches 'tenant-789'
     """
 
     def __init__(
-        self, auth_id: str | None, session_id: str | None, acl: Iterable[str]
+        self,
+        auth_id: str | None,
+        session_id: str | None,
+        acl: Iterable[str],
+        tenant_id: str | None = None,
     ) -> None:
         """Initialize AccessCheck with cached pattern compilation.
 
@@ -202,19 +232,21 @@ class AccessCheck:
             auth_id: User authentication ID (used for 'me' reserved word)
             session_id: Session ID (used for 'my_session' reserved word)
             acl: List of ACL patterns, may include negations (prefixed with '!')
+            tenant_id: Tenant ID (used for 'my_tenant' reserved word)
         """
         self.auth_id = auth_id or ""
         self.session_id = session_id or ""
+        self.tenant_id = tenant_id or ""
         entries = list(acl)
 
         # Compile patterns using cached compilation
         self._positive = [
-            _compile_acl_pattern(entry, self.auth_id, self.session_id)
+            _compile_acl_pattern(entry, self.auth_id, self.session_id, self.tenant_id)
             for entry in entries
             if not entry.startswith("!")
         ]
         self._negative = [
-            _compile_acl_pattern(entry[1:], self.auth_id, self.session_id)
+            _compile_acl_pattern(entry[1:], self.auth_id, self.session_id, self.tenant_id)
             for entry in entries
             if entry.startswith("!")
         ]
