@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import csv
-from datetime import datetime
+from datetime import UTC, datetime
 import io
 import json
 import logging
@@ -204,7 +204,7 @@ class JSONExporter(BaseExporter[T]):
         rows = [self._extract_fields(r) for r in records]
 
         export_data = {
-            "exported_at": datetime.utcnow().isoformat(),
+            "exported_at": datetime.now(UTC).isoformat(),
             "record_count": len(rows),
             "records": rows,
         }
@@ -219,7 +219,7 @@ class JSONExporter(BaseExporter[T]):
         rows = [self._extract_fields(r) for r in records]
 
         export_data = {
-            "exported_at": datetime.utcnow().isoformat(),
+            "exported_at": datetime.now(UTC).isoformat(),
             "record_count": len(rows),
             "records": rows,
         }
@@ -243,16 +243,21 @@ class ExcelExporter(BaseExporter[T]):
     def file_extension(self) -> str:
         return "xlsx"
 
-    def export(self, records: list[T], output_path: Path) -> int:
-        """Export records to Excel file."""
+    def _build_workbook(self, records: list[T]) -> tuple[Any, int]:
+        """Build an Excel workbook from records.
+
+        Args:
+            records: Records to export.
+
+        Returns:
+            Tuple of (workbook, record_count).
+        """
         try:
             from openpyxl import Workbook
             from openpyxl.utils import get_column_letter
         except ImportError as err:
             msg = "openpyxl is required for Excel export. Install with: pip install openpyxl"
-            raise ImportError(
-                msg,
-            ) from err
+            raise ImportError(msg) from err
 
         wb = Workbook()
         ws = wb.active
@@ -262,8 +267,7 @@ class ExcelExporter(BaseExporter[T]):
         ws.title = "Export"
 
         if not records:
-            wb.save(output_path)
-            return 0
+            return wb, 0
 
         rows = [self._extract_fields(r) for r in records]
         fieldnames = list(rows[0].keys()) if rows else []
@@ -289,53 +293,17 @@ class ExcelExporter(BaseExporter[T]):
             column_letter = get_column_letter(col)
             ws.column_dimensions[column_letter].auto_size = True
 
+        return wb, len(rows)
+
+    def export(self, records: list[T], output_path: Path) -> int:
+        """Export records to Excel file."""
+        wb, record_count = self._build_workbook(records)
         wb.save(output_path)
-        return len(rows)
+        return record_count
 
     def export_to_bytes(self, records: list[T]) -> bytes:
         """Export records to Excel bytes."""
-        try:
-            from openpyxl import Workbook
-            from openpyxl.utils import get_column_letter
-        except ImportError as err:
-            msg = "openpyxl is required for Excel export"
-            raise ImportError(msg) from err
-
-        wb = Workbook()
-        ws = wb.active
-        if ws is None:
-            msg = "Workbook has no active worksheet"
-            raise RuntimeError(msg)
-        ws.title = "Export"
-
-        if not records:
-            output = io.BytesIO()
-            wb.save(output)
-            return output.getvalue()
-
-        rows = [self._extract_fields(r) for r in records]
-        fieldnames = list(rows[0].keys()) if rows else []
-
-        # Write headers
-        if self.include_headers:
-            for col, header in enumerate(fieldnames, 1):
-                cell = ws.cell(row=1, column=col, value=header)
-                cell.font = cell.font.copy(bold=True)
-
-        # Write data
-        start_row = 2 if self.include_headers else 1
-        for row_idx, row_data in enumerate(rows, start_row):
-            for col, field in enumerate(fieldnames, 1):
-                value = row_data.get(field)
-                if isinstance(value, (dict, list)):
-                    value = json.dumps(value)
-                ws.cell(row=row_idx, column=col, value=value)
-
-        # Auto-size columns
-        for col in range(1, len(fieldnames) + 1):
-            column_letter = get_column_letter(col)
-            ws.column_dimensions[column_letter].auto_size = True
-
+        wb, _ = self._build_workbook(records)
         output = io.BytesIO()
         wb.save(output)
         return output.getvalue()

@@ -9,6 +9,43 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class FilterOperator(StrEnum):
+    """Supported filter operators for export queries."""
+
+    EQ = "eq"  # equals (default)
+    NE = "ne"  # not equals
+    GT = "gt"  # greater than
+    GTE = "gte"  # greater than or equal
+    LT = "lt"  # less than
+    LTE = "lte"  # less than or equal
+    CONTAINS = "contains"  # string contains (case-insensitive)
+    IN = "in"  # value in list
+    NOT_IN = "not_in"  # value not in list
+    IS_NULL = "is_null"  # value is null
+    IS_NOT_NULL = "is_not_null"  # value is not null
+
+
+class FilterCondition(BaseModel):
+    """A single filter condition for export queries."""
+
+    field: str = Field(description="Field name to filter on")
+    operator: FilterOperator = Field(
+        default=FilterOperator.EQ, description="Filter operator"
+    )
+    value: Any = Field(default=None, description="Value to compare against")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {"field": "is_completed", "operator": "eq", "value": True},
+                {"field": "created_at", "operator": "gte", "value": "2024-01-01"},
+                {"field": "title", "operator": "contains", "value": "urgent"},
+                {"field": "status", "operator": "in", "value": ["active", "pending"]},
+            ]
+        }
+    }
+
+
 class ExportFormat(StrEnum):
     """Supported export formats."""
 
@@ -50,14 +87,35 @@ class ExportRequest(BaseModel):
 
     entity_type: str = Field(description="Type of entity to export (e.g., 'reminders', 'files')")
     format: ExportFormat = Field(default=ExportFormat.CSV, description="Export format")
-    filters: dict[str, Any] | None = Field(default=None, description="Query filters to apply")
+    filters: dict[str, Any] | None = Field(
+        default=None,
+        description="Simple equality filters (deprecated, use filter_conditions for advanced filtering)",
+    )
+    filter_conditions: list[FilterCondition] | None = Field(
+        default=None,
+        description="Advanced filter conditions with operators (gt, lt, contains, in, etc.)",
+    )
     fields: list[str] | None = Field(
         default=None, description="Specific fields to export (all if not specified)"
     )
     include_headers: bool = Field(default=True, description="Include column headers (CSV/Excel)")
     upload_to_storage: bool = Field(default=False, description="Upload to object storage after export")
 
-    model_config = {"json_schema_extra": {"example": {"entity_type": "reminders", "format": "csv"}}}
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {"entity_type": "reminders", "format": "csv"},
+                {
+                    "entity_type": "reminders",
+                    "format": "json",
+                    "filter_conditions": [
+                        {"field": "is_completed", "operator": "eq", "value": False},
+                        {"field": "created_at", "operator": "gte", "value": "2024-01-01"},
+                    ],
+                },
+            ]
+        }
+    }
 
 
 class ExportResult(BaseModel):

@@ -30,6 +30,7 @@ from .app import AppSettings
 from .auth import AuthSettings
 from .backup import BackupSettings
 from .consul import ConsulSettings
+from .datatransfer import DataTransferSettings
 from .email import EmailSettings
 from .graphql import GraphQLSettings
 from .health import HealthCheckSettings
@@ -236,6 +237,16 @@ def get_mock_settings() -> MockModeSettings:
     return MockModeSettings()
 
 
+@lru_cache(maxsize=1)
+def get_datatransfer_settings() -> DataTransferSettings:
+    """Get cached data transfer settings.
+
+    Returns:
+        Validated and frozen DataTransferSettings instance.
+    """
+    return DataTransferSettings()
+
+
 def clear_all_caches() -> None:
     """Clear all settings caches.
 
@@ -261,3 +272,4 @@ def clear_all_caches() -> None:
     get_pagination_settings.cache_clear()
     get_ai_settings.cache_clear()
     get_mock_settings.cache_clear()
+    get_datatransfer_settings.cache_clear()

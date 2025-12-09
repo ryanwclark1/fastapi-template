@@ -7,10 +7,12 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import csv
+from datetime import datetime
 import io
 import json
 import logging
 from typing import TYPE_CHECKING, Any, TypeVar
+from uuid import UUID
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -21,8 +23,11 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-class ImportError(Exception):
-    """Error during import operation."""
+class DataImportError(Exception):
+    """Error during import operation.
+
+    Named DataImportError to avoid shadowing Python's built-in ImportError.
+    """
 
     def __init__(self, message: str, row: int | None = None, field: str | None = None) -> None:
         super().__init__(message)
@@ -143,6 +148,39 @@ class BaseImporter[T](ABC):
                             value = int(value)
                         elif expected_type is float:
                             value = float(value)
+                        elif expected_type is datetime:
+                            if isinstance(value, datetime):
+                                pass  # Already a datetime
+                            elif isinstance(value, str):
+                                # Try ISO format first, then common formats
+                                for fmt in (
+                                    None,  # ISO format via fromisoformat
+                                    "%Y-%m-%d %H:%M:%S",
+                                    "%Y-%m-%d",
+                                    "%d/%m/%Y",
+                                    "%m/%d/%Y",
+                                ):
+                                    try:
+                                        if fmt is None:
+                                            value = datetime.fromisoformat(
+                                                value.replace("Z", "+00:00")
+                                            )
+                                        else:
+                                            value = datetime.strptime(value, fmt)
+                                        break
+                                    except ValueError:
+                                        continue
+                                else:
+                                    raise ValueError(f"Unrecognized datetime format: {value}")
+                            else:
+                                raise TypeError(f"Cannot convert {type(value).__name__} to datetime")
+                        elif expected_type is UUID:
+                            if isinstance(value, UUID):
+                                pass  # Already a UUID
+                            elif isinstance(value, str):
+                                value = UUID(value)
+                            else:
+                                raise TypeError(f"Cannot convert {type(value).__name__} to UUID")
                         else:
                             value = expected_type(value)
                     except (ValueError, TypeError) as e:
@@ -265,10 +303,10 @@ class JSONImporter(BaseImporter[T]):
         elif isinstance(data, dict):
             records_list = data.get(self.records_key, [])
             if not isinstance(records_list, list):
-                raise ImportError(f"Expected '{self.records_key}' to be an array")
+                raise DataImportError(f"Expected '{self.records_key}' to be an array")
         else:
             msg = "JSON must be an array or object with records"
-            raise ImportError(msg)
+            raise DataImportError(msg)
 
         records = []
         for row_num, row in enumerate(records_list, start=1):
@@ -322,7 +360,7 @@ class ExcelImporter(BaseImporter[T]):
             from openpyxl import load_workbook
         except ImportError as err:
             msg = "openpyxl is required for Excel import"
-            raise ImportError(msg) from err
+            raise DataImportError(msg) from err
 
         wb = load_workbook(file_path, read_only=True, data_only=True)
         ws = wb[self.sheet_name] if self.sheet_name else wb.active
@@ -335,7 +373,7 @@ class ExcelImporter(BaseImporter[T]):
             from openpyxl import load_workbook
         except ImportError as err:
             msg = "openpyxl is required for Excel import"
-            raise ImportError(msg) from err
+            raise DataImportError(msg) from err
 
         wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
         ws = wb[self.sheet_name] if self.sheet_name else wb.active
@@ -410,8 +448,8 @@ def get_importer(
 __all__ = [
     "BaseImporter",
     "CSVImporter",
+    "DataImportError",
     "ExcelImporter",
-    "ImportError",
     "JSONImporter",
     "ParsedRecord",
     "get_importer",
