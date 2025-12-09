@@ -8,7 +8,13 @@ from __future__ import annotations
 import importlib
 from pathlib import Path
 
-from .email_config import EmailAuditLog, EmailConfig, EmailProviderType, EmailUsageLog
+# Re-export email models from features/email for backwards compatibility
+from example_service.features.email.models import (
+    EmailAuditLog,
+    EmailConfig,
+    EmailProviderType,
+    EmailUsageLog,
+)
 from .post import Post
 from .tenant import Tenant
 from .user import User
