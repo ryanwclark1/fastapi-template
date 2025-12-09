@@ -9,6 +9,10 @@ autonomous AI agents with:
 - Checkpoint/resume capabilities
 - Full observability (tracing, metrics, logging)
 - Run management (retry, resume, cancel)
+- Memory systems (buffer, window, summary)
+- Structured output enforcement with Pydantic
+- Workflow graphs with human-in-the-loop
+- Analytics and performance benchmarking
 
 Quick Start:
     from example_service.infra.ai.agents import (
@@ -43,6 +47,44 @@ Quick Start:
     print(f"Answer: {result.output}")
     print(f"Cost: ${result.total_cost_usd}")
 
+Memory Systems:
+    from example_service.infra.ai.agents import (
+        BufferMemory,
+        WindowMemory,
+        SummaryMemory,
+        ConversationMemory,
+    )
+
+    # Buffer memory keeps all messages
+    memory = BufferMemory(max_messages=100)
+    await memory.add_message("user", "Hello!")
+    messages = await memory.get_messages()
+
+Structured Output:
+    from example_service.infra.ai.agents import (
+        StructuredOutputParser,
+        StructuredOutputExtractor,
+    )
+
+    class Person(BaseModel):
+        name: str
+        age: int
+
+    extractor = StructuredOutputExtractor(model="gpt-4o")
+    result = await extractor.extract(Person, "John is 25 years old")
+
+Workflows:
+    from example_service.infra.ai.agents import WorkflowBuilder
+
+    workflow = (
+        WorkflowBuilder("approval_flow")
+        .add_node("process", process_fn)
+        .add_human_approval("review", reviewer_id="admin")
+        .add_edge("process", "review")
+        .set_entry("process")
+        .build()
+    )
+
 Architecture:
     BaseAgent (core abstraction)
         ├── AgentConfig (configuration)
@@ -58,6 +100,31 @@ Architecture:
         ├── Run tracking
         ├── Retry/resume
         └── Cost reporting
+
+    Memory (conversation context)
+        ├── BufferMemory (full history)
+        ├── WindowMemory (sliding window)
+        ├── SummaryMemory (summarized)
+        └── ConversationMemory (per-conversation)
+
+    StateStore (persistent state)
+        ├── InMemoryStateStore
+        ├── RedisStateStore
+        └── ScopedStateStore
+
+    StructuredOutput (Pydantic enforcement)
+        ├── StructuredOutputParser
+        └── StructuredOutputExtractor
+
+    Workflows (graph execution)
+        ├── WorkflowBuilder
+        ├── HumanApprovalNode
+        ├── ConditionalNode
+        └── ParallelNode
+
+    Analytics (reporting)
+        ├── AgentAnalytics
+        └── PerformanceBenchmark
 
     Observability
         ├── AgentTracer (OpenTelemetry)
@@ -121,6 +188,60 @@ from example_service.infra.ai.agents.tools import (
     tool,
 )
 
+# Memory
+from example_service.infra.ai.agents.memory import (
+    BaseMemory,
+    BufferMemory,
+    ConversationMemory,
+    MemoryMessage,
+    SummaryMemory,
+    WindowMemory,
+)
+
+# State store
+from example_service.infra.ai.agents.state_store import (
+    BaseStateStore,
+    InMemoryStateStore,
+    RedisStateStore,
+    ScopedStateStore,
+    StateEntry,
+    StateKey,
+)
+
+# Structured output
+from example_service.infra.ai.agents.structured_output import (
+    ExtractionResult,
+    ExtractionStrategy,
+    StructuredOutputExtractor,
+    StructuredOutputParser,
+)
+
+# Workflows
+from example_service.infra.ai.agents.workflows import (
+    ConditionalNode,
+    FunctionNode,
+    HumanApprovalNode,
+    ParallelNode,
+    Workflow,
+    WorkflowBuilder,
+    WorkflowContext,
+    WorkflowNode,
+    WorkflowResult,
+    WorkflowStatus,
+)
+
+# Analytics
+from example_service.infra.ai.agents.analytics import (
+    AgentAnalytics,
+    AgentMetrics,
+    BenchmarkResult,
+    CostAnalysis,
+    ErrorAnalysis,
+    PerformanceBenchmark,
+    UsageMetrics,
+    UsageReport,
+)
+
 __all__ = [
     # Agent base
     "AgentConfig",
@@ -161,4 +282,43 @@ __all__ = [
     "AgentTracer",
     "configure_agent_tracer",
     "get_agent_tracer",
+    # Memory
+    "BaseMemory",
+    "BufferMemory",
+    "ConversationMemory",
+    "MemoryMessage",
+    "SummaryMemory",
+    "WindowMemory",
+    # State store
+    "BaseStateStore",
+    "InMemoryStateStore",
+    "RedisStateStore",
+    "ScopedStateStore",
+    "StateEntry",
+    "StateKey",
+    # Structured output
+    "ExtractionResult",
+    "ExtractionStrategy",
+    "StructuredOutputExtractor",
+    "StructuredOutputParser",
+    # Workflows
+    "ConditionalNode",
+    "FunctionNode",
+    "HumanApprovalNode",
+    "ParallelNode",
+    "Workflow",
+    "WorkflowBuilder",
+    "WorkflowContext",
+    "WorkflowNode",
+    "WorkflowResult",
+    "WorkflowStatus",
+    # Analytics
+    "AgentAnalytics",
+    "AgentMetrics",
+    "BenchmarkResult",
+    "CostAnalysis",
+    "ErrorAnalysis",
+    "PerformanceBenchmark",
+    "UsageMetrics",
+    "UsageReport",
 ]
