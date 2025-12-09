@@ -123,8 +123,8 @@ async def get_feature_flags(
     # Add user attributes if available
     user = getattr(request.state, "user", None)
     if user:
-        if hasattr(user, "roles"):
-            attributes["roles"] = user.roles
+        if hasattr(user, "permissions"):
+            attributes["acl_patterns"] = user.permissions
         if hasattr(user, "plan"):
             attributes["plan"] = user.plan
 

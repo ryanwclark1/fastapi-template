@@ -19,7 +19,7 @@ try:
 except ImportError:
     GraphQLRouter = None  # type: ignore[assignment, misc]
 
-from example_service.core.dependencies.auth import get_current_user_optional
+from example_service.core.dependencies.accent_auth import get_current_user_optional
 from example_service.core.dependencies.database import get_db_session
 from example_service.core.settings import get_app_settings, get_graphql_settings
 
