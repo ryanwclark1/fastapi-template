@@ -706,10 +706,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             }
             error_log_data.update(user_context)
 
-            logger.error(
+            logger.exception(
                 "Request failed",
                 extra=error_log_data,
-                exc_info=True,
             )
 
             if hasattr(tracking, "track_api_call"):

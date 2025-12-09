@@ -132,6 +132,38 @@ class RateLimitMiddleware:
         """
         return any(path.startswith(exempt_path) for exempt_path in self.exempt_paths)
 
+    def _raise_rate_limit_exceeded(
+        self,
+        path: str,
+        method: str,
+        limit_key: str,
+        metadata: dict[str, int],
+        request_url: str,
+    ) -> None:
+        """Raise rate limit exception with logging.
+
+        Args:
+            path: Request path.
+            method: HTTP method.
+            limit_key: Rate limit key.
+            metadata: Rate limit metadata.
+            request_url: Request URL string.
+        """
+        logger.warning(
+            "Rate limit exceeded",
+            extra={
+                "path": path,
+                "method": method,
+                "key": limit_key,
+                "limit": metadata["limit"],
+            },
+        )
+        raise RateLimitException(
+            detail=f"Rate limit exceeded. Retry after {metadata['retry_after']} seconds",
+            instance=request_url,
+            extra=metadata,
+        )
+
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """ASGI callable interface.
 
@@ -178,20 +210,12 @@ class RateLimitMiddleware:
             if not allowed:
                 # Rate limit exceeded - raise exception
                 # Let the exception handler deal with it
-                logger.warning(
-                    "Rate limit exceeded",
-                    extra={
-                        "path": path,
-                        "method": scope.get("method", ""),
-                        "key": limit_key,
-                        "limit": metadata["limit"],
-                    },
-                )
-
-                raise RateLimitException(
-                    detail=f"Rate limit exceeded. Retry after {metadata['retry_after']} seconds",
-                    instance=str(request.url),
-                    extra=metadata,
+                self._raise_rate_limit_exceeded(
+                    path=path,
+                    method=scope.get("method", ""),
+                    limit_key=limit_key,
+                    metadata=metadata,
+                    request_url=str(request.url),
                 )
 
             # Store metadata for response headers
@@ -206,7 +230,7 @@ class RateLimitMiddleware:
                 tracker = get_rate_limit_tracker()
                 if tracker:
                     tracker.record_success()
-            except Exception as e:
+            except (ImportError, AttributeError, RuntimeError) as e:
                 logger.debug("Failed to record rate limit success", exc_info=e)
 
         except RateLimitException as exc:
@@ -224,12 +248,12 @@ class RateLimitMiddleware:
                 tracker = get_rate_limit_tracker()
                 if tracker:
                     tracker.record_failure(str(e))
-            except Exception as tracker_error:
+            except (ImportError, AttributeError, RuntimeError) as tracker_error:
                 logger.debug(
                     "Failed to record rate limit failure", exc_info=tracker_error
                 )
 
-            logger.error(
+            logger.exception(
                 "Rate limit check failed, allowing request (fail-open)",
                 extra={
                     "path": path,
@@ -237,7 +261,6 @@ class RateLimitMiddleware:
                     "error": str(e),
                     "protection_status": "degraded",
                 },
-                exc_info=True,
             )
             # Continue without rate limit metadata
             rate_limit_metadata = None

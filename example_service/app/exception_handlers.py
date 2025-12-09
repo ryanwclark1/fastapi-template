@@ -112,7 +112,8 @@ async def app_exception_handler(request: Request, exc: Exception) -> JSONRespons
         JSONResponse with RFC 7807 Problem Details format.
     """
     if not isinstance(exc, AppException):
-        raise TypeError(f"Expected AppException, got {type(exc).__name__}")
+        msg = f"Expected AppException, got {type(exc).__name__}"
+        raise TypeError(msg)
     request_id = _get_request_id(request)
 
     # Track error metric
@@ -178,7 +179,8 @@ async def not_found_error_handler(request: Request, exc: Exception) -> JSONRespo
         JSONResponse with RFC 7807 Problem Details format and 404 status.
     """
     if not isinstance(exc, NotFoundError):
-        raise TypeError(f"Expected NotFoundError, got {type(exc).__name__}")
+        msg = f"Expected NotFoundError, got {type(exc).__name__}"
+        raise TypeError(msg)
     request_id = _get_request_id(request)
 
     # Track error metric
@@ -220,7 +222,9 @@ async def not_found_error_handler(request: Request, exc: Exception) -> JSONRespo
     )
 
 
-async def validation_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+async def validation_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
     """Handle FastAPI/Pydantic validation errors.
 
     This handler converts validation errors into RFC 7807 Problem Details
@@ -234,7 +238,8 @@ async def validation_exception_handler(request: Request, exc: Exception) -> JSON
         JSONResponse with RFC 7807 Problem Details format.
     """
     if not isinstance(exc, RequestValidationError):
-        raise TypeError(f"Expected RequestValidationError, got {type(exc).__name__}")
+        msg = f"Expected RequestValidationError, got {type(exc).__name__}"
+        raise TypeError(msg)
     request_id = _get_request_id(request)
 
     # Extract validation errors
@@ -337,7 +342,9 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
     )
 
 
-async def pydantic_validation_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+async def pydantic_validation_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
     """Handle Pydantic validation errors outside of FastAPI request validation.
 
     Args:
@@ -348,7 +355,8 @@ async def pydantic_validation_exception_handler(request: Request, exc: Exception
         JSONResponse with RFC 7807 Problem Details format.
     """
     if not isinstance(exc, PydanticValidationError):
-        raise TypeError(f"Expected PydanticValidationError, got {type(exc).__name__}")
+        msg = f"Expected PydanticValidationError, got {type(exc).__name__}"
+        raise TypeError(msg)
     request_id = _get_request_id(request)
 
     # Extract validation errors
@@ -419,7 +427,9 @@ def configure_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
     # Pydantic validation errors
-    app.add_exception_handler(PydanticValidationError, pydantic_validation_exception_handler)
+    app.add_exception_handler(
+        PydanticValidationError, pydantic_validation_exception_handler
+    )
 
     # Catch-all for unexpected exceptions
     app.add_exception_handler(Exception, generic_exception_handler)
@@ -440,5 +450,5 @@ def configure_exception_handlers(app: FastAPI) -> None:
             return await validation_exception_handler(request, exc)
         except PydanticValidationError as exc:
             return await pydantic_validation_exception_handler(request, exc)
-        except Exception as exc:  # pragma: no cover - safety fallback
+        except Exception as exc:  # noqa: BLE001 - pragma: no cover - safety fallback
             return await generic_exception_handler(request, exc)
