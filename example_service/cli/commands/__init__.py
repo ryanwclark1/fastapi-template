@@ -1,11 +1,15 @@
 """CLI command modules."""
 
 from example_service.cli.commands import (
+    ai,
+    audit,
     cache,
     config,
     data,
     database,
     dev,
+    email,
+    featureflags,
     generate,
     monitor,
     scheduler,
@@ -15,14 +19,19 @@ from example_service.cli.commands import (
     tasks,
     users,
     utils,
+    webhooks,
 )
 
 __all__ = [
+    "ai",
+    "audit",
     "cache",
     "config",
     "data",
     "database",
     "dev",
+    "email",
+    "featureflags",
     "generate",
     "monitor",
     "scheduler",
@@ -32,4 +41,5 @@ __all__ = [
     "tasks",
     "users",
     "utils",
+    "webhooks",
 ]
