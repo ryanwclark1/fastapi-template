@@ -7,7 +7,37 @@ enabling backend-agnostic task tracking across Redis and PostgreSQL.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, TypedDict
+
+
+class TaskExecutionDetails(TypedDict, total=False):
+    """TypedDict for task execution details returned by trackers.
+
+    This represents the raw task details from the tracking layer.
+    All fields are marked as optional (total=False) because:
+    1. Some tracker implementations don't provide all fields
+    2. Fields may be None for various reasons (e.g., task not finished yet)
+
+    Required fields in practice: task_id, task_name, status, retry_count
+    """
+
+    task_id: str
+    task_name: str
+    status: str
+    started_at: str | None  # ISO format datetime string
+    finished_at: str | None  # ISO format datetime string
+    duration_ms: int | None
+    return_value: Any | None
+    error_message: str | None
+    error_type: str | None
+    error_traceback: str | None  # Optional - not all trackers provide this
+    retry_count: int
+    worker_id: str | None
+    queue_name: str | None
+    task_args: Any | None
+    task_kwargs: dict[str, Any] | None
+    labels: dict[str, Any] | None
+    progress: dict[str, Any] | None  # Optional - not all trackers provide this
 
 
 class BaseTaskTracker(ABC):
@@ -192,7 +222,7 @@ class BaseTaskTracker(ABC):
         ...
 
     @abstractmethod
-    async def get_task_details(self, task_id: str) -> dict[str, Any] | None:
+    async def get_task_details(self, task_id: str) -> TaskExecutionDetails | None:
         """Get full details for a specific task execution.
 
         Args:

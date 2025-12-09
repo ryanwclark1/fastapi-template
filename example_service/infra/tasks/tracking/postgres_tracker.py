@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from example_service.infra.results.models import TaskExecution
-from example_service.infra.tasks.tracking.base import BaseTaskTracker
+from example_service.infra.tasks.tracking.base import BaseTaskTracker, TaskExecutionDetails
 
 logger = logging.getLogger(__name__)
 
@@ -429,7 +429,7 @@ class PostgresTaskTracker(BaseTaskTracker):
             logger.warning("Failed to count task history", extra={"error": str(e)})
             return 0
 
-    async def get_task_details(self, task_id: str) -> dict[str, Any] | None:
+    async def get_task_details(self, task_id: str) -> TaskExecutionDetails | None:
         """Get full details for a specific task execution."""
         if not self.is_connected:
             return None

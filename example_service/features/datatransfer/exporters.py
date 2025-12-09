@@ -41,8 +41,14 @@ def serialize_value(value: Any) -> Any:
         return value.decode("utf-8", errors="replace")
     if hasattr(value, "model_dump"):
         return value.model_dump()
-    if hasattr(value, "__dict__") and not isinstance(value, (str, int, float, bool, list, dict)):
-        return {k: serialize_value(v) for k, v in value.__dict__.items() if not k.startswith("_")}
+    if hasattr(value, "__dict__") and not isinstance(
+        value, (str, int, float, bool, list, dict)
+    ):
+        return {
+            k: serialize_value(v)
+            for k, v in value.__dict__.items()
+            if not k.startswith("_")
+        }
     return value
 
 
@@ -210,7 +216,9 @@ class JSONExporter(BaseExporter[T]):
         }
 
         with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(export_data, f, indent=self.indent, ensure_ascii=False, default=str)
+            json.dump(
+                export_data, f, indent=self.indent, ensure_ascii=False, default=str
+            )
 
         return len(rows)
 
@@ -224,9 +232,9 @@ class JSONExporter(BaseExporter[T]):
             "records": rows,
         }
 
-        return json.dumps(export_data, indent=self.indent, ensure_ascii=False, default=str).encode(
-            "utf-8"
-        )
+        return json.dumps(
+            export_data, indent=self.indent, ensure_ascii=False, default=str
+        ).encode("utf-8")
 
 
 class ExcelExporter(BaseExporter[T]):

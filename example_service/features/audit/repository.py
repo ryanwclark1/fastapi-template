@@ -6,7 +6,7 @@ concerns from business logic in the service layer.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from sqlalchemy import delete, desc, func, or_, select
 
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from .schemas import AuditLogQuery
+    from .schemas import AuditLogQuery, AuditSummaryStats
 
 _lazy = get_lazy_logger(__name__)
 
@@ -275,7 +275,7 @@ class AuditRepository(BaseRepository[AuditLog]):
         tenant_id: str | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
-    ) -> dict[str, Any]:
+    ) -> AuditSummaryStats:
         """Get aggregated audit statistics.
 
         Args:
@@ -314,8 +314,8 @@ class AuditRepository(BaseRepository[AuditLog]):
             .select_from(subquery)
             .group_by(subquery.c.action)
         )
-        # Convert enum keys to their values for dictionary
-        actions_count: dict[Any, int] = dict(action_result.all())  # type: ignore[arg-type]
+        # Convert enum keys to their string values for dictionary
+        actions_count: dict[str, int] = {str(k): v for k, v in action_result.all()}
 
         # Entity type counts
         entity_result = await session.execute(
