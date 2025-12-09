@@ -23,6 +23,8 @@ Usage:
         get_event_publisher,
         EventPublisherDep,
         get_cache,
+        MessageBroker,
+        Storage,
     )
 
     @router.post("/items")
@@ -30,6 +32,8 @@ Usage:
         session: AsyncSession = Depends(get_db_session),
         publisher: EventPublisher = Depends(get_event_publisher),
         cache: RedisCache = Depends(get_cache),
+        broker: MessageBroker,
+        storage: Storage,
     ):
         ...
 
@@ -62,6 +66,23 @@ Authentication Dependencies (ACL-based using Accent-Auth):
     )
 """
 
+# AI dependencies
+from example_service.core.dependencies.ai import (
+    AILoggerDep,
+    AIMetricsDep,
+    AITracerDep,
+    BudgetServiceDep,
+    OptionalOrchestrator,
+    OrchestratorDep,
+    get_ai_budget_service,
+    get_ai_logger_dep,
+    get_ai_metrics_dep,
+    get_ai_tracer_dep,
+    get_orchestrator,
+    get_pipeline_dep,
+    optional_orchestrator,
+    require_orchestrator,
+)
 from example_service.core.dependencies.availability import (
     RequireAuth,
     RequireBroker,
@@ -74,9 +95,42 @@ from example_service.core.dependencies.availability import (
     require_services,
 )
 from example_service.core.dependencies.database import get_db_session
+
+# Discovery dependencies
+from example_service.core.dependencies.discovery import (
+    DiscoveryServiceDep,
+    OptionalDiscoveryService,
+    get_discovery_service_dep,
+    optional_discovery_service,
+    require_discovery_service,
+)
+
+# Email dependencies
+from example_service.core.dependencies.email import (
+    EmailServiceDep,
+    EnhancedEmailServiceDep,
+    OptionalEnhancedEmailService,
+    TemplateRendererDep,
+    get_email_service_dep,
+    get_enhanced_email_service_dep,
+    get_template_renderer_dep,
+    optional_enhanced_email_service,
+    require_email_service,
+    require_enhanced_email_service,
+    require_template_renderer,
+)
 from example_service.core.dependencies.events import (
     EventPublisherDep,
     get_event_publisher,
+)
+
+# Messaging dependencies
+from example_service.core.dependencies.messaging import (
+    MessageBroker,
+    OptionalMessageBroker,
+    get_message_broker,
+    optional_message_broker,
+    require_message_broker,
 )
 
 # Re-export pagination dependencies
@@ -103,16 +157,85 @@ from example_service.core.dependencies.ratelimit import (
     rate_limit,
 )
 
+# Realtime/WebSocket dependencies
+from example_service.core.dependencies.realtime import (
+    ConnectionManagerDep,
+    EventBridgeDep,
+    OptionalConnectionManager,
+    OptionalEventBridge,
+    get_ws_connection_manager,
+    get_ws_event_bridge,
+    optional_connection_manager,
+    optional_event_bridge,
+    require_connection_manager,
+    require_event_bridge,
+)
+
 # Re-export service dependencies
 from example_service.core.dependencies.services import (
     HealthService,
     HealthServiceDep,
     get_health_service,
 )
+
+# Storage dependencies
+from example_service.core.dependencies.storage import (
+    OptionalStorage,
+    Storage,
+    StorageService,
+    get_storage_service,
+    optional_storage,
+    require_storage,
+)
+
+# Task dependencies
+from example_service.core.dependencies.tasks import (
+    OptionalTaskBroker,
+    OptionalTaskTracker,
+    SchedulerStatusDep,
+    TaskBrokerDep,
+    TaskTrackerDep,
+    get_scheduler_status,
+    get_task_broker,
+    get_task_tracker,
+    optional_task_broker,
+    optional_task_tracker,
+    require_task_broker,
+    require_task_tracker,
+)
+
+# Tracing dependencies
+from example_service.core.dependencies.tracing import (
+    TracerDep,
+    add_span_attributes_dep,
+    add_span_event_dep,
+    get_default_tracer,
+    get_tracer_dep,
+    tracer_factory,
+)
 from example_service.infra.cache import get_cache
 
 __all__ = [
-    # Service availability
+    # ══════════════════════════════════════════════════════════════════════════════
+    # AI Dependencies
+    # ══════════════════════════════════════════════════════════════════════════════
+    "AILoggerDep",
+    "AIMetricsDep",
+    "AITracerDep",
+    "BudgetServiceDep",
+    "OptionalOrchestrator",
+    "OrchestratorDep",
+    "get_ai_budget_service",
+    "get_ai_logger_dep",
+    "get_ai_metrics_dep",
+    "get_ai_tracer_dep",
+    "get_orchestrator",
+    "get_pipeline_dep",
+    "optional_orchestrator",
+    "require_orchestrator",
+    # ══════════════════════════════════════════════════════════════════════════════
+    # Service Availability
+    # ══════════════════════════════════════════════════════════════════════════════
     "RequireAuth",
     "RequireBroker",
     "RequireCache",
@@ -122,33 +245,121 @@ __all__ = [
     "RequireDatabaseAndCache",
     "RequireStorage",
     "require_services",
+    # ══════════════════════════════════════════════════════════════════════════════
+    # Cache
+    # ══════════════════════════════════════════════════════════════════════════════
+    "get_cache",
+    # ══════════════════════════════════════════════════════════════════════════════
+    # Database
+    # ══════════════════════════════════════════════════════════════════════════════
+    "get_db_session",
+    # ══════════════════════════════════════════════════════════════════════════════
+    # Discovery
+    # ══════════════════════════════════════════════════════════════════════════════
+    "DiscoveryServiceDep",
+    "OptionalDiscoveryService",
+    "get_discovery_service_dep",
+    "optional_discovery_service",
+    "require_discovery_service",
+    # ══════════════════════════════════════════════════════════════════════════════
+    # Email
+    # ══════════════════════════════════════════════════════════════════════════════
+    "EmailServiceDep",
+    "EnhancedEmailServiceDep",
+    "OptionalEnhancedEmailService",
+    "TemplateRendererDep",
+    "get_email_service_dep",
+    "get_enhanced_email_service_dep",
+    "get_template_renderer_dep",
+    "optional_enhanced_email_service",
+    "require_email_service",
+    "require_enhanced_email_service",
+    "require_template_renderer",
+    # ══════════════════════════════════════════════════════════════════════════════
+    # Events
+    # ══════════════════════════════════════════════════════════════════════════════
     "EventPublisherDep",
-    "ExtendedPagination",
-    "ExtendedPaginationParams",
+    "get_event_publisher",
+    # ══════════════════════════════════════════════════════════════════════════════
+    # Health
+    # ══════════════════════════════════════════════════════════════════════════════
     "HealthService",
     "HealthServiceDep",
+    "get_health_service",
+    # ══════════════════════════════════════════════════════════════════════════════
+    # Messaging (RabbitMQ)
+    # ══════════════════════════════════════════════════════════════════════════════
+    "MessageBroker",
+    "OptionalMessageBroker",
+    "get_message_broker",
+    "optional_message_broker",
+    "require_message_broker",
+    # ══════════════════════════════════════════════════════════════════════════════
+    # Pagination
+    # ══════════════════════════════════════════════════════════════════════════════
+    "ExtendedPagination",
+    "ExtendedPaginationParams",
     "PaginationParams",
-    "RateLimited",
     "SearchPagination",
     "SearchPaginationParams",
     "StandardPagination",
+    "get_extended_pagination",
+    "get_search_pagination",
+    "get_standard_pagination",
+    # ══════════════════════════════════════════════════════════════════════════════
+    # Rate Limiting
+    # ══════════════════════════════════════════════════════════════════════════════
+    "RateLimited",
     "StrictRateLimit",
     "UserRateLimit",
-    # Cache (infrastructure)
-    "get_cache",
-    # Database
-    "get_db_session",
-    # Events
-    "get_event_publisher",
-    "get_extended_pagination",
-    # Services
-    "get_health_service",
-    # Rate limiting
     "get_rate_limiter",
-    "get_search_pagination",
-    # Pagination
-    "get_standard_pagination",
     "per_api_key_rate_limit",
     "per_user_rate_limit",
     "rate_limit",
+    # ══════════════════════════════════════════════════════════════════════════════
+    # Realtime (WebSocket)
+    # ══════════════════════════════════════════════════════════════════════════════
+    "ConnectionManagerDep",
+    "EventBridgeDep",
+    "OptionalConnectionManager",
+    "OptionalEventBridge",
+    "get_ws_connection_manager",
+    "get_ws_event_bridge",
+    "optional_connection_manager",
+    "optional_event_bridge",
+    "require_connection_manager",
+    "require_event_bridge",
+    # ══════════════════════════════════════════════════════════════════════════════
+    # Storage
+    # ══════════════════════════════════════════════════════════════════════════════
+    "OptionalStorage",
+    "Storage",
+    "StorageService",
+    "get_storage_service",
+    "optional_storage",
+    "require_storage",
+    # ══════════════════════════════════════════════════════════════════════════════
+    # Tasks
+    # ══════════════════════════════════════════════════════════════════════════════
+    "OptionalTaskBroker",
+    "OptionalTaskTracker",
+    "SchedulerStatusDep",
+    "TaskBrokerDep",
+    "TaskTrackerDep",
+    "get_scheduler_status",
+    "get_task_broker",
+    "get_task_tracker",
+    "optional_task_broker",
+    "optional_task_tracker",
+    "require_task_broker",
+    "require_task_tracker",
+    # ══════════════════════════════════════════════════════════════════════════════
+    # Tracing
+    # ══════════════════════════════════════════════════════════════════════════════
+    "TracerDep",
+    "add_span_attributes_dep",
+    "add_span_event_dep",
+    "get_default_tracer",
+    "get_tracer_dep",
+    "tracer_factory",
 ]
