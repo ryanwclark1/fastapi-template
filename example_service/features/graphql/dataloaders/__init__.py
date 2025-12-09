@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from example_service.features.graphql.dataloaders.ai import AIJobDataLoader
 from example_service.features.graphql.dataloaders.reminders import ReminderDataLoader
 
 if TYPE_CHECKING:
@@ -28,9 +29,11 @@ class DataLoaders:
     Usage in resolver:
         ctx = info.context
         reminder = await ctx.loaders.reminders.load(reminder_id)
+        ai_job = await ctx.loaders.ai_jobs.load(job_id)
     """
 
     reminders: ReminderDataLoader
+    ai_jobs: AIJobDataLoader
 
 
 def create_dataloaders(session: AsyncSession) -> DataLoaders:
@@ -44,7 +47,8 @@ def create_dataloaders(session: AsyncSession) -> DataLoaders:
     """
     return DataLoaders(
         reminders=ReminderDataLoader(session),
+        ai_jobs=AIJobDataLoader(session),
     )
 
 
-__all__ = ["DataLoaders", "ReminderDataLoader", "create_dataloaders"]
+__all__ = ["AIJobDataLoader", "DataLoaders", "ReminderDataLoader", "create_dataloaders"]

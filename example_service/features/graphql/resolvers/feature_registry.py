@@ -18,6 +18,22 @@ import logging
 
 from example_service.features.graphql.config import get_feature_registry
 
+# Import AI resolvers
+from example_service.features.graphql.resolvers.ai_mutations import (
+    cancel_ai_job_mutation,
+    create_ai_job_mutation,
+    delete_ai_job_mutation,
+)
+from example_service.features.graphql.resolvers.ai_queries import (
+    ai_job_query,
+    ai_jobs_query,
+    ai_usage_logs_query,
+    ai_usage_stats_query,
+    estimate_ai_cost_query,
+    tenant_ai_config_query,
+    tenant_ai_features_query,
+)
+
 # Import audit log resolvers
 from example_service.features.graphql.resolvers.auditlogs_queries import (
     audit_log_query,
@@ -56,6 +72,17 @@ from example_service.features.graphql.resolvers.mutations import (
     Mutation as ReminderMutation,
 )
 from example_service.features.graphql.resolvers.queries import Query as ReminderQuery
+
+# Import search resolvers
+from example_service.features.graphql.resolvers.search_queries import (
+    search_analytics_query,
+    search_capabilities_query,
+    search_insights_query,
+    search_query,
+    search_suggestions_query,
+    search_trends_query,
+    zero_result_queries_query,
+)
 from example_service.features.graphql.resolvers.subscriptions import (
     Subscription as ReminderSubscription,
 )
@@ -73,6 +100,25 @@ from example_service.features.graphql.resolvers.tags_queries import (
     tag_query,
     tags_by_reminder_query,
     tags_query,
+)
+
+# Import task resolvers
+from example_service.features.graphql.resolvers.tasks_mutations import (
+    bulk_cancel_tasks_mutation,
+    bulk_retry_dlq_tasks_mutation,
+    cancel_task_mutation,
+    discard_dlq_task_mutation,
+    retry_dlq_task_mutation,
+    trigger_task_mutation,
+)
+from example_service.features.graphql.resolvers.tasks_queries import (
+    dlq_entries_query,
+    running_tasks_query,
+    scheduled_jobs_query,
+    task_progress_query,
+    task_query,
+    task_stats_query,
+    tasks_query,
 )
 
 # Import webhook resolvers
@@ -229,6 +275,74 @@ def register_all_features() -> None:
         # Audit logs are read-only (no mutations)
         mutations=[],
         # Subscriptions not yet implemented for audit logs
+        subscriptions=[],
+    )
+
+    # ========================================================================
+    # AI Feature
+    # ========================================================================
+    registry.register(
+        "ai",
+        queries=[
+            ai_job_query,
+            ai_jobs_query,
+            ai_usage_logs_query,
+            ai_usage_stats_query,
+            tenant_ai_config_query,
+            tenant_ai_features_query,
+            estimate_ai_cost_query,
+        ],
+        mutations=[
+            create_ai_job_mutation,
+            cancel_ai_job_mutation,
+            delete_ai_job_mutation,
+        ],
+        # Subscriptions for AI job status updates could be added later
+        subscriptions=[],
+    )
+
+    # ========================================================================
+    # Tasks Feature
+    # ========================================================================
+    registry.register(
+        "tasks",
+        queries=[
+            task_query,
+            tasks_query,
+            running_tasks_query,
+            task_stats_query,
+            scheduled_jobs_query,
+            dlq_entries_query,
+            task_progress_query,
+        ],
+        mutations=[
+            trigger_task_mutation,
+            cancel_task_mutation,
+            bulk_cancel_tasks_mutation,
+            retry_dlq_task_mutation,
+            bulk_retry_dlq_tasks_mutation,
+            discard_dlq_task_mutation,
+        ],
+        # Subscriptions for task status updates could be added later
+        subscriptions=[],
+    )
+
+    # ========================================================================
+    # Search Feature
+    # ========================================================================
+    registry.register(
+        "search",
+        queries=[
+            search_query,
+            search_suggestions_query,
+            search_capabilities_query,
+            search_analytics_query,
+            search_trends_query,
+            zero_result_queries_query,
+            search_insights_query,
+        ],
+        # Search is read-only (no mutations needed)
+        mutations=[],
         subscriptions=[],
     )
 

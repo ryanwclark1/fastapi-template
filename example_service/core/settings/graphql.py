@@ -122,7 +122,15 @@ class GraphQLSettings(BaseSettings):
     )
     feature_ai: bool = Field(
         default=False,
-        description="Enable AI/ML features (experimental, not yet implemented)",
+        description="Enable AI/ML features (experimental)",
+    )
+    feature_tasks: bool = Field(
+        default=True,
+        description="Enable task management queries/mutations",
+    )
+    feature_search: bool = Field(
+        default=True,
+        description="Enable search queries",
     )
 
     model_config = SettingsConfigDict(

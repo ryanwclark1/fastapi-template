@@ -22,6 +22,8 @@ Environment Variables:
     GRAPHQL_FEATURE_WEBHOOKS=true      # Enable webhook management (default: true)
     GRAPHQL_FEATURE_AUDIT_LOGS=true    # Enable audit log queries (default: true)
     GRAPHQL_FEATURE_AI=false           # Enable AI/ML features (default: false)
+    GRAPHQL_FEATURE_TASKS=true         # Enable task management (default: true)
+    GRAPHQL_FEATURE_SEARCH=true        # Enable search functionality (default: true)
 """
 
 from __future__ import annotations
@@ -52,6 +54,8 @@ class GraphQLFeatures:
         webhooks: Enable webhook management
         audit_logs: Enable audit log queries
         ai: Enable AI/ML features (experimental)
+        tasks: Enable task management
+        search: Enable search functionality
     """
 
     def __init__(self) -> None:
@@ -95,6 +99,16 @@ class GraphQLFeatures:
         """Check if AI feature is enabled."""
         return self._settings.feature_ai
 
+    @property
+    def tasks(self) -> bool:
+        """Check if tasks feature is enabled."""
+        return getattr(self._settings, "feature_tasks", True)
+
+    @property
+    def search(self) -> bool:
+        """Check if search feature is enabled."""
+        return getattr(self._settings, "feature_search", True)
+
     def get_enabled_features(self) -> list[str]:
         """Get list of enabled feature names.
 
@@ -104,7 +118,7 @@ class GraphQLFeatures:
         Example:
             >>> features = get_graphql_features()
             >>> features.get_enabled_features()
-            ['reminders', 'feature_flags', 'files', 'webhooks', 'audit_logs']
+            ['reminders', 'feature_flags', 'files', 'webhooks', 'audit_logs', 'tasks', 'search']
         """
         feature_map = {
             "reminders": self.reminders,
@@ -114,6 +128,8 @@ class GraphQLFeatures:
             "webhooks": self.webhooks,
             "audit_logs": self.audit_logs,
             "ai": self.ai,
+            "tasks": self.tasks,
+            "search": self.search,
         }
         return [name for name, enabled in feature_map.items() if enabled]
 
