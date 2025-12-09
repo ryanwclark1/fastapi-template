@@ -5,11 +5,11 @@ from datetime import UTC, datetime
 from io import BytesIO
 from unittest.mock import AsyncMock
 
-from fastapi import Depends, FastAPI, status
+from fastapi import FastAPI, status
 from httpx import ASGITransport, AsyncClient
 import pytest
 
-from example_service.core.dependencies.auth import get_current_user, require_role
+from example_service.core.dependencies.accent_auth import get_current_user
 from example_service.core.dependencies.tenant import get_tenant_context
 from example_service.core.schemas.auth import AuthUser
 from example_service.features.storage.dependencies import get_storage_service
@@ -32,14 +32,13 @@ def mock_storage_service():
 
 @pytest.fixture
 def mock_admin_user():
-    """Create a mock admin user."""
+    """Create a mock admin user with storage admin ACL."""
     return AuthUser(
         user_id="admin-123",
         email="admin@example.com",
-        roles=["admin"],
-        permissions=["*"],
+        permissions=["#"],  # Superuser ACL
         acl={},
-        metadata={},
+        metadata={"tenant_uuid": "tenant-123"},
     )
 
 
@@ -66,20 +65,15 @@ async def storage_client(
     async def override_get_current_user() -> AuthUser:
         return mock_admin_user
 
-    async def override_require_admin(
-        user: AuthUser = Depends(override_get_current_user),
-    ) -> AuthUser:
-        return user
-
     async def override_get_storage_service():
         return mock_storage_service
 
     async def override_get_tenant_context():
         return mock_tenant_context
 
+    # Override get_current_user - since mock_admin_user has "#" permission,
+    # the ACL check in require_acl("storage.#") will pass
     app.dependency_overrides[get_current_user] = override_get_current_user
-    # Override require_role("admin") by creating a dependency override
-    app.dependency_overrides[require_role("admin")] = override_require_admin
     app.dependency_overrides[get_storage_service] = override_get_storage_service
     app.dependency_overrides[get_tenant_context] = override_get_tenant_context
 

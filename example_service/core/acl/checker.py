@@ -24,6 +24,11 @@ class ACLChecker:
     logic, not just at the route level. The checker wraps a validated
     token and provides convenient methods for common ACL operations.
 
+    Supports reserved word substitution:
+    - 'me': Replaced with auth_id/user_id
+    - 'my_session': Replaced with session_id
+    - 'my_tenant': Replaced with tenant_id (for tenant-scoped patterns)
+
     Example:
         >>> async def transfer_ownership(
         ...     token: TokenPayload,
@@ -57,13 +62,23 @@ class ACLChecker:
         Args:
             token: Validated token payload containing ACL list.
                    Must have 'sub' (auth_id), 'session_id', and 'acl' attributes.
+                   For tenant-scoped patterns, should have 'tenant_id' or
+                   'metadata.tenant_uuid'.
         """
         self.token = token
+
+        # Extract tenant_id from token metadata or direct attribute
+        tenant_id = getattr(token, "tenant_id", None)
+        if tenant_id is None:
+            metadata = getattr(token, "metadata", {}) or {}
+            tenant_id = metadata.get("tenant_uuid")
+
         # Use cached factory for optimal performance
         self._checker = get_cached_access_check(
             getattr(token, "sub", None) or getattr(token, "auth_id", None),
             getattr(token, "session_id", None),
-            getattr(token, "acl", None) or [],
+            getattr(token, "acl", None) or getattr(token, "permissions", None) or [],
+            tenant_id=tenant_id,
         )
 
     def has_acl(self, pattern: str) -> bool:
