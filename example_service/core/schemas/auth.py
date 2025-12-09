@@ -1,10 +1,23 @@
-"""Authentication and authorization schemas."""
+"""Authentication and authorization schemas.
+
+This module provides schemas for authentication tokens and authorized users
+using the Accent-Auth ACL system.
+
+ACL Pattern Syntax:
+    - service.resource.action (e.g., "confd.users.read")
+    - Wildcards: * (single level), # (multi-level/recursive)
+    - Negation: ! prefix for explicit deny
+    - Reserved words: me (current user), my_session (current session)
+"""
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+
+if TYPE_CHECKING:
+    from example_service.infra.auth.accent_auth import AccentAuthACL
 
 
 class TokenPayload(BaseModel):
@@ -26,15 +39,14 @@ class TokenPayload(BaseModel):
         description="Service ID if authenticated as service",
     )
     email: EmailStr | None = Field(default=None, description="User email")
-    roles: list[str] = Field(
-        default_factory=list, max_length=50, description="User or service roles"
-    )
     permissions: list[str] = Field(
-        default_factory=list, max_length=200, description="Granted permissions"
+        default_factory=list,
+        max_length=200,
+        description="ACL patterns granted to user (e.g., 'confd.users.read')",
     )
     acl: dict[str, list[str] | dict[str, bool]] = Field(
         default_factory=dict,
-        description="Access Control List with resource permissions",
+        description="Legacy ACL dict - prefer using permissions list with ACL patterns",
     )
     exp: int | None = Field(
         default=None, ge=0, description="Token expiration timestamp"
@@ -44,21 +56,12 @@ class TokenPayload(BaseModel):
         default_factory=dict, description="Additional user/service metadata"
     )
 
-    @field_validator("roles", mode="after")
-    @classmethod
-    def validate_roles(cls, v: list[str]) -> list[str]:
-        """Validate role names are not empty."""
-        if any(not role.strip() for role in v):
-            msg = "Role names cannot be empty or whitespace"
-            raise ValueError(msg)
-        return v
-
     @field_validator("permissions", mode="after")
     @classmethod
     def validate_permissions(cls, v: list[str]) -> list[str]:
-        """Validate permission names are not empty."""
+        """Validate permission/ACL patterns are not empty."""
         if any(not perm.strip() for perm in v):
-            msg = "Permission names cannot be empty or whitespace"
+            msg = "ACL patterns cannot be empty or whitespace"
             raise ValueError(msg)
         return v
 
@@ -68,10 +71,13 @@ class TokenPayload(BaseModel):
 
 
 class AuthUser(BaseModel):
-    """Authenticated user or service with permissions.
+    """Authenticated user or service with ACL permissions.
 
     This is the model that will be injected into endpoints via
     dependency injection after successful authentication.
+
+    The permissions field contains ACL patterns in dot-notation format
+    that are checked using the Accent-Auth ACL engine.
     """
 
     user_id: str | None = Field(default=None, max_length=255, description="User ID")
@@ -79,35 +85,25 @@ class AuthUser(BaseModel):
         default=None, max_length=255, description="Service ID"
     )
     email: EmailStr | None = Field(default=None, description="User email")
-    roles: list[str] = Field(
-        default_factory=list, max_length=50, description="User or service roles"
-    )
     permissions: list[str] = Field(
-        default_factory=list, max_length=200, description="Granted permissions"
+        default_factory=list,
+        max_length=200,
+        description="ACL patterns granted to user (e.g., 'confd.users.read', 'storage.#')",
     )
     acl: dict[str, list[str] | dict[str, bool]] = Field(
         default_factory=dict,
-        description="Access Control List with resource permissions",
+        description="Legacy ACL dict - prefer using permissions list with ACL patterns",
     )
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="Additional user/service metadata"
     )
 
-    @field_validator("roles", mode="after")
-    @classmethod
-    def validate_roles(cls, v: list[str]) -> list[str]:
-        """Validate role names are not empty."""
-        if any(not role.strip() for role in v):
-            msg = "Role names cannot be empty or whitespace"
-            raise ValueError(msg)
-        return v
-
     @field_validator("permissions", mode="after")
     @classmethod
     def validate_permissions(cls, v: list[str]) -> list[str]:
-        """Validate permission names are not empty."""
+        """Validate ACL patterns are not empty."""
         if any(not perm.strip() for perm in v):
-            msg = "Permission names cannot be empty or whitespace"
+            msg = "ACL patterns cannot be empty or whitespace"
             raise ValueError(msg)
         return v
 
@@ -165,57 +161,126 @@ class AuthUser(BaseModel):
         """
         return self.metadata.get("session_uuid")
 
+    def _get_acl_checker(self) -> AccentAuthACL:
+        """Get an ACL checker instance for this user.
+
+        Returns:
+            AccentAuthACL instance configured with user's permissions and context.
+        """
+        from example_service.infra.auth.accent_auth import AccentAuthACL
+
+        return AccentAuthACL(
+            self.permissions,
+            auth_id=self.user_id,
+            session_id=self.session_id,
+        )
+
+    def has_acl(self, acl_pattern: str) -> bool:
+        """Check if user has a specific ACL permission.
+
+        Uses Accent-Auth ACL pattern matching with support for:
+        - Dot-notation patterns (e.g., "confd.users.read")
+        - Wildcards (* for single level, # for recursive)
+        - Negation (! prefix for explicit deny)
+        - Reserved word substitution (me, my_session)
+
+        Args:
+            acl_pattern: ACL pattern to check (e.g., "confd.users.read", "storage.#")
+
+        Returns:
+            True if ACL is granted, False otherwise.
+
+        Example:
+            if user.has_acl("confd.users.read"):
+                # User can read users
+                pass
+        """
+        if not acl_pattern or not acl_pattern.strip():
+            return False
+        return self._get_acl_checker().has_permission(acl_pattern)
+
+    def has_any_acl(self, *acl_patterns: str) -> bool:
+        """Check if user has any of the specified ACL permissions.
+
+        Args:
+            *acl_patterns: ACL patterns to check (any must match)
+
+        Returns:
+            True if any ACL is granted, False otherwise.
+
+        Example:
+            if user.has_any_acl("confd.users.read", "confd.admin.#"):
+                # User can read users or is admin
+                pass
+        """
+        if not acl_patterns:
+            return False
+        return self._get_acl_checker().has_any_permission(*acl_patterns)
+
+    def has_all_acls(self, *acl_patterns: str) -> bool:
+        """Check if user has all of the specified ACL permissions.
+
+        Args:
+            *acl_patterns: ACL patterns to check (all must match)
+
+        Returns:
+            True if all ACLs are granted, False otherwise.
+
+        Example:
+            if user.has_all_acls("confd.users.read", "confd.users.write"):
+                # User can read and write users
+                pass
+        """
+        if not acl_patterns:
+            return False
+        return self._get_acl_checker().has_all_permissions(*acl_patterns)
+
+    def is_superuser(self) -> bool:
+        """Check if user has superuser access (# ACL pattern).
+
+        Returns:
+            True if user has full recursive access, False otherwise.
+
+        Example:
+            if user.is_superuser():
+                # User has full system access
+                pass
+        """
+        return self._get_acl_checker().is_superuser()
+
+    # Legacy method aliases for backward compatibility
     def has_permission(self, permission: str) -> bool:
-        """Check if user/service has a specific permission.
+        """Check if user has a specific ACL permission.
+
+        This is an alias for has_acl() maintained for backward compatibility.
 
         Args:
-            permission: Permission to check.
+            permission: ACL pattern to check.
 
         Returns:
-            True if permission is granted, False otherwise.
+            True if ACL is granted, False otherwise.
         """
-        if not permission or not permission.strip():
-            return False
-        return permission in self.permissions
-
-    def has_role(self, role: str) -> bool:
-        """Check if user/service has a specific role.
-
-        Args:
-            role: Role to check.
-
-        Returns:
-            True if role is assigned, False otherwise.
-        """
-        if not role or not role.strip():
-            return False
-        return role in self.roles
+        return self.has_acl(permission)
 
     def can_access_resource(self, resource: str, action: str) -> bool:
-        """Check if user/service can perform action on resource.
+        """Check if user can perform action on resource using ACL.
+
+        Constructs an ACL pattern from resource and action, then checks
+        against user's permissions.
 
         Args:
-            resource: Resource identifier (e.g., "users", "posts").
+            resource: Resource identifier (e.g., "users", "storage").
             action: Action to perform (e.g., "read", "write", "delete").
 
         Returns:
             True if access is allowed, False otherwise.
 
         Example:
-                    if user.can_access_resource("posts", "delete"):
-                # Allow deletion
+            if user.can_access_resource("users", "delete"):
+                # User can delete users
                 pass
         """
         if not resource or not resource.strip() or not action or not action.strip():
             return False
-
-        if resource not in self.acl:
-            return False
-
-        resource_acl = self.acl[resource]
-        if isinstance(resource_acl, list):
-            return action in resource_acl
-        if isinstance(resource_acl, dict):
-            return bool(resource_acl.get(action, False))
-
-        return False
+        acl_pattern = f"{resource}.{action}"
+        return self.has_acl(acl_pattern)

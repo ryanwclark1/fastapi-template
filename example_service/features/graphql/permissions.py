@@ -1,12 +1,18 @@
 """Permission classes for field-level authorization in GraphQL.
 
 This module provides Strawberry permission classes that integrate with the existing
-authentication and authorization system. Permissions can be applied at the field or
-resolver level for granular access control.
+Accent-Auth ACL system. Permissions can be applied at the field or resolver level
+for granular access control using ACL patterns.
+
+ACL Pattern Syntax:
+    - service.resource.action (e.g., "confd.users.read")
+    - Wildcards: * (single level), # (multi-level/recursive)
+    - Negation: ! prefix for explicit deny
+    - Reserved words: me (current user), my_session (current session)
 
 Usage:
-    @strawberry.field(permission_classes=[IsAuthenticated, HasPermission("reminders:read")])
-    async def reminders(self, info: Info) -> list[ReminderType]:
+    @strawberry.field(permission_classes=[IsAuthenticated, HasACL("confd.users.read")])
+    async def users(self, info: Info) -> list[UserType]:
         ...
 
 Example in types:
@@ -22,6 +28,8 @@ from typing import TYPE_CHECKING, Any
 
 from strawberry.permission import BasePermission
 
+from example_service.infra.auth.accent_auth import AccentAuthACL
+
 if TYPE_CHECKING:
     from strawberry.types import Info
 
@@ -31,11 +39,12 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "CanAccessResource",
-    "HasPermission",
-    "HasRole",
-    "IsAdmin",
+    "HasACL",
+    "HasAllACLs",
+    "HasAnyACL",
     "IsAuthenticated",
     "IsOwner",
+    "IsSuperuser",
 ]
 
 
@@ -87,29 +96,29 @@ class IsAuthenticated(BasePermission):
 
 
 # ============================================================================
-# Role-Based Permissions
+# ACL-Based Permissions
 # ============================================================================
 
 
-class IsAdmin(BasePermission):
-    """Require user to have admin role.
+class IsSuperuser(BasePermission):
+    """Require user to have superuser access (# ACL pattern).
 
-    Checks if the authenticated user has the "admin" role using the
-    existing AuthUser.has_role() method from the auth system.
+    Checks if the authenticated user has the "#" ACL which grants
+    full recursive access to all resources.
 
     Example:
-        @strawberry.mutation(permission_classes=[IsAuthenticated, IsAdmin])
+        @strawberry.mutation(permission_classes=[IsAuthenticated, IsSuperuser])
         async def delete_all_data(self, info: Info) -> bool:
-            # Only admins can do this
+            # Only superusers can do this
             ...
     """
 
-    message = "Administrator access required"
+    message = "Superuser access required"
 
     def has_permission(
         self, _source: Any, info: Info[GraphQLContext, None], **_kwargs: Any
     ) -> bool:
-        """Check if user has admin role.
+        """Check if user has superuser ACL (#).
 
         Args:
             source: The parent object being resolved
@@ -117,51 +126,66 @@ class IsAdmin(BasePermission):
             **kwargs: Field arguments
 
         Returns:
-            True if user is admin, False otherwise
+            True if user is superuser, False otherwise
         """
         user = info.context.user
         if not user:
             return False
 
-        is_admin = user.has_role("admin")
+        # Get session ID from metadata if available
+        session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
 
-        if not is_admin:
+        # Create ACL checker with user context
+        acl = AccentAuthACL(
+            user.permissions,
+            auth_id=user.user_id,
+            session_id=session_id,
+        )
+
+        is_superuser = acl.is_superuser()
+
+        if not is_superuser:
             logger.warning(
-                "Non-admin access attempt to admin-only resource",
+                "Non-superuser access attempt to superuser-only resource",
                 extra={
-                    "user_id": str(user.id),
+                    "user_id": user.user_id,
                     "field": info.field_name,
                     "operation": info.operation.name if info.operation else "anonymous",
                 },
             )
 
-        return is_admin
+        return is_superuser
 
 
-class HasRole(BasePermission):
-    """Require user to have a specific role.
+class HasACL(BasePermission):
+    """Require user to have a specific ACL permission.
 
-    This is a configurable version of IsAdmin that works with any role.
+    Integrates with the Accent-Auth ACL system using dot-notation patterns.
+    Supports wildcards (* for single level, # for recursive) and negation (! prefix).
 
     Example:
-        @strawberry.field(permission_classes=[IsAuthenticated, HasRole("moderator")])
-        async def moderation_queue(self, info: Info) -> list[Item]:
+        @strawberry.field(permission_classes=[IsAuthenticated, HasACL("confd.users.read")])
+        async def users(self, info: Info) -> list[UserType]:
+            ...
+
+        @strawberry.mutation(permission_classes=[IsAuthenticated, HasACL("confd.users.delete")])
+        async def delete_user(self, info: Info, id: strawberry.ID) -> DeletePayload:
             ...
     """
 
-    def __init__(self, role: str):
-        """Initialize with required role.
+    def __init__(self, acl_pattern: str):
+        """Initialize with required ACL pattern.
 
         Args:
-            role: The role name to check (e.g., "admin", "moderator", "editor")
+            acl_pattern: The ACL pattern to check (e.g., "confd.users.read", "storage.#")
         """
-        self.role = role
-        self.message = f"Role '{role}' required"
+        self.acl_pattern = acl_pattern
+        self.message = f"ACL '{acl_pattern}' required"
 
     def has_permission(
         self, _source: Any, info: Info[GraphQLContext, None], **_kwargs: Any
     ) -> bool:
-        """Check if user has the required role.
+        """Check if user has the required ACL.
 
         Args:
             source: The parent object being resolved
@@ -169,89 +193,158 @@ class HasRole(BasePermission):
             **kwargs: Field arguments
 
         Returns:
-            True if user has the role, False otherwise
+            True if user has the ACL, False otherwise
         """
         user = info.context.user
         if not user:
             return False
 
-        has_role = user.has_role(self.role)
+        # Get session ID from metadata if available
+        session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
 
-        if not has_role:
+        # Create ACL checker with user context for reserved word substitution
+        acl = AccentAuthACL(
+            user.permissions,
+            auth_id=user.user_id,
+            session_id=session_id,
+        )
+
+        has_acl = acl.has_permission(self.acl_pattern)
+
+        if not has_acl:
             logger.warning(
-                "Access denied: missing required role",
+                "Access denied: missing required ACL",
                 extra={
-                    "user_id": str(user.id),
-                    "required_role": self.role,
-                    "field": info.field_name,
-                },
-            )
-
-        return has_role
-
-
-# ============================================================================
-# Permission-Based Access Control
-# ============================================================================
-
-
-class HasPermission(BasePermission):
-    """Require user to have a specific permission.
-
-    Integrates with the existing AuthUser.has_permission() method from the
-    auth system. Permissions are more granular than roles (e.g., "reminders:read",
-    "reminders:write", "tasks:cancel").
-
-    Example:
-        @strawberry.field(permission_classes=[IsAuthenticated, HasPermission("reminders:read")])
-        async def reminders(self, info: Info) -> list[ReminderType]:
-            ...
-
-        @strawberry.mutation(permission_classes=[IsAuthenticated, HasPermission("reminders:delete")])
-        async def delete_reminder(self, info: Info, id: strawberry.ID) -> DeletePayload:
-            ...
-    """
-
-    def __init__(self, permission: str):
-        """Initialize with required permission.
-
-        Args:
-            permission: The permission string to check (e.g., "reminders:read", "tasks:trigger")
-        """
-        self.permission = permission
-        self.message = f"Permission '{permission}' required"
-
-    def has_permission(
-        self, _source: Any, info: Info[GraphQLContext, None], **_kwargs: Any
-    ) -> bool:
-        """Check if user has the required permission.
-
-        Args:
-            source: The parent object being resolved
-            info: GraphQL execution info with context
-            **kwargs: Field arguments
-
-        Returns:
-            True if user has the permission, False otherwise
-        """
-        user = info.context.user
-        if not user:
-            return False
-
-        has_perm = user.has_permission(self.permission)
-
-        if not has_perm:
-            logger.warning(
-                "Access denied: missing required permission",
-                extra={
-                    "user_id": str(user.id),
-                    "required_permission": self.permission,
+                    "user_id": user.user_id,
+                    "required_acl": self.acl_pattern,
                     "field": info.field_name,
                     "operation": info.operation.name if info.operation else "anonymous",
                 },
             )
 
-        return has_perm
+        return has_acl
+
+
+class HasAnyACL(BasePermission):
+    """Require user to have any of the specified ACL permissions.
+
+    Uses OR logic - user needs at least one of the ACL patterns.
+
+    Example:
+        @strawberry.field(permission_classes=[IsAuthenticated, HasAnyACL("confd.users.read", "confd.users.*")])
+        async def users(self, info: Info) -> list[UserType]:
+            # Users with either ACL can access
+            ...
+    """
+
+    def __init__(self, *acl_patterns: str):
+        """Initialize with required ACL patterns.
+
+        Args:
+            *acl_patterns: One or more ACL patterns (any must match)
+        """
+        self.acl_patterns = acl_patterns
+        self.message = f"One of these ACLs required: {', '.join(acl_patterns)}"
+
+    def has_permission(
+        self, _source: Any, info: Info[GraphQLContext, None], **_kwargs: Any
+    ) -> bool:
+        """Check if user has any of the required ACLs.
+
+        Args:
+            source: The parent object being resolved
+            info: GraphQL execution info with context
+            **kwargs: Field arguments
+
+        Returns:
+            True if user has any of the ACLs, False otherwise
+        """
+        user = info.context.user
+        if not user:
+            return False
+
+        session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
+
+        acl = AccentAuthACL(
+            user.permissions,
+            auth_id=user.user_id,
+            session_id=session_id,
+        )
+
+        has_any = acl.has_any_permission(*self.acl_patterns)
+
+        if not has_any:
+            logger.warning(
+                "Access denied: missing required ACLs (need any)",
+                extra={
+                    "user_id": user.user_id,
+                    "required_acls": self.acl_patterns,
+                    "field": info.field_name,
+                },
+            )
+
+        return has_any
+
+
+class HasAllACLs(BasePermission):
+    """Require user to have all of the specified ACL permissions.
+
+    Uses AND logic - user needs all of the ACL patterns.
+
+    Example:
+        @strawberry.field(permission_classes=[IsAuthenticated, HasAllACLs("confd.users.read", "confd.users.admin")])
+        async def admin_users(self, info: Info) -> list[UserType]:
+            # Users must have both ACLs to access
+            ...
+    """
+
+    def __init__(self, *acl_patterns: str):
+        """Initialize with required ACL patterns.
+
+        Args:
+            *acl_patterns: All required ACL patterns
+        """
+        self.acl_patterns = acl_patterns
+        self.message = f"All of these ACLs required: {', '.join(acl_patterns)}"
+
+    def has_permission(
+        self, _source: Any, info: Info[GraphQLContext, None], **_kwargs: Any
+    ) -> bool:
+        """Check if user has all of the required ACLs.
+
+        Args:
+            source: The parent object being resolved
+            info: GraphQL execution info with context
+            **kwargs: Field arguments
+
+        Returns:
+            True if user has all ACLs, False otherwise
+        """
+        user = info.context.user
+        if not user:
+            return False
+
+        session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
+
+        acl = AccentAuthACL(
+            user.permissions,
+            auth_id=user.user_id,
+            session_id=session_id,
+        )
+
+        has_all = acl.has_all_permissions(*self.acl_patterns)
+
+        if not has_all:
+            logger.warning(
+                "Access denied: missing required ACLs (need all)",
+                extra={
+                    "user_id": user.user_id,
+                    "required_acls": self.acl_patterns,
+                    "field": info.field_name,
+                },
+            )
+
+        return has_all
 
 
 # ============================================================================
@@ -260,15 +353,14 @@ class HasPermission(BasePermission):
 
 
 class CanAccessResource(BasePermission):
-    """Require user to have access to a specific resource.
+    """Require user to have ACL access to a specific resource action.
 
-    Uses the AuthUser.can_access_resource() method for resource-level access
-    control, which integrates with the ACL (Access Control List) system.
+    Constructs an ACL pattern from resource type and action, then checks
+    against the user's ACL permissions.
 
     Example:
         @strawberry.field(permission_classes=[IsAuthenticated, CanAccessResource("document", "read")])
         async def document(self, info: Info, id: strawberry.ID) -> DocumentType:
-            # Additional resource-level check can be done in resolver
             ...
     """
 
@@ -281,9 +373,10 @@ class CanAccessResource(BasePermission):
         """
         self.resource_type = resource_type
         self.action = action
+        self.acl_pattern = f"{resource_type}.{action}"
         self.message = f"Cannot {action} {resource_type}"
 
-    def has_permission(self, _source: Any, info: Info[GraphQLContext, None], **kwargs: Any) -> bool:
+    def has_permission(self, _source: Any, info: Info[GraphQLContext, None], **_kwargs: Any) -> bool:
         """Check if user can access the resource.
 
         Args:
@@ -299,20 +392,26 @@ class CanAccessResource(BasePermission):
             return False
 
         # Extract resource_id from kwargs if available
-        resource_id = kwargs.get("id") or kwargs.get("resource_id")
+        resource_id = _kwargs.get("id") or _kwargs.get("resource_id")
 
-        can_access = user.can_access_resource(
-            resource=self.resource_type,
-            action=self.action,
+        session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
+
+        acl = AccentAuthACL(
+            user.permissions,
+            auth_id=user.user_id,
+            session_id=session_id,
         )
+
+        can_access = acl.has_permission(self.acl_pattern)
 
         if not can_access:
             logger.warning(
                 "Access denied: resource access check failed",
                 extra={
-                    "user_id": str(user.id),
+                    "user_id": user.user_id,
                     "resource_type": self.resource_type,
                     "action": self.action,
+                    "acl_pattern": self.acl_pattern,
                     "resource_id": str(resource_id) if resource_id else None,
                     "field": info.field_name,
                 },
@@ -337,7 +436,7 @@ class IsOwner(BasePermission):
         @strawberry.field(permission_classes=[IsAuthenticated, IsOwner])
         async def reminder(self, info: Info, id: strawberry.ID) -> ReminderType | None:
             reminder = await load_reminder(id)
-            if reminder.user_id != info.context.user.id:
+            if reminder.user_id != info.context.user.user_id:
                 return None  # IsOwner permission will already have logged this
             return reminder
 
@@ -382,13 +481,13 @@ class IsOwner(BasePermission):
             )
             return False
 
-        is_owner = str(user.id) == str(owner_id)
+        is_owner = str(user.user_id) == str(owner_id)
 
         if not is_owner:
             logger.warning(
                 "Access denied: user is not the owner",
                 extra={
-                    "user_id": str(user.id),
+                    "user_id": user.user_id,
                     "owner_id": str(owner_id),
                     "field": info.field_name,
                 },
@@ -404,30 +503,39 @@ class IsOwner(BasePermission):
 """
 Multiple permissions can be combined in a single field. All permissions must pass.
 
-Example: Admin or owner can access
+Example: Superuser or owner can access
     # Note: Strawberry evaluates permissions with AND logic by default
     # For OR logic, create a custom permission class:
 
-    class IsAdminOrOwner(BasePermission):
-        message = "Must be admin or owner"
+    class IsSuperuserOrOwner(BasePermission):
+        message = "Must be superuser or owner"
 
         def has_permission(self, source, info, **kwargs):
             return (
-                IsAdmin().has_permission(source, info, **kwargs) or
+                IsSuperuser().has_permission(source, info, **kwargs) or
                 IsOwner().has_permission(source, info, **kwargs)
             )
 
-    @strawberry.field(permission_classes=[IsAuthenticated, IsAdminOrOwner])
+    @strawberry.field(permission_classes=[IsAuthenticated, IsSuperuserOrOwner])
     async def sensitive_field(self, info: Info) -> str:
         ...
 
-Example: Multiple required permissions
+Example: Multiple required ACLs
     @strawberry.mutation(permission_classes=[
         IsAuthenticated,
-        HasPermission("reminders:write"),
-        HasRole("verified_user"),
+        HasACL("confd.users.write"),
+        HasACL("confd.users.admin"),
     ])
-    async def create_reminder(self, info: Info, input: CreateReminderInput) -> ReminderPayload:
-        # User must be authenticated AND have reminders:write permission AND have verified_user role
+    async def create_admin_user(self, info: Info, input: CreateAdminInput) -> UserPayload:
+        # User must be authenticated AND have both ACL patterns
+        ...
+
+Example: Any of multiple ACLs
+    @strawberry.field(permission_classes=[
+        IsAuthenticated,
+        HasAnyACL("confd.users.read", "confd.admin.#"),
+    ])
+    async def users(self, info: Info) -> list[UserType]:
+        # User must be authenticated AND have at least one of the ACL patterns
         ...
 """

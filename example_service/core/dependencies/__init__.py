@@ -33,29 +33,32 @@ Usage:
     ):
         ...
 
-Authentication Dependencies:
-    For authentication, import from the specific submodule you need:
+Authentication Dependencies (ACL-based using Accent-Auth):
+    All authentication uses the Accent-Auth ACL system with X-Auth-Token header.
 
-    # External auth service (Bearer token)
     from example_service.core.dependencies.auth import (
+        # Type aliases
         CurrentActiveUser,
         CurrentUser,
         OptionalUser,
-        get_current_user,
-        get_current_user_optional,
-        require_permission,
-        require_role,
-        require_resource_access,
-    )
-
-    # Accent-Auth service (X-Auth-Token header)
-    from example_service.core.dependencies.accent_auth import (
+        SuperUser,
+        # Functions
         get_current_user,
         get_current_user_optional,
         require_acl,
         require_any_acl,
         require_all_acls,
+        require_superuser,
         get_tenant_uuid,
+    )
+
+    # Or import directly from accent_auth:
+    from example_service.core.dependencies.accent_auth import (
+        get_current_user,
+        require_acl,
+        require_any_acl,
+        require_all_acls,
+        require_superuser,
     )
 """
 

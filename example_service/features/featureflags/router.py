@@ -10,7 +10,8 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import APIRouter, Depends, Query, status
 
 from example_service.core.database import NotFoundError
-from example_service.core.dependencies.auth import get_current_user
+from example_service.core.dependencies.accent_auth import get_current_user
+from example_service.core.schemas.auth import AuthUser
 from example_service.core.dependencies.database import get_db_session
 from example_service.core.exceptions import ConflictException
 
@@ -47,7 +48,7 @@ router = APIRouter(prefix="/feature-flags", tags=["feature-flags"])
 async def create_flag(
     data: FeatureFlagCreate,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[AuthUser, Depends(get_current_user)],
 ) -> FeatureFlagResponse:
     """Create a new feature flag.
 
@@ -80,7 +81,7 @@ async def create_flag(
 )
 async def list_flags(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[AuthUser, Depends(get_current_user)],
     flag_status: Annotated[FlagStatus | None, Query(alias="status")] = None,
     enabled: Annotated[bool | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=1000)] = 100,
@@ -115,7 +116,7 @@ async def list_flags(
 async def get_flag(
     key: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[AuthUser, Depends(get_current_user)],
 ) -> FeatureFlagResponse:
     """Get a feature flag.
 
@@ -145,7 +146,7 @@ async def update_flag(
     key: str,
     data: FeatureFlagUpdate,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[AuthUser, Depends(get_current_user)],
 ) -> FeatureFlagResponse:
     """Update a feature flag.
 
@@ -175,7 +176,7 @@ async def update_flag(
 async def delete_flag(
     key: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[AuthUser, Depends(get_current_user)],
 ) -> None:
     """Delete a feature flag.
 
@@ -199,7 +200,7 @@ async def delete_flag(
 async def enable_flag(
     key: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[AuthUser, Depends(get_current_user)],
 ) -> FeatureFlagResponse:
     """Enable a feature flag globally.
 
@@ -231,7 +232,7 @@ async def enable_flag(
 async def disable_flag(
     key: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[AuthUser, Depends(get_current_user)],
 ) -> FeatureFlagResponse:
     """Disable a feature flag globally.
 
@@ -267,7 +268,7 @@ async def disable_flag(
 async def create_override(
     data: FlagOverrideCreate,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[AuthUser, Depends(get_current_user)],
 ) -> FlagOverrideResponse:
     """Create a flag override.
 
@@ -297,7 +298,7 @@ async def create_override(
 )
 async def list_overrides(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[AuthUser, Depends(get_current_user)],
     flag_key: Annotated[str | None, Query()] = None,
     entity_type: Annotated[str | None, Query()] = None,
     entity_id: Annotated[str | None, Query()] = None,
@@ -332,7 +333,7 @@ async def delete_override(
     entity_type: str,
     entity_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[AuthUser, Depends(get_current_user)],
 ) -> None:
     """Delete a flag override.
 
@@ -364,7 +365,7 @@ async def delete_override(
 async def evaluate_flags(
     context: FlagEvaluationRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[AuthUser, Depends(get_current_user)],
     keys: Annotated[list[str] | None, Query()] = None,
     include_details: Annotated[bool, Query()] = False,
 ) -> FlagEvaluationResponse:

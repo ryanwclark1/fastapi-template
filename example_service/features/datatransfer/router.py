@@ -11,7 +11,8 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import StreamingResponse
 
-from example_service.core.dependencies.auth import get_current_user
+from example_service.core.dependencies.accent_auth import get_current_user
+from example_service.core.schemas.auth import AuthUser
 from example_service.core.dependencies.database import get_db_session
 from example_service.core.exceptions import BadRequestException
 
@@ -41,7 +42,7 @@ router = APIRouter(prefix="/data-transfer", tags=["data-transfer"])
 )
 async def list_supported_entities(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[AuthUser, Depends(get_current_user)],
 ) -> SupportedEntitiesResponse:
     """Get list of entities supported for data transfer.
 
@@ -62,7 +63,7 @@ async def list_supported_entities(
 async def export_data(
     request: ExportRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[AuthUser, Depends(get_current_user)],
 ) -> ExportResult:
     """Export data to a file.
 
@@ -85,7 +86,7 @@ async def export_data(
 )
 async def download_export(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[AuthUser, Depends(get_current_user)],
     entity_type: Annotated[str, Query(description="Entity type to export")],
     format: Annotated[ExportFormat, Query(description="Export format")] = ExportFormat.CSV,
 ) -> StreamingResponse:
@@ -134,7 +135,7 @@ async def download_export(
 )
 async def import_data(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[AuthUser, Depends(get_current_user)],
     file: Annotated[UploadFile, File(description="File to import")],
     entity_type: Annotated[str, Query(description="Entity type to import")],
     format: Annotated[ImportFormat, Query(description="File format")],
@@ -195,7 +196,7 @@ async def import_data(
 )
 async def validate_import(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[AuthUser, Depends(get_current_user)],
     file: Annotated[UploadFile, File(description="File to validate")],
     entity_type: Annotated[str, Query(description="Entity type")],
     format: Annotated[ImportFormat, Query(description="File format")],
@@ -237,7 +238,7 @@ async def validate_import(
     description="Get list of supported export and import formats.",
 )
 async def list_formats(
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[AuthUser, Depends(get_current_user)],
 ) -> dict:
     """Get supported data transfer formats.
 
