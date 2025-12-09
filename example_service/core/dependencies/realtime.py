@@ -51,12 +51,19 @@ def get_ws_connection_manager() -> ConnectionManager | None:
     singleton. The import is deferred to runtime to avoid circular
     dependencies.
 
+    Note: The infra.realtime.get_connection_manager() raises RuntimeError
+    if the manager hasn't been started. This dependency catches that
+    exception and returns None to allow graceful degradation.
+
     Returns:
         ConnectionManager | None: The manager instance, or None if not initialized.
     """
     from example_service.infra.realtime import get_connection_manager
 
-    return get_connection_manager()
+    try:
+        return get_connection_manager()
+    except RuntimeError:
+        return None
 
 
 def get_ws_event_bridge() -> EventBridge | None:
