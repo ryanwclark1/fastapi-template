@@ -22,12 +22,24 @@ from example_service.core.exceptions import (
     ServiceUnavailableException,
 )
 from example_service.features.tasks.schemas import (
+    BulkCancelRequest,
+    BulkCancelResponse,
+    BulkRetryRequest,
+    BulkRetryResponse,
     CancelTaskRequest,
     CancelTaskResponse,
+    DLQDiscardRequest,
+    DLQDiscardResponse,
+    DLQEntryResponse,
+    DLQListResponse,
+    DLQRetryRequest,
+    DLQRetryResponse,
+    DLQStatus,
     RunningTaskResponse,
     ScheduledJobListResponse,
     ScheduledJobResponse,
     TaskExecutionDetailResponse,
+    TaskProgressResponse,
     TaskSearchParams,
     TaskSearchResponse,
     TaskStatsResponse,
@@ -359,3 +371,177 @@ async def resume_scheduled_job(
         msg = "ScheduledJob"
         raise NotFoundError(msg, {"job_id": job_id})
     return {"job_id": job_id, "resumed": True, "message": "Job resumed successfully"}
+
+
+# ──────────────────────────────────────────────────────────────
+# Dead Letter Queue (DLQ) Endpoints
+# ──────────────────────────────────────────────────────────────
+
+
+@router.get(
+    "/dlq",
+    response_model=DLQListResponse,
+    summary="List DLQ entries",
+    description="Get tasks from the Dead Letter Queue.",
+)
+async def list_dlq_entries(
+    service: TaskServiceDep,
+    status: Annotated[DLQStatus | None, Query(description="Filter by DLQ status")] = None,
+    limit: Annotated[int, Query(ge=1, le=200, description="Maximum results")] = 50,
+    offset: Annotated[int, Query(ge=0, description="Skip results")] = 0,
+) -> DLQListResponse:
+    """List Dead Letter Queue entries.
+
+    Returns tasks that have failed after exhausting all retries.
+    These can be manually retried or discarded.
+
+    Status values:
+    - **pending**: Awaiting manual action
+    - **retried**: Has been requeued for execution
+    - **discarded**: Marked as permanently failed
+    """
+    return await service.get_dlq_entries(limit=limit, offset=offset, status=status)
+
+
+@router.get(
+    "/dlq/{task_id}",
+    response_model=DLQEntryResponse,
+    summary="Get DLQ entry",
+    description="Get details for a specific DLQ entry.",
+)
+async def get_dlq_entry(
+    task_id: str,
+    service: TaskServiceDep,
+) -> DLQEntryResponse:
+    """Get details for a DLQ entry.
+
+    Returns full information about the failed task including
+    original arguments and error details.
+    """
+    result = await service.get_dlq_entry(task_id)
+    if not result:
+        msg = "DLQEntry"
+        raise NotFoundError(msg, {"task_id": task_id})
+    return result
+
+
+@router.post(
+    "/dlq/{task_id}/retry",
+    response_model=DLQRetryResponse,
+    summary="Retry DLQ task",
+    description="Requeue a task from the Dead Letter Queue.",
+)
+async def retry_dlq_task(
+    task_id: str,
+    service: TaskServiceDep,
+) -> DLQRetryResponse:
+    """Retry a task from the Dead Letter Queue.
+
+    Creates a new task with the same arguments as the original.
+    The DLQ entry is marked as 'retried'.
+    """
+    try:
+        return await service.retry_dlq_task(task_id)
+    except BrokerNotConfiguredError as e:
+        raise ServiceUnavailableException(
+            detail=str(e),
+            type="broker-not-configured",
+        ) from e
+    except TaskServiceError as e:
+        raise InternalServerException(
+            detail=str(e),
+            type="task-service-error",
+        ) from e
+
+
+@router.post(
+    "/dlq/{task_id}/discard",
+    response_model=DLQDiscardResponse,
+    summary="Discard DLQ task",
+    description="Mark a DLQ task as discarded (permanently failed).",
+)
+async def discard_dlq_task(
+    task_id: str,
+    service: TaskServiceDep,
+    request: DLQDiscardRequest | None = None,
+) -> DLQDiscardResponse:
+    """Discard a task from the Dead Letter Queue.
+
+    Marks the task as permanently failed. The entry remains
+    in the DLQ for auditing but won't be retried.
+    """
+    reason = request.reason if request else None
+    return await service.discard_dlq_task(task_id, reason)
+
+
+# ──────────────────────────────────────────────────────────────
+# Bulk Operations Endpoints
+# ──────────────────────────────────────────────────────────────
+
+
+@router.post(
+    "/bulk/cancel",
+    response_model=BulkCancelResponse,
+    summary="Bulk cancel tasks",
+    description="Cancel multiple tasks at once.",
+)
+async def bulk_cancel_tasks(
+    request: BulkCancelRequest,
+    service: TaskServiceDep,
+) -> BulkCancelResponse:
+    """Cancel multiple tasks in a single request.
+
+    Attempts to cancel each task and returns individual results.
+    Maximum 100 tasks per request.
+
+    Only tasks with status 'pending' or 'running' can be cancelled.
+    """
+    return await service.bulk_cancel_tasks(request.task_ids, request.reason)
+
+
+@router.post(
+    "/bulk/retry",
+    response_model=BulkRetryResponse,
+    summary="Bulk retry DLQ tasks",
+    description="Retry multiple tasks from the Dead Letter Queue.",
+)
+async def bulk_retry_dlq_tasks(
+    request: BulkRetryRequest,
+    service: TaskServiceDep,
+) -> BulkRetryResponse:
+    """Retry multiple DLQ tasks in a single request.
+
+    Creates new tasks for each DLQ entry and returns individual results.
+    Maximum 100 tasks per request.
+    """
+    return await service.bulk_retry_dlq_tasks(request.task_ids)
+
+
+# ──────────────────────────────────────────────────────────────
+# Progress Tracking Endpoints
+# ──────────────────────────────────────────────────────────────
+
+
+@router.get(
+    "/{task_id}/progress",
+    response_model=TaskProgressResponse,
+    summary="Get task progress",
+    description="Get progress information for a running task.",
+)
+async def get_task_progress(
+    task_id: str,
+    service: TaskServiceDep,
+) -> TaskProgressResponse:
+    """Get progress for a task.
+
+    Returns progress information if the task has reported any.
+    Progress includes percentage, current/total counts, and messages.
+
+    Progress is only available while the task is running or
+    shortly after completion.
+    """
+    result = await service.get_task_progress(task_id)
+    if not result:
+        msg = "TaskProgress"
+        raise NotFoundError(msg, {"task_id": task_id})
+    return result

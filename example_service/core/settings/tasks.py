@@ -131,6 +131,77 @@ class TaskSettings(BaseSettings):
     )
 
     # ──────────────────────────────────────────────────────────────
+    # Timeout settings
+    # ──────────────────────────────────────────────────────────────
+
+    default_timeout_seconds: int = Field(
+        default=300,
+        ge=10,
+        le=3600,
+        description="Default task timeout in seconds (5 minutes default)",
+    )
+
+    timeout_enabled: bool = Field(
+        default=True,
+        description="Enable task timeout middleware",
+    )
+
+    # ──────────────────────────────────────────────────────────────
+    # Deduplication settings
+    # ──────────────────────────────────────────────────────────────
+
+    deduplication_enabled: bool = Field(
+        default=True,
+        description="Enable task deduplication middleware",
+    )
+
+    deduplication_ttl_seconds: int = Field(
+        default=300,
+        ge=10,
+        le=3600,
+        description="TTL for deduplication keys (how long to prevent duplicates)",
+    )
+
+    # ──────────────────────────────────────────────────────────────
+    # Dead Letter Queue settings
+    # ──────────────────────────────────────────────────────────────
+
+    dlq_enabled: bool = Field(
+        default=True,
+        description="Enable dead letter queue for failed tasks",
+    )
+
+    dlq_max_retries: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Maximum retries before moving task to DLQ",
+    )
+
+    dlq_retention_hours: int = Field(
+        default=168,
+        ge=1,
+        le=720,
+        description="How long to retain DLQ entries (default: 7 days)",
+    )
+
+    # ──────────────────────────────────────────────────────────────
+    # Progress tracking settings
+    # ──────────────────────────────────────────────────────────────
+
+    progress_tracking_enabled: bool = Field(
+        default=True,
+        description="Enable task progress tracking",
+    )
+
+    progress_update_throttle_ms: int = Field(
+        default=500,
+        ge=100,
+        le=5000,
+        description="Minimum interval between progress updates (ms)",
+    )
+
+    # ──────────────────────────────────────────────────────────────
     # API settings
     # ──────────────────────────────────────────────────────────────
 
@@ -170,6 +241,12 @@ class TaskSettings(BaseSettings):
         """Get retention period in seconds."""
         return self.tracking_retention_hours * 3600
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def dlq_retention_seconds(self) -> int:
+        """Get DLQ retention period in seconds."""
+        return self.dlq_retention_hours * 3600
+
     # ──────────────────────────────────────────────────────────────
     # Validators
     # ──────────────────────────────────────────────────────────────
@@ -178,6 +255,11 @@ class TaskSettings(BaseSettings):
         "tracking_retention_hours",
         "redis_result_ttl_seconds",
         "postgres_cleanup_batch_size",
+        "default_timeout_seconds",
+        "deduplication_ttl_seconds",
+        "dlq_max_retries",
+        "dlq_retention_hours",
+        "progress_update_throttle_ms",
         mode="before",
     )
     @classmethod

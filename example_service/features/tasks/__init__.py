@@ -7,6 +7,9 @@ This module provides a comprehensive API for task management, including:
 - Viewing and managing scheduled jobs
 - Triggering tasks on-demand
 - Cancelling queued tasks
+- Dead Letter Queue (DLQ) management
+- Bulk operations (cancel/retry multiple tasks)
+- Task progress tracking
 
 Example usage:
     from example_service.features.tasks import (
@@ -23,18 +26,37 @@ Example usage:
 
     # Search task history
     tasks, total = await service.search_tasks(TaskSearchParams(limit=50))
+
+    # Get DLQ entries
+    dlq = await service.get_dlq_entries()
+
+    # Get task progress
+    progress = await service.get_task_progress("task-123")
 """
 
 from example_service.features.tasks.router import router
 from example_service.features.tasks.schemas import (
+    BulkCancelRequest,
+    BulkCancelResponse,
+    BulkOperationResult,
+    BulkRetryRequest,
+    BulkRetryResponse,
     CancelTaskRequest,
     CancelTaskResponse,
+    DLQDiscardRequest,
+    DLQDiscardResponse,
+    DLQEntryResponse,
+    DLQListResponse,
+    DLQRetryRequest,
+    DLQRetryResponse,
+    DLQStatus,
     RunningTaskResponse,
     ScheduledJobListResponse,
     ScheduledJobResponse,
     TaskExecutionDetailResponse,
     TaskExecutionResponse,
     TaskName,
+    TaskProgressResponse,
     TaskSearchParams,
     TaskSearchResponse,
     TaskStatsResponse,
@@ -51,30 +73,47 @@ from example_service.features.tasks.service import (
 )
 
 __all__ = [
+    # Exceptions
     "BrokerNotConfiguredError",
-    "CancelTaskRequest",
-    "CancelTaskResponse",
-    "RunningTaskResponse",
-    "ScheduledJobListResponse",
-    "ScheduledJobResponse",
-    "TaskExecutionDetailResponse",
-    # Schemas - Responses
-    "TaskExecutionResponse",
+    "TaskServiceError",
+    "TrackerNotAvailableError",
     # Service
     "TaskManagementService",
-    "TaskName",
-    # Schemas - Requests
-    "TaskSearchParams",
-    "TaskSearchResponse",
-    # Exceptions
-    "TaskServiceError",
-    "TaskStatsResponse",
-    # Schemas - Enums
-    "TaskStatus",
-    "TrackerNotAvailableError",
-    "TriggerTaskRequest",
-    "TriggerTaskResponse",
     "get_task_service",
     # Router
     "router",
+    # Schemas - Enums
+    "DLQStatus",
+    "TaskName",
+    "TaskStatus",
+    # Schemas - Task Execution
+    "TaskExecutionResponse",
+    "TaskExecutionDetailResponse",
+    "RunningTaskResponse",
+    "TaskSearchParams",
+    "TaskSearchResponse",
+    "TaskStatsResponse",
+    # Schemas - Task Operations
+    "CancelTaskRequest",
+    "CancelTaskResponse",
+    "TriggerTaskRequest",
+    "TriggerTaskResponse",
+    # Schemas - Scheduled Jobs
+    "ScheduledJobListResponse",
+    "ScheduledJobResponse",
+    # Schemas - DLQ
+    "DLQEntryResponse",
+    "DLQListResponse",
+    "DLQRetryRequest",
+    "DLQRetryResponse",
+    "DLQDiscardRequest",
+    "DLQDiscardResponse",
+    # Schemas - Bulk Operations
+    "BulkCancelRequest",
+    "BulkCancelResponse",
+    "BulkRetryRequest",
+    "BulkRetryResponse",
+    "BulkOperationResult",
+    # Schemas - Progress
+    "TaskProgressResponse",
 ]
