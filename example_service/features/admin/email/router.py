@@ -9,21 +9,15 @@ This module provides administrative endpoints for:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
 import logging
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from fastapi import APIRouter, Query
 
-from example_service.core.dependencies.database import get_async_session
-from example_service.features.email.models import EmailConfig, EmailUsageLog
-from example_service.infra.email import get_enhanced_email_service
-
-if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
-
-    from example_service.infra.email.enhanced_service import EnhancedEmailService
+from example_service.features.admin.email.dependencies import (
+    EmailAdminServiceDep,
+    EnhancedEmailServiceDep,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,85 +35,11 @@ router = APIRouter(prefix="/admin/email", tags=["admin-email"])
     description="Get aggregate email usage statistics across all tenants.",
 )
 async def get_system_usage(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
-    days: int = Query(default=30, ge=1, le=365, description="Number of days to query"),
+    service: EmailAdminServiceDep,
+    days: Annotated[int, Query(ge=1, le=365, description="Number of days to query")] = 30,
 ) -> dict:
     """Get system-wide email usage statistics."""
-    start_date = datetime.now(UTC) - timedelta(days=days)
-
-    # Count active configs
-    config_count_stmt = (
-        select(func.count()).select_from(EmailConfig).where(EmailConfig.is_active)
-    )
-    config_count_result = await session.execute(config_count_stmt)
-    active_configs = config_count_result.scalar_one()
-
-    # Query usage logs
-    usage_stmt = select(EmailUsageLog).where(EmailUsageLog.created_at >= start_date)
-    usage_result = await session.execute(usage_stmt)
-    logs = usage_result.scalars().all()
-
-    # Calculate statistics
-    total_emails = len(logs)
-    total_cost = sum(log.cost_usd for log in logs if log.cost_usd)
-
-    # Group by provider
-    emails_by_provider: dict[str, int] = {}
-    cost_by_provider: dict[str, float] = {}
-
-    for log in logs:
-        provider = log.provider
-        emails_by_provider[provider] = emails_by_provider.get(provider, 0) + 1
-
-        if log.cost_usd:
-            cost_by_provider[provider] = cost_by_provider.get(provider, 0.0) + log.cost_usd
-
-    # Get top tenants by usage
-    tenant_usage_stmt = (
-        select(
-            EmailUsageLog.tenant_id,
-            func.count(EmailUsageLog.id).label("email_count"),
-            func.sum(EmailUsageLog.cost_usd).label("total_cost"),
-        )
-        .where(EmailUsageLog.created_at >= start_date, EmailUsageLog.tenant_id.isnot(None))
-        .group_by(EmailUsageLog.tenant_id)
-        .order_by(func.count(EmailUsageLog.id).desc())
-        .limit(10)
-    )
-    tenant_usage_result = await session.execute(tenant_usage_stmt)
-    top_tenants_raw = tenant_usage_result.all()
-
-    top_tenants = [
-        {
-            "tenant_id": row.tenant_id,
-            "email_count": row.email_count,
-            "total_cost_usd": round(float(row.total_cost or 0), 4),
-        }
-        for row in top_tenants_raw
-    ]
-
-    # Get unique tenant count
-    tenant_count_stmt = (
-        select(func.count(func.distinct(EmailUsageLog.tenant_id)))
-        .select_from(EmailUsageLog)
-        .where(EmailUsageLog.created_at >= start_date, EmailUsageLog.tenant_id.isnot(None))
-    )
-    tenant_count_result = await session.execute(tenant_count_stmt)
-    total_tenants = tenant_count_result.scalar_one()
-
-    return {
-        "period_days": days,
-        "period_start": start_date.isoformat(),
-        "period_end": datetime.now(UTC).isoformat(),
-        "total_tenants_active": total_tenants,
-        "total_tenants_configured": active_configs,
-        "total_emails_sent": total_emails,
-        "total_cost_usd": round(total_cost, 4),
-        "emails_by_provider": emails_by_provider,
-        "cost_by_provider": {k: round(v, 4) for k, v in cost_by_provider.items()},
-        "top_tenants": top_tenants,
-        "average_cost_per_email": round(total_cost / total_emails, 6) if total_emails > 0 else 0,
-    }
+    return await service.get_system_usage(days=days)
 
 
 @router.get(
@@ -128,93 +48,10 @@ async def get_system_usage(
     description="Check health of all configured email providers across the system.",
 )
 async def check_system_health(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
-    email_service: Annotated[EnhancedEmailService, Depends(get_enhanced_email_service)],
+    service: EmailAdminServiceDep,
 ) -> dict:
     """Check health of all email providers."""
-    import asyncio
-    import time
-
-    # Get all active configs
-    stmt = select(EmailConfig).where(EmailConfig.is_active == True)  # noqa: E712
-    result = await session.execute(stmt)
-    configs = result.scalars().all()
-
-    # Also check system default
-    health_checks = []
-
-    # Check system default
-    try:
-        start = time.perf_counter()
-        system_healthy = await email_service.health_check(None)
-        duration_ms = int((time.perf_counter() - start) * 1000)
-
-        health_checks.append(
-            {
-                "tenant_id": None,
-                "provider": "system_default",
-                "healthy": system_healthy,
-                "response_time_ms": duration_ms,
-                "error": None,
-            }
-        )
-    except Exception as e:
-        health_checks.append(
-            {
-                "tenant_id": None,
-                "provider": "system_default",
-                "healthy": False,
-                "response_time_ms": None,
-                "error": str(e),
-            }
-        )
-
-    # Check tenant configs (sample up to 10 for performance)
-    sample_configs = configs[:10] if len(configs) > 10 else configs
-
-    async def check_tenant(config: EmailConfig) -> dict:
-        try:
-            start = time.perf_counter()
-            is_healthy = await email_service.health_check(config.tenant_id)
-            duration_ms = int((time.perf_counter() - start) * 1000)
-
-            return {
-                "tenant_id": config.tenant_id,
-                "provider": config.provider_type,
-                "healthy": is_healthy,
-                "response_time_ms": duration_ms,
-                "error": None,
-            }
-        except Exception as e:
-            return {
-                "tenant_id": config.tenant_id,
-                "provider": config.provider_type,
-                "healthy": False,
-                "response_time_ms": None,
-                "error": str(e),
-            }
-
-    # Run health checks concurrently
-    tenant_checks = await asyncio.gather(*[check_tenant(config) for config in sample_configs])
-    health_checks.extend(tenant_checks)
-
-    # Calculate overall health
-    healthy_count = sum(1 for check in health_checks if check["healthy"])
-    total_checks = len(health_checks)
-    overall_healthy = healthy_count == total_checks
-
-    return {
-        "overall_healthy": overall_healthy,
-        "healthy_count": healthy_count,
-        "total_checks": total_checks,
-        "health_percentage": round((healthy_count / total_checks * 100), 2)
-        if total_checks > 0
-        else 0,
-        "checks": health_checks,
-        "sampled": len(configs) > 10,
-        "total_configs": len(configs),
-        "timestamp": datetime.now(UTC).isoformat(),
-    }
+    return await service.check_system_health()
 
 
 # =============================================================================
@@ -228,40 +65,12 @@ async def check_system_health(
     description="Get a list of all tenant email configurations (admin view).",
 )
 async def list_all_configs(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
-    active_only: bool = Query(default=False, description="Show only active configurations"),
-    provider: str | None = Query(default=None, description="Filter by provider type"),
+    service: EmailAdminServiceDep,
+    active_only: Annotated[bool, Query(description="Show only active configurations")] = False,
+    provider: Annotated[str | None, Query(description="Filter by provider type")] = None,
 ) -> dict:
     """List all email configurations."""
-    stmt = select(EmailConfig)
-
-    if active_only:
-        stmt = stmt.where(EmailConfig.is_active == True)  # noqa: E712
-
-    if provider:
-        stmt = stmt.where(EmailConfig.provider_type == provider)
-
-    stmt = stmt.order_by(EmailConfig.created_at.desc())
-
-    result = await session.execute(stmt)
-    configs = result.scalars().all()
-
-    return {
-        "total": len(configs),
-        "configs": [
-            {
-                "id": str(config.id),
-                "tenant_id": config.tenant_id,
-                "provider_type": config.provider_type,
-                "is_active": config.is_active,
-                "from_email": config.from_email,
-                "rate_limit_per_minute": config.rate_limit_per_minute,
-                "created_at": config.created_at.isoformat(),
-                "updated_at": config.updated_at.isoformat(),
-            }
-            for config in configs
-        ],
-    }
+    return await service.list_all_configs(active_only=active_only, provider=provider)
 
 
 @router.post(
@@ -270,18 +79,11 @@ async def list_all_configs(
     description="Clear the configuration cache for all tenants or a specific tenant.",
 )
 async def invalidate_cache(
-    email_service: Annotated[EnhancedEmailService, Depends(get_enhanced_email_service)],
-    tenant_id: str | None = Query(default=None, description="Tenant ID (None = all)"),
+    service: EmailAdminServiceDep,
+    tenant_id: Annotated[str | None, Query(description="Tenant ID (None = all)")] = None,
 ) -> dict:
     """Invalidate configuration cache."""
-    count = email_service.invalidate_config_cache(tenant_id)
-
-    return {
-        "success": True,
-        "invalidated_count": count,
-        "tenant_id": tenant_id,
-        "timestamp": datetime.now(UTC).isoformat(),
-    }
+    return service.invalidate_cache(tenant_id)
 
 
 # =============================================================================
@@ -300,10 +102,6 @@ async def get_metrics_summary() -> dict:
     Note: This returns snapshot values. For time-series data,
     query Prometheus directly.
     """
-    # Note: Prometheus client doesn't provide easy access to current values
-    # In production, you'd query Prometheus API directly
-    # This is a simplified version showing available metrics
-
     return {
         "metrics_available": [
             "email_delivery_total",
@@ -339,35 +137,7 @@ async def get_metrics_summary() -> dict:
     description="See which providers are most commonly used across tenants.",
 )
 async def get_provider_distribution(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
+    service: EmailAdminServiceDep,
 ) -> dict:
     """Get distribution of providers across tenants."""
-    stmt = (
-        select(
-            EmailConfig.provider_type,
-            func.count(EmailConfig.id).label("count"),
-        )
-        .where(EmailConfig.is_active == True)  # noqa: E712
-        .group_by(EmailConfig.provider_type)
-        .order_by(func.count(EmailConfig.id).desc())
-    )
-
-    result = await session.execute(stmt)
-    distribution_raw = result.all()
-
-    distribution = [
-        {"provider": row.provider_type.value, "tenant_count": row.count} for row in distribution_raw
-    ]
-
-    total_configs = sum(item["tenant_count"] for item in distribution)
-
-    return {
-        "total_configured_tenants": total_configs,
-        "distribution": distribution,
-        "percentages": {
-            item["provider"]: round(item["tenant_count"] / total_configs * 100, 2)
-            for item in distribution
-        }
-        if total_configs > 0
-        else {},
-    }
+    return await service.get_provider_distribution()

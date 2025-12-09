@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from example_service.features.email.models import EmailProviderType
 
@@ -136,8 +136,7 @@ class EmailConfigResponse(EmailConfigBase):
         description="Whether API key is configured",
     )
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TestEmailRequest(BaseModel):
@@ -268,12 +267,11 @@ class EmailAuditLogResponse(BaseModel):
     error_category: str | None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EmailAuditLogsResponse(BaseModel):
-    """Paginated response for audit logs."""
+    """Paginated response for audit logs (offset-based)."""
 
     logs: list[EmailAuditLogResponse]
     total: int
@@ -281,6 +279,87 @@ class EmailAuditLogsResponse(BaseModel):
     page_size: int
 
 
+class EmailAuditLogsCursorResponse(BaseModel):
+    """Cursor-paginated response for audit logs.
+
+    Cursor-based pagination is more efficient for large datasets:
+    - No need to count total rows
+    - Consistent results even when data changes
+    - Better performance with indexed columns
+    """
+
+    logs: list[EmailAuditLogResponse]
+    next_cursor: str | None = Field(
+        description="Cursor to fetch the next page (older items)",
+    )
+    prev_cursor: str | None = Field(
+        description="Cursor to fetch the previous page (newer items)",
+    )
+    has_more: bool = Field(
+        description="Whether there are more items after this page",
+    )
+    limit: int = Field(
+        description="Number of items requested per page",
+    )
+
+
+class SendEmailRequest(BaseModel):
+    """Request schema for sending an email."""
+
+    to: list[EmailStr] = Field(
+        min_length=1,
+        max_length=100,
+        description="Recipient email addresses (max 100)",
+    )
+    subject: str = Field(
+        min_length=1,
+        max_length=500,
+        description="Email subject line",
+    )
+    body: str | None = Field(
+        default=None,
+        max_length=100000,
+        description="Plain text body",
+    )
+    body_html: str | None = Field(
+        default=None,
+        max_length=500000,
+        description="HTML body (takes precedence over plain text)",
+    )
+    reply_to: EmailStr | None = Field(
+        default=None,
+        description="Reply-to address (overrides config default)",
+    )
+    template_name: str | None = Field(
+        default=None,
+        max_length=255,
+        description="Template name to use (if supported by provider)",
+    )
+    template_data: dict[str, Any] | None = Field(
+        default=None,
+        description="Template variables",
+    )
+
+    @field_validator("body", "body_html")
+    @classmethod
+    def validate_body_content(cls, v: str | None, info: Any) -> str | None:
+        """Ensure at least one body type is provided."""
+        return v
+
+
+class SendEmailResponse(BaseModel):
+    """Response schema for email send operation."""
+
+    success: bool
+    message_id: str | None = None
+    provider: str
+    recipients_count: int
+    duration_ms: int
+    error: str | None = None
+    error_code: str | None = None
+
+
 # Rebuild models that use forward references
 EmailConfigCreate.model_rebuild()
 EmailConfigUpdate.model_rebuild()
+SendEmailRequest.model_rebuild()

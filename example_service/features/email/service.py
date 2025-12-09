@@ -12,6 +12,11 @@ import time
 from typing import TYPE_CHECKING
 
 from example_service.core.services.base import BaseService
+from example_service.features.email.exceptions import (
+    EmailConfigNotFoundError,
+    EmailConfigValidationError,
+    EmailSendError,
+)
 from example_service.features.email.models import EmailConfig, EmailProviderType
 from example_service.features.email.repository import (
     EmailAuditLogRepository,
@@ -74,6 +79,60 @@ class EmailConfigService(BaseService):
         self._usage_repo = usage_repository or get_email_usage_log_repository()
         self._audit_repo = audit_repository or get_email_audit_log_repository()
 
+    # Provider-specific required fields
+    PROVIDER_REQUIREMENTS: dict[EmailProviderType, list[str]] = {
+        EmailProviderType.SMTP: ["smtp_host", "smtp_port"],
+        EmailProviderType.AWS_SES: ["aws_access_key", "aws_secret_key", "aws_region"],
+        EmailProviderType.SENDGRID: ["api_key"],
+        EmailProviderType.MAILGUN: ["api_key"],
+        EmailProviderType.CONSOLE: [],
+        EmailProviderType.FILE: [],
+    }
+
+    def validate_provider_config(
+        self,
+        provider_type: EmailProviderType,
+        config_data: dict,
+    ) -> None:
+        """Validate that required fields are present for the provider type.
+
+        Args:
+            provider_type: The email provider type
+            config_data: Configuration data dictionary
+
+        Raises:
+            EmailConfigValidationError: If required fields are missing
+        """
+        required_fields = self.PROVIDER_REQUIREMENTS.get(provider_type, [])
+        missing_fields = [
+            field for field in required_fields
+            if not config_data.get(field)
+        ]
+
+        if missing_fields:
+            raise EmailConfigValidationError(
+                f"Missing required fields for {provider_type.value}: {', '.join(missing_fields)}",
+                provider_type=provider_type.value,
+                missing_fields=missing_fields,
+            )
+
+    async def get_config_or_raise(self, tenant_id: str) -> EmailConfig:
+        """Get email configuration for a tenant, raising if not found.
+
+        Args:
+            tenant_id: Tenant identifier
+
+        Returns:
+            EmailConfig
+
+        Raises:
+            EmailConfigNotFoundError: If config doesn't exist
+        """
+        config = await self._config_repo.get_by_tenant_id(self._session, tenant_id)
+        if config is None:
+            raise EmailConfigNotFoundError(tenant_id)
+        return config
+
     async def create_or_update_config(
         self,
         tenant_id: str,
@@ -87,7 +146,14 @@ class EmailConfigService(BaseService):
 
         Returns:
             Created or updated EmailConfig
+
+        Raises:
+            EmailConfigValidationError: If required provider fields are missing
         """
+        # Validate provider-specific required fields
+        config_dict = config_data.model_dump(exclude_unset=True)
+        self.validate_provider_config(config_data.provider_type, config_dict)
+
         existing_config = await self._config_repo.get_by_tenant_id(
             self._session, tenant_id
         )
@@ -402,7 +468,7 @@ class EmailConfigService(BaseService):
         page: int = 1,
         page_size: int = 50,
     ) -> SearchResult[EmailAuditLog]:
-        """Get paginated audit logs for a tenant.
+        """Get paginated audit logs for a tenant (offset-based).
 
         Args:
             tenant_id: Tenant identifier
@@ -419,6 +485,141 @@ class EmailConfigService(BaseService):
             limit=page_size,
             offset=offset,
         )
+
+    async def get_audit_logs_cursor(
+        self,
+        tenant_id: str,
+        *,
+        limit: int = 50,
+        cursor: str | None = None,
+        direction: str = "next",
+    ) -> dict:
+        """Get paginated audit logs using cursor-based pagination.
+
+        More efficient for large datasets than offset-based pagination.
+
+        Args:
+            tenant_id: Tenant identifier
+            limit: Number of items to return
+            cursor: Cursor string for pagination
+            direction: "next" for older items, "prev" for newer items
+
+        Returns:
+            Dictionary with logs, cursors, and pagination info
+        """
+        items, next_cursor, prev_cursor, has_more = await self._audit_repo.get_audit_logs_cursor(
+            self._session,
+            tenant_id,
+            limit=limit,
+            cursor=cursor,
+            direction=direction,
+        )
+
+        return {
+            "items": items,
+            "next_cursor": next_cursor,
+            "prev_cursor": prev_cursor,
+            "has_more": has_more,
+            "limit": limit,
+        }
+
+    async def send_email(
+        self,
+        tenant_id: str,
+        to: list[str],
+        subject: str,
+        *,
+        body: str | None = None,
+        body_html: str | None = None,
+        reply_to: str | None = None,
+        template_name: str | None = None,
+        template_data: dict | None = None,
+    ) -> "SendEmailResponse":
+        """Send an email using the tenant's configuration.
+
+        Args:
+            tenant_id: Tenant identifier
+            to: List of recipient email addresses
+            subject: Email subject line
+            body: Plain text body
+            body_html: HTML body (takes precedence)
+            reply_to: Override reply-to address
+            template_name: Template name for templated emails
+            template_data: Template variable data
+
+        Returns:
+            SendEmailResponse with delivery result
+
+        Raises:
+            EmailConfigNotFoundError: If tenant has no email configuration
+            EmailSendError: If sending fails
+        """
+        from example_service.features.email.schemas import SendEmailResponse
+
+        start_time = time.perf_counter()
+
+        # Verify tenant has a configuration
+        config = await self._config_repo.get_by_tenant_id(self._session, tenant_id)
+        if config is None:
+            raise EmailConfigNotFoundError(tenant_id)
+
+        if not config.is_active:
+            raise EmailSendError(
+                "Email configuration is disabled",
+                tenant_id=tenant_id,
+                error_code="CONFIG_DISABLED",
+            )
+
+        try:
+            result = await self._email_service.send(
+                to=to,
+                subject=subject,
+                body=body,
+                body_html=body_html,
+                reply_to=reply_to,
+                tenant_id=tenant_id,
+            )
+
+            duration_ms = int((time.perf_counter() - start_time) * 1000)
+
+            if not result.success:
+                self.logger.warning(
+                    "Email send failed",
+                    extra={
+                        "tenant_id": tenant_id,
+                        "recipients": len(to),
+                        "error": result.error,
+                        "error_code": result.error_code,
+                        "operation": "service.send_email",
+                    },
+                )
+
+            return SendEmailResponse(
+                success=result.success,
+                message_id=result.message_id,
+                provider=result.backend,
+                recipients_count=len(to),
+                duration_ms=duration_ms,
+                error=result.error,
+                error_code=result.error_code,
+            )
+
+        except Exception as e:
+            duration_ms = int((time.perf_counter() - start_time) * 1000)
+            self.logger.exception(
+                "Email send failed with exception",
+                extra={
+                    "tenant_id": tenant_id,
+                    "recipients": len(to),
+                    "error": str(e),
+                    "operation": "service.send_email",
+                },
+            )
+            raise EmailSendError(
+                str(e),
+                tenant_id=tenant_id,
+                error_code="SEND_FAILED",
+            ) from e
 
     def get_available_providers(self) -> list[dict]:
         """Get list of available email providers with their requirements.

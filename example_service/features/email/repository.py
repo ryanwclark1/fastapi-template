@@ -299,6 +299,47 @@ class EmailUsageLogRepository(TenantAwareRepository[EmailUsageLog]):
             "total_cost_usd": float(row.total_cost) if row.total_cost else None,
         }
 
+    async def get_all_usage_logs(
+        self,
+        session: AsyncSession,
+        *,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        limit: int = 10000,
+    ) -> Sequence[EmailUsageLog]:
+        """Get all usage logs within a date range (for admin reporting).
+
+        Args:
+            session: Database session
+            start_date: Start of date range
+            end_date: End of date range
+            limit: Maximum results
+
+        Returns:
+            Sequence of EmailUsageLog instances
+        """
+        if end_date is None:
+            end_date = datetime.now(UTC)
+        if start_date is None:
+            start_date = end_date - timedelta(days=30)
+
+        stmt = (
+            select(EmailUsageLog)
+            .where(
+                EmailUsageLog.created_at >= start_date,
+                EmailUsageLog.created_at <= end_date,
+            )
+            .order_by(EmailUsageLog.created_at.desc())
+            .limit(limit)
+        )
+        result = await session.execute(stmt)
+        items = result.scalars().all()
+
+        self._lazy.debug(
+            lambda: f"db.get_all_usage_logs({start_date} to {end_date}) -> {len(items)} items"
+        )
+        return items
+
     async def get_usage_by_provider(
         self,
         session: AsyncSession,
@@ -367,7 +408,7 @@ class EmailAuditLogRepository(TenantAwareRepository[EmailAuditLog]):
         limit: int = 50,
         offset: int = 0,
     ) -> SearchResult[EmailAuditLog]:
-        """Get paginated audit logs for a tenant.
+        """Get paginated audit logs for a tenant (offset-based).
 
         Args:
             session: Database session
@@ -384,6 +425,125 @@ class EmailAuditLogRepository(TenantAwareRepository[EmailAuditLog]):
             .order_by(EmailAuditLog.created_at.desc())
         )
         return await self.search(session, stmt, limit=limit, offset=offset)
+
+    async def get_audit_logs_cursor(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        *,
+        limit: int = 50,
+        cursor: str | None = None,
+        direction: str = "next",
+    ) -> tuple[list[EmailAuditLog], str | None, str | None, bool]:
+        """Get paginated audit logs using cursor-based pagination.
+
+        Cursor-based pagination is more efficient for large datasets as it doesn't
+        require counting all rows and is consistent even when data changes.
+
+        Args:
+            session: Database session
+            tenant_id: Tenant identifier
+            limit: Number of items to return
+            cursor: Cursor string (format: "{created_at_iso}_{id}")
+            direction: "next" for newer items, "prev" for older items
+
+        Returns:
+            Tuple of (items, next_cursor, prev_cursor, has_more)
+        """
+        import base64
+
+        # Parse cursor if provided
+        cursor_created_at: datetime | None = None
+        cursor_id: str | None = None
+
+        if cursor:
+            try:
+                decoded = base64.urlsafe_b64decode(cursor.encode()).decode()
+                parts = decoded.split("_", 1)
+                if len(parts) == 2:
+                    cursor_created_at = datetime.fromisoformat(parts[0])
+                    cursor_id = parts[1]
+            except (ValueError, UnicodeDecodeError):
+                pass  # Invalid cursor, start from beginning
+
+        # Build query based on direction
+        if direction == "prev" and cursor_created_at and cursor_id:
+            # Get items newer than cursor (for going backwards)
+            stmt = (
+                select(EmailAuditLog)
+                .where(
+                    EmailAuditLog.tenant_id == tenant_id,
+                    (
+                        (EmailAuditLog.created_at > cursor_created_at)
+                        | (
+                            (EmailAuditLog.created_at == cursor_created_at)
+                            & (EmailAuditLog.id > cursor_id)
+                        )
+                    ),
+                )
+                .order_by(EmailAuditLog.created_at.asc(), EmailAuditLog.id.asc())
+                .limit(limit + 1)
+            )
+        elif cursor_created_at and cursor_id:
+            # Get items older than cursor (default: going forward through older items)
+            stmt = (
+                select(EmailAuditLog)
+                .where(
+                    EmailAuditLog.tenant_id == tenant_id,
+                    (
+                        (EmailAuditLog.created_at < cursor_created_at)
+                        | (
+                            (EmailAuditLog.created_at == cursor_created_at)
+                            & (EmailAuditLog.id < cursor_id)
+                        )
+                    ),
+                )
+                .order_by(EmailAuditLog.created_at.desc(), EmailAuditLog.id.desc())
+                .limit(limit + 1)
+            )
+        else:
+            # No cursor - start from most recent
+            stmt = (
+                select(EmailAuditLog)
+                .where(EmailAuditLog.tenant_id == tenant_id)
+                .order_by(EmailAuditLog.created_at.desc(), EmailAuditLog.id.desc())
+                .limit(limit + 1)
+            )
+
+        result = await session.execute(stmt)
+        items = list(result.scalars().all())
+
+        # Reverse if we queried in ascending order
+        if direction == "prev" and cursor:
+            items.reverse()
+
+        # Check if there are more items
+        has_more = len(items) > limit
+        if has_more:
+            items = items[:limit]
+
+        # Generate cursors
+        def make_cursor(log: EmailAuditLog) -> str:
+            cursor_str = f"{log.created_at.isoformat()}_{log.id}"
+            return base64.urlsafe_b64encode(cursor_str.encode()).decode()
+
+        next_cursor: str | None = None
+        prev_cursor: str | None = None
+
+        if items:
+            # Next cursor points to the last (oldest) item
+            if has_more or cursor:
+                next_cursor = make_cursor(items[-1])
+
+            # Prev cursor points to the first (newest) item
+            if cursor:
+                prev_cursor = make_cursor(items[0])
+
+        self._lazy.debug(
+            lambda: f"db.get_audit_logs_cursor({tenant_id}, cursor={cursor is not None}) -> {len(items)} items"
+        )
+
+        return items, next_cursor, prev_cursor, has_more
 
     async def get_by_recipient_hash(
         self,

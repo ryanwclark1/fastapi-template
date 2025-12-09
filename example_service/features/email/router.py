@@ -24,10 +24,16 @@ from example_service.features.email.dependencies import (
     EmailConfigServiceDep,
     EnhancedEmailServiceDep,
 )
+from example_service.features.email.exceptions import (
+    EmailConfigNotFoundError,
+    EmailConfigValidationError,
+    EmailSendError,
+)
 from example_service.features.email.models import EmailConfig
 
 from .schemas import (
     EmailAuditLogResponse,
+    EmailAuditLogsCursorResponse,
     EmailAuditLogsResponse,
     EmailConfigCreate,
     EmailConfigResponse,
@@ -37,6 +43,8 @@ from .schemas import (
     EmailUsageStats,
     ProviderInfo,
     ProvidersListResponse,
+    SendEmailRequest,
+    SendEmailResponse,
     TestEmailRequest,
     TestEmailResponse,
 )
@@ -68,8 +76,18 @@ async def create_or_update_config(
     service: EmailConfigServiceDep,
 ) -> EmailConfigResponse:
     """Create or update email configuration for a tenant."""
-    config = await service.create_or_update_config(tenant_id, config_data)
-    return _to_response(config)
+    try:
+        config = await service.create_or_update_config(tenant_id, config_data)
+        return _to_response(config)
+    except EmailConfigValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "message": e.message,
+                "provider_type": e.provider_type,
+                "missing_fields": e.missing_fields,
+            },
+        ) from e
 
 
 @router.get(
@@ -135,6 +153,49 @@ async def delete_config(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Email configuration not found for tenant: {tenant_id}",
         )
+
+
+# =============================================================================
+# Email Sending
+# =============================================================================
+
+
+@router.post(
+    "/send/{tenant_id}",
+    response_model=SendEmailResponse,
+    summary="Send an email",
+    description="Send an email using the tenant's email configuration.",
+)
+async def send_email(
+    tenant_id: TenantIdPath,
+    email_request: SendEmailRequest,
+    service: EmailConfigServiceDep,
+) -> SendEmailResponse:
+    """Send an email using the tenant's email configuration."""
+    try:
+        return await service.send_email(
+            tenant_id=tenant_id,
+            to=[str(addr) for addr in email_request.to],
+            subject=email_request.subject,
+            body=email_request.body,
+            body_html=email_request.body_html,
+            reply_to=str(email_request.reply_to) if email_request.reply_to else None,
+            template_name=email_request.template_name,
+            template_data=email_request.template_data,
+        )
+    except EmailConfigNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=e.message,
+        ) from e
+    except EmailSendError as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={
+                "message": e.message,
+                "error_code": e.error_code,
+            },
+        ) from e
 
 
 # =============================================================================
@@ -227,8 +288,8 @@ async def get_usage_stats(
 @router.get(
     "/configs/{tenant_id}/audit-logs",
     response_model=EmailAuditLogsResponse,
-    summary="Get audit logs",
-    description="Retrieve audit trail for sent emails (privacy-compliant with hashed recipients).",
+    summary="Get audit logs (offset-based)",
+    description="Retrieve audit trail for sent emails using offset-based pagination.",
 )
 async def get_audit_logs(
     tenant_id: TenantIdPath,
@@ -236,7 +297,7 @@ async def get_audit_logs(
     page: Annotated[int, Query(ge=1, description="Page number")] = 1,
     page_size: Annotated[int, Query(ge=1, le=200, description="Items per page")] = 50,
 ) -> EmailAuditLogsResponse:
-    """Get audit logs for a tenant."""
+    """Get audit logs for a tenant (offset-based pagination)."""
     result = await service.get_audit_logs(tenant_id, page=page, page_size=page_size)
 
     return EmailAuditLogsResponse(
@@ -244,6 +305,61 @@ async def get_audit_logs(
         total=result.total,
         page=page,
         page_size=page_size,
+    )
+
+
+@router.get(
+    "/configs/{tenant_id}/audit-logs/cursor",
+    response_model=EmailAuditLogsCursorResponse,
+    summary="Get audit logs (cursor-based)",
+    description="""Retrieve audit trail using cursor-based pagination.
+
+More efficient than offset-based pagination for large datasets:
+- No need to count total rows
+- Consistent results even when data changes
+- Better performance with indexed columns
+
+Use `next_cursor` to get older items, `prev_cursor` to get newer items.""",
+)
+async def get_audit_logs_cursor(
+    tenant_id: TenantIdPath,
+    service: EmailConfigServiceDep,
+    cursor: Annotated[
+        str | None,
+        Query(description="Pagination cursor (from previous response)"),
+    ] = None,
+    limit: Annotated[
+        int,
+        Query(ge=1, le=200, description="Number of items per page"),
+    ] = 50,
+    direction: Annotated[
+        str,
+        Query(
+            pattern="^(next|prev)$",
+            description="Direction: 'next' for older items, 'prev' for newer items",
+        ),
+    ] = "next",
+) -> EmailAuditLogsCursorResponse:
+    """Get audit logs for a tenant (cursor-based pagination).
+
+    Cursor-based pagination is recommended for:
+    - Large datasets
+    - Real-time data that changes frequently
+    - Mobile apps with infinite scroll
+    """
+    result = await service.get_audit_logs_cursor(
+        tenant_id,
+        limit=limit,
+        cursor=cursor,
+        direction=direction,
+    )
+
+    return EmailAuditLogsCursorResponse(
+        logs=[EmailAuditLogResponse.model_validate(log) for log in result["items"]],
+        next_cursor=result["next_cursor"],
+        prev_cursor=result["prev_cursor"],
+        has_more=result["has_more"],
+        limit=result["limit"],
     )
 
 
