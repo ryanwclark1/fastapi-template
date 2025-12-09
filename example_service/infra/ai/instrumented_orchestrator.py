@@ -95,6 +95,10 @@ from example_service.infra.ai.observability import (
     get_ai_tracer,
     get_budget_service,
 )
+from example_service.infra.ai.observability.logging import (
+    AIObservabilityLogger,
+    get_ai_logger,
+)
 from example_service.infra.ai.pipelines.types import (
     PipelineDefinition,
     PipelineResult,
@@ -145,12 +149,14 @@ class InstrumentedOrchestrator:
         tracer: AITracer | None = None,
         metrics: AIMetrics | None = None,
         budget_service: BudgetService | None = None,
+        ai_logger: AIObservabilityLogger | None = None,
         api_keys: dict[str, str] | None = None,
         model_overrides: dict[str, str] | None = None,
         default_budget_policy: BudgetPolicy = BudgetPolicy.WARN,
         enable_tracing: bool = True,
         enable_metrics: bool = True,
         enable_budget_enforcement: bool = True,
+        enable_logging: bool = True,
     ) -> None:
         """Initialize orchestrator.
 
@@ -160,18 +166,21 @@ class InstrumentedOrchestrator:
             tracer: AI tracer (uses global if None)
             metrics: AI metrics (uses global if None)
             budget_service: Budget service (uses global if None)
+            ai_logger: AI observability logger (uses global if None)
             api_keys: API keys by provider name
             model_overrides: Model overrides by provider name
             default_budget_policy: Default budget policy for tenants
             enable_tracing: Enable OpenTelemetry tracing
             enable_metrics: Enable Prometheus metrics
             enable_budget_enforcement: Enable budget checks
+            enable_logging: Enable structured AI logging
         """
         self.registry = registry or get_capability_registry()
         self.event_store = event_store or get_event_store()
         self.tracer = tracer or get_ai_tracer() if enable_tracing else None
         self.metrics = metrics or get_ai_metrics() if enable_metrics else None
         self.budget = budget_service or get_budget_service() if enable_budget_enforcement else None
+        self.ai_logger = ai_logger or get_ai_logger() if enable_logging else None
         self.api_keys = api_keys or {}
         self.model_overrides = model_overrides or {}
         self.default_budget_policy = default_budget_policy
@@ -185,6 +194,17 @@ class InstrumentedOrchestrator:
             event_store=self.event_store,
             api_keys=self.api_keys,
             model_overrides=self.model_overrides,
+        )
+
+        logger.info(
+            "InstrumentedOrchestrator initialized",
+            extra={
+                "tracing_enabled": enable_tracing,
+                "metrics_enabled": enable_metrics,
+                "budget_enabled": enable_budget_enforcement,
+                "logging_enabled": enable_logging,
+                "provider_count": len(self.api_keys),
+            },
         )
 
     async def execute(
@@ -225,6 +245,19 @@ class InstrumentedOrchestrator:
                 estimated_cost_usd=pipeline.estimated_cost_usd,
             )
 
+            # Log budget check result
+            if self.ai_logger:
+                self.ai_logger.budget_check(
+                    tenant_id=tenant_id,
+                    current_spend_usd=budget_check.current_spend_usd,
+                    limit_usd=budget_check.limit_usd,
+                    percent_used=budget_check.percent_used,
+                    action=budget_check.action.value,
+                    estimated_cost_usd=pipeline.estimated_cost_usd,
+                    period=budget_check.period.value,
+                    pipeline_name=pipeline.name,
+                )
+
             if not budget_check.allowed:
                 logger.warning(
                     f"Budget exceeded for tenant: {tenant_id}",
@@ -234,6 +267,15 @@ class InstrumentedOrchestrator:
                         "budget_check": budget_check.message,
                     },
                 )
+
+                if self.ai_logger:
+                    self.ai_logger.budget_exceeded(
+                        tenant_id=tenant_id,
+                        current_spend_usd=budget_check.current_spend_usd,
+                        limit_usd=budget_check.limit_usd or Decimal(0),
+                        period=budget_check.period.value,
+                        blocked=True,
+                    )
 
                 if self.metrics:
                     self.metrics.record_budget_exceeded(tenant_id, "blocked")
@@ -253,9 +295,19 @@ class InstrumentedOrchestrator:
                     },
                 )
 
-        # Record pipeline started metrics
+        # Record pipeline started metrics and log
         if self.metrics:
             self.metrics.record_pipeline_started(pipeline.name, tenant_id)
+
+        if self.ai_logger:
+            self.ai_logger.pipeline_started(
+                pipeline_name=pipeline.name,
+                execution_id=_create_mock_context(pipeline.name, tenant_id).execution_id,
+                tenant_id=tenant_id,
+                step_count=len(pipeline.steps),
+                estimated_cost_usd=pipeline.estimated_cost_usd,
+                estimated_duration_seconds=pipeline.estimated_duration_seconds,
+            )
 
         try:
             # Execute with tracing
@@ -300,6 +352,32 @@ class InstrumentedOrchestrator:
             # Record metrics
             self._record_execution_metrics(pipeline, result, tenant_id)
 
+            # Log pipeline completion
+            if self.ai_logger:
+                if result.success:
+                    self.ai_logger.pipeline_completed(
+                        pipeline_name=pipeline.name,
+                        execution_id=result.execution_id,
+                        tenant_id=tenant_id,
+                        success=True,
+                        duration_ms=result.total_duration_ms,
+                        total_cost_usd=result.total_cost_usd,
+                        completed_steps=result.completed_steps,
+                    )
+                else:
+                    self.ai_logger.pipeline_failed(
+                        pipeline_name=pipeline.name,
+                        execution_id=result.execution_id,
+                        error=result.error or "Unknown error",
+                        error_type="PipelineError",
+                        failed_step=result.failed_step,
+                        tenant_id=tenant_id,
+                        duration_ms=result.total_duration_ms,
+                        completed_steps=result.completed_steps,
+                        total_cost_usd=result.total_cost_usd,
+                        compensation_triggered=result.compensation_performed,
+                    )
+
             # Track budget spend
             if self.budget and tenant_id and result.total_cost_usd > 0:
                 await self.budget.track_spend(
@@ -308,6 +386,15 @@ class InstrumentedOrchestrator:
                     pipeline_name=pipeline.name,
                     execution_id=result.execution_id,
                 )
+
+                # Log spend tracking
+                if self.ai_logger:
+                    self.ai_logger.spend_tracked(
+                        tenant_id=tenant_id,
+                        cost_usd=result.total_cost_usd,
+                        pipeline_name=pipeline.name,
+                        execution_id=result.execution_id,
+                    )
 
             return result
 

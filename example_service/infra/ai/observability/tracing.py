@@ -263,6 +263,52 @@ class AITracer:
                 provider_span.record_error(e)
                 raise
 
+    @asynccontextmanager
+    async def compensation_span(
+        self,
+        pipeline_name: str,
+        context: PipelineContext,
+        reason: str,
+        steps_to_compensate: list[str],
+    ) -> AsyncIterator[CompensationSpan]:
+        """Create a span for compensation execution.
+
+        Args:
+            pipeline_name: Name of pipeline being compensated
+            context: Execution context
+            reason: Reason for compensation
+            steps_to_compensate: List of steps to compensate
+
+        Yields:
+            CompensationSpan wrapper for recording results
+        """
+        if not self.enabled:
+            yield NoOpCompensationSpan()  # type: ignore[misc]
+            return
+
+        span_name = f"ai.compensation.{pipeline_name}"
+
+        if self._tracer is None:
+            msg = "Tracer not initialized"
+            raise RuntimeError(msg)
+        with self._tracer.start_as_current_span(
+            span_name,
+            kind=SpanKind.INTERNAL,
+            attributes={
+                "ai.compensation.pipeline": pipeline_name,
+                "ai.compensation.execution_id": context.execution_id,
+                "ai.compensation.reason": reason,
+                "ai.compensation.step_count": len(steps_to_compensate),
+                "ai.compensation.steps": ",".join(steps_to_compensate),
+            },
+        ) as span:
+            compensation_span = CompensationSpan(span)
+            try:
+                yield compensation_span
+            except Exception as e:
+                compensation_span.record_error(e)
+                raise
+
 
 class PipelineSpan:
     """Wrapper for pipeline execution span."""
@@ -357,6 +403,38 @@ class ProviderSpan:
         """Set a span attribute."""
         self._span.set_attribute(f"{self._prefix}.{key}", value)
 
+    def set_request_attributes(
+        self,
+        model: str | None = None,
+        timeout_seconds: float | None = None,
+        stream_enabled: bool = False,
+        request_size_bytes: int | None = None,
+        estimated_tokens: int | None = None,
+    ) -> None:
+        """Set request-specific attributes before making the call."""
+        if model:
+            self._span.set_attribute(f"{self._prefix}.model", model)
+        if timeout_seconds:
+            self._span.set_attribute(f"{self._prefix}.timeout_seconds", timeout_seconds)
+        self._span.set_attribute(f"{self._prefix}.stream_enabled", stream_enabled)
+        if request_size_bytes:
+            self._span.set_attribute(f"{self._prefix}.request_size_bytes", request_size_bytes)
+        if estimated_tokens:
+            self._span.set_attribute(f"{self._prefix}.estimated_tokens", estimated_tokens)
+
+    def set_fallback_info(
+        self,
+        is_fallback: bool,
+        fallback_from: str | None = None,
+        fallback_reason: str | None = None,
+    ) -> None:
+        """Set fallback-related attributes."""
+        self._span.set_attribute(f"{self._prefix}.is_fallback", is_fallback)
+        if fallback_from:
+            self._span.set_attribute(f"{self._prefix}.fallback_from", fallback_from)
+        if fallback_reason:
+            self._span.set_attribute(f"{self._prefix}.fallback_reason", fallback_reason)
+
     def record_result(self, result: OperationResult) -> None:
         """Record provider call result."""
         self._span.set_attribute(f"{self._prefix}.success", result.success)
@@ -365,11 +443,36 @@ class ProviderSpan:
         if result.latency_ms:
             self._span.set_attribute(f"{self._prefix}.latency_ms", result.latency_ms)
 
-        # Record usage metrics
+        # Record usage metrics with semantic naming
         if result.usage:
             for key, value in result.usage.items():
                 if isinstance(value, (int, float)):
                     self._span.set_attribute(f"{self._prefix}.usage.{key}", value)
+
+            # Standard token attributes
+            if "input_tokens" in result.usage:
+                self._span.set_attribute(
+                    f"{self._prefix}.tokens.input", result.usage["input_tokens"]
+                )
+            if "output_tokens" in result.usage:
+                self._span.set_attribute(
+                    f"{self._prefix}.tokens.output", result.usage["output_tokens"]
+                )
+            if "total_tokens" in result.usage:
+                self._span.set_attribute(
+                    f"{self._prefix}.tokens.total", result.usage["total_tokens"]
+                )
+            # Cache-related tokens (for Claude/Anthropic)
+            if "cache_creation_input_tokens" in result.usage:
+                self._span.set_attribute(
+                    f"{self._prefix}.tokens.cache_creation",
+                    result.usage["cache_creation_input_tokens"],
+                )
+            if "cache_read_input_tokens" in result.usage:
+                self._span.set_attribute(
+                    f"{self._prefix}.tokens.cache_read",
+                    result.usage["cache_read_input_tokens"],
+                )
 
         if result.error:
             self._span.set_attribute(f"{self._prefix}.error", result.error)
@@ -420,13 +523,112 @@ class NoOpStepSpan:
         pass
 
 
+class CompensationSpan:
+    """Wrapper for compensation execution span."""
+
+    def __init__(self, span: Span) -> None:
+        self._span = span
+        self._prefix = "ai.compensation"
+
+    def set_attribute(self, key: str, value: Any) -> None:
+        """Set a span attribute."""
+        self._span.set_attribute(f"{self._prefix}.{key}", value)
+
+    def record_step_started(self, step_name: str, index: int) -> None:
+        """Record compensation step started."""
+        self._span.add_event(
+            "compensation_step_started",
+            attributes={
+                "step_name": step_name,
+                "step_index": index,
+            },
+        )
+
+    def record_step_completed(
+        self,
+        step_name: str,
+        success: bool,
+        duration_ms: float | None = None,
+    ) -> None:
+        """Record compensation step completed."""
+        self._span.add_event(
+            "compensation_step_completed",
+            attributes={
+                "step_name": step_name,
+                "success": success,
+                "duration_ms": duration_ms or 0,
+            },
+        )
+
+    def record_success(
+        self,
+        compensated_steps: list[str],
+        duration_ms: float,
+    ) -> None:
+        """Record successful compensation."""
+        self._span.set_attribute(f"{self._prefix}.success", True)
+        self._span.set_attribute(
+            f"{self._prefix}.compensated_steps", len(compensated_steps)
+        )
+        self._span.set_attribute(f"{self._prefix}.duration_ms", duration_ms)
+        self._span.set_status(Status(StatusCode.OK))
+
+    def record_failure(
+        self,
+        error: str,
+        compensated_steps: list[str],
+        failed_steps: list[str],
+    ) -> None:
+        """Record compensation failure."""
+        self._span.set_attribute(f"{self._prefix}.success", False)
+        self._span.set_attribute(f"{self._prefix}.error", error)
+        self._span.set_attribute(
+            f"{self._prefix}.compensated_steps", len(compensated_steps)
+        )
+        self._span.set_attribute(f"{self._prefix}.failed_steps", len(failed_steps))
+        self._span.set_status(Status(StatusCode.ERROR, error))
+
+    def record_error(self, exception: Exception) -> None:
+        """Record an exception."""
+        self._span.record_exception(exception)
+        self._span.set_status(Status(StatusCode.ERROR, str(exception)))
+
+
 class NoOpProviderSpan:
     """No-op provider span when tracing is disabled."""
 
     def set_attribute(self, key: str, value: Any) -> None:
         pass
 
+    def set_request_attributes(self, *args: Any, **kwargs: Any) -> None:
+        pass
+
+    def set_fallback_info(self, *args: Any, **kwargs: Any) -> None:
+        pass
+
     def record_result(self, result: Any) -> None:
+        pass
+
+    def record_error(self, exception: Exception) -> None:
+        pass
+
+
+class NoOpCompensationSpan:
+    """No-op compensation span when tracing is disabled."""
+
+    def set_attribute(self, key: str, value: Any) -> None:
+        pass
+
+    def record_step_started(self, *args: Any, **kwargs: Any) -> None:
+        pass
+
+    def record_step_completed(self, *args: Any, **kwargs: Any) -> None:
+        pass
+
+    def record_success(self, *args: Any, **kwargs: Any) -> None:
+        pass
+
+    def record_failure(self, *args: Any, **kwargs: Any) -> None:
         pass
 
     def record_error(self, exception: Exception) -> None:

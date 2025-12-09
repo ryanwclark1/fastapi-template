@@ -396,6 +396,132 @@ class AIMetrics:
             ["pipeline", "step", "status"],
         )
 
+        # ============================================================
+        # Provider Health Metrics (SLI/SLO Tracking)
+        # ============================================================
+
+        self.provider_availability = Gauge(
+            f"{self.prefix}_provider_availability",
+            "Provider availability status (1=available, 0=unavailable)",
+            ["provider"],
+        )
+
+        self.provider_health_checks_total = Counter(
+            f"{self.prefix}_provider_health_checks_total",
+            "Total provider health checks performed",
+            ["provider", "status"],  # status: healthy, unhealthy, timeout
+        )
+
+        self.provider_error_rate = Gauge(
+            f"{self.prefix}_provider_error_rate",
+            "Provider error rate over sliding window (0-1)",
+            ["provider", "capability"],
+        )
+
+        self.provider_latency_p99 = Gauge(
+            f"{self.prefix}_provider_latency_p99_seconds",
+            "Provider 99th percentile latency (sliding window)",
+            ["provider", "capability"],
+        )
+
+        self.provider_timeout_total = Counter(
+            f"{self.prefix}_provider_timeout_total",
+            "Total provider timeout events",
+            ["provider", "capability"],
+        )
+
+        self.provider_rate_limit_total = Counter(
+            f"{self.prefix}_provider_rate_limit_total",
+            "Total provider rate limit events",
+            ["provider"],
+        )
+
+        self.provider_circuit_breaker_state = Gauge(
+            f"{self.prefix}_provider_circuit_breaker_state",
+            "Circuit breaker state (0=closed, 1=open, 0.5=half-open)",
+            ["provider"],
+        )
+
+        # ============================================================
+        # SLI Metrics (Service Level Indicators)
+        # ============================================================
+
+        self.sli_availability = Gauge(
+            f"{self.prefix}_sli_availability",
+            "Overall AI service availability (success rate over window)",
+            ["service"],
+        )
+
+        self.sli_latency_target_met = Gauge(
+            f"{self.prefix}_sli_latency_target_met",
+            "Percentage of requests meeting latency SLO target",
+            ["service", "target_ms"],
+        )
+
+        self.sli_error_budget_remaining = Gauge(
+            f"{self.prefix}_sli_error_budget_remaining",
+            "Remaining error budget (0-1 scale)",
+            ["service", "period"],
+        )
+
+        self.sli_throughput = Gauge(
+            f"{self.prefix}_sli_throughput_per_minute",
+            "Current throughput (requests per minute)",
+            ["service"],
+        )
+
+        # ============================================================
+        # Event Metrics
+        # ============================================================
+
+        self.events_emitted_total = Counter(
+            f"{self.prefix}_events_emitted_total",
+            "Total events emitted",
+            ["event_type"],
+        )
+
+        self.event_subscribers_active = Gauge(
+            f"{self.prefix}_event_subscribers_active",
+            "Number of active event subscribers",
+            ["execution_id"],
+        )
+
+        self.event_emit_duration_seconds = Histogram(
+            f"{self.prefix}_event_emit_duration_seconds",
+            "Duration to emit events",
+            [],
+            buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5),
+        )
+
+        # ============================================================
+        # Retry and Fallback Detailed Metrics
+        # ============================================================
+
+        self.retry_success_on_attempt = Counter(
+            f"{self.prefix}_retry_success_on_attempt_total",
+            "Successful retries by attempt number",
+            ["pipeline", "step", "attempt"],
+        )
+
+        self.retry_exhausted_total = Counter(
+            f"{self.prefix}_retry_exhausted_total",
+            "Total times all retries were exhausted",
+            ["pipeline", "step"],
+        )
+
+        self.fallback_success_rate = Gauge(
+            f"{self.prefix}_fallback_success_rate",
+            "Fallback success rate (0-1)",
+            ["from_provider", "to_provider"],
+        )
+
+        self.fallback_latency_overhead_seconds = Histogram(
+            f"{self.prefix}_fallback_latency_overhead_seconds",
+            "Additional latency caused by fallback",
+            ["from_provider", "to_provider"],
+            buckets=self.LATENCY_BUCKETS,
+        )
+
     # ================================================================
     # Pipeline Recording Methods
     # ================================================================
@@ -735,6 +861,270 @@ class AIMetrics:
             step=step_name,
             status=status,
         ).inc()
+
+    # ================================================================
+    # Provider Health Recording Methods
+    # ================================================================
+
+    def record_provider_availability(
+        self,
+        provider: str,
+        available: bool,
+    ) -> None:
+        """Record provider availability status."""
+        if not self.enabled:
+            return
+
+        self.provider_availability.labels(
+            provider=provider,
+        ).set(1 if available else 0)
+
+    def record_provider_health_check(
+        self,
+        provider: str,
+        status: str,
+    ) -> None:
+        """Record provider health check result."""
+        if not self.enabled:
+            return
+
+        self.provider_health_checks_total.labels(
+            provider=provider,
+            status=status,
+        ).inc()
+
+    def record_provider_error_rate(
+        self,
+        provider: str,
+        capability: str,
+        error_rate: float,
+    ) -> None:
+        """Record provider error rate gauge."""
+        if not self.enabled:
+            return
+
+        self.provider_error_rate.labels(
+            provider=provider,
+            capability=capability,
+        ).set(error_rate)
+
+    def record_provider_latency_p99(
+        self,
+        provider: str,
+        capability: str,
+        latency_seconds: float,
+    ) -> None:
+        """Record provider p99 latency gauge."""
+        if not self.enabled:
+            return
+
+        self.provider_latency_p99.labels(
+            provider=provider,
+            capability=capability,
+        ).set(latency_seconds)
+
+    def record_provider_timeout(
+        self,
+        provider: str,
+        capability: str,
+    ) -> None:
+        """Record provider timeout event."""
+        if not self.enabled:
+            return
+
+        self.provider_timeout_total.labels(
+            provider=provider,
+            capability=capability,
+        ).inc()
+
+    def record_provider_rate_limit(
+        self,
+        provider: str,
+    ) -> None:
+        """Record provider rate limit event."""
+        if not self.enabled:
+            return
+
+        self.provider_rate_limit_total.labels(
+            provider=provider,
+        ).inc()
+
+    def record_circuit_breaker_state(
+        self,
+        provider: str,
+        state: str,  # "closed", "open", "half_open"
+    ) -> None:
+        """Record circuit breaker state."""
+        if not self.enabled:
+            return
+
+        state_value = {"closed": 0, "open": 1, "half_open": 0.5}.get(state, 0)
+        self.provider_circuit_breaker_state.labels(
+            provider=provider,
+        ).set(state_value)
+
+    # ================================================================
+    # SLI Recording Methods
+    # ================================================================
+
+    def record_sli_availability(
+        self,
+        service: str,
+        availability: float,
+    ) -> None:
+        """Record SLI availability metric."""
+        if not self.enabled:
+            return
+
+        self.sli_availability.labels(
+            service=service,
+        ).set(availability)
+
+    def record_sli_latency_target(
+        self,
+        service: str,
+        target_ms: int,
+        percent_met: float,
+    ) -> None:
+        """Record percentage of requests meeting latency target."""
+        if not self.enabled:
+            return
+
+        self.sli_latency_target_met.labels(
+            service=service,
+            target_ms=str(target_ms),
+        ).set(percent_met)
+
+    def record_sli_error_budget(
+        self,
+        service: str,
+        period: str,
+        remaining: float,
+    ) -> None:
+        """Record error budget remaining."""
+        if not self.enabled:
+            return
+
+        self.sli_error_budget_remaining.labels(
+            service=service,
+            period=period,
+        ).set(remaining)
+
+    def record_sli_throughput(
+        self,
+        service: str,
+        requests_per_minute: float,
+    ) -> None:
+        """Record service throughput."""
+        if not self.enabled:
+            return
+
+        self.sli_throughput.labels(
+            service=service,
+        ).set(requests_per_minute)
+
+    # ================================================================
+    # Event Recording Methods
+    # ================================================================
+
+    def record_event_emitted(
+        self,
+        event_type: str,
+    ) -> None:
+        """Record event emission."""
+        if not self.enabled:
+            return
+
+        self.events_emitted_total.labels(
+            event_type=event_type,
+        ).inc()
+
+    def record_event_subscribers(
+        self,
+        execution_id: str,
+        count: int,
+    ) -> None:
+        """Record active event subscribers."""
+        if not self.enabled:
+            return
+
+        self.event_subscribers_active.labels(
+            execution_id=execution_id,
+        ).set(count)
+
+    def record_event_emit_duration(
+        self,
+        duration_seconds: float,
+    ) -> None:
+        """Record event emission duration."""
+        if not self.enabled:
+            return
+
+        self.event_emit_duration_seconds.observe(duration_seconds)
+
+    # ================================================================
+    # Retry/Fallback Recording Methods
+    # ================================================================
+
+    def record_retry_success(
+        self,
+        pipeline_name: str,
+        step_name: str,
+        attempt: int,
+    ) -> None:
+        """Record successful retry on specific attempt."""
+        if not self.enabled:
+            return
+
+        self.retry_success_on_attempt.labels(
+            pipeline=pipeline_name,
+            step=step_name,
+            attempt=str(attempt),
+        ).inc()
+
+    def record_retry_exhausted(
+        self,
+        pipeline_name: str,
+        step_name: str,
+    ) -> None:
+        """Record that all retries were exhausted."""
+        if not self.enabled:
+            return
+
+        self.retry_exhausted_total.labels(
+            pipeline=pipeline_name,
+            step=step_name,
+        ).inc()
+
+    def record_fallback_success_rate(
+        self,
+        from_provider: str,
+        to_provider: str,
+        success_rate: float,
+    ) -> None:
+        """Record fallback success rate."""
+        if not self.enabled:
+            return
+
+        self.fallback_success_rate.labels(
+            from_provider=from_provider,
+            to_provider=to_provider,
+        ).set(success_rate)
+
+    def record_fallback_latency_overhead(
+        self,
+        from_provider: str,
+        to_provider: str,
+        overhead_seconds: float,
+    ) -> None:
+        """Record latency overhead from fallback."""
+        if not self.enabled:
+            return
+
+        self.fallback_latency_overhead_seconds.labels(
+            from_provider=from_provider,
+            to_provider=to_provider,
+        ).observe(overhead_seconds)
 
 
 # Singleton instance
