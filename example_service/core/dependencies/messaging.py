@@ -47,12 +47,17 @@ def get_message_broker() -> RabbitBroker | None:
     singleton. The import is deferred to runtime to avoid circular
     dependencies.
 
+    Note: The infra.messaging.get_broker() is an async generator designed
+    for FastAPI's Depends() system. This dependency directly accesses the
+    module-level broker variable to return the actual RabbitBroker instance
+    (or None if not configured/initialized).
+
     Returns:
         RabbitBroker | None: The broker instance, or None if not initialized.
     """
-    from example_service.infra.messaging import get_broker
+    from example_service.infra.messaging import broker
 
-    return get_broker()
+    return broker
 
 
 async def require_message_broker(

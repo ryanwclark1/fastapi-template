@@ -73,12 +73,19 @@ def get_enhanced_email_service_dep() -> EnhancedEmailService | None:
     The enhanced service supports per-tenant email provider configuration.
     Returns None if not initialized (requires database session factory).
 
+    Note: The infra.email.get_enhanced_email_service() raises RuntimeError
+    if the service hasn't been initialized. This dependency catches that
+    exception and returns None to allow graceful degradation.
+
     Returns:
         EnhancedEmailService | None: The enhanced service, or None if not initialized.
     """
     from example_service.infra.email import get_enhanced_email_service
 
-    return get_enhanced_email_service()
+    try:
+        return get_enhanced_email_service()
+    except RuntimeError:
+        return None
 
 
 def get_template_renderer_dep() -> EmailTemplateRenderer:
