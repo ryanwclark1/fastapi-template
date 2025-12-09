@@ -259,4 +259,9 @@ __all__ = [
     # Lifecycle
     "start_ai_infrastructure",
     "stop_ai_infrastructure",
+    # Agents (re-exported from agents subpackage)
+    "agents",
 ]
+
+# Lazy import for agents subpackage
+from example_service.infra.ai import agents  # noqa: E402

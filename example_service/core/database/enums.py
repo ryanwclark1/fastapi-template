@@ -95,6 +95,57 @@ AIJobStatus = ENUM(
 
 
 # =============================================================================
+# AI Agent Enums
+# =============================================================================
+
+AIAgentRunStatus = ENUM(
+    "pending",
+    "running",
+    "paused",
+    "waiting_input",
+    "completed",
+    "failed",
+    "cancelled",
+    "timeout",
+    name="aiagentrunstatus",
+    create_type=False,
+)
+
+AIAgentStepType = ENUM(
+    "llm_call",
+    "tool_call",
+    "human_input",
+    "checkpoint",
+    "branch",
+    "parallel",
+    "subagent",
+    name="aiagentsteptype",
+    create_type=False,
+)
+
+AIAgentStepStatus = ENUM(
+    "pending",
+    "running",
+    "completed",
+    "failed",
+    "skipped",
+    "retrying",
+    name="aiagentstepstatus",
+    create_type=False,
+)
+
+AIAgentMessageRole = ENUM(
+    "system",
+    "user",
+    "assistant",
+    "tool",
+    "function",
+    name="aiagentmessagerole",
+    create_type=False,
+)
+
+
+# =============================================================================
 # Job System Enums
 # =============================================================================
 
@@ -169,6 +220,10 @@ AuditAction = ENUM(
 # =============================================================================
 
 __all__ = [
+    "AIAgentMessageRole",
+    "AIAgentRunStatus",
+    "AIAgentStepStatus",
+    "AIAgentStepType",
     "AIJobStatus",
     "AIJobType",
     "AIProviderType",
