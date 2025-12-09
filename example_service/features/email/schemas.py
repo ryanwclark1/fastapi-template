@@ -14,7 +14,7 @@ from typing import Any
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-from example_service.core.models.email_config import EmailProviderType
+from example_service.features.email.models import EmailProviderType
 
 
 class EmailConfigBase(BaseModel):

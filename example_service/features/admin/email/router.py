@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 
 from example_service.core.dependencies.database import get_async_session
-from example_service.core.models.email_config import EmailConfig, EmailUsageLog
+from example_service.features.email.models import EmailConfig, EmailUsageLog
 from example_service.infra.email import get_enhanced_email_service
 
 if TYPE_CHECKING:
