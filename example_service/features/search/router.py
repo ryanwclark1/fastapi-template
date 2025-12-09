@@ -289,3 +289,96 @@ async def record_click(
         clicked_entity_id=request.clicked_entity_id,
     )
     return {"success": True}
+
+
+# ──────────────────────────────────────────────────────────────
+# Performance Monitoring Endpoints
+# ──────────────────────────────────────────────────────────────
+
+
+@router.get(
+    "/performance/slow-queries",
+    summary="Get slow queries",
+    description="Get queries that exceeded the slow query threshold.",
+)
+async def get_slow_queries(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    _user: Annotated[AuthUser, Depends(get_current_user)],
+    days: Annotated[int, Query(ge=1, le=365, description="Number of days")] = 7,
+    limit: Annotated[int, Query(ge=1, le=100, description="Max results")] = 50,
+) -> dict:
+    """Get slow search queries for performance analysis.
+
+    Args:
+        days: Number of days to analyze.
+        limit: Maximum number of queries to return.
+
+    Returns:
+        List of slow query records.
+    """
+    service = SearchService(session)
+    slow_queries = await service.get_slow_queries(days=days, limit=limit)
+    return {"slow_queries": slow_queries, "days": days}
+
+
+@router.get(
+    "/performance/stats",
+    summary="Get performance statistics",
+    description="Get aggregated query performance metrics.",
+)
+async def get_performance_stats(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    _user: Annotated[AuthUser, Depends(get_current_user)],
+    days: Annotated[int, Query(ge=1, le=365, description="Number of days")] = 7,
+) -> dict:
+    """Get query performance statistics.
+
+    Returns metrics including:
+    - Average response times
+    - Percentile latencies (p50, p95, p99)
+    - Slow query rates
+
+    Args:
+        days: Number of days to analyze.
+
+    Returns:
+        Performance statistics.
+    """
+    service = SearchService(session)
+    stats = await service.get_performance_stats(days=days)
+    return {"stats": stats, "days": days}
+
+
+@router.get(
+    "/health",
+    summary="Search health check",
+    description="Check the health of search components.",
+)
+async def search_health(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    _user: Annotated[AuthUser, Depends(get_current_user)],
+) -> dict:
+    """Get health status of search components.
+
+    Returns:
+        Health status of cache, analytics, and other components.
+    """
+    from .circuit_breaker import get_circuit_stats
+
+    circuit_stats = get_circuit_stats()
+
+    return {
+        "status": "healthy",
+        "components": {
+            "cache": {
+                "circuit_breaker": {
+                    name: {
+                        "state": stats.state,
+                        "failure_count": stats.failure_count,
+                        "total_requests": stats.total_requests,
+                    }
+                    for name, stats in circuit_stats.items()
+                }
+            },
+        },
+    }
