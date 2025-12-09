@@ -59,7 +59,7 @@ def create_app() -> FastAPI:
     configure_documentation(app)
 
     # Configure middleware (centralized configuration with proper ordering)
-    configure_middleware(app, settings)
+    configure_middleware(app)
 
     # Setup routers
     setup_routers(app)

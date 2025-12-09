@@ -66,12 +66,14 @@ def setup_routers(app: FastAPI) -> None:
     app.include_router(email_router, prefix=api_prefix, tags=["email-configuration"])
     app.include_router(admin_email_router, prefix=api_prefix, tags=["admin-email"])
     logger.info(
-        "Email configuration endpoints registered at /api/v1/email and /api/v1/admin/email"
+        "Email configuration endpoints registered at %s/email and %s/admin/email",
+        api_prefix,
+        api_prefix,
     )
 
     # AI pipeline endpoints (capability-based API with observability)
     app.include_router(ai_pipeline_router, prefix=api_prefix, tags=["AI Pipelines"])
-    logger.info("AI pipeline router registered at /api/v1/ai/pipelines")
+    logger.info("AI pipeline router registered at %s/ai/pipelines", api_prefix)
 
     # Include GraphQL endpoint if enabled (follows same pattern as /docs, /redoc, /asyncapi)
     graphql_settings = get_graphql_settings()
@@ -99,8 +101,6 @@ def setup_routers(app: FastAPI) -> None:
             logger.warning(
                 "GraphQL endpoint disabled (strawberry not available): %s", exc
             )
-        except Exception as exc:  # pragma: no cover - optional dependency
-            logger.warning("GraphQL endpoint disabled: %s", exc)
 
     # Include WebSocket realtime router if enabled
     ws_settings = get_websocket_settings()
@@ -108,7 +108,9 @@ def setup_routers(app: FastAPI) -> None:
         from example_service.features.realtime.router import router as realtime_router
 
         app.include_router(realtime_router, prefix=api_prefix, tags=["realtime"])
-        logger.info("WebSocket realtime router included - endpoints at /api/v1/ws")
+        logger.info(
+            "WebSocket realtime router included - endpoints at %s/ws", api_prefix
+        )
 
     # Include RabbitMQ/FastStream router for messaging + AsyncAPI docs
     # Note: RabbitRouter automatically includes AsyncAPI docs at /asyncapi
