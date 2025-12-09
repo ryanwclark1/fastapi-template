@@ -10,6 +10,10 @@ with PostgreSQL full-text search, including:
 - Faceted search
 - Search analytics
 - Redis caching for frequent queries
+- Synonym expansion for improved recall
+- Click signal boosting for improved ranking
+- Query intent classification
+- Performance profiling
 """
 
 from __future__ import annotations
@@ -22,12 +26,24 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import func, literal, or_, select, text
 
 from example_service.core.database.search import (
+    QueryRewriter,
     RankNormalization,
     SearchAnalytics,
     SearchQueryParser,
+    get_default_synonyms,
 )
 
 from .cache import SearchCache, get_search_cache
+from .circuit_breaker import CircuitBreaker, get_circuit_breaker
+from .config import (
+    EntitySearchConfig,
+    SearchConfiguration,
+    SearchEntityRegistry,
+    get_search_config,
+)
+from .intent import IntentClassifier, IntentType, QueryIntent
+from .profiler import QueryProfiler
+from .ranking import ClickBoostRanker, RankingConfig
 from .schemas import (
     DidYouMeanSuggestion,
     EntitySearchResult,
@@ -109,6 +125,10 @@ class SearchService:
     - "Did you mean?" suggestions
     - Faceted search results
     - Search analytics tracking
+    - Synonym expansion for improved recall
+    - Click signal boosting for ranking
+    - Query intent classification
+    - Performance profiling
 
     Example:
         service = SearchService(session)
@@ -130,27 +150,88 @@ class SearchService:
         self,
         session: AsyncSession,
         *,
+        config: SearchConfiguration | None = None,
         enable_analytics: bool = True,
         enable_fuzzy_fallback: bool = True,
         enable_cache: bool = True,
+        enable_synonyms: bool = True,
+        enable_click_boosting: bool = True,
+        enable_intent_classification: bool = False,
+        enable_profiling: bool = True,
         cache: SearchCache | None = None,
     ) -> None:
         """Initialize search service.
 
         Args:
             session: Database session.
+            config: Search configuration (uses global if not provided).
             enable_analytics: Enable search analytics tracking.
             enable_fuzzy_fallback: Enable fuzzy search when FTS returns no results.
             enable_cache: Enable Redis caching for search results.
+            enable_synonyms: Enable synonym expansion for queries.
+            enable_click_boosting: Enable click signal boosting for ranking.
+            enable_intent_classification: Enable query intent classification.
+            enable_profiling: Enable query performance profiling.
             cache: Optional pre-configured SearchCache instance.
         """
         self.session = session
+        self._config = config or get_search_config()
+
+        # Feature flags (override config if explicitly set)
         self.enable_analytics = enable_analytics
         self.enable_fuzzy_fallback = enable_fuzzy_fallback
         self.enable_cache = enable_cache
+        self.enable_synonyms = enable_synonyms and self._config.settings.enable_synonyms
+        self.enable_click_boosting = enable_click_boosting and self._config.settings.enable_click_boosting
+        self.enable_intent_classification = (
+            enable_intent_classification or self._config.settings.enable_intent_classification
+        )
+        self.enable_profiling = enable_profiling and self._config.settings.enable_query_profiling
+
+        # Core components
         self._query_parser = SearchQueryParser()
         self._analytics = SearchAnalytics(session) if enable_analytics else None
         self._cache = cache
+
+        # Enhanced components
+        self._query_rewriter: QueryRewriter | None = None
+        if self.enable_synonyms and self._config.synonym_dictionary:
+            self._query_rewriter = QueryRewriter.with_dictionary(self._config.synonym_dictionary)
+
+        self._click_ranker: ClickBoostRanker | None = None
+        if self.enable_click_boosting:
+            self._click_ranker = ClickBoostRanker(
+                session,
+                RankingConfig(
+                    enable_click_boost=True,
+                    click_boost_weight=self._config.settings.click_boost_weight,
+                    min_clicks_for_boost=self._config.settings.min_clicks_for_boost,
+                    click_decay_days=self._config.settings.click_decay_days,
+                ),
+            )
+
+        self._intent_classifier: IntentClassifier | None = None
+        if self.enable_intent_classification:
+            self._intent_classifier = IntentClassifier()
+
+        self._profiler: QueryProfiler | None = None
+        if self.enable_profiling:
+            self._profiler = QueryProfiler(
+                session,
+                slow_threshold_ms=self._config.settings.slow_query_threshold_ms,
+            )
+
+        # Circuit breaker for cache
+        self._cache_circuit_breaker = get_circuit_breaker(
+            "search_cache",
+            threshold=self._config.settings.circuit_breaker_threshold,
+            timeout=self._config.settings.circuit_breaker_timeout,
+        )
+
+    @property
+    def entity_registry(self) -> SearchEntityRegistry:
+        """Get the entity registry."""
+        return self._config.entity_registry
 
     def get_capabilities(self) -> SearchCapabilitiesResponse:
         """Get search capabilities and searchable entities.
@@ -159,49 +240,94 @@ class SearchService:
             Description of search capabilities.
         """
         entities = []
-        for name, config in SEARCHABLE_ENTITIES.items():
-            entities.append(
-                SearchableEntity(
-                    name=name,
-                    display_name=config["display_name"],
-                    search_fields=config["search_fields"],
-                    title_field=config.get("title_field"),
-                    snippet_field=config.get("snippet_field"),
-                    supports_fuzzy=bool(config.get("fuzzy_fields")),
-                    facet_fields=config.get("facet_fields", []),
+        for name in self._config.entity_registry.list_entities():
+            config = self._config.entity_registry.get(name)
+            if config:
+                entities.append(
+                    SearchableEntity(
+                        name=name,
+                        display_name=config.display_name,
+                        search_fields=config.search_fields,
+                        title_field=config.title_field,
+                        snippet_field=config.snippet_field,
+                        supports_fuzzy=bool(config.fuzzy_fields),
+                        facet_fields=config.facet_fields,
+                    )
                 )
-            )
 
         return SearchCapabilitiesResponse(
             entities=entities,
             supported_syntax=list(SearchSyntax),
-            max_query_length=500,
-            max_results_per_entity=100,
-            features=[
-                "full_text_search",
-                "fuzzy_matching",
-                "highlighting",
-                "faceted_search",
-                "autocomplete",
-                "did_you_mean",
-            ],
+            max_query_length=self._config.settings.max_query_length,
+            max_results_per_entity=self._config.settings.max_results_per_entity,
+            features=self._config.get_enabled_features(),
         )
 
     async def _get_cache(self) -> SearchCache | None:
-        """Get the search cache instance.
+        """Get the search cache instance with circuit breaker protection.
 
         Returns:
-            SearchCache if caching is enabled, None otherwise.
+            SearchCache if caching is enabled and circuit is closed, None otherwise.
         """
         if not self.enable_cache:
+            return None
+
+        # Check circuit breaker
+        if not self._cache_circuit_breaker.can_execute():
+            logger.debug("Cache circuit breaker is open, skipping cache")
             return None
 
         if self._cache:
             return self._cache
 
         # Try to get global cache instance
-        self._cache = await get_search_cache()
-        return self._cache
+        try:
+            self._cache = await get_search_cache()
+            self._cache_circuit_breaker.record_success()
+            return self._cache
+        except Exception as e:
+            self._cache_circuit_breaker.record_failure()
+            logger.warning("Failed to get search cache: %s", e)
+            return None
+
+    def _expand_query_with_synonyms(self, query: str) -> str:
+        """Expand query with synonyms for improved recall.
+
+        Args:
+            query: Original query.
+
+        Returns:
+            Expanded query with synonyms.
+        """
+        if not self.enable_synonyms or not self._query_rewriter:
+            return query
+
+        try:
+            expanded = self._query_rewriter.expand_synonyms(query)
+            if expanded != query:
+                logger.debug("Query expanded with synonyms: '%s' -> '%s'", query, expanded)
+            return expanded
+        except Exception as e:
+            logger.warning("Failed to expand query with synonyms: %s", e)
+            return query
+
+    def _classify_intent(self, query: str) -> QueryIntent | None:
+        """Classify the intent of a search query.
+
+        Args:
+            query: Search query.
+
+        Returns:
+            QueryIntent or None if classification is disabled.
+        """
+        if not self.enable_intent_classification or not self._intent_classifier:
+            return None
+
+        try:
+            return self._intent_classifier.classify(query)
+        except Exception as e:
+            logger.warning("Failed to classify query intent: %s", e)
+            return None
 
     async def search(self, request: SearchRequest) -> SearchResponse:
         """Execute a search across entity types.
@@ -214,31 +340,69 @@ class SearchService:
         """
         start_time = time.monotonic()
 
+        # Profile the search if enabled
+        profile_ctx = None
+        if self._profiler:
+            profile_ctx = self._profiler.profile("fts_search")
+            await profile_ctx.__aenter__()
+            profile_ctx.gen.set_query(request.query)
+
+        try:
+            return await self._execute_search(request, start_time)
+        finally:
+            if profile_ctx:
+                await profile_ctx.__aexit__(None, None, None)
+
+    async def _execute_search(
+        self,
+        request: SearchRequest,
+        start_time: float,
+    ) -> SearchResponse:
+        """Execute the search operation.
+
+        Args:
+            request: Search request.
+            start_time: Start timestamp.
+
+        Returns:
+            Search response.
+        """
+        # Classify intent (for adjustments)
+        intent = self._classify_intent(request.query)
+
         # Try to get cached results
         cache = await self._get_cache()
         if cache:
-            cached = await cache.get_search_results(request)
-            if cached:
-                # Return cached response (add cache hit indicator to took_ms)
-                return SearchResponse(
-                    query=cached.get("query", request.query),
-                    total_hits=cached.get("total_hits", 0),
-                    results=[
-                        EntitySearchResult(**r) for r in cached.get("results", [])
-                    ],
-                    suggestions=cached.get("suggestions", []),
-                    did_you_mean=DidYouMeanSuggestion(**cached["did_you_mean"])
-                    if cached.get("did_you_mean")
-                    else None,
-                    facets=[FacetResult(**f) for f in cached.get("facets", [])]
-                    if cached.get("facets")
-                    else None,
-                    took_ms=0,  # Indicate cache hit with 0ms
-                )
+            try:
+                cached = await cache.get_search_results(request)
+                if cached:
+                    self._cache_circuit_breaker.record_success()
+                    # Return cached response (add cache hit indicator to took_ms)
+                    return SearchResponse(
+                        query=cached.get("query", request.query),
+                        total_hits=cached.get("total_hits", 0),
+                        results=[
+                            EntitySearchResult(**r) for r in cached.get("results", [])
+                        ],
+                        suggestions=cached.get("suggestions", []),
+                        did_you_mean=DidYouMeanSuggestion(**cached["did_you_mean"])
+                        if cached.get("did_you_mean")
+                        else None,
+                        facets=[FacetResult(**f) for f in cached.get("facets", [])]
+                        if cached.get("facets")
+                        else None,
+                        took_ms=0,  # Indicate cache hit with 0ms
+                    )
+            except Exception as e:
+                self._cache_circuit_breaker.record_failure()
+                logger.warning("Cache get failed: %s", e)
+
+        # Expand query with synonyms if enabled
+        expanded_query = self._expand_query_with_synonyms(request.query)
 
         # Determine which entities to search
-        entity_types = request.entity_types or list(SEARCHABLE_ENTITIES.keys())
-        entity_types = [t for t in entity_types if t in SEARCHABLE_ENTITIES]
+        entity_types = request.entity_types or self._config.entity_registry.list_entities()
+        entity_types = [t for t in entity_types if self._config.entity_registry.get(t)]
 
         if not entity_types:
             return SearchResponse(
@@ -253,14 +417,29 @@ class SearchService:
         total_hits = 0
         all_facets: list[FacetResult] = []
 
+        # Collect all entity IDs for batch click boost
+        all_entity_ids: dict[str, list[str]] = {}
+
         for entity_type in entity_types:
-            entity_result = await self._search_entity(entity_type, request)
+            entity_result = await self._search_entity(
+                entity_type,
+                request,
+                expanded_query,
+                intent,
+            )
             results.append(entity_result)
             total_hits += entity_result.total
+
+            # Collect entity IDs
+            all_entity_ids[entity_type] = [hit.entity_id for hit in entity_result.hits]
 
             # Collect facets
             if request.include_facets and entity_result.facets:
                 all_facets.extend(entity_result.facets)
+
+        # Apply click boosting if enabled
+        if self.enable_click_boosting and self._click_ranker:
+            results = await self._apply_click_boosting(results, all_entity_ids)
 
         # Generate "Did you mean?" suggestions for low/no results
         did_you_mean = None
@@ -303,27 +482,101 @@ class SearchService:
         if cache:
             try:
                 await cache.set_search_results(request, response)
+                self._cache_circuit_breaker.record_success()
             except Exception as e:
+                self._cache_circuit_breaker.record_failure()
                 logger.warning("Failed to cache search results: %s", e)
 
         return response
+
+    async def _apply_click_boosting(
+        self,
+        results: list[EntitySearchResult],
+        entity_ids: dict[str, list[str]],
+    ) -> list[EntitySearchResult]:
+        """Apply click boosting to search results.
+
+        Args:
+            results: Search results to boost.
+            entity_ids: Entity IDs by type.
+
+        Returns:
+            Results with adjusted rankings.
+        """
+        if not self._click_ranker:
+            return results
+
+        boosted_results = []
+
+        for entity_result in results:
+            entity_type = entity_result.entity_type
+            ids = entity_ids.get(entity_type, [])
+
+            if not ids:
+                boosted_results.append(entity_result)
+                continue
+
+            # Get batch click boosts
+            boosts = await self._click_ranker.get_batch_click_boosts(entity_type, ids)
+
+            # Apply boosts to hits
+            boosted_hits = []
+            for hit in entity_result.hits:
+                boost = boosts.get(hit.entity_id, 0.0)
+                adjusted_rank = self._click_ranker.calculate_final_rank(
+                    hit.rank,
+                    entity_type,
+                    click_boost=boost,
+                )
+                boosted_hits.append(
+                    SearchHit(
+                        entity_type=hit.entity_type,
+                        entity_id=hit.entity_id,
+                        rank=adjusted_rank,
+                        title=hit.title,
+                        snippet=hit.snippet,
+                        data=hit.data,
+                        created_at=hit.created_at,
+                    )
+                )
+
+            # Re-sort by adjusted rank
+            boosted_hits.sort(key=lambda h: h.rank, reverse=True)
+
+            boosted_results.append(
+                EntitySearchResult(
+                    entity_type=entity_type,
+                    total=entity_result.total,
+                    hits=boosted_hits,
+                    facets=entity_result.facets,
+                )
+            )
+
+        return boosted_results
 
     async def _search_entity(
         self,
         entity_type: str,
         request: SearchRequest,
+        expanded_query: str,
+        intent: QueryIntent | None,
     ) -> EntitySearchResult:
         """Search a specific entity type.
 
         Args:
             entity_type: Entity type to search.
             request: Search request.
+            expanded_query: Query with synonym expansion.
+            intent: Classified query intent.
 
         Returns:
             Search results for this entity type.
         """
-        config = SEARCHABLE_ENTITIES[entity_type]
-        model_class = self._import_model(config["model_path"])
+        config = self._config.entity_registry.get(entity_type)
+        if not config:
+            return EntitySearchResult(entity_type=entity_type, total=0, hits=[])
+
+        model_class = self._import_model(config.model_path)
 
         # Check if model has search_vector
         if not hasattr(model_class, "search_vector"):
@@ -334,8 +587,9 @@ class SearchService:
             )
 
         # Build tsquery based on syntax
-        ts_config = config.get("config", "english")
-        ts_query = self._build_tsquery(request.query, request.syntax, ts_config)
+        ts_config = config.config
+        query_to_use = expanded_query if self.enable_synonyms else request.query
+        ts_query = self._build_tsquery(query_to_use, request.syntax, ts_config)
 
         # Build search query with rank
         search_vector = model_class.search_vector
@@ -354,6 +608,15 @@ class SearchService:
                 RankNormalization.SELF_PLUS_ONE,
             )
 
+        # Apply intent-based adjustments
+        limit = request.limit
+        if intent and intent.is_high_confidence:
+            adjustments = intent.suggested_adjustments
+            if adjustments.get("limit_results"):
+                limit = min(limit, adjustments["limit_results"])
+            elif adjustments.get("increase_limit"):
+                limit = min(limit * 2, config.max_results)
+
         # Main query
         stmt = (
             select(  # type: ignore
@@ -364,7 +627,7 @@ class SearchService:
             .where(rank_expr >= request.min_rank)
             .order_by(rank_expr.desc())
             .offset(request.offset)
-            .limit(request.limit)
+            .limit(limit)
         )
 
         # Execute search
@@ -372,7 +635,7 @@ class SearchService:
         rows = result.all()
 
         # If no FTS results and fuzzy is enabled, try fuzzy search
-        if not rows and self.enable_fuzzy_fallback and config.get("fuzzy_fields"):
+        if not rows and self.enable_fuzzy_fallback and config.fuzzy_fields:
             rows = await self._fuzzy_search(model_class, config, request)
 
         # Get total count
@@ -393,21 +656,21 @@ class SearchService:
 
             # Get title
             title = None
-            if config.get("title_field"):
-                title = getattr(entity, config["title_field"], None)
+            if config.title_field:
+                title = getattr(entity, config.title_field, None)
 
             # Get snippet with highlighting
             snippet = None
-            if request.highlight and config.get("snippet_field"):
+            if request.highlight and config.snippet_field:
                 snippet = await self._get_highlighted_snippet(
                     entity,
                     request.query,
-                    config.get("snippet_field"),  # type: ignore
+                    config.snippet_field,
                     ts_config,
                     request.highlight_tag,
                 )
-            elif config.get("snippet_field"):
-                snippet_text = getattr(entity, config["snippet_field"], None)
+            elif config.snippet_field:
+                snippet_text = getattr(entity, config.snippet_field, None)
                 if snippet_text:
                     snippet = (
                         snippet_text[:200] + "..."
@@ -416,7 +679,7 @@ class SearchService:
                     )
 
             # Build entity data
-            entity_id = str(getattr(entity, config.get("id_field", "id")))
+            entity_id = str(getattr(entity, config.id_field, "id"))
             created_at = getattr(entity, "created_at", None)
 
             # Get entity data as dict
@@ -446,7 +709,7 @@ class SearchService:
 
         # Get facets if requested
         facets = None
-        if request.include_facets and config.get("facet_fields"):
+        if request.include_facets and config.facet_fields:
             facets = await self._get_facets(
                 model_class,
                 config,
@@ -464,7 +727,7 @@ class SearchService:
     async def _fuzzy_search(
         self,
         model_class: Any,
-        config: dict[str, Any],
+        config: EntitySearchConfig,
         request: SearchRequest,
     ) -> list[Any]:
         """Perform fuzzy search as fallback.
@@ -477,7 +740,7 @@ class SearchService:
         Returns:
             List of (entity, rank) tuples.
         """
-        fuzzy_fields = config.get("fuzzy_fields", [])
+        fuzzy_fields = config.fuzzy_fields
         if not fuzzy_fields:
             return []
 
@@ -517,7 +780,7 @@ class SearchService:
     async def _get_facets(
         self,
         model_class: Any,
-        config: dict[str, Any],
+        config: EntitySearchConfig,
         ts_query: Any,
         search_vector: Any,
     ) -> list[FacetResult]:
@@ -533,7 +796,7 @@ class SearchService:
             List of facet results.
         """
         facets = []
-        facet_fields = config.get("facet_fields", [])
+        facet_fields = config.facet_fields
 
         for field_name in facet_fields:
             if not hasattr(model_class, field_name):
@@ -591,12 +854,12 @@ class SearchService:
         best_similarity = 0.0
 
         for entity_type in entity_types:
-            if entity_type not in SEARCHABLE_ENTITIES:
+            config = self._config.entity_registry.get(entity_type)
+            if not config:
                 continue
 
-            config = SEARCHABLE_ENTITIES[entity_type]
-            model_class = self._import_model(config["model_path"])
-            fuzzy_fields = config.get("fuzzy_fields", [])
+            model_class = self._import_model(config.model_path)
+            fuzzy_fields = config.fuzzy_fields
 
             for field_name in fuzzy_fields:
                 if not hasattr(model_class, field_name):
@@ -654,20 +917,20 @@ class SearchService:
         if request.entity_type:
             entity_types = [request.entity_type]
         else:
-            entity_types = list(SEARCHABLE_ENTITIES.keys())
+            entity_types = self._config.entity_registry.list_entities()
 
         for entity_type in entity_types:
-            if entity_type not in SEARCHABLE_ENTITIES:
+            config = self._config.entity_registry.get(entity_type)
+            if not config:
                 continue
 
-            config = SEARCHABLE_ENTITIES[entity_type]
-            model_class = self._import_model(config["model_path"])
+            model_class = self._import_model(config.model_path)
 
             if not hasattr(model_class, "search_vector"):
                 continue
 
             # Build prefix query
-            ts_config = config.get("config", "english")
+            ts_config = config.config
             # Add :* for prefix matching
             prefix_query = request.prefix + ":*"
 
@@ -678,7 +941,7 @@ class SearchService:
                 ts_query = func.plainto_tsquery(ts_config, request.prefix)
 
             # Get matching titles
-            title_field = config.get("title_field")
+            title_field = config.title_field
             if not title_field or not hasattr(model_class, title_field):
                 continue
 
@@ -805,7 +1068,7 @@ class SearchService:
 
         return suggestions[:5]
 
-    def _import_model(self, model_path: str) -> str:
+    def _import_model(self, model_path: str) -> Any:
         """Dynamically import a model class.
 
         Args:
@@ -818,7 +1081,7 @@ class SearchService:
         module_path, class_name = parts
 
         module = importlib.import_module(module_path)
-        return getattr(module, class_name)  # type: ignore
+        return getattr(module, class_name)
 
     # ──────────────────────────────────────────────────────────────
     # Analytics Methods
@@ -971,6 +1234,58 @@ class SearchService:
             clicked_position=clicked_position,
             clicked_entity_id=clicked_entity_id,
         )
+
+    # ──────────────────────────────────────────────────────────────
+    # Performance Profiling Methods
+    # ──────────────────────────────────────────────────────────────
+
+    async def get_slow_queries(
+        self,
+        days: int = 7,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """Get slow query information.
+
+        Args:
+            days: Number of days to analyze.
+            limit: Maximum queries to return.
+
+        Returns:
+            List of slow query records.
+        """
+        if not self._profiler:
+            return []
+
+        return await self._profiler.get_slow_queries(days=days, limit=limit)
+
+    async def get_performance_stats(
+        self,
+        days: int = 7,
+    ) -> list[dict[str, Any]]:
+        """Get query performance statistics.
+
+        Args:
+            days: Number of days to analyze.
+
+        Returns:
+            List of performance stats.
+        """
+        if not self._profiler:
+            return []
+
+        stats = await self._profiler.get_performance_stats(days=days)
+        return [
+            {
+                "query_type": s.query_type,
+                "total_queries": s.total_queries,
+                "avg_time_ms": s.avg_time_ms,
+                "p50_time_ms": s.p50_time_ms,
+                "p95_time_ms": s.p95_time_ms,
+                "p99_time_ms": s.p99_time_ms,
+                "slow_query_rate": s.slow_query_rate,
+            }
+            for s in stats
+        ]
 
 
 async def get_search_service(

@@ -17,6 +17,14 @@ class SearchSyntax(StrEnum):
     PHRASE = "phrase"  # Exact phrase matching
 
 
+class SearchFilter(BaseModel):
+    """Filter for refining search results."""
+
+    field: str = Field(description="Field name to filter on")
+    value: str | list[str] = Field(description="Value(s) to filter by")
+    operator: str = Field(default="eq", description="Filter operator: eq, ne, in, range")
+
+
 class SearchRequest(BaseModel):
     """Search request parameters."""
 
@@ -41,6 +49,12 @@ class SearchRequest(BaseModel):
     include_facets: bool = Field(
         default=False, description="Include faceted search results"
     )
+    filters: list[SearchFilter] | None = Field(
+        default=None, description="Filters for drill-down within results"
+    )
+    expand_synonyms: bool = Field(
+        default=True, description="Expand query with synonyms"
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -49,6 +63,7 @@ class SearchRequest(BaseModel):
                 "entity_types": ["reminders"],
                 "highlight": True,
                 "include_facets": True,
+                "filters": [{"field": "is_completed", "value": "false"}],
             }
         }
     }
@@ -259,6 +274,7 @@ __all__ = [
     "SearchAnalyticsRequest",
     "SearchAnalyticsResponse",
     "SearchCapabilitiesResponse",
+    "SearchFilter",
     "SearchHit",
     "SearchInsightResponse",
     "SearchRequest",
