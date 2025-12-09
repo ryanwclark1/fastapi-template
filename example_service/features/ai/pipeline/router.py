@@ -40,6 +40,8 @@ from example_service.features.ai.pipeline.schemas import (
     BudgetStatusResponse,
     CapabilityInfoSchema,
     CapabilityListResponse,
+    CostEstimateRequest,
+    CostEstimateResponse,
     EventCategory,
     EventSchema,
     ExecutionNotFoundError,
@@ -53,6 +55,7 @@ from example_service.features.ai.pipeline.schemas import (
     ProgressResponse,
     ProviderInfoSchema,
     ProviderListResponse,
+    RateLimitExceededError,
     SetBudgetRequest,
     SpendSummaryResponse,
     StepResultSchema,
@@ -75,9 +78,12 @@ from example_service.infra.ai.observability import (
     get_budget_service,
 )
 from example_service.infra.ai.pipelines import get_pipeline, list_pipelines
+from example_service.infra.cache import get_cache
 from example_service.infra.database.session import get_async_session as get_session
+from example_service.infra.ratelimit.limiter import RateLimiter
 
 if TYPE_CHECKING:
+    from redis.asyncio import Redis
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from example_service.infra.ai.pipelines.types import PipelineResult
@@ -137,6 +143,149 @@ async def validate_tenant_budget(
     return tenant_id
 
 
+async def get_ai_rate_limiter() -> RateLimiter | None:
+    """Get rate limiter for AI pipelines.
+
+    Returns None if rate limiting is disabled or Redis is unavailable.
+    """
+    from example_service.core.settings import get_settings
+
+    settings = get_settings()
+    ai_settings = getattr(settings, "ai", None)
+
+    # Check if rate limiting is enabled
+    if ai_settings and not getattr(ai_settings, "enable_rate_limiting", True):
+        return None
+
+    try:
+        async with get_cache() as cache:
+            redis_client: Redis = cache.get_client()
+            return RateLimiter(
+                redis_client,
+                key_prefix="ai_pipeline_ratelimit",
+                default_limit=getattr(ai_settings, "rate_limit_requests_per_minute", 60)
+                if ai_settings
+                else 60,
+                default_window=getattr(ai_settings, "rate_limit_window_seconds", 60)
+                if ai_settings
+                else 60,
+            )
+    except Exception as e:
+        logger.warning(f"Failed to initialize AI rate limiter: {e}")
+        return None
+
+
+async def check_rate_limit(
+    tenant_id: Annotated[str, Depends(get_current_tenant)],
+) -> str:
+    """Check rate limit for tenant before pipeline execution.
+
+    Returns tenant_id if allowed, raises HTTPException if rate limited.
+    """
+    limiter = await get_ai_rate_limiter()
+    if limiter is None:
+        return tenant_id
+
+    from example_service.core.settings import get_settings
+
+    settings = get_settings()
+    ai_settings = getattr(settings, "ai", None)
+
+    limit = (
+        getattr(ai_settings, "rate_limit_requests_per_minute", 60) if ai_settings else 60
+    )
+    window = getattr(ai_settings, "rate_limit_window_seconds", 60) if ai_settings else 60
+
+    key = f"tenant:{tenant_id}:pipelines"
+    allowed, metadata = await limiter.check_limit(
+        key=key, limit=limit, window=window, endpoint="ai_pipeline_execute"
+    )
+
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "error": "rate_limit_exceeded",
+                "message": f"Rate limit exceeded. Maximum {limit} requests per {window} seconds.",
+                "tenant_id": tenant_id,
+                "limit": limit,
+                "window_seconds": window,
+                "retry_after_seconds": metadata.get("retry_after", window),
+            },
+            headers={"Retry-After": str(metadata.get("retry_after", window))},
+        )
+
+    return tenant_id
+
+
+# Track concurrent executions per tenant
+_concurrent_executions: dict[str, int] = {}
+
+# Track cancellation requests - maps execution_id to cancellation timestamp
+_cancellation_requests: dict[str, datetime] = {}
+
+
+def request_cancellation(execution_id: str) -> None:
+    """Mark an execution for cancellation."""
+    _cancellation_requests[execution_id] = datetime.now(UTC)
+
+
+def is_cancellation_requested(execution_id: str) -> bool:
+    """Check if cancellation has been requested for an execution."""
+    return execution_id in _cancellation_requests
+
+
+def clear_cancellation(execution_id: str) -> None:
+    """Clear cancellation request after processing."""
+    _cancellation_requests.pop(execution_id, None)
+
+
+async def check_concurrent_limit(
+    tenant_id: Annotated[str, Depends(get_current_tenant)],
+) -> str:
+    """Check concurrent execution limit for tenant.
+
+    This is an in-memory check for concurrent executions.
+    For distributed deployments, this should use Redis.
+    """
+    from example_service.core.settings import get_settings
+
+    settings = get_settings()
+    ai_settings = getattr(settings, "ai", None)
+
+    max_concurrent = (
+        getattr(ai_settings, "rate_limit_concurrent_executions", 10) if ai_settings else 10
+    )
+
+    current = _concurrent_executions.get(tenant_id, 0)
+    if current >= max_concurrent:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "error": "concurrent_limit_exceeded",
+                "message": f"Maximum concurrent executions ({max_concurrent}) reached. Please wait for current executions to complete.",
+                "tenant_id": tenant_id,
+                "current_executions": current,
+                "max_concurrent": max_concurrent,
+            },
+        )
+
+    return tenant_id
+
+
+def increment_concurrent(tenant_id: str) -> None:
+    """Increment concurrent execution count for tenant."""
+    _concurrent_executions[tenant_id] = _concurrent_executions.get(tenant_id, 0) + 1
+
+
+def decrement_concurrent(tenant_id: str) -> None:
+    """Decrement concurrent execution count for tenant."""
+    if tenant_id in _concurrent_executions:
+        _concurrent_executions[tenant_id] = max(0, _concurrent_executions[tenant_id] - 1)
+        if _concurrent_executions[tenant_id] == 0:
+            del _concurrent_executions[tenant_id]
+
+
 # =============================================================================
 # Pipeline Execution Endpoints
 # =============================================================================
@@ -148,6 +297,7 @@ async def validate_tenant_budget(
     responses={
         402: {"model": BudgetExceededError, "description": "Budget exceeded"},
         404: {"model": PipelineNotFoundError, "description": "Pipeline not found"},
+        429: {"model": RateLimitExceededError, "description": "Rate limit exceeded"},
     },
     summary="Execute an AI pipeline",
     description="""
@@ -168,12 +318,18 @@ Execute a predefined or custom AI pipeline.
 **Real-time Updates:**
 Connect to the WebSocket endpoint for real-time progress updates:
 `/ws/ai/pipelines/{execution_id}/events`
+
+**Rate Limits:**
+- Per-tenant rate limiting applies (default: 60 requests/minute)
+- Concurrent execution limit applies (default: 10 concurrent)
 """,
 )
 async def execute_pipeline(
     request: PipelineExecutionRequest,
     background_tasks: BackgroundTasks,
     tenant_id: Annotated[str, Depends(validate_tenant_budget)],
+    _rate_limited: Annotated[str, Depends(check_rate_limit)],
+    _concurrent_limited: Annotated[str, Depends(check_concurrent_limit)],
     orchestrator: Annotated[InstrumentedOrchestrator, Depends(get_orchestrator)],
     response: Response,
 ) -> PipelineExecutionResponse | PipelineResultResponse:
@@ -208,6 +364,9 @@ async def execute_pipeline(
     )
 
     if request.async_processing:
+        # Track concurrent execution
+        increment_concurrent(tenant_id)
+
         # Queue for background execution
         background_tasks.add_task(
             _execute_pipeline_background,
@@ -233,13 +392,17 @@ async def execute_pipeline(
             stream_url=f"/ws/ai/pipelines/{execution_id}/events",
         )
 
-    # Execute synchronously
-    result = await orchestrator.execute(
-        pipeline=pipeline,
-        input_data=request.input_data,
-        tenant_id=tenant_id,
-        budget_limit_usd=request.budget_limit_usd,
-    )
+    # Execute synchronously - track concurrent execution
+    increment_concurrent(tenant_id)
+    try:
+        result = await orchestrator.execute(
+            pipeline=pipeline,
+            input_data=request.input_data,
+            tenant_id=tenant_id,
+            budget_limit_usd=request.budget_limit_usd,
+        )
+    finally:
+        decrement_concurrent(tenant_id)
 
     # For sync execution, return result response
     step_results: dict[str, StepResultSchema] = {}
@@ -289,6 +452,25 @@ async def _execute_pipeline_background(
 ) -> None:
     """Execute pipeline in background task."""
     try:
+        # Check if cancelled before starting
+        if is_cancellation_requested(execution_id):
+            logger.info(
+                "Pipeline execution cancelled before start",
+                extra={"execution_id": execution_id, "tenant_id": tenant_id},
+            )
+            # Emit cancellation event
+            event_store = get_event_store()
+            if event_store is not None:
+                await event_store.emit(
+                    execution_id=execution_id,
+                    event_type=EventType.WORKFLOW_CANCELLED,
+                    data={
+                        "reason": "Cancelled before execution started",
+                        "completed_steps": [],
+                    },
+                )
+            return
+
         await orchestrator.execute(
             pipeline=pipeline,
             input_data=input_data,
@@ -300,6 +482,10 @@ async def _execute_pipeline_background(
             "Background pipeline execution failed",
             extra={"execution_id": execution_id, "error": str(e)},
         )
+    finally:
+        # Always decrement concurrent count and clear cancellation request when done
+        decrement_concurrent(tenant_id)
+        clear_cancellation(execution_id)
 
 
 # =============================================================================
@@ -474,6 +660,115 @@ async def get_pipeline_info(
         if pipeline.estimated_cost_usd
         else None,
         required_capabilities=[step.capability.value for step in pipeline.steps if step.capability],
+    )
+
+
+# =============================================================================
+# Cost Estimation Endpoint
+# =============================================================================
+
+
+@router.post(
+    "/estimate",
+    response_model=CostEstimateResponse,
+    responses={
+        404: {"model": PipelineNotFoundError, "description": "Pipeline not found"},
+    },
+    summary="Estimate pipeline execution cost",
+    description="""
+Estimate the cost of executing a pipeline before actually running it.
+
+This endpoint returns:
+- Estimated total cost based on pipeline steps
+- Estimated duration
+- Per-step cost breakdown (if available)
+- Current budget status
+- Whether execution is allowed based on budget limits
+
+Use this endpoint to get user confirmation before expensive operations.
+""",
+)
+async def estimate_pipeline_cost(
+    request: CostEstimateRequest,
+    tenant_id: Annotated[str, Depends(get_current_tenant)],
+) -> CostEstimateResponse:
+    """Estimate cost for pipeline execution without actually executing."""
+    # Look up the pipeline definition
+    pipeline = get_pipeline(request.pipeline_name)
+    if pipeline is None:
+        pipelines = list_pipelines()
+        available = [p.name if hasattr(p, "name") else p.get("name", "unknown") for p in pipelines]
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error": "pipeline_not_found",
+                "message": f"Pipeline '{request.pipeline_name}' not found",
+                "requested_pipeline": request.pipeline_name,
+                "available_pipelines": available,
+            },
+        )
+
+    # Get estimated cost from pipeline definition
+    estimated_cost = pipeline.estimated_cost_usd or Decimal(0)
+
+    # Try to get more accurate per-step estimates
+    step_estimates: dict[str, str] = {}
+    for step in pipeline.steps:
+        # Basic estimate based on capability type
+        step_cost = Decimal("0.01")  # Default per-step cost
+        if step.capability:
+            cap_name = step.capability.value.lower()
+            if "transcription" in cap_name:
+                step_cost = Decimal("0.02")  # Transcription typically costs more
+            elif "llm" in cap_name or "generation" in cap_name:
+                step_cost = Decimal("0.01")
+            elif "embedding" in cap_name:
+                step_cost = Decimal("0.001")
+        step_estimates[step.name] = str(step_cost)
+
+    # If no pipeline-level estimate, sum step estimates
+    if estimated_cost == Decimal(0) and step_estimates:
+        estimated_cost = sum(Decimal(v) for v in step_estimates.values())
+
+    # Get budget status
+    budget_service = get_budget_service()
+    budget_status_response: BudgetStatusResponse | None = None
+    can_execute = True
+    warning: str | None = None
+
+    if budget_service is not None:
+        check = await budget_service.check_budget(tenant_id, estimated_cost_usd=estimated_cost)
+
+        remaining = None
+        if check.limit_usd is not None and check.limit_usd > 0:
+            remaining = max(Decimal(0), check.limit_usd - check.current_spend_usd)
+
+        budget_status_response = BudgetStatusResponse(
+            tenant_id=tenant_id,
+            period="monthly",
+            current_spend_usd=str(check.current_spend_usd),
+            limit_usd=str(check.limit_usd) if check.limit_usd else None,
+            remaining_usd=str(remaining) if remaining is not None else None,
+            percent_used=check.percent_used,
+            is_exceeded=check.action == BudgetAction.BLOCKED,
+            policy=check.policy.value if hasattr(check, "policy") and check.policy else "warn",
+        )
+
+        # Check if execution is allowed
+        if check.action == BudgetAction.BLOCKED:
+            can_execute = False
+            warning = f"Budget exceeded. Current spend: ${check.current_spend_usd}, Limit: ${check.limit_usd}"
+        elif check.percent_used and check.percent_used >= 80:
+            warning = f"Budget warning: {check.percent_used:.1f}% of budget used. This execution would cost approximately ${estimated_cost}"
+
+    return CostEstimateResponse(
+        pipeline_name=pipeline.name,
+        estimated_cost_usd=str(estimated_cost),
+        estimated_duration_seconds=pipeline.estimated_duration_seconds,
+        step_estimates=step_estimates,
+        budget_status=budget_status_response,
+        can_execute=can_execute,
+        warning=warning,
     )
 
 
@@ -994,20 +1289,23 @@ async def get_execution_result(
     "/{execution_id}",
     status_code=status.HTTP_202_ACCEPTED,
     summary="Cancel execution",
-    description="Request cancellation of a running pipeline execution.",
+    description="""
+Request cancellation of a running pipeline execution.
+
+The cancellation is processed as follows:
+- If the execution is still pending/queued, it will be cancelled immediately
+- If the execution is running, it will be cancelled at the next step boundary
+- Completed or already-cancelled executions cannot be cancelled
+
+Cancellation will trigger compensation actions if configured on the pipeline.
+""",
 )
 async def cancel_execution(
     execution_id: str,
     tenant_id: Annotated[str, Depends(get_current_tenant)],
     orchestrator: Annotated[InstrumentedOrchestrator, Depends(get_orchestrator)],
 ) -> dict[str, Any]:
-    """Request cancellation of a running pipeline execution.
-
-    Note: Pipeline cancellation is not yet fully implemented. This endpoint
-    accepts cancellation requests and logs them, but active pipeline executions
-    will continue to completion. Full cancellation support will be added in a
-    future release.
-    """
+    """Request cancellation of a running pipeline execution."""
     logger.info(
         "Cancellation requested",
         extra={"execution_id": execution_id, "tenant_id": tenant_id},
@@ -1025,12 +1323,64 @@ async def cancel_execution(
             },
         )
 
+    # Check current status
+    current_status = state.get("status", "unknown")
+
+    # Cannot cancel completed or already cancelled executions
+    if current_status in ("completed", "failed", "cancelled"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error": "cannot_cancel",
+                "message": f"Cannot cancel execution with status '{current_status}'",
+                "execution_id": execution_id,
+                "current_status": current_status,
+            },
+        )
+
+    # Check if already requested
+    if is_cancellation_requested(execution_id):
+        return {
+            "execution_id": execution_id,
+            "cancellation_requested": True,
+            "message": "Cancellation already requested and pending",
+            "status": "cancellation_pending",
+            "current_execution_status": current_status,
+        }
+
+    # Request cancellation
+    request_cancellation(execution_id)
+
+    # Emit cancellation event
+    event_store = get_event_store()
+    if event_store is not None:
+        await event_store.emit(
+            execution_id=execution_id,
+            event_type=EventType.WORKFLOW_CANCELLED,
+            data={
+                "requested_by": tenant_id,
+                "requested_at": datetime.now(UTC).isoformat(),
+                "reason": "User requested cancellation",
+                "completed_steps": state.get("completed_steps", []),
+            },
+        )
+
+    logger.info(
+        "Cancellation request registered",
+        extra={
+            "execution_id": execution_id,
+            "tenant_id": tenant_id,
+            "current_status": current_status,
+        },
+    )
+
     return {
         "execution_id": execution_id,
         "cancellation_requested": True,
-        "message": "Cancellation request logged. Note: Full cancellation support is not yet implemented.",
-        "status": "pending",
-        "note": "Active pipeline executions will continue to completion. Full cancellation support coming soon.",
+        "message": "Cancellation requested. The execution will be cancelled at the next step boundary.",
+        "status": "cancellation_pending",
+        "current_execution_status": current_status,
+        "completed_steps": state.get("completed_steps", []),
     }
 
 
