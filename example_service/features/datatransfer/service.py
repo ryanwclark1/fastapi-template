@@ -7,6 +7,7 @@ with progress tracking, validation, and storage integration.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+import gzip
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -14,12 +15,16 @@ import uuid
 
 from sqlalchemy import select
 
+from example_service.core.settings import get_datatransfer_settings
+
 from .exporters import get_exporter
 from .importers import ParsedRecord, get_importer
 from .schemas import (
     ExportRequest,
     ExportResult,
     ExportStatus,
+    FilterCondition,
+    FilterOperator,
     ImportFormat,
     ImportResult,
     ImportStatus,
@@ -32,15 +37,6 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
-
-# Export directory (development/testing - use proper temp directory in production)
-EXPORT_DIR = Path("/tmp/exports")  # noqa: S108
-
-
-def ensure_export_dir() -> Path:
-    """Ensure export directory exists."""
-    EXPORT_DIR.mkdir(parents=True, exist_ok=True)
-    return EXPORT_DIR
 
 
 # Entity registry - maps entity names to their model, fields, and configuration
@@ -215,11 +211,152 @@ class DataTransferService:
         model_class = getattr(module, class_name)
         return cast("type[Any]", model_class)
 
-    async def export(self, request: ExportRequest) -> ExportResult:
+    def _compress_data(self, data: bytes) -> bytes:
+        """Compress data using gzip.
+
+        Args:
+            data: Data to compress.
+
+        Returns:
+            Compressed data.
+        """
+        settings = get_datatransfer_settings()
+        return gzip.compress(data, compresslevel=settings.compression_level)
+
+    def _apply_filter_condition(
+        self,
+        stmt: Any,
+        model_class: type[Any],
+        condition: FilterCondition,
+    ) -> Any:
+        """Apply a single filter condition to a query statement.
+
+        Args:
+            stmt: SQLAlchemy select statement.
+            model_class: Model class to filter on.
+            condition: Filter condition to apply.
+
+        Returns:
+            Updated statement with the filter applied.
+        """
+        if not hasattr(model_class, condition.field):
+            logger.warning(
+                "Ignoring filter on unknown field: %s", condition.field
+            )
+            return stmt
+
+        column = getattr(model_class, condition.field)
+        op = condition.operator
+        value = condition.value
+
+        if op == FilterOperator.EQ:
+            stmt = stmt.where(column == value)
+        elif op == FilterOperator.NE:
+            stmt = stmt.where(column != value)
+        elif op == FilterOperator.GT:
+            stmt = stmt.where(column > value)
+        elif op == FilterOperator.GTE:
+            stmt = stmt.where(column >= value)
+        elif op == FilterOperator.LT:
+            stmt = stmt.where(column < value)
+        elif op == FilterOperator.LTE:
+            stmt = stmt.where(column <= value)
+        elif op == FilterOperator.CONTAINS:
+            # Case-insensitive contains
+            stmt = stmt.where(column.ilike(f"%{value}%"))
+        elif op == FilterOperator.IN:
+            if isinstance(value, list):
+                stmt = stmt.where(column.in_(value))
+            else:
+                logger.warning("IN operator requires a list value, got: %s", type(value))
+        elif op == FilterOperator.NOT_IN:
+            if isinstance(value, list):
+                stmt = stmt.where(column.notin_(value))
+            else:
+                logger.warning("NOT_IN operator requires a list value, got: %s", type(value))
+        elif op == FilterOperator.IS_NULL:
+            stmt = stmt.where(column.is_(None))
+        elif op == FilterOperator.IS_NOT_NULL:
+            stmt = stmt.where(column.isnot(None))
+
+        return stmt
+
+    async def _fetch_export_records(
+        self,
+        entity_type: str,
+        filters: dict[str, Any] | None = None,
+        filter_conditions: list[FilterCondition] | None = None,
+        tenant_id: str | None = None,
+    ) -> tuple[list[Any], dict[str, Any]]:
+        """Fetch records for export.
+
+        Shared helper for export and export_to_bytes to avoid code duplication.
+
+        Args:
+            entity_type: Type of entity to export.
+            filters: Optional simple equality filters (legacy, deprecated).
+            filter_conditions: Optional advanced filter conditions.
+            tenant_id: Optional tenant ID for filtering in multi-tenant scenarios.
+
+        Returns:
+            Tuple of (records list, entity config dict).
+
+        Raises:
+            ValueError: If entity type is not exportable.
+        """
+        # Get entity configuration
+        config = self._get_entity_config(entity_type)
+        if not config.get("exportable", True):
+            raise ValueError(f"Entity '{entity_type}' is not exportable")
+
+        # Import the model
+        model_class = self._import_model(config["model_path"])
+
+        # Build query
+        stmt = select(model_class)
+
+        # Apply tenant filter if tenant isolation is enabled and tenant_id is provided
+        settings = get_datatransfer_settings()
+        if settings.enable_tenant_isolation and tenant_id:
+            if hasattr(model_class, "tenant_id"):
+                stmt = stmt.where(getattr(model_class, "tenant_id") == tenant_id)
+                logger.debug(
+                    "Applied tenant filter for export",
+                    extra={"entity_type": entity_type, "tenant_id": tenant_id},
+                )
+            else:
+                logger.warning(
+                    "Tenant isolation enabled but model has no tenant_id field",
+                    extra={"entity_type": entity_type, "model": model_class.__name__},
+                )
+
+        # Apply legacy simple filters if provided (deprecated)
+        if filters:
+            for field, value in filters.items():
+                if hasattr(model_class, field):
+                    stmt = stmt.where(getattr(model_class, field) == value)
+
+        # Apply advanced filter conditions
+        if filter_conditions:
+            for condition in filter_conditions:
+                stmt = self._apply_filter_condition(stmt, model_class, condition)
+
+        # Execute query
+        result = await self.session.execute(stmt)
+        records = result.scalars().all()
+
+        return list(records), config
+
+    async def export(
+        self,
+        request: ExportRequest,
+        tenant_id: str | None = None,
+    ) -> ExportResult:
         """Export data to a file.
 
         Args:
             request: Export request with entity type, format, and filters.
+            tenant_id: Optional tenant ID for multi-tenant filtering.
 
         Returns:
             Export result with file path and statistics.
@@ -228,26 +365,13 @@ class DataTransferService:
         started_at = datetime.now(UTC)
 
         try:
-            # Get entity configuration
-            config = self._get_entity_config(request.entity_type)
-            if not config.get("exportable", True):
-                raise ValueError(f"Entity '{request.entity_type}' is not exportable")
-
-            # Import the model
-            model_class = self._import_model(config["model_path"])
-
-            # Build query
-            stmt = select(model_class)
-
-            # Apply filters if provided
-            if request.filters:
-                for field, value in request.filters.items():
-                    if hasattr(model_class, field):
-                        stmt = stmt.where(getattr(model_class, field) == value)
-
-            # Execute query
-            result = await self.session.execute(stmt)
-            records = result.scalars().all()
+            # Fetch records using shared helper
+            records, config = await self._fetch_export_records(
+                request.entity_type,
+                request.filters,
+                request.filter_conditions,
+                tenant_id,
+            )
 
             # Get exporter
             exporter = get_exporter(
@@ -256,8 +380,9 @@ class DataTransferService:
                 include_headers=request.include_headers,
             )
 
-            # Generate filename
-            export_dir = ensure_export_dir()
+            # Generate filename using settings
+            settings = get_datatransfer_settings()
+            export_dir = settings.ensure_export_dir()
             timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
             filename = f"{request.entity_type}_{timestamp}.{exporter.file_extension}"
             file_path = export_dir / filename
@@ -300,31 +425,31 @@ class DataTransferService:
                 error_message=str(e),
             )
 
-    async def export_to_bytes(self, request: ExportRequest) -> tuple[bytes, str, str]:
+    async def export_to_bytes(
+        self,
+        request: ExportRequest,
+        tenant_id: str | None = None,
+        compress: bool | None = None,
+    ) -> tuple[bytes, str, str]:
         """Export data to bytes for streaming download.
 
         Args:
             request: Export request.
+            tenant_id: Optional tenant ID for multi-tenant filtering.
+            compress: Override compression setting (None = use settings default).
 
         Returns:
             Tuple of (data bytes, content_type, filename).
         """
-        config = self._get_entity_config(request.entity_type)
-        if not config.get("exportable", True):
-            raise ValueError(f"Entity '{request.entity_type}' is not exportable")
+        settings = get_datatransfer_settings()
 
-        # Import the model
-        model_class = self._import_model(config["model_path"])
-
-        # Build and execute query
-        stmt = select(model_class)
-        if request.filters:
-            for field, value in request.filters.items():
-                if hasattr(model_class, field):
-                    stmt = stmt.where(getattr(model_class, field) == value)
-
-        result = await self.session.execute(stmt)
-        records = result.scalars().all()
+        # Fetch records using shared helper
+        records, config = await self._fetch_export_records(
+            request.entity_type,
+            request.filters,
+            request.filter_conditions,
+            tenant_id,
+        )
 
         # Get exporter and export
         exporter = get_exporter(
@@ -333,9 +458,25 @@ class DataTransferService:
             include_headers=request.include_headers,
         )
 
-        data = exporter.export_to_bytes(list(records))
+        data = exporter.export_to_bytes(records)
         timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         filename = f"{request.entity_type}_{timestamp}.{exporter.file_extension}"
+
+        # Apply compression if enabled
+        should_compress = compress if compress is not None else settings.enable_compression
+        if should_compress:
+            data = self._compress_data(data)
+            filename = f"{filename}.gz"
+            content_type = "application/gzip"
+            logger.debug(
+                "Compressed export data",
+                extra={
+                    "entity_type": request.entity_type,
+                    "original_size": len(data),
+                    "compressed_size": len(data),
+                },
+            )
+            return data, content_type, filename
 
         return data, exporter.content_type, filename
 
@@ -347,6 +488,7 @@ class DataTransferService:
         validate_only: bool = False,
         skip_errors: bool = False,
         update_existing: bool = False,
+        batch_size: int = 100,
     ) -> ImportResult:
         """Import data from bytes.
 
@@ -357,6 +499,7 @@ class DataTransferService:
             validate_only: Only validate, don't import.
             skip_errors: Continue importing even if some records fail.
             update_existing: Update existing records instead of skipping.
+            batch_size: Number of records to process per batch (1-1000).
 
         Returns:
             Import result with statistics and validation errors.
@@ -436,77 +579,94 @@ class DataTransferService:
                     error_message="Validation failed. Fix errors or use skip_errors=true.",
                 )
 
-            # Import valid records
+            # Import valid records in batches
             model_class = self._import_model(config["model_path"])
             successful = 0
             skipped = 0
             failed = 0
 
-            for record in valid_records:
-                try:
-                    # Check for existing record if update_existing is enabled
-                    existing = None
-                    if update_existing and "id" in record.data:
-                        existing = await self.session.get(
-                            model_class, record.data["id"]
-                        )
+            # Ensure batch_size is within valid range
+            batch_size = max(1, min(batch_size, 1000))
 
-                    if existing:
-                        # Update existing
-                        for key, value in record.data.items():
-                            if key != "id" and hasattr(existing, key):
-                                setattr(existing, key, value)
-                        successful += 1
-                    elif "id" in record.data:
-                        # Skip if exists and not updating
-                        existing = await self.session.get(
-                            model_class, record.data["id"]
-                        )
-                        if existing:
-                            skipped += 1
-                            continue
+            # Process records in batches
+            for batch_start in range(0, len(valid_records), batch_size):
+                batch_end = min(batch_start + batch_size, len(valid_records))
+                batch = valid_records[batch_start:batch_end]
 
-                    if not existing:
-                        # Create new record
-                        # Remove id if present to let DB generate it
-                        create_data = {
-                            k: v for k, v in record.data.items() if k != "id"
-                        }
-                        new_record = model_class(**create_data)
-                        self.session.add(new_record)
-                        successful += 1
-
-                except Exception as e:
-                    failed += 1
-                    if len(validation_errors) < 100:
-                        validation_errors.append(
-                            ImportValidationError(
-                                row=record.row_number,
-                                field=None,
-                                error=f"Database error: {e}",
+                for record in batch:
+                    try:
+                        # Check for existing record if update_existing is enabled
+                        existing = None
+                        if update_existing and "id" in record.data:
+                            existing = await self.session.get(
+                                model_class, record.data["id"]
                             )
-                        )
-                    if not skip_errors:
-                        await self.session.rollback()
-                        return ImportResult(
-                            status=ImportStatus.FAILED,
-                            import_id=import_id,
-                            entity_type=entity_type,
-                            format=format,
-                            total_rows=total_rows,
-                            processed_rows=successful + failed + skipped,
-                            successful_rows=successful,
-                            failed_rows=failed
-                            + len(parsed_records)
-                            - len(valid_records),
-                            skipped_rows=skipped,
-                            validation_errors=validation_errors,
-                            started_at=started_at,
-                            completed_at=datetime.now(UTC),
-                            error_message=str(e),
-                        )
 
-            # Commit all changes
+                        if existing:
+                            # Update existing
+                            for key, value in record.data.items():
+                                if key != "id" and hasattr(existing, key):
+                                    setattr(existing, key, value)
+                            successful += 1
+                        elif "id" in record.data:
+                            # Skip if exists and not updating
+                            existing = await self.session.get(
+                                model_class, record.data["id"]
+                            )
+                            if existing:
+                                skipped += 1
+                                continue
+
+                        if not existing:
+                            # Create new record
+                            # Remove id if present to let DB generate it
+                            create_data = {
+                                k: v for k, v in record.data.items() if k != "id"
+                            }
+                            new_record = model_class(**create_data)
+                            self.session.add(new_record)
+                            successful += 1
+
+                    except Exception as e:
+                        failed += 1
+                        if len(validation_errors) < 100:
+                            validation_errors.append(
+                                ImportValidationError(
+                                    row=record.row_number,
+                                    field=None,
+                                    error=f"Database error: {e}",
+                                )
+                            )
+                        if not skip_errors:
+                            await self.session.rollback()
+                            return ImportResult(
+                                status=ImportStatus.FAILED,
+                                import_id=import_id,
+                                entity_type=entity_type,
+                                format=format,
+                                total_rows=total_rows,
+                                processed_rows=successful + failed + skipped,
+                                successful_rows=successful,
+                                failed_rows=failed
+                                + len(parsed_records)
+                                - len(valid_records),
+                                skipped_rows=skipped,
+                                validation_errors=validation_errors,
+                                started_at=started_at,
+                                completed_at=datetime.now(UTC),
+                                error_message=str(e),
+                            )
+
+                # Flush the batch to the database
+                await self.session.flush()
+                logger.debug(
+                    "Processed batch %d-%d of %d records",
+                    batch_start + 1,
+                    batch_end,
+                    len(valid_records),
+                )
+
+            # Commit all changes after all batches
             await self.session.commit()
 
             # Determine final status
@@ -544,6 +704,67 @@ class DataTransferService:
                 completed_at=datetime.now(UTC),
                 error_message=str(e),
             )
+
+    def generate_import_template(
+        self,
+        entity_type: str,
+        format: ImportFormat,
+    ) -> tuple[bytes, str, str]:
+        """Generate a sample import template for an entity type.
+
+        Creates a template file with column headers and sample data
+        showing the expected format for importing.
+
+        Args:
+            entity_type: Type of entity to generate template for.
+            format: Output format (csv, json, xlsx).
+
+        Returns:
+            Tuple of (data bytes, content_type, filename).
+
+        Raises:
+            ValueError: If entity type is not importable.
+        """
+        # Get entity configuration
+        config = self._get_entity_config(entity_type)
+        if not config.get("importable", True):
+            raise ValueError(f"Entity '{entity_type}' is not importable")
+
+        fields = config.get("fields", [])
+        required_fields = config.get("required_fields", [])
+
+        # Filter out auto-generated fields that shouldn't be in import template
+        template_fields = [
+            f for f in fields
+            if f not in ("id", "created_at", "updated_at")
+        ]
+
+        # Generate sample data row
+        sample_data = {}
+        for field in template_fields:
+            if field in required_fields:
+                sample_data[field] = f"<required: {field}>"
+            else:
+                sample_data[field] = f"<optional: {field}>"
+
+        # Get exporter for the format
+        exporter = get_exporter(
+            format=format.value,
+            fields=template_fields,
+            include_headers=True,
+        )
+
+        # Create a fake record class to export
+        class TemplateRecord:
+            def __init__(self, data: dict) -> None:
+                for key, value in data.items():
+                    setattr(self, key, value)
+
+        template_record = TemplateRecord(sample_data)
+        data = exporter.export_to_bytes([template_record])
+
+        filename = f"{entity_type}_template.{exporter.file_extension}"
+        return data, exporter.content_type, filename
 
     async def _upload_to_storage(self, file_path: Path, entity_type: str) -> str | None:
         """Upload export file to object storage.

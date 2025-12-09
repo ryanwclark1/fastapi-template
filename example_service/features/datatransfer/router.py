@@ -13,7 +13,9 @@ from fastapi.responses import StreamingResponse
 
 from example_service.core.dependencies.auth import get_current_user
 from example_service.core.dependencies.database import get_db_session
+from example_service.core.dependencies.tenant import TenantContextDep
 from example_service.core.exceptions import BadRequestException
+from example_service.core.settings import get_datatransfer_settings
 
 from .schemas import (
     ExportFormat,
@@ -31,6 +33,37 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/data-transfer", tags=["data-transfer"])
+
+
+async def validate_file_size(file: UploadFile) -> bytes:
+    """Validate uploaded file size and return content.
+
+    Args:
+        file: Uploaded file to validate.
+
+    Returns:
+        File content as bytes.
+
+    Raises:
+        BadRequestException: If file exceeds maximum size.
+    """
+    settings = get_datatransfer_settings()
+    max_size = settings.max_import_size_bytes
+
+    # Read file content
+    content = await file.read()
+
+    # Check size
+    if len(content) > max_size:
+        raise BadRequestException(
+            detail=(
+                f"File size ({len(content) / (1024 * 1024):.2f} MB) exceeds "
+                f"maximum allowed size ({settings.max_import_size_mb} MB)"
+            ),
+            type="file-too-large",
+        )
+
+    return content
 
 
 @router.get(
@@ -63,6 +96,7 @@ async def export_data(
     request: ExportRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     _user: Annotated[dict, Depends(get_current_user)],
+    tenant: TenantContextDep = None,
 ) -> ExportResult:
     """Export data to a file.
 
@@ -70,12 +104,14 @@ async def export_data(
 
     Args:
         request: Export configuration including entity type, format, and filters.
+        tenant: Optional tenant context for multi-tenant filtering.
 
     Returns:
         Export result with file path and statistics.
     """
     service = DataTransferService(session)
-    return await service.export(request)
+    tenant_id = tenant.tenant_uuid if tenant else None
+    return await service.export(request, tenant_id=tenant_id)
 
 
 @router.get(
@@ -88,6 +124,10 @@ async def download_export(
     _user: Annotated[dict, Depends(get_current_user)],
     entity_type: Annotated[str, Query(description="Entity type to export")],
     format: Annotated[ExportFormat, Query(description="Export format")] = ExportFormat.CSV,
+    compress: Annotated[
+        bool | None, Query(description="Enable gzip compression (default from settings)")
+    ] = None,
+    tenant: TenantContextDep = None,
 ) -> StreamingResponse:
     """Export data and stream directly as download.
 
@@ -97,11 +137,14 @@ async def download_export(
     Args:
         entity_type: Type of entity to export.
         format: Output format (csv, json, xlsx).
+        compress: Enable gzip compression (None = use settings default).
+        tenant: Optional tenant context for multi-tenant filtering.
 
     Returns:
         Streaming file download response.
     """
     service = DataTransferService(session)
+    tenant_id = tenant.tenant_uuid if tenant else None
 
     request = ExportRequest(
         entity_type=entity_type,
@@ -109,7 +152,9 @@ async def download_export(
     )
 
     try:
-        data, content_type, filename = await service.export_to_bytes(request)
+        data, content_type, filename = await service.export_to_bytes(
+            request, tenant_id=tenant_id, compress=compress
+        )
     except ValueError as e:
         raise BadRequestException(
             detail=str(e),
@@ -147,6 +192,9 @@ async def import_data(
     update_existing: Annotated[
         bool, Query(description="Update existing records")
     ] = False,
+    batch_size: Annotated[
+        int, Query(description="Records per batch (1-1000)", ge=1, le=1000)
+    ] = 100,
 ) -> ImportResult:
     """Import data from an uploaded file.
 
@@ -166,8 +214,8 @@ async def import_data(
     """
     service = DataTransferService(session)
 
-    # Read file content
-    content = await file.read()
+    # Read and validate file content
+    content = await validate_file_size(file)
 
     try:
         result = await service.import_from_bytes(
@@ -177,6 +225,7 @@ async def import_data(
             validate_only=validate_only,
             skip_errors=skip_errors,
             update_existing=update_existing,
+            batch_size=batch_size,
         )
     except ValueError as e:
         raise BadRequestException(
@@ -213,7 +262,9 @@ async def validate_import(
         Validation result with any errors found.
     """
     service = DataTransferService(session)
-    content = await file.read()
+
+    # Read and validate file content
+    content = await validate_file_size(file)
 
     try:
         result = await service.import_from_bytes(
@@ -248,3 +299,52 @@ async def list_formats(
         "export_formats": [f.value for f in ExportFormat],
         "import_formats": [f.value for f in ImportFormat],
     }
+
+
+@router.get(
+    "/import/template",
+    summary="Download import template",
+    description="Download a sample template file for importing data.",
+)
+async def download_import_template(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    _user: Annotated[dict, Depends(get_current_user)],
+    entity_type: Annotated[str, Query(description="Entity type to get template for")],
+    format: Annotated[ImportFormat, Query(description="Template format")] = ImportFormat.CSV,
+) -> StreamingResponse:
+    """Download a sample import template.
+
+    Returns a template file with headers and sample data showing the
+    expected format for importing the specified entity type.
+
+    Args:
+        entity_type: Type of entity to get template for.
+        format: Output format (csv, json, xlsx).
+
+    Returns:
+        Streaming file download with template.
+    """
+    service = DataTransferService(session)
+
+    try:
+        data, content_type, filename = service.generate_import_template(
+            entity_type=entity_type,
+            format=format,
+        )
+    except ValueError as e:
+        raise BadRequestException(
+            detail=str(e),
+            type="template-error",
+        ) from e
+
+    # Rename file to indicate it's a template
+    template_filename = f"{entity_type}_template.{format.value}"
+
+    return StreamingResponse(
+        iter([data]),
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{template_filename}"',
+            "Content-Length": str(len(data)),
+        },
+    )

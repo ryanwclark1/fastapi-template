@@ -42,6 +42,7 @@ from .exporters import (
 from .importers import (
     BaseImporter,
     CSVImporter,
+    DataImportError,
     ExcelImporter,
     JSONImporter,
     ParsedRecord,
@@ -53,6 +54,8 @@ from .schemas import (
     ExportRequest,
     ExportResult,
     ExportStatus,
+    FilterCondition,
+    FilterOperator,
     ImportFormat,
     ImportRequest,
     ImportResult,
@@ -70,6 +73,8 @@ __all__ = [
     "BaseImporter",
     "CSVExporter",
     "CSVImporter",
+    # Errors
+    "DataImportError",
     # Service
     "DataTransferService",
     "ExcelExporter",
@@ -79,6 +84,8 @@ __all__ = [
     "ExportRequest",
     "ExportResult",
     "ExportStatus",
+    "FilterCondition",
+    "FilterOperator",
     "ImportFormat",
     "ImportRequest",
     "ImportResult",
