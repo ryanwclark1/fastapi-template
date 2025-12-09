@@ -10,12 +10,21 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from example_service.features.tasks.schemas import (
+    BulkCancelResponse,
+    BulkOperationResult,
+    BulkRetryResponse,
     CancelTaskResponse,
+    DLQDiscardResponse,
+    DLQEntryResponse,
+    DLQListResponse,
+    DLQRetryResponse,
+    DLQStatus,
     RunningTaskResponse,
     ScheduledJobResponse,
     TaskExecutionDetailResponse,
     TaskExecutionResponse,
     TaskName,
+    TaskProgressResponse,
     TaskSearchParams,
     TaskStatsResponse,
     TriggerTaskResponse,
@@ -32,6 +41,16 @@ try:
     from example_service.infra.tasks.scheduler import scheduler
 except Exception:  # pragma: no cover - best effort
     scheduler = None
+
+# Try to import DLQ and progress middleware
+try:
+    from example_service.infra.tasks.middleware import (
+        get_dlq_middleware,
+        get_progress_middleware,
+    )
+except Exception:  # pragma: no cover - best effort
+    get_dlq_middleware = lambda: None  # noqa: E731
+    get_progress_middleware = lambda: None  # noqa: E731
 
 
 # ──────────────────────────────────────────────────────────────
@@ -640,6 +659,355 @@ class TaskManagementService:
             misfire_grace_time=job.misfire_grace_time,
             max_instances=job.max_instances,
         )
+
+    # ──────────────────────────────────────────────────────────────
+    # Dead Letter Queue (DLQ)
+    # ──────────────────────────────────────────────────────────────
+
+    async def get_dlq_entries(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        status: DLQStatus | None = None,
+    ) -> DLQListResponse:
+        """Get Dead Letter Queue entries.
+
+        Args:
+            limit: Maximum number of entries to return.
+            offset: Number of entries to skip.
+            status: Filter by status.
+
+        Returns:
+            DLQ list response.
+        """
+        dlq = get_dlq_middleware()
+        if not dlq:
+            return DLQListResponse(items=[], total=0, limit=limit, offset=offset)
+
+        try:
+            status_str = status.value if status else None
+            entries = await dlq.get_dlq_entries(
+                limit=limit,
+                offset=offset,
+                status=status_str,
+            )
+            total = await dlq.get_dlq_count()
+
+            items = [
+                DLQEntryResponse(
+                    task_id=e.get("task_id", ""),
+                    task_name=e.get("task_name", "unknown"),
+                    args=e.get("args"),
+                    kwargs=e.get("kwargs"),
+                    labels=e.get("labels"),
+                    error_message=e.get("error_message", ""),
+                    error_type=e.get("error_type", "Unknown"),
+                    retry_count=int(e.get("retry_count", 0)),
+                    failed_at=e.get("failed_at", ""),
+                    status=DLQStatus(e.get("status", "pending")),
+                )
+                for e in entries
+            ]
+
+            return DLQListResponse(
+                items=items,
+                total=total,
+                limit=limit,
+                offset=offset,
+            )
+        except Exception as e:
+            logger.exception("Failed to get DLQ entries", extra={"error": str(e)})
+            return DLQListResponse(items=[], total=0, limit=limit, offset=offset)
+
+    async def get_dlq_entry(self, task_id: str) -> DLQEntryResponse | None:
+        """Get a specific DLQ entry.
+
+        Args:
+            task_id: Task identifier.
+
+        Returns:
+            DLQ entry or None if not found.
+        """
+        dlq = get_dlq_middleware()
+        if not dlq:
+            return None
+
+        try:
+            entry = await dlq.get_dlq_entry(task_id)
+            if not entry:
+                return None
+
+            return DLQEntryResponse(
+                task_id=entry.get("task_id", ""),
+                task_name=entry.get("task_name", "unknown"),
+                args=entry.get("args"),
+                kwargs=entry.get("kwargs"),
+                labels=entry.get("labels"),
+                error_message=entry.get("error_message", ""),
+                error_type=entry.get("error_type", "Unknown"),
+                retry_count=int(entry.get("retry_count", 0)),
+                failed_at=entry.get("failed_at", ""),
+                status=DLQStatus(entry.get("status", "pending")),
+            )
+        except Exception as e:
+            logger.exception(
+                "Failed to get DLQ entry",
+                extra={"task_id": task_id, "error": str(e)},
+            )
+            return None
+
+    async def retry_dlq_task(self, task_id: str) -> DLQRetryResponse:
+        """Retry a task from the DLQ.
+
+        Args:
+            task_id: Task identifier.
+
+        Returns:
+            Retry response.
+        """
+        dlq = get_dlq_middleware()
+        if not dlq:
+            msg = "DLQ not available"
+            raise TaskServiceError(msg)
+
+        try:
+            entry = await dlq.get_dlq_entry(task_id)
+            if not entry:
+                msg = f"DLQ entry not found: {task_id}"
+                raise TaskServiceError(msg)
+
+            task_name = entry.get("task_name")
+            args = entry.get("args", [])
+            kwargs = entry.get("kwargs", {})
+
+            if broker is None:
+                msg = "Task broker not available"
+                raise BrokerNotConfiguredError(msg)
+
+            # Re-submit the task
+            # We need to dynamically get the task function
+            task_func = broker.find_task(task_name)
+            if not task_func:
+                msg = f"Task function not found: {task_name}"
+                raise TaskServiceError(msg)
+
+            # Submit with args and kwargs
+            task_handle = await task_func.kiq(*args, **kwargs)
+
+            # Update DLQ status
+            await dlq.update_dlq_status(task_id, "retried")
+
+            logger.info(
+                "DLQ task retried",
+                extra={
+                    "original_task_id": task_id,
+                    "new_task_id": task_handle.task_id,
+                    "task_name": task_name,
+                },
+            )
+
+            return DLQRetryResponse(
+                original_task_id=task_id,
+                new_task_id=task_handle.task_id,
+                task_name=task_name,
+                status="queued",
+                message=f"Task '{task_name}' requeued for execution",
+            )
+        except (TaskServiceError, BrokerNotConfiguredError):
+            raise
+        except Exception as e:
+            logger.exception(
+                "Failed to retry DLQ task",
+                extra={"task_id": task_id, "error": str(e)},
+            )
+            raise TaskServiceError(f"Failed to retry task: {e}") from e
+
+    async def discard_dlq_task(
+        self,
+        task_id: str,
+        reason: str | None = None,
+    ) -> DLQDiscardResponse:
+        """Discard a task from the DLQ.
+
+        Args:
+            task_id: Task identifier.
+            reason: Optional reason for discarding.
+
+        Returns:
+            Discard response.
+        """
+        dlq = get_dlq_middleware()
+        if not dlq:
+            return DLQDiscardResponse(
+                task_id=task_id,
+                discarded=False,
+                message="DLQ not available",
+            )
+
+        try:
+            entry = await dlq.get_dlq_entry(task_id)
+            if not entry:
+                return DLQDiscardResponse(
+                    task_id=task_id,
+                    discarded=False,
+                    message="DLQ entry not found",
+                )
+
+            # Update status to discarded
+            success = await dlq.update_dlq_status(task_id, "discarded")
+
+            if success:
+                message = "Task discarded from DLQ"
+                if reason:
+                    message += f" (reason: {reason})"
+                logger.info(
+                    "DLQ task discarded",
+                    extra={"task_id": task_id, "reason": reason},
+                )
+            else:
+                message = "Failed to discard task"
+
+            return DLQDiscardResponse(
+                task_id=task_id,
+                discarded=success,
+                message=message,
+            )
+        except Exception as e:
+            logger.exception(
+                "Failed to discard DLQ task",
+                extra={"task_id": task_id, "error": str(e)},
+            )
+            return DLQDiscardResponse(
+                task_id=task_id,
+                discarded=False,
+                message=f"Error: {e!s}",
+            )
+
+    # ──────────────────────────────────────────────────────────────
+    # Bulk Operations
+    # ──────────────────────────────────────────────────────────────
+
+    async def bulk_cancel_tasks(
+        self,
+        task_ids: list[str],
+        reason: str | None = None,
+    ) -> BulkCancelResponse:
+        """Cancel multiple tasks.
+
+        Args:
+            task_ids: List of task IDs to cancel.
+            reason: Optional cancellation reason.
+
+        Returns:
+            Bulk cancel response.
+        """
+        results = []
+        successful = 0
+        failed = 0
+
+        for task_id in task_ids:
+            result = await self.cancel_task(task_id, reason)
+            results.append(
+                BulkOperationResult(
+                    task_id=task_id,
+                    success=result.cancelled,
+                    message=result.message,
+                    previous_status=result.previous_status,
+                )
+            )
+            if result.cancelled:
+                successful += 1
+            else:
+                failed += 1
+
+        return BulkCancelResponse(
+            total_requested=len(task_ids),
+            successful=successful,
+            failed=failed,
+            results=results,
+        )
+
+    async def bulk_retry_dlq_tasks(
+        self,
+        task_ids: list[str],
+    ) -> BulkRetryResponse:
+        """Retry multiple tasks from DLQ.
+
+        Args:
+            task_ids: List of DLQ task IDs to retry.
+
+        Returns:
+            Bulk retry response.
+        """
+        results = []
+        successful = 0
+        failed = 0
+
+        for task_id in task_ids:
+            try:
+                retry_result = await self.retry_dlq_task(task_id)
+                results.append(
+                    BulkOperationResult(
+                        task_id=task_id,
+                        success=True,
+                        message=retry_result.message,
+                    )
+                )
+                successful += 1
+            except Exception as e:
+                results.append(
+                    BulkOperationResult(
+                        task_id=task_id,
+                        success=False,
+                        message=str(e),
+                    )
+                )
+                failed += 1
+
+        return BulkRetryResponse(
+            total_requested=len(task_ids),
+            successful=successful,
+            failed=failed,
+            results=results,
+        )
+
+    # ──────────────────────────────────────────────────────────────
+    # Progress Tracking
+    # ──────────────────────────────────────────────────────────────
+
+    async def get_task_progress(self, task_id: str) -> TaskProgressResponse | None:
+        """Get progress for a task.
+
+        Args:
+            task_id: Task identifier.
+
+        Returns:
+            Task progress or None if not found.
+        """
+        progress_middleware = get_progress_middleware()
+        if not progress_middleware:
+            return None
+
+        try:
+            progress = await progress_middleware.get_progress(task_id)
+            if not progress:
+                return None
+
+            return TaskProgressResponse(
+                task_id=progress.get("task_id", task_id),
+                percent=progress.get("percent"),
+                message=progress.get("message"),
+                current=progress.get("current"),
+                total=progress.get("total"),
+                updated_at=progress.get("updated_at"),
+                extra=progress.get("extra"),
+            )
+        except Exception as e:
+            logger.exception(
+                "Failed to get task progress",
+                extra={"task_id": task_id, "error": str(e)},
+            )
+            return None
 
 
 # ──────────────────────────────────────────────────────────────

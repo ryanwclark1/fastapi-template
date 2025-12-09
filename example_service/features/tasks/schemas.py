@@ -261,3 +261,143 @@ class TriggerTaskResponse(CustomBase):
     task_name: str = Field(..., description="Name of the triggered task")
     status: str = Field(default="queued", description="Task status (queued)")
     message: str = Field(..., description="Status message")
+
+
+# ──────────────────────────────────────────────────────────────
+# Dead Letter Queue (DLQ)
+# ──────────────────────────────────────────────────────────────
+
+
+class DLQStatus(str, Enum):
+    """DLQ entry status."""
+
+    PENDING = "pending"
+    RETRIED = "retried"
+    DISCARDED = "discarded"
+
+
+class DLQEntryResponse(CustomBase):
+    """Dead Letter Queue entry information."""
+
+    task_id: str = Field(..., description="Original task ID")
+    task_name: str = Field(..., description="Name of the failed task")
+    args: Any | None = Field(None, description="Positional arguments")
+    kwargs: dict[str, Any] | None = Field(None, description="Keyword arguments")
+    labels: dict[str, Any] | None = Field(None, description="Task labels")
+    error_message: str = Field(..., description="Error message from last failure")
+    error_type: str = Field(..., description="Exception type name")
+    retry_count: int = Field(..., description="Number of retries attempted")
+    failed_at: str = Field(..., description="When the task finally failed (ISO format)")
+    status: DLQStatus = Field(default=DLQStatus.PENDING, description="DLQ entry status")
+
+
+class DLQListResponse(CustomBase):
+    """Response for DLQ list endpoint."""
+
+    items: list[DLQEntryResponse] = Field(..., description="DLQ entries")
+    total: int = Field(..., description="Total DLQ entries")
+    limit: int = Field(..., description="Requested limit")
+    offset: int = Field(..., description="Requested offset")
+
+
+class DLQRetryRequest(BaseModel):
+    """Request to retry a DLQ task."""
+
+    task_id: str = Field(..., description="Task ID to retry")
+
+
+class DLQRetryResponse(CustomBase):
+    """Response for DLQ retry."""
+
+    original_task_id: str = Field(..., description="Original task ID")
+    new_task_id: str = Field(..., description="New task ID for the retry")
+    task_name: str = Field(..., description="Task name")
+    status: str = Field(default="queued", description="New task status")
+    message: str = Field(..., description="Status message")
+
+
+class DLQDiscardRequest(BaseModel):
+    """Request to discard a DLQ entry."""
+
+    task_id: str = Field(..., description="Task ID to discard")
+    reason: str | None = Field(None, max_length=500, description="Reason for discarding")
+
+
+class DLQDiscardResponse(CustomBase):
+    """Response for DLQ discard."""
+
+    task_id: str = Field(..., description="Task ID")
+    discarded: bool = Field(..., description="Whether the entry was discarded")
+    message: str = Field(..., description="Status message")
+
+
+# ──────────────────────────────────────────────────────────────
+# Bulk Operations
+# ──────────────────────────────────────────────────────────────
+
+
+class BulkCancelRequest(BaseModel):
+    """Request to cancel multiple tasks."""
+
+    task_ids: list[str] = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="List of task IDs to cancel (max 100)",
+    )
+    reason: str | None = Field(None, max_length=500, description="Reason for cancellation")
+
+
+class BulkOperationResult(CustomBase):
+    """Result for a single item in a bulk operation."""
+
+    task_id: str = Field(..., description="Task ID")
+    success: bool = Field(..., description="Whether the operation succeeded")
+    message: str = Field(..., description="Status message")
+    previous_status: str | None = Field(None, description="Previous status (for cancel)")
+
+
+class BulkCancelResponse(CustomBase):
+    """Response for bulk cancel operation."""
+
+    total_requested: int = Field(..., description="Total tasks requested to cancel")
+    successful: int = Field(..., description="Number of successfully cancelled tasks")
+    failed: int = Field(..., description="Number of failed cancellations")
+    results: list[BulkOperationResult] = Field(..., description="Individual results")
+
+
+class BulkRetryRequest(BaseModel):
+    """Request to retry multiple tasks from DLQ."""
+
+    task_ids: list[str] = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="List of DLQ task IDs to retry (max 100)",
+    )
+
+
+class BulkRetryResponse(CustomBase):
+    """Response for bulk retry operation."""
+
+    total_requested: int = Field(..., description="Total tasks requested to retry")
+    successful: int = Field(..., description="Number of successfully retried tasks")
+    failed: int = Field(..., description="Number of failed retries")
+    results: list[BulkOperationResult] = Field(..., description="Individual results")
+
+
+# ──────────────────────────────────────────────────────────────
+# Progress Tracking
+# ──────────────────────────────────────────────────────────────
+
+
+class TaskProgressResponse(CustomBase):
+    """Task progress information."""
+
+    task_id: str = Field(..., description="Task ID")
+    percent: float | None = Field(None, ge=0, le=100, description="Progress percentage (0-100)")
+    message: str | None = Field(None, description="Progress message")
+    current: int | None = Field(None, description="Current item number")
+    total: int | None = Field(None, description="Total items")
+    updated_at: str | None = Field(None, description="Last update time (ISO format)")
+    extra: dict[str, Any] | None = Field(None, description="Additional progress data")

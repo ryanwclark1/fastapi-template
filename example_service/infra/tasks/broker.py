@@ -244,18 +244,38 @@ if _can_create_broker():
     from taskiq.middlewares import SimpleRetryMiddleware
 
     from example_service.infra.tasks.middleware import (
+        DeadLetterQueueMiddleware,
+        DeduplicationMiddleware,
         MetricsMiddleware,
+        ProgressTrackingMiddleware,
+        TimeoutMiddleware,
         TracingMiddleware,
         TrackingMiddleware,
+        set_dlq_middleware,
+        set_progress_middleware,
     )
 
     result_backend = _create_result_backend()
 
+    # Create middleware instances
+    dedup_middleware = DeduplicationMiddleware()
+    timeout_middleware = TimeoutMiddleware()
+    dlq_middleware = DeadLetterQueueMiddleware()
+    progress_middleware = ProgressTrackingMiddleware()
+
+    # Register global instances for service layer access
+    set_dlq_middleware(dlq_middleware)
+    set_progress_middleware(progress_middleware)
+
     # Middleware order matters:
     # 1. SimpleRetryMiddleware - handles retry_on_error=True on tasks (must be first)
-    # 2. MetricsMiddleware - records Prometheus metrics (uses existing FastAPI registry)
-    # 3. TracingMiddleware - creates OpenTelemetry spans for distributed tracing
-    # 4. TrackingMiddleware - records task history in Redis/PostgreSQL
+    # 2. DeduplicationMiddleware - prevents duplicate task submissions
+    # 3. TimeoutMiddleware - enforces task execution timeouts
+    # 4. MetricsMiddleware - records Prometheus metrics (uses existing FastAPI registry)
+    # 5. TracingMiddleware - creates OpenTelemetry spans for distributed tracing
+    # 6. ProgressTrackingMiddleware - enables task progress reporting
+    # 7. TrackingMiddleware - records task history in Redis/PostgreSQL
+    # 8. DeadLetterQueueMiddleware - handles failed tasks after max retries
     broker = (
         AioPikaBroker(
             url=rabbit_settings.get_url(),
@@ -266,9 +286,13 @@ if _can_create_broker():
         .with_result_backend(result_backend)
         .with_middlewares(
             SimpleRetryMiddleware(),
-            MetricsMiddleware(),  # Uses existing Prometheus registry - no separate server
+            dedup_middleware,
+            timeout_middleware,
+            MetricsMiddleware(),
             TracingMiddleware(),
+            progress_middleware,
             TrackingMiddleware(),
+            dlq_middleware,
         )
     )
 
@@ -277,7 +301,16 @@ if _can_create_broker():
         extra={
             "queue": rabbit_settings.get_prefixed_queue("taskiq-tasks"),
             "result_backend": task_settings.result_backend,
-            "middlewares": ["SimpleRetryMiddleware", "MetricsMiddleware", "TracingMiddleware", "TrackingMiddleware"],
+            "middlewares": [
+                "SimpleRetryMiddleware",
+                "DeduplicationMiddleware",
+                "TimeoutMiddleware",
+                "MetricsMiddleware",
+                "TracingMiddleware",
+                "ProgressTrackingMiddleware",
+                "TrackingMiddleware",
+                "DeadLetterQueueMiddleware",
+            ],
         },
     )
 
