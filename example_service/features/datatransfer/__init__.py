@@ -32,6 +32,22 @@ Usage:
 
 from __future__ import annotations
 
+from .audit import (
+    DataTransferAuditLogger,
+    get_audit_logger,
+    log_export_operation,
+    log_import_operation,
+)
+from .cleanup import cleanup_old_exports, cleanup_old_exports_async, get_export_stats
+from .jobs import (
+    JobProgress,
+    JobStatus,
+    JobTracker,
+    JobType,
+    get_job_tracker,
+    run_export_job,
+    run_import_job,
+)
 from .exporters import (
     BaseExporter,
     CSVExporter,
@@ -65,16 +81,49 @@ from .schemas import (
     SupportedEntity,
 )
 from .service import DataTransferService, get_data_transfer_service
+from .validators import (
+    EntityValidator,
+    ValidationError,
+    ValidationResult,
+    ValidatorRegistry,
+    create_validator,
+    get_validator_registry,
+    register_validator,
+    validate_entity,
+)
+from .webhooks import (
+    DataTransferEvent,
+    get_supported_events,
+    notify_export_complete,
+    notify_import_complete,
+    notify_streaming_export_complete,
+)
 
 __all__ = [
+    # Audit
+    "DataTransferAuditLogger",
+    "get_audit_logger",
+    "log_export_operation",
+    "log_import_operation",
     # Exporters
     "BaseExporter",
     # Importers
     "BaseImporter",
     "CSVExporter",
     "CSVImporter",
+    # Cleanup
+    "cleanup_old_exports",
+    "cleanup_old_exports_async",
     # Errors
     "DataImportError",
+    # Jobs
+    "JobProgress",
+    "JobStatus",
+    "JobTracker",
+    "JobType",
+    "get_job_tracker",
+    "run_export_job",
+    "run_import_job",
     # Service
     "DataTransferService",
     "ExcelExporter",
@@ -97,8 +146,24 @@ __all__ = [
     "SupportedEntitiesResponse",
     "SupportedEntity",
     "get_data_transfer_service",
+    "get_export_stats",
     "get_exporter",
     "get_importer",
+    # Validators
+    "EntityValidator",
+    "ValidationError",
+    "ValidationResult",
+    "ValidatorRegistry",
+    "create_validator",
+    "get_validator_registry",
+    "register_validator",
+    "validate_entity",
+    # Webhooks
+    "DataTransferEvent",
+    "get_supported_events",
+    "notify_export_complete",
+    "notify_import_complete",
+    "notify_streaming_export_complete",
     # Router
     "router",
 ]

@@ -6,6 +6,7 @@ with progress tracking, validation, and storage integration.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 import gzip
 import logging
@@ -13,12 +14,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from example_service.core.settings import get_datatransfer_settings
 
 from .exporters import get_exporter
 from .importers import ParsedRecord, get_importer
+from .validators import get_validator_registry, validate_entity
 from .schemas import (
     ExportRequest,
     ExportResult,
@@ -480,6 +482,165 @@ class DataTransferService:
 
         return data, exporter.content_type, filename
 
+    async def get_export_count(
+        self,
+        entity_type: str,
+        filters: dict[str, Any] | None = None,
+        filter_conditions: list[FilterCondition] | None = None,
+        tenant_id: str | None = None,
+    ) -> int:
+        """Get count of records to export.
+
+        Args:
+            entity_type: Type of entity.
+            filters: Optional simple filters.
+            filter_conditions: Optional advanced filter conditions.
+            tenant_id: Optional tenant ID.
+
+        Returns:
+            Number of records matching the criteria.
+        """
+        config = self._get_entity_config(entity_type)
+        model_class = self._import_model(config["model_path"])
+
+        stmt = select(func.count()).select_from(model_class)
+
+        # Apply tenant filter
+        settings = get_datatransfer_settings()
+        if settings.enable_tenant_isolation and tenant_id:
+            if hasattr(model_class, "tenant_id"):
+                stmt = stmt.where(getattr(model_class, "tenant_id") == tenant_id)
+
+        # Apply filters
+        if filters:
+            for field, value in filters.items():
+                if hasattr(model_class, field):
+                    stmt = stmt.where(getattr(model_class, field) == value)
+
+        if filter_conditions:
+            for condition in filter_conditions:
+                stmt = self._apply_filter_condition(stmt, model_class, condition)
+
+        result = await self.session.execute(stmt)
+        return result.scalar_one()
+
+    async def stream_export(
+        self,
+        request: ExportRequest,
+        tenant_id: str | None = None,
+        chunk_size: int = 1000,
+    ) -> AsyncIterator[bytes]:
+        """Stream export data in chunks for large datasets.
+
+        Uses server-side cursors and pagination to efficiently handle
+        large datasets without loading everything into memory.
+
+        Args:
+            request: Export request.
+            tenant_id: Optional tenant ID.
+            chunk_size: Number of records per chunk.
+
+        Yields:
+            Bytes chunks of exported data.
+        """
+        config = self._get_entity_config(entity_type=request.entity_type)
+        if not config.get("exportable", True):
+            raise ValueError(f"Entity '{request.entity_type}' is not exportable")
+
+        model_class = self._import_model(config["model_path"])
+
+        # Build base query
+        stmt = select(model_class)
+
+        # Apply tenant filter
+        settings = get_datatransfer_settings()
+        if settings.enable_tenant_isolation and tenant_id:
+            if hasattr(model_class, "tenant_id"):
+                stmt = stmt.where(getattr(model_class, "tenant_id") == tenant_id)
+
+        # Apply filters
+        if request.filters:
+            for field, value in request.filters.items():
+                if hasattr(model_class, field):
+                    stmt = stmt.where(getattr(model_class, field) == value)
+
+        if request.filter_conditions:
+            for condition in request.filter_conditions:
+                stmt = self._apply_filter_condition(stmt, model_class, condition)
+
+        # Order by primary key for consistent pagination
+        if hasattr(model_class, "id"):
+            stmt = stmt.order_by(model_class.id)
+
+        # Get exporter
+        exporter = get_exporter(
+            format=request.format.value,
+            fields=request.fields or config.get("fields"),
+            include_headers=request.include_headers,
+        )
+
+        # Stream in chunks with offset-based pagination
+        offset = 0
+        first_chunk = True
+
+        while True:
+            # Execute paginated query
+            paginated_stmt = stmt.offset(offset).limit(chunk_size)
+            result = await self.session.execute(paginated_stmt)
+            records = list(result.scalars().all())
+
+            if not records:
+                break
+
+            # For CSV/JSON, we need to handle headers specially
+            if request.format.value == "csv":
+                if first_chunk:
+                    # Include headers in first chunk
+                    chunk_data = exporter.export_to_bytes(records)
+                else:
+                    # Skip headers for subsequent chunks
+                    temp_exporter = get_exporter(
+                        format=request.format.value,
+                        fields=request.fields or config.get("fields"),
+                        include_headers=False,
+                    )
+                    chunk_data = temp_exporter.export_to_bytes(records)
+            elif request.format.value == "json":
+                # For JSON, yield each record as a JSON line (JSONL format for streaming)
+                import json
+                lines = []
+                for record in records:
+                    record_dict = {
+                        field: getattr(record, field, None)
+                        for field in (request.fields or config.get("fields", []))
+                    }
+                    # Handle datetime serialization
+                    for key, value in record_dict.items():
+                        if isinstance(value, datetime):
+                            record_dict[key] = value.isoformat()
+                    lines.append(json.dumps(record_dict))
+                chunk_data = ("\n".join(lines) + "\n").encode("utf-8")
+            else:
+                # For Excel and other formats, export the chunk directly
+                chunk_data = exporter.export_to_bytes(records)
+
+            yield chunk_data
+            first_chunk = False
+            offset += chunk_size
+
+            # Check if we got fewer records than requested (last chunk)
+            if len(records) < chunk_size:
+                break
+
+        logger.info(
+            "Streaming export completed",
+            extra={
+                "entity_type": request.entity_type,
+                "total_chunks": (offset // chunk_size) + 1,
+                "total_records": offset + len(records) if records else offset,
+            },
+        )
+
     async def import_from_bytes(
         self,
         data: bytes,
@@ -527,13 +688,18 @@ class DataTransferService:
             # Collect validation errors
             validation_errors: list[ImportValidationError] = []
             valid_records: list[ParsedRecord] = []
+            settings = get_datatransfer_settings()
+            max_errors = settings.max_validation_errors
+
+            # Check if entity-specific validator exists
+            validator_registry = get_validator_registry()
+            has_entity_validator = validator_registry.has_validator(entity_type)
 
             for record in parsed_records:
-                if record.is_valid:
-                    valid_records.append(record)
-                else:
+                if not record.is_valid:
+                    # Basic type validation failed
                     for field, error in record.errors:
-                        if len(validation_errors) < 100:  # Limit error reporting
+                        if len(validation_errors) < max_errors:
                             validation_errors.append(
                                 ImportValidationError(
                                     row=record.row_number,
@@ -544,6 +710,29 @@ class DataTransferService:
                                     else None,
                                 )
                             )
+                    continue
+
+                # Run entity-specific validation if available
+                if has_entity_validator:
+                    entity_result = validate_entity(entity_type, record.data)
+                    if not entity_result.is_valid:
+                        for err in entity_result.errors:
+                            if len(validation_errors) < max_errors:
+                                validation_errors.append(
+                                    ImportValidationError(
+                                        row=record.row_number,
+                                        field=err.field,
+                                        error=err.message,
+                                        value=err.value,
+                                    )
+                                )
+                        continue
+
+                    # Use transformed data if available
+                    if entity_result.transformed_data:
+                        record.data = entity_result.transformed_data
+
+                valid_records.append(record)
 
             # If validation only, return here
             if validate_only:
