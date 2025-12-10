@@ -242,6 +242,17 @@ from example_service.infra.ai.agents.analytics import (
     UsageReport,
 )
 
+# Workflow database models
+from example_service.infra.ai.agents.workflow_models import (
+    AIWorkflowApproval,
+    AIWorkflowDefinition,
+    AIWorkflowExecution,
+    AIWorkflowNodeExecution,
+    WorkflowNodeStatus,
+    WorkflowNodeType,
+    WorkflowStatus as WorkflowDBStatus,
+)
+
 __all__ = [
     # Agent base
     "AgentConfig",
@@ -321,4 +332,12 @@ __all__ = [
     "PerformanceBenchmark",
     "UsageMetrics",
     "UsageReport",
+    # Workflow database models
+    "AIWorkflowApproval",
+    "AIWorkflowDefinition",
+    "AIWorkflowExecution",
+    "AIWorkflowNodeExecution",
+    "WorkflowDBStatus",
+    "WorkflowNodeStatus",
+    "WorkflowNodeType",
 ]

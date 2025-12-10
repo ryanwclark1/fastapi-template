@@ -144,6 +144,46 @@ AIAgentMessageRole = ENUM(
     create_type=False,
 )
 
+# =============================================================================
+# AI Workflow Enums
+# =============================================================================
+
+AIWorkflowStatus = ENUM(
+    "pending",
+    "running",
+    "paused",
+    "waiting_approval",
+    "completed",
+    "failed",
+    "cancelled",
+    "timeout",
+    name="aiworkflowstatus",
+    create_type=False,
+)
+
+AIWorkflowNodeStatus = ENUM(
+    "pending",
+    "running",
+    "completed",
+    "failed",
+    "skipped",
+    "waiting_approval",
+    "approved",
+    "rejected",
+    name="aiworkflownodestatus",
+    create_type=False,
+)
+
+AIWorkflowNodeType = ENUM(
+    "function",
+    "human_approval",
+    "conditional",
+    "parallel",
+    "subworkflow",
+    name="aiworkflownodetype",
+    create_type=False,
+)
+
 
 # =============================================================================
 # Job System Enums
@@ -227,6 +267,9 @@ __all__ = [
     "AIJobStatus",
     "AIJobType",
     "AIProviderType",
+    "AIWorkflowNodeStatus",
+    "AIWorkflowNodeType",
+    "AIWorkflowStatus",
     "AuditAction",
     "DeliveryStatus",
     "EmailProviderType",
