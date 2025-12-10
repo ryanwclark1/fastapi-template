@@ -259,6 +259,74 @@ from example_service.infra.ai.agents.workflow_models import (
     WorkflowStatus as WorkflowDBStatus,
 )
 
+# Pre-built agent types
+from example_service.infra.ai.agents.prebuilt import (
+    AgentConfig as PrebuiltAgentConfig,
+    AgentType,
+    CodeExecutor,
+    CodeGenerationResponse,
+    ContentCreationResponse,
+    CustomerSupportResponse,
+    DataAnalysisResponse,
+    DataSource,
+    PrebuiltAgent,
+    RAGResponse,
+    Retriever,
+    create_code_agent,
+    create_content_agent,
+    create_customer_support_agent,
+    create_data_analysis_agent,
+    create_rag_agent,
+)
+
+# Streaming
+from example_service.infra.ai.agents.streaming import (
+    AsyncGeneratorHandler,
+    CallbackHandler,
+    EventType,
+    StreamConfig,
+    StreamEvent,
+    StreamHandler,
+    StreamingAgentMixin,
+    StreamingContext,
+    StreamState,
+    StreamStatus,
+    create_json_stream,
+    create_sse_response,
+)
+
+# Webhooks
+from example_service.infra.ai.agents.webhooks import (
+    WebhookClient,
+    WebhookConfig,
+    WebhookDelivery,
+    WebhookEvent,
+    WebhookPayload,
+    WebhookRegistry,
+    WorkflowWebhookHandler,
+    generate_signature,
+    get_webhook_registry,
+    reset_webhook_registry,
+    verify_signature,
+)
+
+# Quotas and rate limiting
+from example_service.infra.ai.agents.quotas import (
+    ConcurrencyLimiter,
+    InMemoryQuotaStore,
+    QuotaCheckResult,
+    QuotaConfig,
+    QuotaExceededError,
+    QuotaManager,
+    QuotaStatus,
+    QuotaStore,
+    QuotaType,
+    QuotaUsage,
+    RateLimitedError,
+    RateLimiter,
+    require_quota,
+)
+
 __all__ = [
     # Agent base
     "AgentConfig",
@@ -352,4 +420,60 @@ __all__ = [
     "WorkflowDBStatus",
     "WorkflowNodeStatus",
     "WorkflowNodeType",
+    # Pre-built agent types
+    "AgentType",
+    "CodeExecutor",
+    "CodeGenerationResponse",
+    "ContentCreationResponse",
+    "CustomerSupportResponse",
+    "DataAnalysisResponse",
+    "DataSource",
+    "PrebuiltAgent",
+    "PrebuiltAgentConfig",
+    "RAGResponse",
+    "Retriever",
+    "create_code_agent",
+    "create_content_agent",
+    "create_customer_support_agent",
+    "create_data_analysis_agent",
+    "create_rag_agent",
+    # Streaming
+    "AsyncGeneratorHandler",
+    "CallbackHandler",
+    "EventType",
+    "StreamConfig",
+    "StreamEvent",
+    "StreamHandler",
+    "StreamingAgentMixin",
+    "StreamingContext",
+    "StreamState",
+    "StreamStatus",
+    "create_json_stream",
+    "create_sse_response",
+    # Webhooks
+    "WebhookClient",
+    "WebhookConfig",
+    "WebhookDelivery",
+    "WebhookEvent",
+    "WebhookPayload",
+    "WebhookRegistry",
+    "WorkflowWebhookHandler",
+    "generate_signature",
+    "get_webhook_registry",
+    "reset_webhook_registry",
+    "verify_signature",
+    # Quotas and rate limiting
+    "ConcurrencyLimiter",
+    "InMemoryQuotaStore",
+    "QuotaCheckResult",
+    "QuotaConfig",
+    "QuotaExceededError",
+    "QuotaManager",
+    "QuotaStatus",
+    "QuotaStore",
+    "QuotaType",
+    "QuotaUsage",
+    "RateLimitedError",
+    "RateLimiter",
+    "require_quota",
 ]
