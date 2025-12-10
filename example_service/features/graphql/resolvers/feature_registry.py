@@ -135,6 +135,27 @@ from example_service.features.graphql.resolvers.webhooks_queries import (
     webhooks_query,
 )
 
+# Import workflow resolvers
+from example_service.features.graphql.resolvers.workflows_mutations import (
+    cancel_workflow_execution_mutation,
+    create_workflow_definition_mutation,
+    delete_workflow_definition_mutation,
+    execute_workflow_mutation,
+    respond_to_approval_mutation,
+    update_workflow_definition_mutation,
+)
+from example_service.features.graphql.resolvers.workflows_queries import (
+    pending_approvals_query,
+    workflow_approvals_query,
+    workflow_definition_by_slug_query,
+    workflow_definition_query,
+    workflow_definitions_query,
+    workflow_execution_query,
+    workflow_executions_query,
+    workflow_node_executions_query,
+    workflow_stats_query,
+)
+
 logger = logging.getLogger(__name__)
 
 __all__ = ["get_registered_features_summary", "register_all_features"]
@@ -343,6 +364,34 @@ def register_all_features() -> None:
         ],
         # Search is read-only (no mutations needed)
         mutations=[],
+        subscriptions=[],
+    )
+
+    # ========================================================================
+    # Workflows Feature
+    # ========================================================================
+    registry.register(
+        "workflows",
+        queries=[
+            workflow_definition_query,
+            workflow_definition_by_slug_query,
+            workflow_definitions_query,
+            workflow_execution_query,
+            workflow_executions_query,
+            workflow_node_executions_query,
+            workflow_approvals_query,
+            pending_approvals_query,
+            workflow_stats_query,
+        ],
+        mutations=[
+            create_workflow_definition_mutation,
+            update_workflow_definition_mutation,
+            delete_workflow_definition_mutation,
+            execute_workflow_mutation,
+            cancel_workflow_execution_mutation,
+            respond_to_approval_mutation,
+        ],
+        # Subscriptions for workflow status updates could be added later
         subscriptions=[],
     )
 

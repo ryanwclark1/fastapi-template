@@ -24,6 +24,7 @@ Environment Variables:
     GRAPHQL_FEATURE_AI=false           # Enable AI/ML features (default: false)
     GRAPHQL_FEATURE_TASKS=true         # Enable task management (default: true)
     GRAPHQL_FEATURE_SEARCH=true        # Enable search functionality (default: true)
+    GRAPHQL_FEATURE_WORKFLOWS=true     # Enable AI workflow management (default: true)
 """
 
 from __future__ import annotations
@@ -56,6 +57,7 @@ class GraphQLFeatures:
         ai: Enable AI/ML features (experimental)
         tasks: Enable task management
         search: Enable search functionality
+        workflows: Enable AI workflow management
     """
 
     def __init__(self) -> None:
@@ -109,6 +111,11 @@ class GraphQLFeatures:
         """Check if search feature is enabled."""
         return getattr(self._settings, "feature_search", True)
 
+    @property
+    def workflows(self) -> bool:
+        """Check if workflows feature is enabled."""
+        return getattr(self._settings, "feature_workflows", True)
+
     def get_enabled_features(self) -> list[str]:
         """Get list of enabled feature names.
 
@@ -130,6 +137,7 @@ class GraphQLFeatures:
             "ai": self.ai,
             "tasks": self.tasks,
             "search": self.search,
+            "workflows": self.workflows,
         }
         return [name for name, enabled in feature_map.items() if enabled]
 
