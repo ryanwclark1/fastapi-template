@@ -46,6 +46,8 @@ if TYPE_CHECKING:
     from redis.asyncio import Redis
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from example_service.infra.cache import RedisCache
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
@@ -657,6 +659,152 @@ class ScopedStateStore:
         )
 
 
+class RedisCacheStateStore(BaseStateStore):
+    """State store using the existing RedisCache infrastructure.
+
+    This integrates with the application's existing Redis cache setup,
+    providing connection pooling, retry logic, and metrics.
+
+    Example:
+        from example_service.infra.cache import get_cache_instance
+        from example_service.infra.ai.agents.state_store import (
+            RedisCacheStateStore,
+            configure_state_store,
+        )
+
+        # Configure to use existing Redis cache
+        cache = get_cache_instance()
+        if cache:
+            store = RedisCacheStateStore(cache)
+            configure_state_store(store)
+    """
+
+    def __init__(
+        self,
+        cache: RedisCache,  # type: ignore[name-defined]
+        key_prefix: str = "ai:state",
+    ) -> None:
+        """Initialize Redis cache state store.
+
+        Args:
+            cache: RedisCache instance from infra/cache
+            key_prefix: Prefix for all state keys
+        """
+        self._cache = cache
+        self._key_prefix = key_prefix
+
+    def _make_key(self, key: StateKey) -> str:
+        """Create Redis key from StateKey."""
+        return f"{self._key_prefix}:{key}"
+
+    async def get(self, key: StateKey) -> Any | None:
+        """Get value by key."""
+        redis_key = self._make_key(key)
+        data = await self._cache.client.get(redis_key)
+
+        if data is None:
+            return None
+
+        try:
+            if isinstance(data, bytes):
+                data = data.decode("utf-8")
+            entry = json.loads(data)
+            return entry.get("value")
+        except json.JSONDecodeError:
+            logger.warning(f"Failed to decode state for key: {key}")
+            return None
+
+    async def set(
+        self,
+        key: StateKey,
+        value: Any,
+        ttl_seconds: int | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Set value by key."""
+        redis_key = self._make_key(key)
+        now = datetime.now(UTC)
+
+        entry = {
+            "key": key.to_dict(),
+            "value": value,
+            "updated_at": now.isoformat(),
+            "metadata": metadata or {},
+        }
+
+        data = json.dumps(entry, default=str)
+
+        if ttl_seconds is not None:
+            await self._cache.client.setex(redis_key, ttl_seconds, data)
+        else:
+            await self._cache.client.set(redis_key, data)
+
+    async def delete(self, key: StateKey) -> bool:
+        """Delete value by key."""
+        redis_key = self._make_key(key)
+        result = await self._cache.client.delete(redis_key)
+        return result > 0
+
+    async def exists(self, key: StateKey) -> bool:
+        """Check if key exists."""
+        redis_key = self._make_key(key)
+        result = await self._cache.client.exists(redis_key)
+        return result > 0
+
+    async def list_keys(
+        self,
+        tenant_id: str,
+        namespace: str | None = None,
+        pattern: str | None = None,
+    ) -> list[StateKey]:
+        """List keys matching criteria."""
+        search_pattern = f"{self._key_prefix}:{tenant_id}:"
+        if namespace:
+            search_pattern += f"{namespace}:"
+        if pattern:
+            search_pattern += f"*{pattern}*"
+        else:
+            search_pattern += "*"
+
+        keys = []
+        async for redis_key in self._cache.scan_iter(search_pattern):
+            key_str = redis_key.decode() if isinstance(redis_key, bytes) else redis_key
+            key_str = key_str.removeprefix(f"{self._key_prefix}:")
+            try:
+                state_key = StateKey.from_string(key_str)
+                keys.append(state_key)
+            except ValueError:
+                continue
+
+        return keys
+
+    async def clear_namespace(
+        self,
+        tenant_id: str,
+        namespace: str,
+    ) -> int:
+        """Clear all keys in namespace."""
+        pattern = f"{self._key_prefix}:{tenant_id}:{namespace}:*"
+        return await self._cache.delete_pattern(pattern)
+
+    async def increment(
+        self,
+        key: StateKey,
+        amount: int = 1,
+        ttl_seconds: int | None = None,
+    ) -> int:
+        """Atomic increment."""
+        redis_key = self._make_key(key)
+
+        pipe = self._cache.pipeline()
+        pipe.incrby(redis_key, amount)
+        if ttl_seconds:
+            pipe.expire(redis_key, ttl_seconds)
+
+        results = await pipe.execute()
+        return results[0]
+
+
 # Global state store instance
 _global_store: BaseStateStore | None = None
 
@@ -679,3 +827,65 @@ def reset_state_store() -> None:
     """Reset to default in-memory store."""
     global _global_store
     _global_store = None
+
+
+async def configure_redis_state_store() -> RedisCacheStateStore | None:
+    """Configure state store to use Redis from existing infrastructure.
+
+    This should be called during application startup after Redis is connected.
+
+    Returns:
+        RedisCacheStateStore if Redis is available, None otherwise.
+
+    Example:
+        # In your application startup
+        from example_service.infra.ai.agents.state_store import (
+            configure_redis_state_store,
+        )
+
+        @app.on_event("startup")
+        async def startup():
+            await configure_redis_state_store()
+    """
+    try:
+        from example_service.infra.cache import get_cache_instance
+
+        cache = get_cache_instance()
+        if cache is None:
+            logger.warning(
+                "Redis cache not initialized - using in-memory state store. "
+                "State will be lost on restart."
+            )
+            return None
+
+        store = RedisCacheStateStore(cache)
+        configure_state_store(store)
+        logger.info("AI state store configured with Redis backend")
+        return store
+
+    except ImportError as e:
+        logger.warning(f"Could not import Redis cache: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Failed to configure Redis state store: {e}")
+        return None
+
+
+def get_state_store_dependency() -> BaseStateStore:
+    """FastAPI dependency for getting the state store.
+
+    Usage:
+        from example_service.infra.ai.agents.state_store import (
+            get_state_store_dependency,
+            BaseStateStore,
+        )
+
+        @router.get("/state/{key}")
+        async def get_state(
+            key: str,
+            store: BaseStateStore = Depends(get_state_store_dependency),
+        ):
+            value = await store.get(StateKey(...))
+            return {"value": value}
+    """
+    return get_state_store()

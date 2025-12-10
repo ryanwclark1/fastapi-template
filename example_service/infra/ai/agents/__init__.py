@@ -202,10 +202,16 @@ from example_service.infra.ai.agents.memory import (
 from example_service.infra.ai.agents.state_store import (
     BaseStateStore,
     InMemoryStateStore,
+    RedisCacheStateStore,
     RedisStateStore,
     ScopedStateStore,
     StateEntry,
     StateKey,
+    configure_redis_state_store,
+    configure_state_store,
+    get_state_store,
+    get_state_store_dependency,
+    reset_state_store,
 )
 
 # Structured output
@@ -303,10 +309,16 @@ __all__ = [
     # State store
     "BaseStateStore",
     "InMemoryStateStore",
+    "RedisCacheStateStore",
     "RedisStateStore",
     "ScopedStateStore",
     "StateEntry",
     "StateKey",
+    "configure_redis_state_store",
+    "configure_state_store",
+    "get_state_store",
+    "get_state_store_dependency",
+    "reset_state_store",
     # Structured output
     "ExtractionResult",
     "ExtractionStrategy",

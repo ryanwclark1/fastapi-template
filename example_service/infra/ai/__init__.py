@@ -160,7 +160,24 @@ async def start_ai_infrastructure(settings: AISettings | None = None) -> bool:
                 extra={"policy": settings.budget_policy},
             )
 
-        # 5. Create global orchestrator
+        # 5. Initialize agent state store with Redis if available
+        try:
+            from example_service.infra.ai.agents.state_store import (
+                configure_redis_state_store,
+            )
+
+            redis_store = await configure_redis_state_store()
+            if redis_store:
+                logger.debug("Agent state store configured with Redis backend")
+            else:
+                logger.debug("Agent state store using in-memory backend")
+        except Exception as e:
+            logger.warning(
+                "Failed to configure Redis state store for agents",
+                extra={"error": str(e)},
+            )
+
+        # 6. Create global orchestrator
         from example_service.infra.ai.instrumented_orchestrator import (
             InstrumentedOrchestrator,
             configure_orchestrator,
@@ -217,6 +234,13 @@ async def stop_ai_infrastructure() -> None:
         # Reset event store
         from example_service.infra.ai.events import configure_event_store
         configure_event_store(None)
+
+        # Reset agent state store
+        try:
+            from example_service.infra.ai.agents.state_store import reset_state_store
+            reset_state_store()
+        except Exception as e:
+            logger.debug(f"Error resetting state store: {e}")
 
         # Reset registry
         from example_service.infra.ai.capabilities import reset_capability_registry
