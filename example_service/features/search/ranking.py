@@ -24,7 +24,7 @@ import logging
 import math
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Float, Integer, String, func, select, text
+from sqlalchemy import func, select, text
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession

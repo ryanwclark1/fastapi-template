@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated
 
 import strawberry
 from strawberry.scalars import JSON

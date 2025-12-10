@@ -5,8 +5,8 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-import pytest
 from pydantic import BaseModel, Field
+import pytest
 
 from example_service.infra.ai.agents.structured_output import (
     ExtractionResult,

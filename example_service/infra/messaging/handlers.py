@@ -18,6 +18,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 import logging
 
+from faststream.exceptions import SubscriberNotFound
+
 from example_service.infra.messaging.broker import router
 from example_service.infra.messaging.events import (
     ExampleCreatedEvent,
@@ -295,7 +297,6 @@ if router is not None:
         ECHO_SERVICE_QUEUE,
         exchange=DOMAIN_EVENTS_EXCHANGE,
     )
-    @router.publisher(ECHO_RESPONSE_QUEUE)
     async def handle_echo_request(message: dict) -> dict:
         """Echo service - receives message, logs it, returns with timestamp.
 
@@ -326,6 +327,22 @@ if router is not None:
             "Echo response being published",
             extra={"response_queue": ECHO_RESPONSE_QUEUE},
         )
+
+        if router is not None and router.broker is not None:
+            try:
+                await router.broker.publish(
+                    echo_response,
+                    queue=ECHO_RESPONSE_QUEUE,
+                    exchange=DOMAIN_EVENTS_EXCHANGE,
+                )
+            except SubscriberNotFound:
+                logger.warning(
+                    "No subscribers registered for echo responses, processing inline",
+                    extra={"response_queue": ECHO_RESPONSE_QUEUE},
+                )
+                await handle_echo_response(echo_response)
+        else:
+            await handle_echo_response(echo_response)
 
         return echo_response
 

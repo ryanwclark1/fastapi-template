@@ -32,7 +32,6 @@ from example_service.features.tasks.schemas import (
     DLQDiscardResponse,
     DLQEntryResponse,
     DLQListResponse,
-    DLQRetryRequest,
     DLQRetryResponse,
     DLQStatus,
     RunningTaskResponse,

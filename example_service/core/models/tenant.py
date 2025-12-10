@@ -19,6 +19,10 @@ if TYPE_CHECKING:
         TenantAIConfig,
         TenantAIFeature,
     )
+    from example_service.infra.ai.agents.workflow_models import (
+        AIWorkflowDefinition,
+        AIWorkflowExecution,
+    )
 
 
 class Tenant(Base, TimestampMixin):
@@ -69,5 +73,27 @@ class Tenant(Base, TimestampMixin):
         lazy="select",
     )
 
+    # AI workflow orchestration relationships
+    workflow_definitions: Mapped[list["AIWorkflowDefinition"]] = relationship(
+        "AIWorkflowDefinition",
+        back_populates="tenant",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    workflow_executions: Mapped[list["AIWorkflowExecution"]] = relationship(
+        "AIWorkflowExecution",
+        back_populates="tenant",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
     def __repr__(self) -> str:
         return f"<Tenant(id={self.id}, name={self.name})>"
+
+
+# Ensure workflow models are imported so relationship strings resolve at runtime
+try:
+    import example_service.infra.ai.agents.workflow_models  # noqa: F401
+except ImportError:
+    # Workflow models are optional depending on feature flags; ignore if unavailable
+    pass

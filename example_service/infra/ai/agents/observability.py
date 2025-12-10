@@ -39,7 +39,6 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from decimal import Decimal
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -144,7 +143,7 @@ if PROMETHEUS_AVAILABLE:
 else:
     # No-op metrics when Prometheus is not available
     class NoOpMetric:
-        def labels(self, *args: Any, **kwargs: Any) -> "NoOpMetric":
+        def labels(self, *args: Any, **kwargs: Any) -> NoOpMetric:
             return self
 
         def inc(self, *args: Any, **kwargs: Any) -> None:

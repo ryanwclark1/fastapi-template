@@ -352,7 +352,13 @@ class CircuitBreaker:
             await self._on_success()
             return result
         except self.expected_exception as e:
-            await self._on_failure(e)
+            opened = await self._on_failure(e)
+            if opened:
+                msg = (
+                    f"Circuit breaker '{self.name}' opened due to failure: "
+                    f"{type(e).__name__}"
+                )
+                raise CircuitOpenError(msg) from e
             raise
         except Exception as e:
             # Unexpected exceptions don't affect circuit state
@@ -406,20 +412,11 @@ class CircuitBreaker:
 
                 if self._success_count >= self.success_threshold:
                     await self._transition_to_closed()
-            elif self.is_closed:
-                # Reset failure count on success
-                if self._failure_count > 0:
-                    logger.debug(
-                        "Circuit breaker '%s' resetting failure count",
-                        self.name,
-                        extra={
-                            "circuit_breaker": self.name,
-                            "previous_failures": self._failure_count,
-                        },
-                    )
-                    self._failure_count = 0
+            elif self.is_closed and self._failure_count > 0:
+                # Gradually decay the failure count rather than resetting entirely
+                self._failure_count = max(0, self._failure_count - 1)
 
-    async def _on_failure(self, exception: Exception) -> None:
+    async def _on_failure(self, exception: Exception) -> bool:
         """Handle failed operation.
 
         Records failure, updates metrics, and potentially transitions circuit
@@ -428,7 +425,11 @@ class CircuitBreaker:
         Args:
             exception: The exception that caused the failure.
 
+        Returns:
+            True if the circuit transitioned to OPEN during this failure.
+
         """
+        opened = False
         async with self._lock:
             self.total_failures += 1
             self._failure_count += 1
@@ -456,9 +457,13 @@ class CircuitBreaker:
                     extra={"circuit_breaker": self.name, "state": "half_open"},
                 )
                 await self._transition_to_open()
+                opened = True
             elif self.is_closed and self._failure_count >= self.failure_threshold:
                 # Threshold exceeded, open the circuit
                 await self._transition_to_open()
+                opened = True
+
+        return opened
 
     async def _transition_to_open(self) -> None:
         """Transition circuit to OPEN state.
@@ -680,6 +685,7 @@ class CircuitBreaker:
         failure_rate = self.total_failures / total_calls if total_calls > 0 else 0.0
 
         return {
+            "name": self.name,
             "state": self.state.value,
             "failure_count": self._failure_count,
             "success_count": self._success_count,

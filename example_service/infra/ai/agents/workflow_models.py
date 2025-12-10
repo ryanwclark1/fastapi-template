@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 import enum
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -39,10 +39,8 @@ from example_service.core.database.enums import (
     AIWorkflowNodeType,
     AIWorkflowStatus,
 )
-
-if TYPE_CHECKING:
-    from example_service.features.tenants.models import Tenant
-    from example_service.features.users.models import User
+from example_service.core.models.tenant import Tenant
+from example_service.core.models.user import User
 
 
 class WorkflowStatus(str, enum.Enum):
@@ -244,7 +242,9 @@ class AIWorkflowExecution(Base):
     # Metadata
     correlation_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
-    metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    extra_metadata: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSON, default=dict
+    )
 
     # Audit fields
     created_at: Mapped[datetime] = mapped_column(
@@ -369,7 +369,9 @@ class AIWorkflowNodeExecution(Base):
     attempt_number: Mapped[int] = mapped_column(Integer, default=1)
 
     # Metadata
-    metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    extra_metadata: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSON, default=dict
+    )
 
     # Relationships
     workflow_execution: Mapped[AIWorkflowExecution] = relationship(
@@ -427,7 +429,9 @@ class AIWorkflowApproval(Base):
 
     # Approval request details
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
-    options: Mapped[list[str]] = mapped_column(JSON, default=lambda: ["approve", "reject"])
+    options: Mapped[list[str]] = mapped_column(
+        JSON, default=lambda: ["approve", "reject"]
+    )
     context: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
     # Status
@@ -453,7 +457,9 @@ class AIWorkflowApproval(Base):
     expires_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     # Metadata
-    metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    extra_metadata: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSON, default=dict
+    )
 
     # Relationships
     workflow_execution: Mapped[AIWorkflowExecution] = relationship(

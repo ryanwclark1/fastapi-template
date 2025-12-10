@@ -20,7 +20,7 @@ Example usage:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -38,19 +38,44 @@ from example_service.features.email.repository import (
     get_email_usage_log_repository,
 )
 from example_service.features.email.service import EmailConfigService
-from example_service.infra.email import get_enhanced_email_service
-from example_service.infra.email.enhanced_service import EnhancedEmailService
 
 # Database session dependency
 SessionDep = Annotated[AsyncSession, Depends(get_async_session)]
 
-# Infrastructure service dependency
-EnhancedEmailServiceDep = Annotated[EnhancedEmailService, Depends(get_enhanced_email_service)]
+
+# Infrastructure service dependency - deferred import to avoid circular dependencies
+def _lazy_get_enhanced_email_service() -> Any:
+    """Lazy import wrapper to avoid circular dependencies."""
+    from example_service.infra.email import get_enhanced_email_service
+
+    return get_enhanced_email_service()
+
+
+# Type alias - use try/except to handle circular imports gracefully
+# The type is imported lazily, and if a circular import occurs, we use Any as fallback
+try:
+    from example_service.infra.email.enhanced_service import EnhancedEmailService
+
+    EnhancedEmailServiceDep = Annotated[
+        EnhancedEmailService, Depends(_lazy_get_enhanced_email_service)
+    ]
+except ImportError:
+    # Circular import detected - use Any as fallback type
+    # The actual type will be resolved at runtime when the dependency is used
+    from typing import Any
+
+    EnhancedEmailServiceDep = Annotated[Any, Depends(_lazy_get_enhanced_email_service)]
 
 # Repository dependencies
-EmailConfigRepositoryDep = Annotated[EmailConfigRepository, Depends(get_email_config_repository)]
-EmailUsageLogRepositoryDep = Annotated[EmailUsageLogRepository, Depends(get_email_usage_log_repository)]
-EmailAuditLogRepositoryDep = Annotated[EmailAuditLogRepository, Depends(get_email_audit_log_repository)]
+EmailConfigRepositoryDep = Annotated[
+    EmailConfigRepository, Depends(get_email_config_repository)
+]
+EmailUsageLogRepositoryDep = Annotated[
+    EmailUsageLogRepository, Depends(get_email_usage_log_repository)
+]
+EmailAuditLogRepositoryDep = Annotated[
+    EmailAuditLogRepository, Depends(get_email_audit_log_repository)
+]
 
 
 async def get_email_config_service(

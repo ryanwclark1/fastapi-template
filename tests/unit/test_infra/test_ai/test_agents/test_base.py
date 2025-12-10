@@ -77,7 +77,7 @@ class TestAgentState:
         assert state.tool_call_count == 0
         assert state.messages == []
         assert state.context == {}
-        assert state.total_cost_usd == Decimal("0")
+        assert state.total_cost_usd == Decimal(0)
         assert state.is_complete is False
 
     def test_state_to_dict(self) -> None:

@@ -16,7 +16,10 @@ from redis.asyncio import ConnectionPool, Redis
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
-from example_service.infra.tasks.tracking.base import BaseTaskTracker, TaskExecutionDetails
+from example_service.infra.tasks.tracking.base import (
+    BaseTaskTracker,
+    TaskExecutionDetails,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping

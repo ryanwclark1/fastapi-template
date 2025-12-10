@@ -1,0 +1,142 @@
+# =============================================================================
+# Accent Intel Service - .dockerignore
+# =============================================================================
+# Service-specific exclusions for accent-intel
+# Inherits patterns from root .dockerignore
+# =============================================================================
+
+# Python virtual environments (CRITICAL - prevents including local venv)
+.venv/
+venv/
+ENV/
+env/
+
+# UV cache
+.uv/
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.benchmarks/
+coverage/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+!README.md
+docs/
+*.rst
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Logs
+*.log
+logs/
+
+# Development environment files
+.env.local
+.env.development
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Uploads (don't include test uploads in image)
+uploads/
+
+# Output directories
+output/
+
+# Large test assets
+**/*.wav
+**/*.mp3
+**/*.mp4
+**/*.mov
+
+# Playwright test results
+test-results/
+playwright-report/
+screenshots/
+videos/
+
+# Development artifacts
+benchmark_results/
+profile_results/
+flamegraph/
+memory_profiler/
+*.profiler
+*.perf
+
+# AI Assistant files
+.claude/
+.mcp.json
+.cursor/
+.continue/
+.ai-assistant/
+.serena/
+serena-project.json
+tasks.json
+task-*.json
+.taskmaster/
+
+# Security-sensitive files
+secrets/
+credentials/
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
+
+# Frontend build artifacts (not needed in backend containers)
+node_modules/
+dist/
+build/
+static/dist/
+
+# IMPORTANT: Keep essential files for devcontainers
+!pyproject.toml
+!uv.lock
+!.devcontainer/
+!.pre-commit-config.yaml
+!pyrightconfig.json
+!docker-compose.yml
+!.devcontainer/docker-compose.yml

@@ -36,21 +36,19 @@ Example with context manager:
 
 from __future__ import annotations
 
-import logging
-import time
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass, field
 from decimal import Decimal
+import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterator
 
-    from example_service.infra.ai.capabilities.types import OperationResult
     from example_service.infra.ai.pipelines.types import (
         PipelineContext,
         PipelineDefinition,
-        PipelineResult,
         PipelineStep,
         StepResult,
     )

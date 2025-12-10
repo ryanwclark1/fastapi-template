@@ -35,19 +35,16 @@ Example:
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from decimal import Decimal
 from enum import Enum
 import json
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, get_type_hints
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, ValidationError, create_model
-
-if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +75,7 @@ class ExtractionResult(Generic[T]):
 
     # Cost tracking
     total_tokens: int = 0
-    total_cost_usd: Decimal = field(default_factory=lambda: Decimal("0"))
+    total_cost_usd: Decimal = field(default_factory=lambda: Decimal(0))
 
 
 @dataclass
@@ -247,9 +244,9 @@ Important:
         """Extract JSON string from response using strategy."""
         if strategy == ExtractionStrategy.MARKDOWN_JSON:
             return self._extract_markdown_json(response)
-        elif strategy == ExtractionStrategy.INLINE_JSON:
+        if strategy == ExtractionStrategy.INLINE_JSON:
             return self._extract_inline_json(response)
-        elif strategy == ExtractionStrategy.JSON_MODE:
+        if strategy == ExtractionStrategy.JSON_MODE:
             # Response should already be JSON
             return response.strip()
         return None
@@ -353,7 +350,7 @@ class StructuredOutputExtractor(Generic[T]):
             ExtractionResult with parsed data or errors
         """
         total_tokens = 0
-        total_cost = Decimal("0")
+        total_cost = Decimal(0)
 
         # Prepare messages with system prompt
         extraction_messages = self._prepare_messages(messages)
@@ -437,12 +434,11 @@ class StructuredOutputExtractor(Generic[T]):
                     }
                     for m in messages
                 ]
-            else:
-                # Add new system message
-                return [
-                    {"role": "system", "content": system_prompt},
-                    *messages,
-                ]
+            # Add new system message
+            return [
+                {"role": "system", "content": system_prompt},
+                *messages,
+            ]
 
         return messages
 

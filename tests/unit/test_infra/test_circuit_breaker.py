@@ -161,8 +161,13 @@ class TestCircuitBreakerStateTransitions:
         assert breaker.state == CircuitState.CLOSED
 
         # Cause failures up to threshold
-        for _ in range(breaker.failure_threshold):
-            with pytest.raises(ServiceError):
+        for attempt in range(breaker.failure_threshold):
+            expected_exception = (
+                ServiceError
+                if attempt < breaker.failure_threshold - 1
+                else CircuitOpenError
+            )
+            with pytest.raises(expected_exception):
                 await breaker.call(fast_failing_func)
 
         assert breaker.state == CircuitState.OPEN
@@ -206,7 +211,7 @@ class TestCircuitBreakerStateTransitions:
         breaker._failure_count = 0
 
         # Single failure should reopen circuit
-        with pytest.raises(ServiceError):
+        with pytest.raises(CircuitOpenError):
             await breaker.call(fast_failing_func)
 
         assert breaker.state == CircuitState.OPEN
@@ -262,9 +267,9 @@ class TestCircuitBreakerCallProtection:
 
         assert breaker._failure_count == breaker.failure_threshold - 1
 
-        # Success should reset failure count
+        # Success should reduce failure count
         await breaker.call(successful_func)
-        assert breaker._failure_count == 0
+        assert breaker._failure_count == breaker.failure_threshold - 2
 
     async def test_call_with_unexpected_exception(self, breaker: CircuitBreaker) -> None:
         """Test unexpected exceptions don't affect circuit state."""
@@ -574,8 +579,13 @@ class TestCircuitBreakerIntegration:
         assert breaker.state == CircuitState.CLOSED
 
         # 2. Cause failures to open circuit
-        for _ in range(breaker.failure_threshold):
-            with pytest.raises(ServiceError):
+        for attempt in range(breaker.failure_threshold):
+            expected_exception = (
+                ServiceError
+                if attempt < breaker.failure_threshold - 1
+                else CircuitOpenError
+            )
+            with pytest.raises(expected_exception):
                 await breaker.call(fast_failing_func)
 
         assert breaker.state == CircuitState.OPEN
@@ -622,8 +632,9 @@ class TestCircuitBreakerIntegration:
             return "Payment processed"
 
         # Calls 1-5: Failures that open the circuit
-        for _ in range(5):
-            with pytest.raises(ServiceError):
+        for attempt in range(5):
+            expected_exception = ServiceError if attempt < 4 else CircuitOpenError
+            with pytest.raises(expected_exception):
                 await service_breaker.call(payment_api_call)
 
         assert service_breaker.is_open

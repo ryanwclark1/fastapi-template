@@ -24,7 +24,6 @@ from example_service.features.email.repository import (
 from example_service.infra.email import get_enhanced_email_service
 from example_service.infra.email.enhanced_service import EnhancedEmailService
 
-
 # Type aliases for dependencies
 SessionDep = Annotated[AsyncSession, Depends(get_async_session)]
 EnhancedEmailServiceDep = Annotated[EnhancedEmailService, Depends(get_enhanced_email_service)]

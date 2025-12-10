@@ -39,17 +39,15 @@ Example:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 import inspect
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar, get_type_hints
+from typing import Any, Generic, TypeVar, get_type_hints
 
 from pydantic import BaseModel, Field, create_model
-
-if TYPE_CHECKING:
-    from collections.abc import Awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -181,13 +179,12 @@ class ToolResult(Generic[T]):
         if self.is_success:
             if isinstance(self.data, str):
                 return self.data
-            elif isinstance(self.data, dict):
+            if isinstance(self.data, dict):
                 import json
+
                 return json.dumps(self.data, indent=2, default=str)
-            else:
-                return str(self.data)
-        else:
-            return f"Error: {self.error}"
+            return str(self.data)
+        return f"Error: {self.error}"
 
 
 class ToolParameter(BaseModel):
@@ -289,7 +286,6 @@ class BaseTool(ABC):
         Returns:
             ToolResult with execution outcome
         """
-        pass
 
     def validate_input(self, **kwargs: Any) -> dict[str, Any]:
         """Validate input against InputSchema if defined.
@@ -451,6 +447,7 @@ def tool(
         async def web_search(query: str, max_results: int = 10) -> list[dict]:
             return await perform_search(query, max_results)
     """
+
     def decorator(func: Callable[..., Awaitable[Any]]) -> FunctionTool:
         tool_name = name or func.__name__
         tool_description = description or func.__doc__ or f"Execute {tool_name}"
@@ -608,8 +605,7 @@ class ToolRegistry:
     ) -> list[dict[str, Any]]:
         """Get tools in OpenAI function calling format."""
         return [
-            d.to_openai_format()
-            for d in self.get_definitions(names, exclude_dangerous)
+            d.to_openai_format() for d in self.get_definitions(names, exclude_dangerous)
         ]
 
     def get_anthropic_tools(

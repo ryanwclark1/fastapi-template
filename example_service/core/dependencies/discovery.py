@@ -97,6 +97,9 @@ async def optional_discovery_service(
 
 
 # Type aliases for cleaner route signatures
+# Import at runtime after function definitions to avoid circular dependencies
+from example_service.infra.discovery import ConsulService  # noqa: E402
+
 DiscoveryServiceDep = Annotated[ConsulService, Depends(require_discovery_service)]
 """Discovery service dependency that requires Consul to be available.
 

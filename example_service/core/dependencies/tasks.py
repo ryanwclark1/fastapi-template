@@ -31,14 +31,9 @@ Usage:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException, status
-
-if TYPE_CHECKING:
-    from taskiq_aio_pika import AioPikaBroker
-
-    from example_service.infra.tasks.tracking import BaseTaskTracker
 
 
 async def get_task_broker() -> AioPikaBroker | None:
@@ -172,6 +167,11 @@ async def optional_task_tracker(
 
 
 # Type aliases for cleaner route signatures
+# Import at runtime after function definitions to avoid circular dependencies
+from taskiq_aio_pika import AioPikaBroker  # noqa: E402
+
+from example_service.infra.tasks.tracking import BaseTaskTracker  # noqa: E402
+
 TaskBrokerDep = Annotated[AioPikaBroker, Depends(require_task_broker)]
 """Task broker dependency that requires broker to be available.
 

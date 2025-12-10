@@ -10,6 +10,11 @@ from fastapi import FastAPI, status
 from httpx import ASGITransport, AsyncClient
 import pytest
 
+from example_service.core.dependencies.database import get_async_session
+from example_service.features.email.dependencies import (
+    _lazy_get_enhanced_email_service,
+    get_email_config_service,
+)
 from example_service.features.email.models import (
     EmailAuditLog,
     EmailConfig,
@@ -17,12 +22,7 @@ from example_service.features.email.models import (
     EmailUsageLog,
 )
 from example_service.features.email.router import router
-from example_service.features.email.dependencies import (
-    get_email_config_service,
-)
 from example_service.features.email.service import EmailConfigService
-from example_service.core.dependencies.database import get_async_session
-from example_service.infra.email import get_enhanced_email_service
 
 
 @pytest.fixture
@@ -108,11 +108,11 @@ async def email_client(
     async def override_get_email_config_service():
         yield mock_service
 
-    async def override_get_enhanced_email_service():
+    def override_get_enhanced_email_service():
         return mock_email_service
 
     app.dependency_overrides[get_email_config_service] = override_get_email_config_service
-    app.dependency_overrides[get_enhanced_email_service] = override_get_enhanced_email_service
+    app.dependency_overrides[_lazy_get_enhanced_email_service] = override_get_enhanced_email_service
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client

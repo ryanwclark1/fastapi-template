@@ -40,15 +40,13 @@ Example:
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import hmac
-import json
-import logging
-from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, Callable
-from uuid import UUID, uuid4
+import hashlib
+import hmac
+import logging
+from typing import Any
+from uuid import uuid4
 
 import httpx
 from pydantic import BaseModel, Field, HttpUrl
@@ -336,7 +334,7 @@ class WebhookClient:
                     delivery.status = "success"
                     delivery.completed_at = datetime.now(UTC)
                     logger.info(
-                        f"Webhook delivered successfully",
+                        "Webhook delivered successfully",
                         extra={
                             "webhook_id": payload.id,
                             "event": payload.event,
@@ -350,7 +348,7 @@ class WebhookClient:
                 if response.status_code >= 500:
                     delivery.error = f"Server error: {response.status_code}"
                     logger.warning(
-                        f"Webhook server error, will retry",
+                        "Webhook server error, will retry",
                         extra={
                             "webhook_id": payload.id,
                             "status_code": response.status_code,
@@ -363,7 +361,7 @@ class WebhookClient:
                     delivery.error = f"Client error: {response.status_code}"
                     delivery.completed_at = datetime.now(UTC)
                     logger.error(
-                        f"Webhook client error, not retrying",
+                        "Webhook client error, not retrying",
                         extra={
                             "webhook_id": payload.id,
                             "status_code": response.status_code,
@@ -374,14 +372,14 @@ class WebhookClient:
             except httpx.TimeoutException:
                 delivery.error = "Request timeout"
                 logger.warning(
-                    f"Webhook timeout, will retry",
+                    "Webhook timeout, will retry",
                     extra={"webhook_id": payload.id, "attempt": attempt + 1},
                 )
 
             except httpx.RequestError as e:
                 delivery.error = f"Request error: {e!s}"
                 logger.warning(
-                    f"Webhook request error, will retry",
+                    "Webhook request error, will retry",
                     extra={
                         "webhook_id": payload.id,
                         "error": str(e),
@@ -503,8 +501,7 @@ class WorkflowWebhookHandler:
         if self.config.batch_events:
             await self._add_to_batch(payload)
             return None
-        else:
-            return await self._send_single(payload)
+        return await self._send_single(payload)
 
     async def _send_single(self, payload: WebhookPayload) -> WebhookDelivery:
         """Send a single webhook."""

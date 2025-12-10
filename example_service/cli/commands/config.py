@@ -59,7 +59,9 @@ def show(output_format: str, show_secrets: bool) -> None:
                 "port": settings.db.port,
                 "name": settings.db.name,
                 "user": settings.db.user,
-                "password": "***" if not show_secrets else settings.db.password.get_secret_value(),
+                "password": "***"
+                if not show_secrets
+                else settings.db.password.get_secret_value(),
                 "pool_size": settings.db.pool_size,
                 "max_overflow": settings.db.max_overflow,
             },
@@ -137,7 +139,9 @@ def validate() -> None:
         # Check database configuration
         click.echo("\n🗄️  Database Configuration:")
         try:
-            info(f"  Database URL: {settings.db.host}:{settings.db.port}/{settings.db.name}")
+            info(
+                f"  Database URL: {settings.db.host}:{settings.db.port}/{settings.db.name}"
+            )
             success("  ✓ Database settings valid")
         except Exception as e:
             error(f"  ✗ Database configuration error: {e}")
@@ -213,34 +217,84 @@ def _extract_defaults_from_settings() -> dict[str, tuple[str, str]]:
     from pydantic import SecretStr
     from pydantic_core import PydanticUndefined
 
+    # Import all settings classes
+    from example_service.core.settings.ai import AISettings
     from example_service.core.settings.app import AppSettings
     from example_service.core.settings.auth import AuthSettings
     from example_service.core.settings.backup import BackupSettings
+    from example_service.core.settings.consul import ConsulSettings
+    from example_service.core.settings.datatransfer import DataTransferSettings
+    from example_service.core.settings.email import EmailSettings
+    from example_service.core.settings.graphql import GraphQLSettings
+    from example_service.core.settings.health import HealthCheckSettings
+    from example_service.core.settings.i18n import I18nSettings
+    from example_service.core.settings.jobs import JobSettings
     from example_service.core.settings.logs import LoggingSettings
+    from example_service.core.settings.mock import MockModeSettings
     from example_service.core.settings.otel import OtelSettings
+    from example_service.core.settings.pagination import PaginationSettings
     from example_service.core.settings.postgres import PostgresSettings
     from example_service.core.settings.rabbit import RabbitSettings
     from example_service.core.settings.redis import RedisSettings
+    from example_service.core.settings.storage import StorageSettings
+    from example_service.core.settings.tasks import TaskSettings
+    from example_service.core.settings.websocket import WebSocketSettings
 
     defaults: dict[str, tuple[str, str]] = {}
 
-    # Define settings classes with their prefixes
-    settings_map: list[tuple[type[BaseSettings], str]] = [
-        (AppSettings, "APP_"),
-        (PostgresSettings, "DB_"),
-        (RedisSettings, "REDIS_"),
-        (RabbitSettings, "RABBIT_"),
-        (AuthSettings, "AUTH_"),
-        (LoggingSettings, "LOG_"),
-        (OtelSettings, "OTEL_"),
-        (BackupSettings, "BACKUP_"),
+    # Define settings classes - prefixes will be extracted from their model_config
+    settings_classes: list[type[BaseSettings]] = [
+        AppSettings,
+        PostgresSettings,
+        RedisSettings,
+        RabbitSettings,
+        AuthSettings,
+        LoggingSettings,
+        OtelSettings,
+        BackupSettings,
+        ConsulSettings,
+        StorageSettings,
+        TaskSettings,
+        PaginationSettings,
+        MockModeSettings,
+        AISettings,
+        EmailSettings,
+        GraphQLSettings,
+        HealthCheckSettings,
+        I18nSettings,
+        DataTransferSettings,
+        WebSocketSettings,
+        JobSettings,
     ]
 
-    for settings_cls, prefix in settings_map:
+    for settings_cls in settings_classes:
+        # Extract prefix from model_config (SettingsConfigDict is dict-like)
+        model_config = getattr(settings_cls, "model_config", None)
+        if model_config is None:
+            warning(f"No model_config found for {settings_cls.__name__}, skipping")
+            continue
+
+        # Get env_prefix from model_config
+        prefix = model_config.get("env_prefix", "")  # type: ignore[union-attr]
+        if not prefix:
+            warning(
+                f"No env_prefix found in {settings_cls.__name__}.model_config, skipping"
+            )
+            continue
+
         # Iterate through model_fields
         for field_name, field_info in settings_cls.model_fields.items():
-            # Build env var name
-            env_name = f"{prefix}{field_name.upper()}"
+            # Check if field has an alias (for env var name)
+            # In Pydantic Settings, when a field has an alias, it's used as the env var name
+            # instead of prefix + field_name. For example, PostgresSettings.dsn has
+            # alias="DATABASE_URL", so the env var is DATABASE_URL, not DB_DSN.
+            if field_info.alias and field_info.alias != field_name:
+                # Use alias directly (uppercase) as the env var name
+                # The prefix is still used for section grouping
+                env_var_name = field_info.alias.upper()
+            else:
+                # Build env var name from prefix + field name
+                env_var_name = f"{prefix}{field_name.upper()}"
 
             # Get default value
             default_val = field_info.default
@@ -249,7 +303,9 @@ def _extract_defaults_from_settings() -> dict[str, tuple[str, str]]:
                     # Call factory to get default
                     try:
                         # Type narrowing: default_factory is Callable[[], Any] when not None
-                        factory = cast("Callable[[], object]", field_info.default_factory)
+                        factory = cast(
+                            "Callable[[], object]", field_info.default_factory
+                        )
                         default_val = factory()
                     except Exception as e:
                         # Skip if factory fails
@@ -275,7 +331,7 @@ def _extract_defaults_from_settings() -> dict[str, tuple[str, str]]:
             else:
                 formatted = str(default_val)
 
-            defaults[env_name] = (prefix, formatted)
+            defaults[env_var_name] = (prefix, formatted)
 
     return defaults
 
@@ -314,7 +370,9 @@ def generate_env(output: str, overwrite: bool) -> None:
         ]
 
         # Helper to add a section
-        def add_section(title: str, prefix: str, header_comments: list[str] | None = None) -> None:
+        def add_section(
+            title: str, prefix: str, header_comments: list[str] | None = None
+        ) -> None:
             lines.append("# " + "=" * 76)
             lines.append(f"# {title}")
             lines.append("# " + "=" * 76)
@@ -353,6 +411,19 @@ def generate_env(output: str, overwrite: bool) -> None:
         add_section("LOGGING SETTINGS", "LOG_")
         add_section("OPENTELEMETRY SETTINGS", "OTEL_")
         add_section("BACKUP SETTINGS", "BACKUP_")
+        add_section("CONSUL SETTINGS", "CONSUL_")
+        add_section("STORAGE SETTINGS", "STORAGE_")
+        add_section("TASK SETTINGS", "TASK_")
+        add_section("PAGINATION SETTINGS", "PAGINATION_")
+        add_section("MOCK MODE SETTINGS", "MOCK_")
+        add_section("AI SETTINGS", "AI_")
+        add_section("EMAIL SETTINGS", "EMAIL_")
+        add_section("GRAPHQL SETTINGS", "GRAPHQL_")
+        add_section("HEALTH CHECK SETTINGS", "HEALTH_")
+        add_section("INTERNATIONALIZATION SETTINGS", "I18N_")
+        add_section("DATA TRANSFER SETTINGS", "DATATRANSFER_")
+        add_section("WEBSOCKET SETTINGS", "WS_")
+        add_section("JOB SETTINGS", "JOB_")
 
         # Write to file
         env_content = "\n".join(lines)
@@ -409,7 +480,9 @@ def generate_env_with_defaults(output: str, overwrite: bool) -> None:
         ]
 
         # Helper to add a section
-        def add_section(title: str, prefix: str, header_comments: list[str] | None = None) -> None:
+        def add_section(
+            title: str, prefix: str, header_comments: list[str] | None = None
+        ) -> None:
             lines.append("# " + "=" * 76)
             lines.append(f"# {title}")
             lines.append("# " + "=" * 76)
@@ -448,6 +521,19 @@ def generate_env_with_defaults(output: str, overwrite: bool) -> None:
         add_section("LOGGING SETTINGS", "LOG_")
         add_section("OPENTELEMETRY SETTINGS", "OTEL_")
         add_section("BACKUP SETTINGS", "BACKUP_")
+        add_section("CONSUL SETTINGS", "CONSUL_")
+        add_section("STORAGE SETTINGS", "STORAGE_")
+        add_section("TASK SETTINGS", "TASK_")
+        add_section("PAGINATION SETTINGS", "PAGINATION_")
+        add_section("MOCK MODE SETTINGS", "MOCK_")
+        add_section("AI SETTINGS", "AI_")
+        add_section("EMAIL SETTINGS", "EMAIL_")
+        add_section("GRAPHQL SETTINGS", "GRAPHQL_")
+        add_section("HEALTH CHECK SETTINGS", "HEALTH_")
+        add_section("INTERNATIONALIZATION SETTINGS", "I18N_")
+        add_section("DATA TRANSFER SETTINGS", "DATATRANSFER_")
+        add_section("WEBSOCKET SETTINGS", "WS_")
+        add_section("JOB SETTINGS", "JOB_")
 
         # Write to file
         env_content = "\n".join(lines)
@@ -485,7 +571,9 @@ def get(key: str) -> None:
 
         # Handle SecretStr
         if hasattr(value, "get_secret_value"):
-            warning("This is a secret value. Use 'config show --show-secrets' to view it.")
+            warning(
+                "This is a secret value. Use 'config show --show-secrets' to view it."
+            )
             click.echo("***")
         else:
             click.echo(value)
@@ -599,11 +687,15 @@ def show_env(show_all: bool, filter_prefix: str | None) -> None:
                 if value:
                     set_count += 1
                     # Mask sensitive values
-                    if any(s in var.upper() for s in ["PASSWORD", "SECRET", "TOKEN", "KEY"]):
+                    if any(
+                        s in var.upper() for s in ["PASSWORD", "SECRET", "TOKEN", "KEY"]
+                    ):
                         display_value = "***"
                     else:
                         display_value = value[:40] + ("..." if len(value) > 40 else "")
-                    click.echo(f"  {click.style('OK', fg='green')} {var}={display_value}")
+                    click.echo(
+                        f"  {click.style('OK', fg='green')} {var}={display_value}"
+                    )
                 else:
                     unset_count += 1
                     click.echo(f"  {click.style('--', fg='red')} {var} (not set)")
@@ -689,7 +781,9 @@ def check_env() -> None:
                     f"  {click.style('SET', fg='yellow')} {var} (ignored, DATABASE_URL is used)"
                 )
             else:
-                click.echo(f"  {click.style('--', fg='white', dim=True)} {var} (not needed)")
+                click.echo(
+                    f"  {click.style('--', fg='white', dim=True)} {var} (not needed)"
+                )
 
     section("Recommended Variables")
     for var in recommended:
@@ -697,7 +791,9 @@ def check_env() -> None:
         if value:
             click.echo(f"  {click.style('OK', fg='green')} {var}")
         else:
-            click.echo(f"  {click.style('DEFAULT', fg='yellow')} {var} - not set (using default)")
+            click.echo(
+                f"  {click.style('DEFAULT', fg='yellow')} {var} - not set (using default)"
+            )
             warnings_list.append(var)
 
     # Check for common issues
@@ -725,7 +821,9 @@ def check_env() -> None:
             )
             warnings_list.append("DEBUG_IN_PROD")
         else:
-            click.echo(f"  {click.style('OK', fg='green')} Debug disabled in production")
+            click.echo(
+                f"  {click.style('OK', fg='green')} Debug disabled in production"
+            )
 
     # Summary
     click.echo()
@@ -768,7 +866,9 @@ def show_sources() -> None:
 
     # Show current environment
     section("Active Environment")
-    click.echo(f"  APP_ENVIRONMENT: {os.environ.get('APP_ENVIRONMENT', 'development (default)')}")
+    click.echo(
+        f"  APP_ENVIRONMENT: {os.environ.get('APP_ENVIRONMENT', 'development (default)')}"
+    )
 
     # Show configuration loading order
     section("Loading Priority (highest to lowest)")
@@ -791,11 +891,14 @@ def show_sources() -> None:
                         if line and not line.startswith("#") and "=" in line:
                             key = line.split("=")[0]
                             if any(
-                                s in key.upper() for s in ["PASSWORD", "SECRET", "TOKEN", "KEY"]
+                                s in key.upper()
+                                for s in ["PASSWORD", "SECRET", "TOKEN", "KEY"]
                             ):
                                 click.echo(f"    {key}=***")
                             else:
-                                click.echo(f"    {line[:60]}{'...' if len(line) > 60 else ''}")
+                                click.echo(
+                                    f"    {line[:60]}{'...' if len(line) > 60 else ''}"
+                                )
             except Exception as e:
                 click.echo(f"    (Error reading file: {e})")
 
@@ -839,13 +942,11 @@ def show_diff(output_format: str) -> None:
     for key, default in sorted(defaults.items()):
         current = os.environ.get(key, default)
         if current != default:
-            differences.append(
-                {
-                    "key": key,
-                    "default": default,
-                    "current": current,
-                }
-            )
+            differences.append({
+                "key": key,
+                "default": default,
+                "current": current,
+            })
         else:
             same.append(key)
 
@@ -866,7 +967,9 @@ def show_diff(output_format: str) -> None:
         for diff in differences:
             # Mask sensitive values
             current = diff["current"]
-            if any(s in diff["key"].upper() for s in ["PASSWORD", "SECRET", "TOKEN", "KEY"]):
+            if any(
+                s in diff["key"].upper() for s in ["PASSWORD", "SECRET", "TOKEN", "KEY"]
+            ):
                 current = "***"
 
             click.echo(f"  {diff['key']}:")

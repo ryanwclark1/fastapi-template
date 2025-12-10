@@ -37,14 +37,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
-import hashlib
 import json
 import logging
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 if TYPE_CHECKING:
     from redis.asyncio import Redis
-    from sqlalchemy.ext.asyncio import AsyncSession
 
     from example_service.infra.cache import RedisCache
 
@@ -165,7 +163,6 @@ class BaseStateStore(ABC):
         Returns:
             Value if exists and not expired, None otherwise
         """
-        pass
 
     @abstractmethod
     async def set(
@@ -183,7 +180,6 @@ class BaseStateStore(ABC):
             ttl_seconds: Time-to-live in seconds (None = no expiry)
             metadata: Additional metadata to store
         """
-        pass
 
     @abstractmethod
     async def delete(self, key: StateKey) -> bool:
@@ -195,7 +191,6 @@ class BaseStateStore(ABC):
         Returns:
             True if deleted, False if not found
         """
-        pass
 
     @abstractmethod
     async def exists(self, key: StateKey) -> bool:
@@ -207,7 +202,6 @@ class BaseStateStore(ABC):
         Returns:
             True if exists and not expired
         """
-        pass
 
     @abstractmethod
     async def list_keys(
@@ -226,7 +220,6 @@ class BaseStateStore(ABC):
         Returns:
             List of matching keys
         """
-        pass
 
     @abstractmethod
     async def clear_namespace(
@@ -243,7 +236,6 @@ class BaseStateStore(ABC):
         Returns:
             Number of keys deleted
         """
-        pass
 
     async def get_or_set(
         self,

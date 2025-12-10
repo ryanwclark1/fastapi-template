@@ -482,9 +482,8 @@ class AISettings(BaseSettings):
             "ollama",
         }
         if v not in valid_providers:
-            raise ValueError(
-                f"Invalid provider: {v}. Must be one of: {', '.join(valid_providers)}"
-            )
+            msg = f"Invalid provider: {v}"
+            raise ValueError(msg)
         return v
 
     @field_validator("default_embedding_provider")
@@ -493,9 +492,8 @@ class AISettings(BaseSettings):
         """Validate embedding provider name."""
         valid_providers = {"openai", "cohere", "local"}
         if v not in valid_providers:
-            raise ValueError(
-                f"Invalid embedding provider: {v}. Must be one of: {', '.join(valid_providers)}"
-            )
+            msg = f"Invalid embedding provider: {v}"
+            raise ValueError(msg)
         return v
 
     model_config = SettingsConfigDict(
@@ -717,7 +715,8 @@ class AISettings(BaseSettings):
                 max_retries=self.max_retries,
                 base_url=self.ollama_base_url,
             )
-        raise ValueError(f"Invalid LLM provider: {provider}")
+        msg = f"Invalid LLM provider: {provider}"
+        raise ValueError(msg)
 
     def get_transcription_settings(
         self,
@@ -778,7 +777,8 @@ class AISettings(BaseSettings):
                 max_retries=self.max_retries,
                 service_url=self.accent_stt_url,
             )
-        raise ValueError(f"Invalid transcription provider: {provider}")
+        msg = f"Invalid transcription provider: {provider}"
+        raise ValueError(msg)
 
     def get_embedding_settings(
         self,
@@ -831,4 +831,5 @@ class AISettings(BaseSettings):
                 normalize=self.local_embedding_normalize,
                 batch_size=self.local_embedding_batch_size,
             )
-        raise ValueError(f"Invalid embedding provider: {provider}")
+        msg = f"Invalid embedding provider: {provider}"
+        raise ValueError(msg)

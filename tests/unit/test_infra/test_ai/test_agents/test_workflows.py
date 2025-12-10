@@ -19,7 +19,6 @@ from example_service.infra.ai.agents.workflows import (
     Workflow,
     WorkflowBuilder,
     WorkflowContext,
-    WorkflowResult,
     WorkflowState,
     WorkflowStatus,
     conditional_branch,
@@ -623,11 +622,7 @@ class TestWorkflowBuilder:
         async def process(data: dict[str, Any]) -> dict[str, Any]:
             return {}
 
-        workflow = (
-            WorkflowBuilder("test")
-            .add_node("only_node", process)
-            .compile()
-        )
+        workflow = WorkflowBuilder("test").add_node("only_node", process).compile()
 
         assert workflow.entry_point == "only_node"
 

@@ -37,8 +37,8 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from example_service.core.database import get_async_session
+from example_service.core.models.user import User
 from example_service.features.auth.dependencies import get_current_user
-from example_service.features.users.models import User
 from example_service.infra.ai.agents.workflow_models import (
     AIWorkflowApproval,
     AIWorkflowDefinition,

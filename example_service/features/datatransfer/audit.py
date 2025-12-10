@@ -7,8 +7,7 @@ and import operations with detailed metadata.
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from example_service.features.audit.models import AuditAction
 from example_service.features.audit.service import AuditService

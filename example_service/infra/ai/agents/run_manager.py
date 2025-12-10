@@ -114,7 +114,7 @@ class RunStats:
     paused: int = 0
     average_duration_seconds: float | None = None
     success_rate: float | None = None
-    average_cost_usd: Decimal = field(default_factory=lambda: Decimal("0"))
+    average_cost_usd: Decimal = field(default_factory=lambda: Decimal(0))
 
 
 class RunManager:
@@ -473,7 +473,7 @@ class RunManager:
             total_input_tokens=agg_row.input_tokens or 0,
             total_output_tokens=agg_row.output_tokens or 0,
             average_cost_per_run=(
-                total_cost / total_runs if total_runs > 0 else Decimal("0")
+                total_cost / total_runs if total_runs > 0 else Decimal(0)
             ),
             cost_by_agent=cost_by_agent,
             cost_by_status=cost_by_status,
@@ -679,8 +679,6 @@ class RunManager:
         Returns:
             True if deleted, False if not found
         """
-        from example_service.infra.ai.agents.models import AIAgentRun
-
         run = await self.get_run(run_id)
         if not run:
             return False

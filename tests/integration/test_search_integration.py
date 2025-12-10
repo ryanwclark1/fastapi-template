@@ -15,6 +15,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
+from tests.conftest import ENUM_DEFINITIONS
+
 # ============================================================================
 # Fixtures
 # ============================================================================
@@ -48,9 +50,31 @@ async def search_db_engine(postgres_container: str):
 async def search_session(search_db_engine) -> AsyncSession:
     """Create session with search tables and triggers."""
     from example_service.core.database.base import Base
+    from example_service.features.reminders import (
+        models as reminder_models,
+    )
 
-    # Create all tables
+    # Ensure enum types exist before creating tables
+    enum_definitions = ENUM_DEFINITIONS
+
     async with search_db_engine.begin() as conn:
+        for values, name in enum_definitions:
+            values_sql = ", ".join(f"'{value}'" for value in values)
+            await conn.execute(
+                text(
+                    f"""
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = '{name}') THEN
+                            CREATE TYPE {name} AS ENUM ({values_sql});
+                        END IF;
+                    END
+                    $$;
+                    """
+                )
+            )
+
+        # Create all tables
         await conn.run_sync(Base.metadata.create_all)
 
         # Create the search trigger function and trigger
@@ -94,6 +118,8 @@ async def search_session(search_db_engine) -> AsyncSession:
 
     async with async_session_maker() as session:
         try:
+            # Lower trigram threshold slightly so typo-based tests remain stable
+            await session.execute(text("SET pg_trgm.similarity_threshold = 0.2"))
             yield session
         finally:
             await session.rollback()

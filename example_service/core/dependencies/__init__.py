@@ -23,7 +23,8 @@ Usage:
         get_event_publisher,
         EventPublisherDep,
         get_cache,
-        MessageBroker,
+        BusPublisherDep,  # New Protocol-based API (recommended)
+        MessageBroker,     # Legacy API (still supported)
         Storage,
     )
 
@@ -32,7 +33,7 @@ Usage:
         session: AsyncSession = Depends(get_db_session),
         publisher: EventPublisher = Depends(get_event_publisher),
         cache: RedisCache = Depends(get_cache),
-        broker: MessageBroker,
+        bus: BusPublisherDep,  # New Protocol-based messaging
         storage: Storage,
     ):
         ...
@@ -126,10 +127,18 @@ from example_service.core.dependencies.events import (
 
 # Messaging dependencies
 from example_service.core.dependencies.messaging import (
+    # New Protocol-based API (recommended)
+    BusPublisher,
+    BusPublisherDep,
+    # Legacy API (backward compatibility)
     MessageBroker,
     OptionalMessageBroker,
+    RabbitBusPublisher,
+    RequiredBusPublisher,
+    get_bus_publisher,
     get_message_broker,
     optional_message_broker,
+    require_bus_publisher,
     require_message_broker,
 )
 
@@ -220,6 +229,8 @@ __all__ = [
     "AIMetricsDep",
     "AITracerDep",
     "BudgetServiceDep",
+    "BusPublisher",
+    "BusPublisherDep",
     "ConnectionManagerDep",
     "DiscoveryServiceDep",
     "EmailServiceDep",
@@ -242,6 +253,7 @@ __all__ = [
     "OptionalTaskTracker",
     "OrchestratorDep",
     "PaginationParams",
+    "RabbitBusPublisher",
     "RateLimited",
     "RequireAuth",
     "RequireBroker",
@@ -251,6 +263,7 @@ __all__ = [
     "RequireDatabaseAndBroker",
     "RequireDatabaseAndCache",
     "RequireStorage",
+    "RequiredBusPublisher",
     "SchedulerStatusDep",
     "SearchPagination",
     "SearchPaginationParams",
@@ -269,6 +282,7 @@ __all__ = [
     "get_ai_logger_dep",
     "get_ai_metrics_dep",
     "get_ai_tracer_dep",
+    "get_bus_publisher",
     "get_cache",
     "get_db_session",
     "get_default_tracer",
@@ -304,6 +318,7 @@ __all__ = [
     "per_api_key_rate_limit",
     "per_user_rate_limit",
     "rate_limit",
+    "require_bus_publisher",
     "require_connection_manager",
     "require_discovery_service",
     "require_email_service",

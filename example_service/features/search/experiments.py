@@ -24,15 +24,15 @@ Usage:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
 import hashlib
 import logging
 import math
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Boolean, Float, Integer, String, func, select
+from sqlalchemy import Float, Integer, String, func, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 

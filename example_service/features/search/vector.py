@@ -33,12 +33,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
 import logging
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Float, Integer, String, func, select, text
-from sqlalchemy.orm import Mapped, mapped_column
-
-from example_service.core.database import TimestampedBase
+from sqlalchemy import text
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession

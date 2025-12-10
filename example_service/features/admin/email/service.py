@@ -191,7 +191,7 @@ class EmailAdminService(BaseService):
 
                 return {
                     "tenant_id": config.tenant_id,
-                    "provider": config.provider_type.value if hasattr(config.provider_type, 'value') else config.provider_type,
+                    "provider": config.provider_type.value if hasattr(config.provider_type, "value") else config.provider_type,
                     "healthy": is_healthy,
                     "response_time_ms": duration_ms,
                     "error": None,
@@ -199,7 +199,7 @@ class EmailAdminService(BaseService):
             except Exception as e:
                 return {
                     "tenant_id": config.tenant_id,
-                    "provider": config.provider_type.value if hasattr(config.provider_type, 'value') else config.provider_type,
+                    "provider": config.provider_type.value if hasattr(config.provider_type, "value") else config.provider_type,
                     "healthy": False,
                     "response_time_ms": None,
                     "error": str(e),
@@ -257,7 +257,7 @@ class EmailAdminService(BaseService):
                 {
                     "id": str(config.id),
                     "tenant_id": config.tenant_id,
-                    "provider_type": config.provider_type.value if hasattr(config.provider_type, 'value') else config.provider_type,
+                    "provider_type": config.provider_type.value if hasattr(config.provider_type, "value") else config.provider_type,
                     "is_active": config.is_active,
                     "from_email": config.from_email,
                     "rate_limit_per_minute": config.rate_limit_per_minute,
@@ -297,7 +297,7 @@ class EmailAdminService(BaseService):
         # Count by provider
         provider_counts: dict[str, int] = {}
         for config in configs:
-            provider = config.provider_type.value if hasattr(config.provider_type, 'value') else config.provider_type
+            provider = config.provider_type.value if hasattr(config.provider_type, "value") else config.provider_type
             provider_counts[provider] = provider_counts.get(provider, 0) + 1
 
         distribution = [

@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from example_service.core.schemas.common import HealthStatus
-from example_service.features.health.accent_auth_provider import (
+from example_service.features.health.providers.accent_auth import (
     AccentAuthHealthProvider,
 )
 

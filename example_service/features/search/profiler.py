@@ -20,14 +20,15 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 import logging
 import time
-from typing import TYPE_CHECKING, Any, AsyncGenerator
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Float, Integer, String, func, select, text
+from sqlalchemy import Float, Integer, String, func, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -170,7 +171,7 @@ class QueryProfiler:
     async def profile(
         self,
         query_type: str,
-    ) -> AsyncGenerator[ProfileContext, None]:
+    ) -> AsyncGenerator[ProfileContext]:
         """Context manager for profiling a query.
 
         Args:

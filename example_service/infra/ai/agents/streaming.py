@@ -29,14 +29,15 @@ Example:
 
 from __future__ import annotations
 
-import asyncio
-import json
-import logging
 from abc import ABC, abstractmethod
+import asyncio
+from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, AsyncGenerator, Callable, TypeVar
+import json
+import logging
+from typing import Any, TypeVar
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
@@ -212,17 +213,14 @@ class StreamHandler(ABC):
         Args:
             event: Event to emit
         """
-        pass
 
     @abstractmethod
     async def close(self) -> None:
         """Close the stream."""
-        pass
 
     @abstractmethod
     def is_closed(self) -> bool:
         """Check if stream is closed."""
-        pass
 
 
 class AsyncGeneratorHandler(StreamHandler):
@@ -246,7 +244,7 @@ class AsyncGeneratorHandler(StreamHandler):
         """Check if closed."""
         return self._closed
 
-    async def __aiter__(self) -> AsyncGenerator[StreamEvent, None]:
+    async def __aiter__(self) -> AsyncGenerator[StreamEvent]:
         """Iterate over events."""
         while True:
             event = await self._queue.get()
@@ -693,8 +691,8 @@ class StreamingAgentMixin:
 
 
 async def create_sse_response(
-    events: AsyncGenerator[StreamEvent, None],
-) -> AsyncGenerator[str, None]:
+    events: AsyncGenerator[StreamEvent],
+) -> AsyncGenerator[str]:
     """Convert stream events to SSE format.
 
     Args:
@@ -722,8 +720,8 @@ async def create_sse_response(
 
 
 async def create_json_stream(
-    events: AsyncGenerator[StreamEvent, None],
-) -> AsyncGenerator[str, None]:
+    events: AsyncGenerator[StreamEvent],
+) -> AsyncGenerator[str]:
     """Convert stream events to newline-delimited JSON.
 
     Args:

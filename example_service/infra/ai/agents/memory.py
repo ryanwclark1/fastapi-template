@@ -35,15 +35,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections import deque
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Callable, Protocol
 import hashlib
 import json
 import logging
-
-if TYPE_CHECKING:
-    from collections.abc import Awaitable
+from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +128,6 @@ class BaseMemory(ABC):
         Args:
             message: Message to add (dict or MemoryMessage)
         """
-        pass
 
     @abstractmethod
     def add_messages(self, messages: list[dict[str, Any] | MemoryMessage]) -> None:
@@ -139,7 +136,6 @@ class BaseMemory(ABC):
         Args:
             messages: List of messages to add
         """
-        pass
 
     @abstractmethod
     def get_messages(self) -> list[dict[str, Any]]:
@@ -148,29 +144,24 @@ class BaseMemory(ABC):
         Returns:
             List of message dicts for LLM API
         """
-        pass
 
     @abstractmethod
     def clear(self) -> None:
         """Clear all messages from memory."""
-        pass
 
     @abstractmethod
     def to_dict(self) -> dict[str, Any]:
         """Serialize memory state for persistence."""
-        pass
 
     @classmethod
     @abstractmethod
     def from_dict(cls, data: dict[str, Any]) -> BaseMemory:
         """Restore memory from serialized state."""
-        pass
 
     @property
     @abstractmethod
     def message_count(self) -> int:
         """Get number of messages in memory."""
-        pass
 
     @property
     def token_count(self) -> int | None:
@@ -324,9 +315,7 @@ class WindowMemory(BaseMemory):
 
         if self.keep_system and message.role == "system":
             # Check for duplicate system messages
-            if not any(
-                m.content == message.content for m in self._system_messages
-            ):
+            if not any(m.content == message.content for m in self._system_messages):
                 self._system_messages.append(message)
         else:
             self._messages.append(message)
@@ -441,9 +430,7 @@ class SummaryMemory(BaseMemory):
             message = MemoryMessage(**message)
 
         if message.role == "system":
-            if not any(
-                m.content == message.content for m in self._system_messages
-            ):
+            if not any(m.content == message.content for m in self._system_messages):
                 self._system_messages.append(message)
         else:
             # If recent buffer is full, move oldest to pending summary
@@ -470,10 +457,13 @@ class SummaryMemory(BaseMemory):
 
         # Include existing summary in context
         if self._summary:
-            messages_to_summarize.insert(0, {
-                "role": "system",
-                "content": f"Previous summary: {self._summary}",
-            })
+            messages_to_summarize.insert(
+                0,
+                {
+                    "role": "system",
+                    "content": f"Previous summary: {self._summary}",
+                },
+            )
 
         try:
             self._summary = await self._summarizer(messages_to_summarize)
@@ -707,15 +697,14 @@ def _deserialize_memory(data: dict[str, Any]) -> BaseMemory:
 
     if memory_type == "buffer":
         return BufferMemory.from_dict(data)
-    elif memory_type == "window":
+    if memory_type == "window":
         return WindowMemory.from_dict(data)
-    elif memory_type == "summary":
+    if memory_type == "summary":
         return SummaryMemory.from_dict(data)
-    elif memory_type == "conversation":
+    if memory_type == "conversation":
         return ConversationMemory.from_dict(data)
-    else:
-        logger.warning(f"Unknown memory type: {memory_type}, using BufferMemory")
-        return BufferMemory.from_dict(data)
+    logger.warning(f"Unknown memory type: {memory_type}, using BufferMemory")
+    return BufferMemory.from_dict(data)
 
 
 # Factory function for creating memory instances
@@ -737,22 +726,21 @@ def create_memory(
             max_messages=kwargs.get("max_messages", 100),
             max_tokens=kwargs.get("max_tokens"),
         )
-    elif memory_type == "window":
+    if memory_type == "window":
         return WindowMemory(
             window_size=kwargs.get("window_size", 10),
             keep_system=kwargs.get("keep_system", True),
         )
-    elif memory_type == "summary":
+    if memory_type == "summary":
         return SummaryMemory(
             max_recent=kwargs.get("max_recent", 10),
             summarizer=kwargs.get("summarizer"),
             summary_prompt=kwargs.get("summary_prompt"),
         )
-    elif memory_type == "conversation":
+    if memory_type == "conversation":
         return ConversationMemory(
             short_term=kwargs.get("short_term"),
             long_term=kwargs.get("long_term"),
             max_short_term=kwargs.get("max_short_term", 20),
         )
-    else:
-        raise ValueError(f"Unknown memory type: {memory_type}")
+    raise ValueError(f"Unknown memory type: {memory_type}")

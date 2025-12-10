@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import desc, func, or_, select
+from sqlalchemy import String, cast, desc, func, or_, select
 
 from example_service.infra.database.session import get_async_session
 
@@ -486,9 +486,8 @@ class AuditService:
         dangerous_patterns = ["%.deleted", "%.revoked", "%.suspended", "%.disconnected"]
         dangerous_exact = ["delete", "bulk_delete", "purge"]
 
-        action_filters = [
-            AuditLog.action.like(pattern) for pattern in dangerous_patterns
-        ]
+        action_column = cast(AuditLog.action, String)
+        action_filters = [action_column.like(pattern) for pattern in dangerous_patterns]
         action_filters.extend([AuditLog.action == exact for exact in dangerous_exact])
 
         stmt = select(func.count(AuditLog.id)).where(or_(*action_filters))
@@ -529,9 +528,8 @@ class AuditService:
         dangerous_patterns = ["%.deleted", "%.revoked", "%.suspended", "%.disconnected"]
         dangerous_exact = ["delete", "bulk_delete", "purge"]
 
-        action_filters = [
-            AuditLog.action.like(pattern) for pattern in dangerous_patterns
-        ]
+        action_column = cast(AuditLog.action, String)
+        action_filters = [action_column.like(pattern) for pattern in dangerous_patterns]
         action_filters.extend([AuditLog.action == exact for exact in dangerous_exact])
 
         stmt = (

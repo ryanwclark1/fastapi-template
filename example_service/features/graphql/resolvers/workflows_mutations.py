@@ -11,8 +11,8 @@ Provides:
 
 from __future__ import annotations
 
-import logging
 from datetime import UTC, datetime
+import logging
 from typing import TYPE_CHECKING
 from uuid import UUID
 

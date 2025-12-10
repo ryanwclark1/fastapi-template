@@ -12,8 +12,8 @@ Provides:
 
 from __future__ import annotations
 
-import logging
 from datetime import datetime
+import logging
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
@@ -21,19 +21,14 @@ import strawberry
 from example_service.features.graphql.types.base import PageInfoType
 from example_service.features.graphql.types.tasks import (
     DLQConnection,
-    DLQEntryEdge,
-    DLQEntryType,
     DLQStatusEnum,
     RunningTaskType,
     ScheduledJobType,
     TaskExecutionConnection,
     TaskExecutionDetailType,
-    TaskExecutionEdge,
-    TaskExecutionType,
     TaskProgressType,
     TaskSearchFilterInput,
     TaskStatsType,
-    TaskStatusEnum,
 )
 
 if TYPE_CHECKING:

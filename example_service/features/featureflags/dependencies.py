@@ -127,6 +127,8 @@ async def get_feature_flags(
             attributes["acl_patterns"] = user.permissions
         if hasattr(user, "plan"):
             attributes["plan"] = user.plan
+        if hasattr(user, "roles") and user.roles is not None:
+            attributes["roles"] = list(user.roles)
 
     service = FeatureFlagService(session)
     return FeatureFlags(

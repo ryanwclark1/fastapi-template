@@ -21,7 +21,10 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from example_service.infra.results.models import TaskExecution
-from example_service.infra.tasks.tracking.base import BaseTaskTracker, TaskExecutionDetails
+from example_service.infra.tasks.tracking.base import (
+    BaseTaskTracker,
+    TaskExecutionDetails,
+)
 
 logger = logging.getLogger(__name__)
 

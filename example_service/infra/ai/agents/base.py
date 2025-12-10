@@ -30,8 +30,8 @@ Example:
 
 from __future__ import annotations
 
-import asyncio
 from abc import ABC, abstractmethod
+import asyncio
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -42,7 +42,6 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, Field
 
 from example_service.infra.ai.agents.tools import (
-    BaseTool,
     ToolRegistry,
     ToolResult,
     get_tool_registry,
@@ -52,9 +51,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from example_service.infra.ai.agents.models import (
-        AIAgentCheckpoint,
         AIAgentRun,
-        AIAgentStep,
     )
 
 logger = logging.getLogger(__name__)
@@ -200,7 +197,7 @@ class AgentState:
     tool_results: list[dict[str, Any]] = field(default_factory=list)
 
     # Cost tracking
-    total_cost_usd: Decimal = field(default_factory=lambda: Decimal("0"))
+    total_cost_usd: Decimal = field(default_factory=lambda: Decimal(0))
     total_input_tokens: int = 0
     total_output_tokens: int = 0
 
@@ -273,7 +270,7 @@ class AgentResult(Generic[TOutput]):
     tool_calls: int = 0
 
     # Cost
-    total_cost_usd: Decimal = field(default_factory=lambda: Decimal("0"))
+    total_cost_usd: Decimal = field(default_factory=lambda: Decimal(0))
     total_input_tokens: int = 0
     total_output_tokens: int = 0
 
@@ -338,7 +335,7 @@ class AgentResult(Generic[TOutput]):
             iterations=state.iteration if state else 0,
             steps=state.step_count if state else 0,
             tool_calls=state.tool_call_count if state else 0,
-            total_cost_usd=state.total_cost_usd if state else Decimal("0"),
+            total_cost_usd=state.total_cost_usd if state else Decimal(0),
             total_input_tokens=state.total_input_tokens if state else 0,
             total_output_tokens=state.total_output_tokens if state else 0,
             started_at=started_at,
@@ -358,7 +355,7 @@ class LLMResponse(BaseModel):
     # Usage
     input_tokens: int = 0
     output_tokens: int = 0
-    cost_usd: Decimal = Field(default_factory=lambda: Decimal("0"))
+    cost_usd: Decimal = Field(default_factory=lambda: Decimal(0))
 
     # Metadata
     model: str | None = None
@@ -459,7 +456,6 @@ class BaseAgent(ABC, Generic[TInput, TOutput]):
         Returns:
             Agent output
         """
-        pass
 
     async def execute(
         self,
@@ -527,7 +523,7 @@ class BaseAgent(ABC, Generic[TInput, TOutput]):
                     started_at=self._started_at,
                 )
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 error = f"Agent execution timed out after {self.config.timeout_seconds}s"
                 if self._db_run:
                     await self._fail_db_run(error, "timeout")
@@ -676,12 +672,11 @@ class BaseAgent(ABC, Generic[TInput, TOutput]):
             return await self._call_openai(
                 orchestrator, messages, tools, temperature, max_tokens, **kwargs
             )
-        elif self.config.provider == "anthropic":
+        if self.config.provider == "anthropic":
             return await self._call_anthropic(
                 orchestrator, messages, tools, temperature, max_tokens, **kwargs
             )
-        else:
-            raise ValueError(f"Unsupported provider: {self.config.provider}")
+        raise ValueError(f"Unsupported provider: {self.config.provider}")
 
     async def _call_openai(
         self,
@@ -727,7 +722,7 @@ class BaseAgent(ABC, Generic[TInput, TOutput]):
             finish_reason=data.get("finish_reason"),
             input_tokens=usage.get("input_tokens", 0),
             output_tokens=usage.get("output_tokens", 0),
-            cost_usd=result.cost_usd or Decimal("0"),
+            cost_usd=result.cost_usd or Decimal(0),
             model=self.config.model,
             provider="openai",
             latency_ms=result.latency_ms,
@@ -777,7 +772,7 @@ class BaseAgent(ABC, Generic[TInput, TOutput]):
             finish_reason=data.get("finish_reason"),
             input_tokens=usage.get("input_tokens", 0),
             output_tokens=usage.get("output_tokens", 0),
-            cost_usd=result.cost_usd or Decimal("0"),
+            cost_usd=result.cost_usd or Decimal(0),
             model=self.config.model,
             provider="anthropic",
             latency_ms=result.latency_ms,
@@ -841,7 +836,7 @@ class BaseAgent(ABC, Generic[TInput, TOutput]):
 
             return result
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return ToolResult.timeout(
                 error=f"Tool '{tool_name}' timed out after {tool.timeout_seconds}s"
             )

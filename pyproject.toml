@@ -3,9 +3,6 @@ name = "example-service"
 version = "0.1.0"
 description = "FastAPI service template following standard architecture"
 authors = [{ name = "Your Name", email = "your.email@example.com" }]
-readme = "README.md"
-requires-python = ">=3.13"
-license = { text = "MIT" }
 keywords = [
     "fastapi",
     "async",
@@ -27,56 +24,75 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Application Frameworks",
     "Typing :: Typed",
 ]
-# Uncomment and update these URLs if you have a repository
-# [project.urls]
-# Homepage = "https://github.com/yourusername/example-service"
-# Documentation = "https://github.com/yourusername/example-service#readme"
-# Repository = "https://github.com/yourusername/example-service"
-# Issues = "https://github.com/yourusername/example-service/issues"
+requires-python = ">=3.13"
 
 dependencies = [
     # Core FastAPI framework
     "fastapi>=0.122.0",
     "uvicorn[standard]>=0.34.0",
+
     # Data validation and settings
     "pydantic[email]>=2.9.0",
     "pydantic-settings>=2.5.0",
+
     # Database and ORM
-    "sqlalchemy[asyncio]>=2.0.44",
-    "alembic>=1.17.2",
     "alembic-postgresql-enum>=1.8.0",
+    "alembic>=1.17.2",
     "psycopg[binary,pool]>=3.2.0",
+    "sqlalchemy[asyncio]>=2.0.44",
+
+    # Caching
     "redis[hiredis]>=5.1.0",
+
+    # HTTP clients
     "httpx>=0.28.1",
+
+    # Monitoring and metrics
     "prometheus-client>=0.21.0",
+
+    # File uploads
     "python-multipart>=0.0.12",
+
+    # CLI framework
     "click>=8.1.0",
+
     # OpenTelemetry
     "opentelemetry-api>=1.28.0",
-    "opentelemetry-sdk>=1.28.0",
+    "opentelemetry-exporter-otlp>=1.28.0",
     "opentelemetry-instrumentation-fastapi>=0.49b0",
     "opentelemetry-instrumentation-httpx>=0.49b0",
-    "opentelemetry-instrumentation-sqlalchemy>=0.49b0",
     "opentelemetry-instrumentation-psycopg>=0.49b0",
-    "opentelemetry-exporter-otlp>=1.28.0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.49b0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.29.0",
+    "opentelemetry-sdk>=1.28.0",
+
     # Messaging and Tasks
-    "faststream[otel,prometheus,rabbit]>=0.6.0",
-    "taskiq>=0.11.0",
-    "taskiq-faststream>=0.3.0",
     "apscheduler>=3.10.0",
+    "faststream[otel,prometheus,rabbit]>=0.6.0",
     "taskiq-aio-pika>=0.4.4",
+    "taskiq-faststream>=0.3.0",
+    "taskiq-postgresql>=0.4.0",
+    "taskiq-redis>=1.1.2",
+    "taskiq>=0.11.0",
+
     # GraphQL
     "strawberry-graphql[fastapi]>=0.235.0",
-    # Recurrence rules (iCalendar RRULE)
+
+    # Date and time utilities
     "python-dateutil>=2.9.0",
+
+    # Authentication and security
     "pwdlib[argon2]>=0.3.0",
+
     # Email
     "aiosmtplib>=3.0.0",
     "jinja2>=3.1.0",
-    "taskiq-redis>=1.1.2",
-    "taskiq-postgresql>=0.4.0",
+
+    # Utilities
     "frozendict>=2.4.0",
     "phonenumbers>=9.0.19",
+
+    # AI/ML
     "instructor>=1.13.0",
 ]
 
@@ -141,8 +157,7 @@ example-service-main = "example_service.main:main"
 track = "example_service.infra.tasks.cli:TrackingCommand"
 
 [build-system]
-# Using hatchling as the build backend (modern, PEP 517 compliant)
-requires = ["hatchling>=1.18.0"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build]
@@ -150,6 +165,9 @@ include = [
     "example_service/static/docs/**",
     "example_service/static/graphql/**",
 ]
+
+[tool.hatch.build.targets.sdist]
+include = ["example_service"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["example_service"]
@@ -282,22 +300,60 @@ indent-width = 4
 target-version = "py313"
 respect-gitignore = true
 exclude = [
+    # Version control
     ".git",
+    ".git-rewrite",
+    ".bzr",
+    ".hg",
+    ".svn",
+    # Virtual environments and package directories
     ".venv",
+    "__pypackages__",
+    "site-packages",
+    # Python cache and build artifacts
     "__pycache__",
     "*.egg-info",
+    ".eggs",
+    "_build",
+    "build",
+    "dist",
+    # Cache directories
     ".pytest_cache",
     ".mypy_cache",
     ".ruff_cache",
+    ".pytype",
+    # Development tools
+    ".direnv",
+    ".ipynb_checkpoints",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".tox",
+    ".vscode",
+    # Project-specific exclusions
     "**/examples/*",
     "scripts",
     "**/alembic/**",
     "**/migrations/**",
+    # Other
+    "node_modules",
+    "buck-out",
 ]
+extend-exclude = ["test_.*\\.py"]
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 88
+indent-style = "space"
+line-ending = "auto"
+preview = true
+quote-style = "double"
+skip-magic-trailing-comma = false
 
 [tool.ruff.lint]
 select = ["ALL"]
 fixable = ["ALL"]
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 ignore = [
     # Documentation - add incrementally
     "D100", # Missing docstring in public module
@@ -376,6 +432,8 @@ ignore = [
     "TC001",  # Move application import into TYPE_CHECKING block
     "TC002",  # Move third-party import into TYPE_CHECKING block
     "TC003",  # Move standard library import into TYPE_CHECKING block
+    "INP001", # Implicit namespace package - Alembic discovers migrations dynamically, no __init__.py needed
+    "D415",   # First line should end with punctuation - autogenerated docstrings
 ]
 # Alembic env.py: configuration file with specific patterns
 "alembic/env.py" = [
@@ -477,14 +535,6 @@ runtime-evaluated-base-classes = [
     "example_service.core.database.AuditedBase",
 ]
 
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-line-ending = "auto"
-skip-magic-trailing-comma = false
-docstring-code-format = true
-docstring-code-line-length = 88
-preview = true
 
 [tool.ruff.lint.isort]
 known-first-party = ["example_service"]
@@ -654,18 +704,6 @@ prepend_sys_path = "."
 file_template = "%%(year)d%%(month).2d%%(day).2d_%%(hour).2d%%(minute).2d_%%(rev)s_%%(slug)s"
 truncate_slug_length = 40
 timezone = "UTC"
-
-[[tool.alembic.post_write_hooks]]
-name = "ruff_format"
-type = "exec"
-executable = "uv"
-options = "run ruff format REVISION_SCRIPT_FILENAME"
-
-[[tool.alembic.post_write_hooks]]
-name = "ruff_fix"
-type = "exec"
-executable = "uv"
-options = "run ruff check --fix REVISION_SCRIPT_FILENAME"
 
 # === UV Configuration ===
 [tool.uv]

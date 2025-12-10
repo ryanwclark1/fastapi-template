@@ -241,7 +241,7 @@ class OtelSettings(BaseSettings):
         if self.compression != "none":
             from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
                 Compression,
-            )  # type: ignore[attr-defined]  # noqa: I001
+            )  # type: ignore[attr-defined]
 
             kwargs["compression"] = (
                 Compression.Gzip

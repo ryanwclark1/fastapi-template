@@ -18,24 +18,17 @@ from typing import TYPE_CHECKING
 import strawberry
 
 from example_service.features.graphql.types.search import (
-    DidYouMeanSuggestionType,
     EntitySearchResultType,
-    FacetResultType,
-    FacetValueType,
     SearchableEntityType,
     SearchAnalyticsType,
     SearchCapabilitiesType,
-    SearchHitType,
     SearchInput,
     SearchInsightType,
     SearchResponseType,
     SearchSuggestionInput,
-    SearchSuggestionType,
     SearchSuggestionsResponseType,
     SearchSyntaxEnum,
-    SearchTrendPointType,
     SearchTrendsType,
-    ZeroResultQueryType,
     ZeroResultsResponseType,
 )
 

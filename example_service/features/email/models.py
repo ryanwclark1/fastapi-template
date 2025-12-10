@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 import enum
 import os
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import JSON, Boolean, Float, ForeignKey, Index, Integer, String, Text
@@ -22,10 +22,8 @@ from example_service.core.database.enums import (
     EmailProviderType as EmailProviderTypeEnum,
 )
 from example_service.core.database.types import EncryptedString
-
-if TYPE_CHECKING:
-    from example_service.core.models.tenant import Tenant
-    from example_service.core.models.user import User
+from example_service.core.models.tenant import Tenant
+from example_service.core.models.user import User
 
 
 def _get_email_encryption_key() -> str | None:

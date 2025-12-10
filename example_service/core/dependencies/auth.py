@@ -49,8 +49,6 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from example_service.core.schemas.auth import AuthUser
-
 # Re-export all ACL-based auth functions from accent_auth
 from example_service.core.dependencies.accent_auth import (
     get_current_user,
@@ -61,6 +59,7 @@ from example_service.core.dependencies.accent_auth import (
     require_any_acl,
     require_superuser,
 )
+from example_service.core.schemas.auth import AuthUser
 
 # Type aliases for dependency injection
 CurrentUser = Annotated[AuthUser, Depends(get_current_user)]

@@ -39,6 +39,9 @@ from alembic import context
 # Import example_service package for dynamic model discovery
 import example_service
 
+# Setup logger early so it can be used in import error handling
+logger = logging.getLogger("alembic.env")
+
 # Import the models package so Base.metadata is aware of all mapped classes.
 # The package handles recursively loading feature-level models.
 from example_service.core import models
@@ -52,7 +55,18 @@ from example_service.core.settings import get_db_settings
 # These are in infra/tasks/jobs/ not features/, so need explicit import
 from example_service.infra.tasks.jobs import models as job_models
 
-logger = logging.getLogger("alembic.env")
+# Import AI agent models explicitly (workflow_models.py is not named models.py)
+# so it won't be caught by dynamic discovery
+try:
+    from example_service.infra.ai.agents import workflow_models  # noqa: F401
+except ImportError as exc:
+    logger.debug("Could not import workflow_models: %s", exc)
+
+# Import results models explicitly
+try:
+    from example_service.infra.results import models as results_models  # noqa: F401
+except ImportError as exc:
+    logger.debug("Could not import results models: %s", exc)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -105,15 +119,41 @@ def get_database_url() -> str | None:
     except Exception as exc:
         logger.debug("Could not load database settings: %s", exc)
 
-    # Last resort: use alembic.ini
-    return config.get_main_option("sqlalchemy.url")
+    # Last resort: use alembic.ini, but check if it's a placeholder
+    config_url = config.get_main_option("sqlalchemy.url")
+    if config_url and not (
+        config_url.startswith("driver://") or "driver://user:pass@localhost/dbname" in config_url
+    ):
+        return config_url
+
+    return None
 
 
 # Override URL from environment or settings (CLI usage)
-if not config.get_main_option("sqlalchemy.url"):
+# Check if URL is missing or is a placeholder
+current_url = config.get_main_option("sqlalchemy.url")
+is_placeholder = current_url and (
+    current_url.startswith("driver://") or "driver://user:pass@localhost/dbname" in current_url
+)
+
+if not current_url or is_placeholder:
     db_url = get_database_url()
     if db_url:
         config.set_main_option("sqlalchemy.url", db_url)
+    else:
+        # For offline mode (revision without --autogenerate), allow missing URL
+        # Autogenerate will still fail, but empty migrations can be created
+        if context.is_offline_mode():
+            logger.warning(
+                "Database URL not configured. Offline mode will work for empty migrations, "
+                "but autogenerate requires a database connection."
+            )
+        else:
+            # If we have a placeholder but no real URL, raise an error
+            raise ValueError(
+                "Database URL not configured. Set DATABASE_URL environment variable "
+                "or configure DB_* environment variables (DB_HOST, DB_PORT, DB_NAME, etc.)."
+            )
 
 
 # =============================================================================
@@ -130,9 +170,16 @@ def _should_import(module_name: str) -> bool:
     Returns:
         True if module should be imported for model discovery
     """
+    # Check for common model file patterns:
+    # - *.models (e.g., example_service.features.email.models)
+    # - *.model (e.g., example_service.features.user.model)
+    # - *_models (e.g., example_service.infra.ai.agents.workflow_models)
+    # - *.models.* (nested models modules)
+    # - *.model.* (nested model modules)
     return (
         module_name.endswith(".models")
         or module_name.endswith(".model")
+        or module_name.endswith("_models")
         or ".models." in module_name
         or ".model." in module_name
     )
@@ -158,7 +205,7 @@ def _import_all_models() -> None:
             continue
         try:
             importlib.import_module(module_name)
-            logger.debug("Imported model module: %s", module_name)
+            logger.info("Imported model module: %s", module_name)
         except ModuleNotFoundError as exc:
             # Only raise if it's a core example_service dependency
             if exc.name and exc.name.startswith("example_service"):
@@ -180,6 +227,12 @@ def _import_all_models() -> None:
 # Run dynamic model discovery after explicit imports
 # This ensures we catch any models not explicitly imported above
 _import_all_models()
+
+# Log all registered tables for debugging
+if logger.isEnabledFor(logging.DEBUG):
+    all_tables = sorted(target_metadata.tables.keys())
+    logger.debug("Registered tables in Base.metadata: %s", ", ".join(all_tables))
+    logger.debug("Total tables: %d", len(all_tables))
 
 # =============================================================================
 # Configuration Helpers

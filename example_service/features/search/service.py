@@ -30,18 +30,17 @@ from example_service.core.database.search import (
     RankNormalization,
     SearchAnalytics,
     SearchQueryParser,
-    get_default_synonyms,
 )
 
 from .cache import SearchCache, get_search_cache
-from .circuit_breaker import CircuitBreaker, get_circuit_breaker
+from .circuit_breaker import get_circuit_breaker
 from .config import (
     EntitySearchConfig,
     SearchConfiguration,
     SearchEntityRegistry,
     get_search_config,
 )
-from .intent import IntentClassifier, IntentType, QueryIntent
+from .intent import IntentClassifier, QueryIntent
 from .profiler import QueryProfiler
 from .ranking import ClickBoostRanker, RankingConfig
 from .schemas import (
@@ -341,17 +340,18 @@ class SearchService:
         start_time = time.monotonic()
 
         # Profile the search if enabled
+        profile_gen = None
         profile_ctx = None
         if self._profiler:
-            profile_ctx = self._profiler.profile("fts_search")
-            await profile_ctx.__aenter__()
-            profile_ctx.gen.set_query(request.query)
+            profile_gen = self._profiler.profile("fts_search")
+            profile_ctx = await profile_gen.__aenter__()
+            profile_ctx.set_query(request.query)
 
         try:
             return await self._execute_search(request, start_time)
         finally:
-            if profile_ctx:
-                await profile_ctx.__aexit__(None, None, None)
+            if profile_gen:
+                await profile_gen.__aexit__(None, None, None)
 
     async def _execute_search(
         self,

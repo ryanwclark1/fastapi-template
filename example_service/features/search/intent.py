@@ -76,25 +76,25 @@ class IntentClassifier:
     # Patterns for intent detection
     INFORMATIONAL_PATTERNS: list[IntentPattern] = [
         IntentPattern(
-            re.compile(r"^(how|what|why|when|where|which|who)\b", re.I),
+            re.compile(r"^(how|what|why|when|where|which|who)\b", re.IGNORECASE),
             IntentType.INFORMATIONAL,
             weight=1.5,
             signal="question_word",
         ),
         IntentPattern(
-            re.compile(r"\b(tutorial|guide|learn|example|explain|documentation|docs)\b", re.I),
+            re.compile(r"\b(tutorial|guide|learn|example|explain|documentation|docs)\b", re.IGNORECASE),
             IntentType.INFORMATIONAL,
             weight=1.3,
             signal="learning_term",
         ),
         IntentPattern(
-            re.compile(r"\b(difference between|vs|versus|compare|comparison)\b", re.I),
+            re.compile(r"\b(difference between|vs|versus|compare|comparison)\b", re.IGNORECASE),
             IntentType.INFORMATIONAL,
             weight=1.2,
             signal="comparison",
         ),
         IntentPattern(
-            re.compile(r"\b(best practices?|recommended|tips?)\b", re.I),
+            re.compile(r"\b(best practices?|recommended|tips?)\b", re.IGNORECASE),
             IntentType.INFORMATIONAL,
             weight=1.1,
             signal="advice_seeking",
@@ -109,13 +109,13 @@ class IntentClassifier:
 
     NAVIGATIONAL_PATTERNS: list[IntentPattern] = [
         IntentPattern(
-            re.compile(r"^(go to|open|find|show|view)\b", re.I),
+            re.compile(r"^(go to|open|find|show|view)\b", re.IGNORECASE),
             IntentType.NAVIGATIONAL,
             weight=1.5,
             signal="navigation_command",
         ),
         IntentPattern(
-            re.compile(r"\b(page|section|menu|settings?|dashboard|profile)\b", re.I),
+            re.compile(r"\b(page|section|menu|settings?|dashboard|profile)\b", re.IGNORECASE),
             IntentType.NAVIGATIONAL,
             weight=1.2,
             signal="ui_element",
@@ -127,7 +127,7 @@ class IntentClassifier:
             signal="single_term",
         ),
         IntentPattern(
-            re.compile(r"\b(specific|exact|named?)\b", re.I),
+            re.compile(r"\b(specific|exact|named?)\b", re.IGNORECASE),
             IntentType.NAVIGATIONAL,
             weight=1.0,
             signal="specificity",
@@ -136,19 +136,19 @@ class IntentClassifier:
 
     TRANSACTIONAL_PATTERNS: list[IntentPattern] = [
         IntentPattern(
-            re.compile(r"^(create|add|new|make|delete|remove|update|edit|change)\b", re.I),
+            re.compile(r"^(create|add|new|make|delete|remove|update|edit|change)\b", re.IGNORECASE),
             IntentType.TRANSACTIONAL,
             weight=1.5,
             signal="action_verb",
         ),
         IntentPattern(
-            re.compile(r"\b(submit|save|send|post|upload|download)\b", re.I),
+            re.compile(r"\b(submit|save|send|post|upload|download)\b", re.IGNORECASE),
             IntentType.TRANSACTIONAL,
             weight=1.3,
             signal="transaction_verb",
         ),
         IntentPattern(
-            re.compile(r"\b(configure|setup|install|enable|disable)\b", re.I),
+            re.compile(r"\b(configure|setup|install|enable|disable)\b", re.IGNORECASE),
             IntentType.TRANSACTIONAL,
             weight=1.2,
             signal="configuration",
@@ -157,19 +157,19 @@ class IntentClassifier:
 
     EXPLORATORY_PATTERNS: list[IntentPattern] = [
         IntentPattern(
-            re.compile(r"^(browse|explore|list|all|show all)\b", re.I),
+            re.compile(r"^(browse|explore|list|all|show all)\b", re.IGNORECASE),
             IntentType.EXPLORATORY,
             weight=1.4,
             signal="exploration_command",
         ),
         IntentPattern(
-            re.compile(r"\b(related|similar|like|more)\b", re.I),
+            re.compile(r"\b(related|similar|like|more)\b", re.IGNORECASE),
             IntentType.EXPLORATORY,
             weight=1.0,
             signal="related_content",
         ),
         IntentPattern(
-            re.compile(r"\b(options?|choices?|alternatives?)\b", re.I),
+            re.compile(r"\b(options?|choices?|alternatives?)\b", re.IGNORECASE),
             IntentType.EXPLORATORY,
             weight=1.1,
             signal="options_seeking",

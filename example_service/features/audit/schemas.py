@@ -107,7 +107,9 @@ class AuditLogResponse(BaseModel):
     entity_type: str = Field(description="Type of entity affected")
     entity_id: str | None = Field(description="ID of the affected entity")
     user_id: str | None = Field(description="User who performed the action")
-    actor_roles: list[str] = Field(default_factory=list, description="Roles user had at time of action")
+    actor_roles: list[str] = Field(
+        default_factory=list, description="Roles user had at time of action"
+    )
     tenant_id: str | None = Field(description="Tenant context")
     old_values: dict[str, Any] | None = Field(description="Previous state")
     new_values: dict[str, Any] | None = Field(description="New state")

@@ -17,22 +17,19 @@ Endpoints:
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from example_service.core.database import get_async_session
+from example_service.core.models.user import User
 from example_service.features.auth.dependencies import get_current_user
-from example_service.features.users.models import User
 from example_service.infra.ai.agents.analytics import (
     AgentAnalytics,
     AgentMetrics,
-    CostAnalysis,
     UsageMetrics,
-    UsageReport,
 )
 
 router = APIRouter(prefix="/analytics", tags=["AI Analytics"])
@@ -205,8 +202,9 @@ async def list_agent_metrics(
     current_user: User = Depends(get_current_user),
 ) -> list[AgentMetricsResponse]:
     """Get metrics for all agent types used by the tenant."""
-    from example_service.infra.ai.agents.models import AIAgentRun
     from sqlalchemy import func, select
+
+    from example_service.infra.ai.agents.models import AIAgentRun
 
     now = datetime.now(UTC)
     start = start_date or (now - timedelta(days=30))
@@ -427,8 +425,9 @@ async def get_usage_trends(
     - Success rates
     - Token usage
     """
-    from example_service.infra.ai.agents.models import AIAgentRun
     from sqlalchemy import and_, case, func, select
+
+    from example_service.infra.ai.agents.models import AIAgentRun
 
     now = datetime.now(UTC)
     start = start_date or (now - timedelta(days=30))

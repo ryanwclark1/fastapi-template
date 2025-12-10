@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
+
 import pytest
 
 
@@ -372,7 +373,10 @@ class TestAITracer:
     @pytest.mark.asyncio
     async def test_noop_pipeline_span(self) -> None:
         """Test no-op pipeline span when tracing disabled."""
-        from example_service.infra.ai.observability.tracing import AITracer, NoOpPipelineSpan
+        from example_service.infra.ai.observability.tracing import (
+            AITracer,
+            NoOpPipelineSpan,
+        )
 
         tracer = AITracer(enabled=False)
 
@@ -395,7 +399,10 @@ class TestAITracer:
     @pytest.mark.asyncio
     async def test_noop_step_span(self) -> None:
         """Test no-op step span when tracing disabled."""
-        from example_service.infra.ai.observability.tracing import AITracer, NoOpStepSpan
+        from example_service.infra.ai.observability.tracing import (
+            AITracer,
+            NoOpStepSpan,
+        )
 
         tracer = AITracer(enabled=False)
 
@@ -417,7 +424,10 @@ class TestAITracer:
     @pytest.mark.asyncio
     async def test_noop_provider_span(self) -> None:
         """Test no-op provider span when tracing disabled."""
-        from example_service.infra.ai.observability.tracing import AITracer, NoOpProviderSpan
+        from example_service.infra.ai.observability.tracing import (
+            AITracer,
+            NoOpProviderSpan,
+        )
 
         tracer = AITracer(enabled=False)
 

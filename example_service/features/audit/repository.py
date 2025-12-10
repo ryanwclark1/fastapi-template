@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import delete, desc, func, or_, select
+from sqlalchemy import String, cast, delete, desc, func, or_, select
 
 from example_service.core.database.repository import BaseRepository, SearchResult
 from example_service.infra.logging import get_lazy_logger
@@ -126,7 +126,9 @@ class AuditRepository(BaseRepository[AuditLog]):
         result = await session.execute(stmt)
         logs = result.scalars().all()
 
-        _lazy.debug(lambda: f"get_entity_history: {entity_type}/{entity_id} -> {len(logs)} entries")
+        _lazy.debug(
+            lambda: f"get_entity_history: {entity_type}/{entity_id} -> {len(logs)} entries"
+        )
         return logs
 
     async def list_dangerous_actions(
@@ -178,12 +180,9 @@ class AuditRepository(BaseRepository[AuditLog]):
         ]
 
         # Build OR condition for all patterns
-        action_filters = [
-            AuditLog.action.like(pattern) for pattern in dangerous_patterns
-        ]
-        action_filters.extend([
-            AuditLog.action == exact for exact in dangerous_exact
-        ])
+        action_column = cast(AuditLog.action, String)
+        action_filters = [action_column.like(pattern) for pattern in dangerous_patterns]
+        action_filters.extend([AuditLog.action == exact for exact in dangerous_exact])
 
         stmt = (
             select(AuditLog)
@@ -247,12 +246,9 @@ class AuditRepository(BaseRepository[AuditLog]):
         ]
         dangerous_exact = ["delete", "bulk_delete", "purge"]
 
-        action_filters = [
-            AuditLog.action.like(pattern) for pattern in dangerous_patterns
-        ]
-        action_filters.extend([
-            AuditLog.action == exact for exact in dangerous_exact
-        ])
+        action_column = cast(AuditLog.action, String)
+        action_filters = [action_column.like(pattern) for pattern in dangerous_patterns]
+        action_filters.extend([AuditLog.action == exact for exact in dangerous_exact])
 
         stmt = select(func.count(AuditLog.id)).where(or_(*action_filters))
 
@@ -339,14 +335,16 @@ class AuditRepository(BaseRepository[AuditLog]):
 
         # Time range
         time_result = await session.execute(
-            select(func.min(subquery.c.timestamp), func.max(subquery.c.timestamp)).select_from(
-                subquery
-            )
+            select(
+                func.min(subquery.c.timestamp), func.max(subquery.c.timestamp)
+            ).select_from(subquery)
         )
         time_row = time_result.one_or_none()
         time_range = (time_row[0], time_row[1]) if time_row else (None, None)
 
-        _lazy.debug(lambda: f"get_summary_stats: {total_entries} entries, {unique_users} users")
+        _lazy.debug(
+            lambda: f"get_summary_stats: {total_entries} entries, {unique_users} users"
+        )
 
         return {
             "total_entries": total_entries,

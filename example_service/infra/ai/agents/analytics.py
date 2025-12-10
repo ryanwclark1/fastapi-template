@@ -30,19 +30,19 @@ Example:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from decimal import Decimal
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
-import statistics
 import logging
+import statistics
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, case, func, select
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from example_service.infra.ai.agents.base import AgentResult, BaseAgent
+    from example_service.infra.ai.agents.base import BaseAgent
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +78,8 @@ class UsageMetrics:
     average_tokens_per_run: float = 0.0
 
     # Cost
-    total_cost_usd: Decimal = field(default_factory=lambda: Decimal("0"))
-    average_cost_per_run: Decimal = field(default_factory=lambda: Decimal("0"))
+    total_cost_usd: Decimal = field(default_factory=lambda: Decimal(0))
+    average_cost_per_run: Decimal = field(default_factory=lambda: Decimal(0))
 
     # Performance
     average_duration_seconds: float | None = None
@@ -133,9 +133,9 @@ class AgentMetrics:
     average_tool_calls: float | None = None
 
     # Cost
-    total_cost_usd: Decimal = field(default_factory=lambda: Decimal("0"))
-    cost_per_run: Decimal = field(default_factory=lambda: Decimal("0"))
-    cost_per_1k_tokens: Decimal = field(default_factory=lambda: Decimal("0"))
+    total_cost_usd: Decimal = field(default_factory=lambda: Decimal(0))
+    cost_per_run: Decimal = field(default_factory=lambda: Decimal(0))
+    cost_per_1k_tokens: Decimal = field(default_factory=lambda: Decimal(0))
 
     # Reliability
     success_rate: float | None = None
@@ -155,7 +155,7 @@ class CostAnalysis:
     period_end: datetime
 
     # Totals
-    total_cost_usd: Decimal = field(default_factory=lambda: Decimal("0"))
+    total_cost_usd: Decimal = field(default_factory=lambda: Decimal(0))
     total_runs: int = 0
     total_tokens: int = 0
 
@@ -165,13 +165,13 @@ class CostAnalysis:
     cost_by_day: list[dict[str, Any]] = field(default_factory=list)
 
     # Trends
-    daily_average: Decimal = field(default_factory=lambda: Decimal("0"))
+    daily_average: Decimal = field(default_factory=lambda: Decimal(0))
     daily_trend: float | None = None  # % change
-    projected_monthly: Decimal = field(default_factory=lambda: Decimal("0"))
+    projected_monthly: Decimal = field(default_factory=lambda: Decimal(0))
 
     # Efficiency
-    cost_per_successful_run: Decimal = field(default_factory=lambda: Decimal("0"))
-    wasted_cost: Decimal = field(default_factory=lambda: Decimal("0"))  # Failed runs
+    cost_per_successful_run: Decimal = field(default_factory=lambda: Decimal(0))
+    wasted_cost: Decimal = field(default_factory=lambda: Decimal(0))  # Failed runs
 
 
 @dataclass
@@ -289,16 +289,16 @@ class AgentAnalytics:
         query = select(
             func.count(AIAgentRun.id).label("total_runs"),
             func.sum(
-                func.case((AIAgentRun.status == "completed", 1), else_=0)
+                case((AIAgentRun.status == "completed", 1), else_=0)
             ).label("successful"),
             func.sum(
-                func.case((AIAgentRun.status == "failed", 1), else_=0)
+                case((AIAgentRun.status == "failed", 1), else_=0)
             ).label("failed"),
             func.sum(
-                func.case((AIAgentRun.status == "cancelled", 1), else_=0)
+                case((AIAgentRun.status == "cancelled", 1), else_=0)
             ).label("cancelled"),
             func.sum(
-                func.case((AIAgentRun.status == "timeout", 1), else_=0)
+                case((AIAgentRun.status == "timeout", 1), else_=0)
             ).label("timed_out"),
             func.sum(AIAgentRun.total_input_tokens).label("input_tokens"),
             func.sum(AIAgentRun.total_output_tokens).label("output_tokens"),
@@ -331,7 +331,7 @@ class AgentAnalytics:
             total_output_tokens=row.output_tokens or 0,
             average_tokens_per_run=total_tokens / total_runs if total_runs > 0 else 0,
             total_cost_usd=total_cost,
-            average_cost_per_run=total_cost / total_runs if total_runs > 0 else Decimal("0"),
+            average_cost_per_run=total_cost / total_runs if total_runs > 0 else Decimal(0),
             average_duration_seconds=row.avg_duration,
             success_rate=successful / total_runs * 100 if total_runs > 0 else None,
             error_rate=(row.failed or 0) / total_runs * 100 if total_runs > 0 else None,
@@ -382,13 +382,13 @@ class AgentAnalytics:
             ).label("avg_duration"),
             func.avg(AIAgentRun.current_step).label("avg_iterations"),
             func.sum(
-                func.case((AIAgentRun.status == "completed", 1), else_=0)
+                case((AIAgentRun.status == "completed", 1), else_=0)
             ).label("successful"),
             func.sum(
-                func.case((AIAgentRun.retry_count > 0, 1), else_=0)
+                case((AIAgentRun.retry_count > 0, 1), else_=0)
             ).label("retried"),
             func.sum(
-                func.case((AIAgentRun.status == "timeout", 1), else_=0)
+                case((AIAgentRun.status == "timeout", 1), else_=0)
             ).label("timed_out"),
         ).where(and_(*conditions))
 
@@ -406,7 +406,7 @@ class AgentAnalytics:
             cost_per_run=(
                 Decimal(str(row.total_cost or 0)) / total_runs
                 if total_runs > 0
-                else Decimal("0")
+                else Decimal(0)
             ),
             average_duration_seconds=row.avg_duration,
             average_iterations=row.avg_iterations,
@@ -666,8 +666,8 @@ class BenchmarkResult:
     p99_duration_ms: float
 
     # Cost
-    total_cost_usd: Decimal = field(default_factory=lambda: Decimal("0"))
-    avg_cost_per_run: Decimal = field(default_factory=lambda: Decimal("0"))
+    total_cost_usd: Decimal = field(default_factory=lambda: Decimal(0))
+    avg_cost_per_run: Decimal = field(default_factory=lambda: Decimal(0))
 
     # Tokens
     total_tokens: int = 0
@@ -782,7 +782,7 @@ class PerformanceBenchmark(Generic[T]):
         p95_idx = int(len(sorted_durations) * 0.95)
         p99_idx = int(len(sorted_durations) * 0.99)
 
-        total_cost = sum(costs, Decimal("0"))
+        total_cost = sum(costs, Decimal(0))
         total_tokens = sum(tokens)
 
         return BenchmarkResult(
@@ -812,7 +812,7 @@ class PerformanceBenchmark(Generic[T]):
                 f"Test: {result.test_name}",
                 f"  Runs: {result.iterations} "
                 f"(Success: {result.success_count}, Failed: {result.failure_count})",
-                f"  Duration (ms):",
+                "  Duration (ms):",
                 f"    Min: {result.min_duration_ms:.2f}",
                 f"    Max: {result.max_duration_ms:.2f}",
                 f"    Avg: {result.avg_duration_ms:.2f}",

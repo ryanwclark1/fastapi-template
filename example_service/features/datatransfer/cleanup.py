@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 import logging
-from pathlib import Path
 
 from example_service.core.settings import get_datatransfer_settings
 
@@ -156,10 +155,8 @@ def get_export_stats() -> dict[str, int | float]:
             stats["file_count"] += 1
             stats["total_size_bytes"] += file_stat.st_size
 
-            if file_stat.st_mtime < oldest_mtime:
-                oldest_mtime = file_stat.st_mtime
-            if file_stat.st_mtime > newest_mtime:
-                newest_mtime = file_stat.st_mtime
+            oldest_mtime = min(oldest_mtime, file_stat.st_mtime)
+            newest_mtime = max(newest_mtime, file_stat.st_mtime)
 
         except OSError:
             pass

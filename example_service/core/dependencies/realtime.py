@@ -36,12 +36,9 @@ Usage:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
-
-if TYPE_CHECKING:
-    from example_service.infra.realtime import ConnectionManager, EventBridge
 
 
 def get_ws_connection_manager() -> ConnectionManager | None:
@@ -171,6 +168,9 @@ async def optional_event_bridge(
 
 
 # Type aliases for cleaner route signatures
+# Import at runtime after function definitions to avoid circular dependencies
+from example_service.infra.realtime import ConnectionManager, EventBridge  # noqa: E402
+
 ConnectionManagerDep = Annotated[ConnectionManager, Depends(require_connection_manager)]
 """Connection manager dependency that requires it to be available.
 

@@ -20,7 +20,6 @@ from example_service.core.settings import get_datatransfer_settings
 
 from .exporters import get_exporter
 from .importers import ParsedRecord, get_importer
-from .validators import get_validator_registry, validate_entity
 from .schemas import (
     ExportRequest,
     ExportResult,
@@ -33,12 +32,32 @@ from .schemas import (
     ImportValidationError,
     SupportedEntity,
 )
+from .validators import get_validator_registry, validate_entity
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
 logger = logging.getLogger(__name__)
+
+# Default export directory that can be overridden in tests
+EXPORT_DIR: Path | None = None
+
+
+def ensure_export_dir() -> Path:
+    """Ensure the export directory exists and return it.
+
+    This helper mirrors the legacy module-level function that tests expect
+    while delegating to settings by default.
+    """
+    global EXPORT_DIR
+
+    if EXPORT_DIR is None:
+        EXPORT_DIR = get_datatransfer_settings().export_path
+
+    export_path = Path(EXPORT_DIR)
+    export_path.mkdir(parents=True, exist_ok=True)
+    return export_path
 
 
 # Entity registry - maps entity names to their model, fields, and configuration
@@ -321,7 +340,7 @@ class DataTransferService:
         settings = get_datatransfer_settings()
         if settings.enable_tenant_isolation and tenant_id:
             if hasattr(model_class, "tenant_id"):
-                stmt = stmt.where(getattr(model_class, "tenant_id") == tenant_id)
+                stmt = stmt.where(model_class.tenant_id == tenant_id)
                 logger.debug(
                     "Applied tenant filter for export",
                     extra={"entity_type": entity_type, "tenant_id": tenant_id},
@@ -509,7 +528,7 @@ class DataTransferService:
         settings = get_datatransfer_settings()
         if settings.enable_tenant_isolation and tenant_id:
             if hasattr(model_class, "tenant_id"):
-                stmt = stmt.where(getattr(model_class, "tenant_id") == tenant_id)
+                stmt = stmt.where(model_class.tenant_id == tenant_id)
 
         # Apply filters
         if filters:
@@ -556,7 +575,7 @@ class DataTransferService:
         settings = get_datatransfer_settings()
         if settings.enable_tenant_isolation and tenant_id:
             if hasattr(model_class, "tenant_id"):
-                stmt = stmt.where(getattr(model_class, "tenant_id") == tenant_id)
+                stmt = stmt.where(model_class.tenant_id == tenant_id)
 
         # Apply filters
         if request.filters:

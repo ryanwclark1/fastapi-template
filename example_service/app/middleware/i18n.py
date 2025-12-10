@@ -13,8 +13,8 @@ loads translations via a translation_provider callable.
 
 Priority order for locale detection:
 1. User preference (request.state.user.preferred_language)
-2. Accept-Language header (with quality value parsing)
-3. Query parameter (?lang=es)
+2. Query parameter (?lang=es) - explicit override
+3. Accept-Language header (with quality value parsing)
 4. Cookie (locale cookie)
 5. Default fallback
 
@@ -113,8 +113,8 @@ class I18nMiddleware(BaseHTTPMiddleware):
 
         Priority order:
         1. User preference (if authenticated)
-        2. Accept-Language header
-        3. Query parameter
+        2. Query parameter (explicit override)
+        3. Accept-Language header
         4. Cookie
         5. Default fallback
 
@@ -130,19 +130,19 @@ class I18nMiddleware(BaseHTTPMiddleware):
             if user_locale and user_locale in self.supported_locales:
                 return str(user_locale)
 
-        # 2. Check Accept-Language header
+        # 2. Check query parameter (explicit override should have high priority)
+        if self.use_query_param:
+            query_locale = request.query_params.get(self.query_param)
+            if query_locale and query_locale in self.supported_locales:
+                return query_locale
+
+        # 3. Check Accept-Language header
         if self.use_accept_language:
             accept_language = request.headers.get("accept-language", "")
             if accept_language:
                 locale = self._parse_accept_language(accept_language)
                 if locale:
                     return locale
-
-        # 3. Check query parameter
-        if self.use_query_param:
-            query_locale = request.query_params.get(self.query_param)
-            if query_locale and query_locale in self.supported_locales:
-                return query_locale
 
         # 4. Check cookie
         if self.use_cookie:

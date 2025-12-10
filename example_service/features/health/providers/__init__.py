@@ -36,19 +36,24 @@ Example:
 
 from __future__ import annotations
 
-# Import ProviderConfig for backward compatibility
-from example_service.core.settings.health import ProviderConfig
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+import time
 
-# Application-specific providers
+from example_service.core.schemas.common import HealthStatus
+from example_service.core.settings.health import ProviderConfig
+from example_service.infra.metrics.health import (
+    health_check_duration_seconds,
+    health_check_status_gauge,
+    health_check_status_transitions_total,
+    health_check_total,
+)
+
 from .accent_auth import AccentAuthHealthProvider
 from .consul import ConsulHealthProvider
-
-# Core infrastructure providers
 from .database import DatabaseHealthProvider
 from .external import ExternalServiceHealthProvider
 from .pool import DatabasePoolHealthProvider
-
-# Protocol and base types
 from .protocol import (
     DEGRADED_LATENCY_THRESHOLD_MS,
     HealthCheckResult,
@@ -61,11 +66,48 @@ from .s3 import S3StorageHealthProvider
 from .storage import StorageHealthProvider
 from .task_tracker import TaskTrackerHealthProvider
 
+_STATUS_GAUGE_VALUES = {
+    HealthStatus.HEALTHY: 1.0,
+    HealthStatus.DEGRADED: 0.5,
+    HealthStatus.UNHEALTHY: 0.0,
+}
+
+
+@asynccontextmanager
+async def track_health_check(provider: str) -> AsyncIterator[None]:
+    """Measure health check duration for Prometheus histograms."""
+    start = time.perf_counter()
+    try:
+        yield
+    finally:
+        duration = time.perf_counter() - start
+        health_check_duration_seconds.labels(provider=provider).observe(duration)
+
+
+def record_health_check_result(
+    provider: str,
+    result: HealthCheckResult,
+    previous_status: HealthStatus | None,
+) -> None:
+    """Update Prometheus metrics for completed health checks."""
+    health_check_total.labels(provider=provider, status=result.status.value).inc()
+    gauge_value = _STATUS_GAUGE_VALUES.get(result.status, 0.0)
+    health_check_status_gauge.labels(provider=provider).set(gauge_value)
+
+    if previous_status is not None and previous_status != result.status:
+        health_check_status_transitions_total.labels(
+            provider=provider,
+            from_status=previous_status.value,
+            to_status=result.status.value,
+        ).inc()
+
 __all__ = [
     # Protocol and base types
     "DEGRADED_LATENCY_THRESHOLD_MS",
     "HealthCheckResult",
     "HealthProvider",
+    "record_health_check_result",
+    "track_health_check",
     "ProviderConfig",
     # Core infrastructure providers
     "DatabaseHealthProvider",

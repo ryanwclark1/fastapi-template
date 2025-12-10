@@ -12,11 +12,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any
 
 import strawberry
 from strawberry.scalars import JSON
-
 
 # --- Enums ---
 

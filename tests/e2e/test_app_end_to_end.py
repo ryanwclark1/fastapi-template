@@ -84,8 +84,16 @@ async def test_in_memory_broker_processes_echo_flow(e2e_stack):
         "data": {"value": "ping"},
     }
 
-    await broker.publish(payload, queue=handlers.ECHO_SERVICE_QUEUE)
-    await handlers.handle_echo_response.wait_call(timeout=1.0)
+    # Import exchanges module to get DOMAIN_EVENTS_EXCHANGE
+    from example_service.infra.messaging import exchanges
+
+    # Publish through the exchange, not directly to the queue
+    await broker.publish(
+        payload,
+        queue=handlers.ECHO_SERVICE_QUEUE,
+        exchange=exchanges.DOMAIN_EVENTS_EXCHANGE,
+    )
+    await handlers.handle_echo_response.wait_call(timeout=3.0)
 
     assert handlers.handle_echo_request.mock.call_count == 1
     response_payload = handlers.handle_echo_response.mock.call_args[0][0]

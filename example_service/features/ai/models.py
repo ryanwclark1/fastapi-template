@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 import enum
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import JSON, Boolean, Float, ForeignKey, Index, Integer, String, Text
@@ -27,10 +27,8 @@ from example_service.core.database.enums import (
 from example_service.core.database.enums import (
     AIProviderType as AIProviderTypeEnum,
 )
-
-if TYPE_CHECKING:
-    from example_service.features.tenants.models import Tenant
-    from example_service.features.users.models import User
+from example_service.core.models.tenant import Tenant
+from example_service.core.models.user import User
 
 
 class AIProviderType(str, enum.Enum):

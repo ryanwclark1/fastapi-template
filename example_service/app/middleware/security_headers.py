@@ -206,11 +206,10 @@ class SecurityHeadersMiddleware:
             Development policy allows Swagger UI, ReDoc, and WebSocket connections.
         """
         if self._is_production:
-            # Stricter policy for production
+            # Stricter policy for production - no unsafe-eval or unsafe-inline in scripts
             return {
                 "default-src": "'self'",
-                # Allow AsyncAPI/Swagger bundles that rely on AJV's eval-based validators
-                "script-src": "'self' 'unsafe-eval'",
+                "script-src": "'self'",
                 "style-src": "'self' 'unsafe-inline'",  # 'unsafe-inline' for dynamic styles
                 "img-src": "'self' data: https:",
                 "font-src": "'self' data:",

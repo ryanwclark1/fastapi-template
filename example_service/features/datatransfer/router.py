@@ -12,15 +12,14 @@ from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from example_service.core.dependencies.accent_auth import get_current_user
-from example_service.core.schemas.auth import AuthUser
 from example_service.core.dependencies.database import get_db_session
-from example_service.core.dependencies.ratelimit import per_user_rate_limit, rate_limit
+from example_service.core.dependencies.ratelimit import per_user_rate_limit
 from example_service.core.dependencies.tenant import TenantContextDep
 from example_service.core.exceptions import BadRequestException
+from example_service.core.schemas.auth import AuthUser
 from example_service.core.settings import get_datatransfer_settings
 
 from .audit import log_export_operation, log_import_operation
-from .webhooks import notify_export_complete, notify_import_complete
 from .schemas import (
     ExportFormat,
     ExportRequest,
@@ -30,6 +29,7 @@ from .schemas import (
     SupportedEntitiesResponse,
 )
 from .service import DataTransferService
+from .webhooks import notify_export_complete, notify_import_complete
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -91,13 +91,13 @@ async def list_supported_entities(
 
 
 # Rate limit for export operations: 20 exports per minute per user
-ExportRateLimit = Annotated[None, Depends(per_user_rate_limit(limit=20, window=60))]
+ExportRateLimit = Annotated[None, per_user_rate_limit(limit=20, window=60)]
 
 # Rate limit for import operations: 10 imports per minute per user
-ImportRateLimit = Annotated[None, Depends(per_user_rate_limit(limit=10, window=60))]
+ImportRateLimit = Annotated[None, per_user_rate_limit(limit=10, window=60)]
 
 # Rate limit for streaming exports: 5 per minute (more resource-intensive)
-StreamingRateLimit = Annotated[None, Depends(per_user_rate_limit(limit=5, window=60))]
+StreamingRateLimit = Annotated[None, per_user_rate_limit(limit=5, window=60)]
 
 
 @router.post(
@@ -164,9 +164,12 @@ async def download_export(
     _user: Annotated[AuthUser, Depends(get_current_user)],
     _rate_limit: ExportRateLimit,
     entity_type: Annotated[str, Query(description="Entity type to export")],
-    format: Annotated[ExportFormat, Query(description="Export format")] = ExportFormat.CSV,
+    format: Annotated[
+        ExportFormat, Query(description="Export format")
+    ] = ExportFormat.CSV,
     compress: Annotated[
-        bool | None, Query(description="Enable gzip compression (default from settings)")
+        bool | None,
+        Query(description="Enable gzip compression (default from settings)"),
     ] = None,
     tenant: TenantContextDep = None,
 ) -> StreamingResponse:
@@ -222,7 +225,9 @@ async def stream_export(
     _user: Annotated[AuthUser, Depends(get_current_user)],
     _rate_limit: StreamingRateLimit,
     entity_type: Annotated[str, Query(description="Entity type to export")],
-    format: Annotated[ExportFormat, Query(description="Export format")] = ExportFormat.CSV,
+    format: Annotated[
+        ExportFormat, Query(description="Export format")
+    ] = ExportFormat.CSV,
     chunk_size: Annotated[
         int, Query(description="Records per chunk (100-10000)", ge=100, le=10000)
     ] = 1000,
@@ -263,7 +268,11 @@ async def stream_export(
     )
 
     # Determine content type and filename
-    timestamp = __import__("datetime").datetime.now(__import__("datetime").UTC).strftime("%Y%m%d_%H%M%S")
+    timestamp = (
+        __import__("datetime")
+        .datetime.now(__import__("datetime").UTC)
+        .strftime("%Y%m%d_%H%M%S")
+    )
     if format == ExportFormat.CSV:
         content_type = "text/csv"
         filename = f"{entity_type}_{timestamp}.csv"
@@ -272,7 +281,9 @@ async def stream_export(
         filename = f"{entity_type}_{timestamp}.jsonl"
 
     async def generate():
-        async for chunk in service.stream_export(request, tenant_id=tenant_id, chunk_size=chunk_size):
+        async for chunk in service.stream_export(
+            request, tenant_id=tenant_id, chunk_size=chunk_size
+        ):
             yield chunk
 
     return StreamingResponse(
@@ -342,9 +353,7 @@ async def import_data(
     validate_only: Annotated[
         bool, Query(description="Only validate, don't import")
     ] = False,
-    skip_errors: Annotated[
-        bool, Query(description="Continue on errors")
-    ] = False,
+    skip_errors: Annotated[bool, Query(description="Continue on errors")] = False,
     update_existing: Annotated[
         bool, Query(description="Update existing records")
     ] = False,
@@ -489,7 +498,9 @@ async def download_import_template(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     _user: Annotated[AuthUser, Depends(get_current_user)],
     entity_type: Annotated[str, Query(description="Entity type to get template for")],
-    format: Annotated[ImportFormat, Query(description="Template format")] = ImportFormat.CSV,
+    format: Annotated[
+        ImportFormat, Query(description="Template format")
+    ] = ImportFormat.CSV,
 ) -> StreamingResponse:
     """Download a sample import template.
 
@@ -572,9 +583,13 @@ async def get_job_status(
 )
 async def list_jobs(
     _user: Annotated[AuthUser, Depends(get_current_user)],
-    job_type: Annotated[str | None, Query(description="Filter by job type (export/import)")] = None,
+    job_type: Annotated[
+        str | None, Query(description="Filter by job type (export/import)")
+    ] = None,
     status: Annotated[str | None, Query(description="Filter by status")] = None,
-    limit: Annotated[int, Query(description="Maximum jobs to return", ge=1, le=500)] = 100,
+    limit: Annotated[
+        int, Query(description="Maximum jobs to return", ge=1, le=500)
+    ] = 100,
 ) -> dict:
     """List background jobs.
 

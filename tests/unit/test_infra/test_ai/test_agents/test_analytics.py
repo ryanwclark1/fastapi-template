@@ -88,7 +88,7 @@ class TestUsageMetrics:
         assert metrics.total_runs == 0
         assert metrics.cancelled_runs == 0
         assert metrics.average_tokens_per_run == 0.0
-        assert metrics.total_cost_usd == Decimal("0")
+        assert metrics.total_cost_usd == Decimal(0)
 
 
 class TestAgentMetrics:
@@ -132,7 +132,7 @@ class TestCostAnalysis:
             total_cost_usd=Decimal("500.00"),
             total_runs=1000,
             total_tokens=500000,
-            cost_by_agent={"qa_agent": Decimal("300"), "code_agent": Decimal("200")},
+            cost_by_agent={"qa_agent": Decimal(300), "code_agent": Decimal(200)},
             daily_average=Decimal("16.67"),
             projected_monthly=Decimal("500.00"),
             wasted_cost=Decimal("50.00"),
@@ -151,7 +151,7 @@ class TestCostAnalysis:
             period_end=now,
         )
 
-        assert analysis.total_cost_usd == Decimal("0")
+        assert analysis.total_cost_usd == Decimal(0)
         assert analysis.cost_by_agent == {}
         assert analysis.cost_by_day == []
 
@@ -427,8 +427,8 @@ class TestAgentAnalytics:
                 tenant_id="test",
                 period_start=now,
                 period_end=now,
-                total_cost_usd=Decimal("100"),
-                wasted_cost=Decimal("10"),
+                total_cost_usd=Decimal(100),
+                wasted_cost=Decimal(10),
             ),
         )
 
@@ -456,8 +456,8 @@ class TestAgentAnalytics:
                 tenant_id="test",
                 period_start=now,
                 period_end=now,
-                total_cost_usd=Decimal("100"),
-                wasted_cost=Decimal("30"),  # 30% wasted
+                total_cost_usd=Decimal(100),
+                wasted_cost=Decimal(30),  # 30% wasted
             ),
         )
 

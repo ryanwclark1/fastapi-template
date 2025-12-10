@@ -31,18 +31,16 @@ Example:
 
 from __future__ import annotations
 
-import asyncio
 from abc import ABC, abstractmethod
+import asyncio
 from collections import defaultdict
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar
-from uuid import UUID, uuid4
 import logging
-
-if TYPE_CHECKING:
-    from collections.abc import Awaitable
+from typing import Any, Generic, TypeVar
+from uuid import UUID, uuid4
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +153,9 @@ class WorkflowState(Generic[StateT]):
             "current_node": self.current_node,
             "executed_nodes": self.executed_nodes,
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "completed_at": self.completed_at.isoformat()
+            if self.completed_at
+            else None,
             "paused_at": self.paused_at.isoformat() if self.paused_at else None,
             "error": self.error,
             "failed_node": self.failed_node,
@@ -188,7 +188,6 @@ class WorkflowNode(ABC):
         Returns:
             NodeResult with output or approval request
         """
-        pass
 
 
 class FunctionNode(WorkflowNode):
@@ -645,10 +644,11 @@ class Workflow:
         next_nodes = self.edges.get(request.node_name, [])
         if next_nodes:
             state.current_node = next_nodes[0]
-            return await self.run({}, context=WorkflowContext(workflow=self), resume_state=state)
-        else:
-            state.status = WorkflowStatus.COMPLETED
-            state.completed_at = datetime.now(UTC)
+            return await self.run(
+                {}, context=WorkflowContext(workflow=self), resume_state=state
+            )
+        state.status = WorkflowStatus.COMPLETED
+        state.completed_at = datetime.now(UTC)
 
         return state
 
@@ -858,8 +858,10 @@ def human_approval(
     Example:
         builder.add_node("review", human_approval("Please review")("review"))
     """
+
     def factory(name: str) -> HumanApprovalNode:
         return HumanApprovalNode(name, prompt, options, context_keys=context_keys)
+
     return factory
 
 
@@ -879,8 +881,10 @@ def conditional_branch(
             )("route")
         )
     """
+
     def factory(name: str) -> ConditionalNode:
         return ConditionalNode(name, condition, branches, default)
+
     return factory
 
 
@@ -896,6 +900,8 @@ def parallel_branches(
             parallel_branches(["analyze_text", "analyze_images"])("parallel_analysis")
         )
     """
+
     def factory(name: str) -> ParallelNode:
         return ParallelNode(name, branches, merge)
+
     return factory

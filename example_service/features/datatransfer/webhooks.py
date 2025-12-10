@@ -6,9 +6,9 @@ allowing external systems to react to data transfer activities.
 
 from __future__ import annotations
 
-import logging
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+import logging
+from typing import TYPE_CHECKING
 import uuid
 
 if TYPE_CHECKING:

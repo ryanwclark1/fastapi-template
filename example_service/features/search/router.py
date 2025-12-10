@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import APIRouter, Depends, Query
 
 from example_service.core.dependencies.accent_auth import get_current_user
-from example_service.core.schemas.auth import AuthUser
 from example_service.core.dependencies.database import get_db_session
+from example_service.core.schemas.auth import AuthUser
 
 from .schemas import (
     RecordClickRequest,

@@ -293,8 +293,8 @@ class TestRequestLoggingMiddleware:
                 with contextlib.suppress(Exception):
                     await client.get("/error")
 
-            # Verify error was logged
-            assert mock_logger.error.called
+            # Verify error was logged (middleware uses logger.exception, not logger.error)
+            assert mock_logger.exception.called
 
     @pytest.mark.asyncio
     async def test_middleware_logs_slow_requests(self, app: FastAPI) -> None:

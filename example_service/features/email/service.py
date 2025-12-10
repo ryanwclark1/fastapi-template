@@ -534,7 +534,7 @@ class EmailConfigService(BaseService):
         reply_to: str | None = None,
         template_name: str | None = None,
         template_data: dict | None = None,
-    ) -> "SendEmailResponse":
+    ) -> SendEmailResponse:
         """Send an email using the tenant's configuration.
 
         Args:

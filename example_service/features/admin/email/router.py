@@ -16,7 +16,6 @@ from fastapi import APIRouter, Query
 
 from example_service.features.admin.email.dependencies import (
     EmailAdminServiceDep,
-    EnhancedEmailServiceDep,
 )
 
 logger = logging.getLogger(__name__)

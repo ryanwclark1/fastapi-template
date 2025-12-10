@@ -8,6 +8,9 @@ is unavailable while still serving requests that don't require authentication.
 from __future__ import annotations
 
 import logging
+import time
+
+import httpx
 
 from example_service.core.schemas.common import HealthStatus
 from example_service.core.settings import get_auth_settings
@@ -76,24 +79,11 @@ class AccentAuthHealthProvider:
         client = get_accent_auth_client()
 
         try:
-            # Use async context manager for proper resource cleanup
             async with client:
-                # Perform a simple HEAD request to check connectivity
-                # This doesn't require authentication and is very fast
-                import time
-
-                import httpx
-
                 start = time.perf_counter()
-                if client._client is None:
-                    return HealthCheckResult(
-                        status=HealthStatus.UNHEALTHY,
-                        message="Accent-Auth client not initialized",
-                        metadata={"error": "Client not initialized"},
-                    )
-                response = await client._client.head(
-                    f"{client.base_url}/api/auth/0.1/token/check",
-                    headers={"X-Auth-Token": "health-check"},  # Invalid token is OK
+                response = await client.head(
+                    "/api/auth/0.1/token/check",
+                    headers=client.build_headers(token="health-check"),
                 )
                 latency_ms = (time.perf_counter() - start) * 1000
 

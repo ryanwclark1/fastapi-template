@@ -275,6 +275,8 @@ from example_service.infra.ai.pipelines import (  # noqa: E402
 __all__ = [
     # Orchestrator
     "InstrumentedOrchestrator",
+    # Agents (re-exported from agents subpackage)
+    "agents",
     "get_instrumented_orchestrator",
     # Pipelines
     "get_pipeline",
@@ -283,8 +285,6 @@ __all__ = [
     # Lifecycle
     "start_ai_infrastructure",
     "stop_ai_infrastructure",
-    # Agents (re-exported from agents subpackage)
-    "agents",
 ]
 
 # Lazy import for agents subpackage

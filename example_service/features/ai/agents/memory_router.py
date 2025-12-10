@@ -21,27 +21,23 @@ Endpoints:
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
+from example_service.core.models.user import User
 from example_service.features.auth.dependencies import get_current_user
-from example_service.features.users.models import User
 from example_service.infra.ai.agents.memory import (
     BufferMemory,
     ConversationMemory,
-    MemoryMessage,
     SummaryMemory,
     WindowMemory,
     create_memory,
 )
 from example_service.infra.ai.agents.state_store import (
-    InMemoryStateStore,
     ScopedStateStore,
-    StateKey,
     get_state_store,
 )
 

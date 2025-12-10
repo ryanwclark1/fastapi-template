@@ -23,12 +23,10 @@ Usage:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 from fastapi import Depends
-
-if TYPE_CHECKING:
-    from opentelemetry.trace import Tracer
+from opentelemetry.trace import Tracer
 
 
 def get_tracer_dep(name: str = "example_service") -> Tracer:
@@ -98,7 +96,7 @@ Example:
 """
 
 
-def add_span_attributes_dep(**attributes: str | int | float | bool):
+def add_span_attributes_dep(**attributes: str | float | bool):
     """Factory for adding attributes to the current span.
 
     This creates a dependency that adds the specified attributes
@@ -127,7 +125,7 @@ def add_span_attributes_dep(**attributes: str | int | float | bool):
     return add_attributes
 
 
-def add_span_event_dep(name: str, **attributes: str | int | float | bool):
+def add_span_event_dep(name: str, **attributes: str | float | bool):
     """Factory for adding an event to the current span.
 
     This creates a dependency that adds a named event with optional

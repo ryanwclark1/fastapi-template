@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 
 import strawberry
 
+from example_service.features.graphql.types.reminders import DeletePayload
 from example_service.features.graphql.types.tasks import (
     BulkCancelInput,
     BulkCancelResult,
@@ -32,7 +33,6 @@ from example_service.features.graphql.types.tasks import (
     TriggerTaskPayload,
     TriggerTaskSuccess,
 )
-from example_service.features.graphql.types.reminders import DeletePayload
 
 if TYPE_CHECKING:
     from strawberry.types import Info
@@ -102,7 +102,7 @@ async def trigger_task_mutation(
         logger.exception("Error triggering task %s: %s", input.task.value, e)
         return TaskOperationError(
             code="TRIGGER_FAILED",
-            message=f"Failed to trigger task: {str(e)}",
+            message=f"Failed to trigger task: {e!s}",
         )
 
 
@@ -141,7 +141,7 @@ async def cancel_task_mutation(
         return CancelTaskResult(
             task_id=input.task_id,
             cancelled=False,
-            message=f"Failed to cancel task: {str(e)}",
+            message=f"Failed to cancel task: {e!s}",
             previous_status=None,
         )
 
@@ -252,7 +252,7 @@ async def retry_dlq_task_mutation(
             new_task_id="",
             task_name="unknown",
             status="failed",
-            message=f"Failed to retry task: {str(e)}",
+            message=f"Failed to retry task: {e!s}",
         )
 
 
@@ -351,7 +351,7 @@ async def discard_dlq_task_mutation(
         logger.exception("Error discarding DLQ task %s: %s", task_id, e)
         return DeletePayload(
             success=False,
-            message=f"Failed to discard task: {str(e)}",
+            message=f"Failed to discard task: {e!s}",
         )
 
 

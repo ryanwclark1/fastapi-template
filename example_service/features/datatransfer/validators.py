@@ -6,10 +6,10 @@ custom validation logic that goes beyond basic type checking.
 
 from __future__ import annotations
 
-import logging
-import re
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
+import logging
+import re
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:

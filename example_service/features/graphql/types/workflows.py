@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated
 
 import strawberry
 from strawberry.scalars import JSON
@@ -96,7 +96,9 @@ class WorkflowDefinitionType:
     is_public: bool = strawberry.field(description="Whether workflow is public")
     created_at: datetime = strawberry.field(description="Creation timestamp")
     updated_at: datetime = strawberry.field(description="Last update timestamp")
-    created_by_id: strawberry.ID | None = strawberry.field(description="Creator user ID")
+    created_by_id: strawberry.ID | None = strawberry.field(
+        description="Creator user ID"
+    )
 
     @classmethod
     def from_model(cls, definition: AIWorkflowDefinition) -> WorkflowDefinitionType:
@@ -133,11 +135,15 @@ class WorkflowExecutionType:
     """GraphQL type for Workflow Execution entity."""
 
     id: strawberry.ID = strawberry.field(description="Unique identifier (UUID)")
-    definition_id: strawberry.ID = strawberry.field(description="Workflow definition ID")
+    definition_id: strawberry.ID = strawberry.field(
+        description="Workflow definition ID"
+    )
     tenant_id: str = strawberry.field(description="Tenant identifier")
     status: WorkflowStatusEnum = strawberry.field(description="Execution status")
     current_node: str | None = strawberry.field(description="Currently executing node")
-    executed_nodes: list[str] = strawberry.field(description="Nodes that have been executed")
+    executed_nodes: list[str] = strawberry.field(
+        description="Nodes that have been executed"
+    )
     input_data: JSON = strawberry.field(description="Execution input data")
     state_data: JSON = strawberry.field(description="Current state data")
     output_data: JSON | None = strawberry.field(description="Execution output")
@@ -146,18 +152,28 @@ class WorkflowExecutionType:
     error_code: str | None = strawberry.field(description="Error code if failed")
     failed_node: str | None = strawberry.field(description="Node that failed")
     started_at: datetime | None = strawberry.field(description="When execution started")
-    completed_at: datetime | None = strawberry.field(description="When execution completed")
-    paused_at: datetime | None = strawberry.field(description="When execution was paused")
+    completed_at: datetime | None = strawberry.field(
+        description="When execution completed"
+    )
+    paused_at: datetime | None = strawberry.field(
+        description="When execution was paused"
+    )
     total_cost_usd: float = strawberry.field(description="Total cost in USD")
     total_tokens: int = strawberry.field(description="Total tokens consumed")
     retry_count: int = strawberry.field(description="Number of retries")
-    correlation_id: str | None = strawberry.field(description="Correlation ID for tracing")
+    correlation_id: str | None = strawberry.field(
+        description="Correlation ID for tracing"
+    )
     tags: list[str] = strawberry.field(description="Execution tags")
     metadata: JSON = strawberry.field(description="Additional metadata")
     created_at: datetime = strawberry.field(description="Creation timestamp")
     updated_at: datetime = strawberry.field(description="Last update timestamp")
-    created_by_id: strawberry.ID | None = strawberry.field(description="User who started execution")
-    duration_seconds: float | None = strawberry.field(description="Total duration in seconds")
+    created_by_id: strawberry.ID | None = strawberry.field(
+        description="User who started execution"
+    )
+    duration_seconds: float | None = strawberry.field(
+        description="Total duration in seconds"
+    )
 
     @classmethod
     def from_model(cls, execution: AIWorkflowExecution) -> WorkflowExecutionType:
@@ -184,7 +200,7 @@ class WorkflowExecutionType:
             retry_count=execution.retry_count,
             correlation_id=execution.correlation_id,
             tags=execution.tags,
-            metadata=execution.metadata,
+            metadata=execution.extra_metadata,
             created_at=execution.created_at,
             updated_at=execution.updated_at,
             created_by_id=(
@@ -201,7 +217,9 @@ class WorkflowNodeExecutionType:
     """GraphQL type for Workflow Node Execution entity."""
 
     id: strawberry.ID = strawberry.field(description="Unique identifier (UUID)")
-    workflow_execution_id: strawberry.ID = strawberry.field(description="Parent execution ID")
+    workflow_execution_id: strawberry.ID = strawberry.field(
+        description="Parent execution ID"
+    )
     node_name: str = strawberry.field(description="Name of the node")
     node_type: WorkflowNodeTypeEnum = strawberry.field(description="Type of node")
     status: WorkflowNodeStatusEnum = strawberry.field(description="Execution status")
@@ -217,7 +235,9 @@ class WorkflowNodeExecutionType:
     duration_ms: float | None = strawberry.field(description="Duration in milliseconds")
 
     @classmethod
-    def from_model(cls, node_exec: AIWorkflowNodeExecution) -> WorkflowNodeExecutionType:
+    def from_model(
+        cls, node_exec: AIWorkflowNodeExecution
+    ) -> WorkflowNodeExecutionType:
         """Convert SQLAlchemy model to GraphQL type."""
         return cls(
             id=strawberry.ID(str(node_exec.id)),
@@ -233,7 +253,7 @@ class WorkflowNodeExecutionType:
             started_at=node_exec.started_at,
             completed_at=node_exec.completed_at,
             attempt_number=node_exec.attempt_number,
-            metadata=node_exec.metadata,
+            metadata=node_exec.extra_metadata,
             duration_ms=node_exec.duration_ms,
         )
 
@@ -243,7 +263,9 @@ class WorkflowApprovalType:
     """GraphQL type for Workflow Approval entity."""
 
     id: strawberry.ID = strawberry.field(description="Unique identifier (UUID)")
-    workflow_execution_id: strawberry.ID = strawberry.field(description="Parent execution ID")
+    workflow_execution_id: strawberry.ID = strawberry.field(
+        description="Parent execution ID"
+    )
     node_name: str = strawberry.field(description="Approval node name")
     prompt: str = strawberry.field(description="Approval prompt message")
     options: list[str] = strawberry.field(description="Available response options")
@@ -251,10 +273,16 @@ class WorkflowApprovalType:
     is_pending: bool = strawberry.field(description="Whether approval is pending")
     timeout_seconds: int | None = strawberry.field(description="Approval timeout")
     response: str | None = strawberry.field(description="Response choice")
-    response_data: JSON | None = strawberry.field(description="Additional response data")
+    response_data: JSON | None = strawberry.field(
+        description="Additional response data"
+    )
     response_comment: str | None = strawberry.field(description="Approver's comment")
-    responded_by_id: strawberry.ID | None = strawberry.field(description="User who responded")
-    responded_at: datetime | None = strawberry.field(description="When response was given")
+    responded_by_id: strawberry.ID | None = strawberry.field(
+        description="User who responded"
+    )
+    responded_at: datetime | None = strawberry.field(
+        description="When response was given"
+    )
     created_at: datetime = strawberry.field(description="When approval was created")
     expires_at: datetime | None = strawberry.field(description="When approval expires")
     is_expired: bool = strawberry.field(description="Whether approval has expired")
@@ -284,7 +312,7 @@ class WorkflowApprovalType:
             created_at=approval.created_at,
             expires_at=approval.expires_at,
             is_expired=approval.is_expired,
-            metadata=approval.metadata,
+            metadata=approval.extra_metadata,
         )
 
 
@@ -300,7 +328,9 @@ class WorkflowStatsType:
     pending_approvals: int = strawberry.field(description="Pending approval requests")
     total_cost_usd: float = strawberry.field(description="Total cost in USD")
     total_tokens: int = strawberry.field(description="Total tokens consumed")
-    avg_duration_seconds: float | None = strawberry.field(description="Average execution duration")
+    avg_duration_seconds: float | None = strawberry.field(
+        description="Average execution duration"
+    )
     executions_by_status: JSON = strawberry.field(description="Breakdown by status")
     executions_by_workflow: JSON = strawberry.field(description="Breakdown by workflow")
 
@@ -314,13 +344,17 @@ class CreateWorkflowDefinitionInput:
 
     name: str = strawberry.field(description="Workflow name")
     slug: str = strawberry.field(description="URL-friendly slug")
-    description: str | None = strawberry.field(default=None, description="Workflow description")
+    description: str | None = strawberry.field(
+        default=None, description="Workflow description"
+    )
     version: str = strawberry.field(default="1.0.0", description="Workflow version")
     nodes: JSON = strawberry.field(description="Node definitions")
     edges: JSON = strawberry.field(description="Edge connections")
     entry_point: str = strawberry.field(description="Entry node name")
     end_nodes: list[str] = strawberry.field(description="Terminal node names")
-    default_config: JSON | None = strawberry.field(default=None, description="Default config")
+    default_config: JSON | None = strawberry.field(
+        default=None, description="Default config"
+    )
     timeout_seconds: int | None = strawberry.field(default=None, description="Timeout")
     max_retries: int = strawberry.field(default=0, description="Max retries")
     tags: list[str] | None = strawberry.field(default=None, description="Tags")
@@ -337,8 +371,12 @@ class UpdateWorkflowDefinitionInput:
     nodes: JSON | None = strawberry.field(default=None, description="Node definitions")
     edges: JSON | None = strawberry.field(default=None, description="Edge connections")
     entry_point: str | None = strawberry.field(default=None, description="Entry node")
-    end_nodes: list[str] | None = strawberry.field(default=None, description="End nodes")
-    default_config: JSON | None = strawberry.field(default=None, description="Default config")
+    end_nodes: list[str] | None = strawberry.field(
+        default=None, description="End nodes"
+    )
+    default_config: JSON | None = strawberry.field(
+        default=None, description="Default config"
+    )
     timeout_seconds: int | None = strawberry.field(default=None, description="Timeout")
     max_retries: int | None = strawberry.field(default=None, description="Max retries")
     tags: list[str] | None = strawberry.field(default=None, description="Tags")
@@ -350,11 +388,17 @@ class UpdateWorkflowDefinitionInput:
 class ExecuteWorkflowInput:
     """Input for executeWorkflow mutation."""
 
-    definition_id: strawberry.ID = strawberry.field(description="Workflow definition ID")
+    definition_id: strawberry.ID = strawberry.field(
+        description="Workflow definition ID"
+    )
     input_data: JSON = strawberry.field(description="Execution input data")
     config: JSON | None = strawberry.field(default=None, description="Config overrides")
-    correlation_id: str | None = strawberry.field(default=None, description="Correlation ID")
-    tags: list[str] | None = strawberry.field(default=None, description="Execution tags")
+    correlation_id: str | None = strawberry.field(
+        default=None, description="Correlation ID"
+    )
+    tags: list[str] | None = strawberry.field(
+        default=None, description="Execution tags"
+    )
 
 
 @strawberry.input(description="Input for responding to an approval")
@@ -363,7 +407,9 @@ class RespondToApprovalInput:
 
     approval_id: strawberry.ID = strawberry.field(description="Approval request ID")
     response: str = strawberry.field(description="Response choice (approve/reject)")
-    response_data: JSON | None = strawberry.field(default=None, description="Additional data")
+    response_data: JSON | None = strawberry.field(
+        default=None, description="Additional data"
+    )
     comment: str | None = strawberry.field(default=None, description="Approver comment")
 
 
@@ -371,10 +417,18 @@ class RespondToApprovalInput:
 class WorkflowDefinitionFilterInput:
     """Filter input for workflow definitions query."""
 
-    is_active: bool | None = strawberry.field(default=None, description="Filter by active")
-    is_public: bool | None = strawberry.field(default=None, description="Filter by public")
-    tags: list[str] | None = strawberry.field(default=None, description="Filter by tags")
-    search: str | None = strawberry.field(default=None, description="Search name/description")
+    is_active: bool | None = strawberry.field(
+        default=None, description="Filter by active"
+    )
+    is_public: bool | None = strawberry.field(
+        default=None, description="Filter by public"
+    )
+    tags: list[str] | None = strawberry.field(
+        default=None, description="Filter by tags"
+    )
+    search: str | None = strawberry.field(
+        default=None, description="Search name/description"
+    )
 
 
 @strawberry.input(description="Filter for workflow executions query")
@@ -393,14 +447,18 @@ class WorkflowExecutionFilterInput:
     created_before: datetime | None = strawberry.field(
         default=None, description="Created before"
     )
-    tags: list[str] | None = strawberry.field(default=None, description="Filter by tags")
+    tags: list[str] | None = strawberry.field(
+        default=None, description="Filter by tags"
+    )
 
 
 @strawberry.input(description="Filter for workflow approvals query")
 class WorkflowApprovalFilterInput:
     """Filter input for workflow approvals query."""
 
-    is_pending: bool | None = strawberry.field(default=None, description="Filter by pending")
+    is_pending: bool | None = strawberry.field(
+        default=None, description="Filter by pending"
+    )
     execution_id: strawberry.ID | None = strawberry.field(
         default=None, description="Filter by execution"
     )
@@ -413,21 +471,27 @@ class WorkflowApprovalFilterInput:
 class WorkflowDefinitionSuccess:
     """Success payload for workflow definition mutations."""
 
-    definition: WorkflowDefinitionType = strawberry.field(description="The workflow definition")
+    definition: WorkflowDefinitionType = strawberry.field(
+        description="The workflow definition"
+    )
 
 
 @strawberry.type(description="Successful workflow execution operation result")
 class WorkflowExecutionSuccess:
     """Success payload for workflow execution mutations."""
 
-    execution: WorkflowExecutionType = strawberry.field(description="The workflow execution")
+    execution: WorkflowExecutionType = strawberry.field(
+        description="The workflow execution"
+    )
 
 
 @strawberry.type(description="Successful approval response result")
 class WorkflowApprovalSuccess:
     """Success payload for approval mutations."""
 
-    approval: WorkflowApprovalType = strawberry.field(description="The approval request")
+    approval: WorkflowApprovalType = strawberry.field(
+        description="The approval request"
+    )
 
 
 @strawberry.type(description="Error result from a workflow operation")
@@ -473,7 +537,9 @@ WorkflowApprovalPayload = Annotated[
 class WorkflowDefinitionEdge:
     """Edge wrapper for paginated workflow definitions."""
 
-    node: WorkflowDefinitionType = strawberry.field(description="The workflow definition")
+    node: WorkflowDefinitionType = strawberry.field(
+        description="The workflow definition"
+    )
     cursor: str = strawberry.field(description="Cursor for this item")
 
 

@@ -12,8 +12,8 @@ Provides:
 
 from __future__ import annotations
 
-import logging
 from datetime import UTC, datetime, timedelta
+import logging
 from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
@@ -31,7 +31,6 @@ from example_service.features.graphql.types.ai import (
     AIJobConnection,
     AIJobEdge,
     AIJobFilterInput,
-    AIJobStatusEnum,
     AIJobType,
     AIJobTypeEnum,
     AIUsageFilterInput,

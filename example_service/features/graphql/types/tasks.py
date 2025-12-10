@@ -13,13 +13,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, Any
+from typing import Annotated
 
 import strawberry
 from strawberry.scalars import JSON
 
 from example_service.features.graphql.types.base import PageInfoType
-
 
 # --- Enums ---
 

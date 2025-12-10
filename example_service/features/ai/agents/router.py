@@ -22,22 +22,19 @@ Endpoints:
 from __future__ import annotations
 
 from datetime import datetime
-from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from example_service.core.database import get_async_session
+from example_service.core.models.user import User
 from example_service.features.auth.dependencies import get_current_user
-from example_service.features.users.models import User
 from example_service.infra.ai.agents.run_manager import (
-    CostSummary,
     RunFilter,
     RunManager,
-    RunStats,
 )
 
 router = APIRouter(prefix="/agents", tags=["AI Agents"])

@@ -11,9 +11,9 @@ from fastapi import APIRouter, Depends, Query, status
 
 from example_service.core.database import NotFoundError
 from example_service.core.dependencies.accent_auth import get_current_user
-from example_service.core.schemas.auth import AuthUser
 from example_service.core.dependencies.database import get_db_session
 from example_service.core.exceptions import ConflictException
+from example_service.core.schemas.auth import AuthUser
 
 from .dependencies import FeatureFlags, get_feature_flags
 from .models import FlagStatus

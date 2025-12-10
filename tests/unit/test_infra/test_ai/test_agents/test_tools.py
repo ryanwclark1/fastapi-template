@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import pytest
 from pydantic import BaseModel
+import pytest
 
 from example_service.infra.ai.agents.tools import (
     BaseTool,
@@ -81,7 +81,7 @@ class TestToolResult:
         result = ToolResult.failure(error="Test error")
         content = result.to_message_content()
 
-        assert "Error: Test error" == content
+        assert content == "Error: Test error"
 
 
 class TestBaseTool:

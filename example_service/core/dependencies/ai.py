@@ -43,14 +43,16 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import Depends, HTTPException, status
 
 if TYPE_CHECKING:
-    from example_service.infra.ai import InstrumentedOrchestrator
-    from example_service.infra.ai.observability import (
-        AIMetrics,
-        AIObservabilityLogger,
-        AITracer,
-        BudgetService,
-    )
     from example_service.infra.ai.pipelines import Pipeline
+
+# Runtime imports needed for Annotated type annotations
+from example_service.infra.ai import InstrumentedOrchestrator
+from example_service.infra.ai.observability import (
+    AIMetrics,
+    AIObservabilityLogger,
+    AITracer,
+    BudgetService,
+)
 
 
 def get_orchestrator() -> InstrumentedOrchestrator | None:

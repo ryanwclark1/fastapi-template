@@ -233,6 +233,128 @@ async def db_engine(postgres_container: str) -> AsyncGenerator[AsyncEngine]:
         await engine.dispose()
 
 
+ENUM_DEFINITIONS: list[tuple[list[str], str]] = [
+    (["pending", "processing", "ready", "failed", "deleted"], "filestatus"),
+    (["smtp", "aws_ses", "sendgrid", "mailgun", "console", "file"], "emailprovidertype"),
+    (["pending", "delivered", "failed", "retrying"], "deliverystatus"),
+    (["LLM", "TRANSCRIPTION", "EMBEDDING", "IMAGE", "PII_REDACTION"], "aiprovidertype"),
+    (
+        [
+            "TRANSCRIPTION",
+            "PII_REDACTION",
+            "SUMMARY",
+            "SENTIMENT",
+            "COACHING",
+            "FULL_ANALYSIS",
+        ],
+        "aijobtype",
+    ),
+    (["PENDING", "PROCESSING", "COMPLETED", "FAILED", "CANCELLED"], "aijobstatus"),
+    (
+        [
+            "pending",
+            "queued",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "retrying",
+            "paused",
+        ],
+        "jobstatus",
+    ),
+    (["1", "2", "3", "4"], "jobpriority"),
+    (["enabled", "disabled", "percentage", "targeted"], "flagstatus"),
+    (
+        [
+            "create",
+            "read",
+            "update",
+            "delete",
+            "bulk_create",
+            "bulk_update",
+            "bulk_delete",
+            "export",
+            "import",
+            "login",
+            "logout",
+            "login_failed",
+            "password_change",
+            "token_refresh",
+            "permission_denied",
+            "acl_check",
+            "archive",
+            "restore",
+            "purge",
+        ],
+        "auditaction",
+    ),
+    (
+        [
+            "pending",
+            "running",
+            "paused",
+            "waiting_input",
+            "completed",
+            "failed",
+            "cancelled",
+            "timeout",
+        ],
+        "aiagentrunstatus",
+    ),
+    (
+        [
+            "llm_call",
+            "tool_call",
+            "human_input",
+            "checkpoint",
+            "branch",
+            "parallel",
+            "subagent",
+        ],
+        "aiagentsteptype",
+    ),
+    (
+        ["pending", "running", "completed", "failed", "skipped", "retrying"],
+        "aiagentstepstatus",
+    ),
+    (
+        ["system", "user", "assistant", "tool", "function"],
+        "aiagentmessagerole",
+    ),
+    (
+        [
+            "pending",
+            "running",
+            "paused",
+            "waiting_approval",
+            "completed",
+            "failed",
+            "cancelled",
+            "timeout",
+        ],
+        "aiworkflowstatus",
+    ),
+    (
+        [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "skipped",
+            "waiting_approval",
+            "approved",
+            "rejected",
+        ],
+        "aiworkflownodestatus",
+    ),
+    (
+        ["function", "human_approval", "conditional", "parallel", "subworkflow"],
+        "aiworkflownodetype",
+    ),
+]
+
+
 @pytest.fixture
 async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
     """Create async database session with automatic table creation and cleanup.
@@ -264,63 +386,7 @@ async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
     async with db_engine.begin() as conn:
         # Create all enum types that are used by models
         # These must be created before tables that reference them
-        enum_definitions = [
-            (["pending", "processing", "ready", "failed", "deleted"], "filestatus"),
-            (["smtp", "aws_ses", "sendgrid", "mailgun", "console", "file"], "emailprovidertype"),
-            (["pending", "delivered", "failed", "retrying"], "deliverystatus"),
-            (["LLM", "TRANSCRIPTION", "EMBEDDING", "IMAGE", "PII_REDACTION"], "aiprovidertype"),
-            (
-                [
-                    "TRANSCRIPTION",
-                    "PII_REDACTION",
-                    "SUMMARY",
-                    "SENTIMENT",
-                    "COACHING",
-                    "FULL_ANALYSIS",
-                ],
-                "aijobtype",
-            ),
-            (["PENDING", "PROCESSING", "COMPLETED", "FAILED", "CANCELLED"], "aijobstatus"),
-            (
-                [
-                    "pending",
-                    "queued",
-                    "running",
-                    "completed",
-                    "failed",
-                    "cancelled",
-                    "retrying",
-                    "paused",
-                ],
-                "jobstatus",
-            ),
-            (["1", "2", "3", "4"], "jobpriority"),
-            (["enabled", "disabled", "percentage", "targeted"], "flagstatus"),
-            (
-                [
-                    "create",
-                    "read",
-                    "update",
-                    "delete",
-                    "bulk_create",
-                    "bulk_update",
-                    "bulk_delete",
-                    "export",
-                    "import",
-                    "login",
-                    "logout",
-                    "login_failed",
-                    "password_change",
-                    "token_refresh",
-                    "permission_denied",
-                    "acl_check",
-                    "archive",
-                    "restore",
-                    "purge",
-                ],
-                "auditaction",
-            ),
-        ]
+        enum_definitions = ENUM_DEFINITIONS
 
         # Create each enum type if it doesn't exist
         for enum_values, enum_name in enum_definitions:

@@ -40,13 +40,13 @@ Example:
 
 from __future__ import annotations
 
-import asyncio
-import logging
 from abc import ABC, abstractmethod
+import asyncio
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from enum import Enum
+import logging
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -181,7 +181,6 @@ class QuotaStore(ABC):
         window_start: datetime,
     ) -> int | Decimal:
         """Get current usage for a quota window."""
-        pass
 
     @abstractmethod
     async def increment_usage(
@@ -193,7 +192,6 @@ class QuotaStore(ABC):
         ttl_seconds: int | None = None,
     ) -> int | Decimal:
         """Increment usage and return new total."""
-        pass
 
     @abstractmethod
     async def get_concurrent_count(
@@ -202,7 +200,6 @@ class QuotaStore(ABC):
         scope: str = "global",
     ) -> int:
         """Get current concurrent execution count."""
-        pass
 
     @abstractmethod
     async def acquire_concurrent_slot(
@@ -213,7 +210,6 @@ class QuotaStore(ABC):
         ttl_seconds: int = 3600,
     ) -> bool:
         """Try to acquire a concurrent execution slot."""
-        pass
 
     @abstractmethod
     async def release_concurrent_slot(
@@ -223,7 +219,6 @@ class QuotaStore(ABC):
         scope: str = "global",
     ) -> None:
         """Release a concurrent execution slot."""
-        pass
 
 
 class InMemoryQuotaStore(QuotaStore):
@@ -491,18 +486,18 @@ class QuotaManager:
         now = datetime.now(UTC)
         if period == "day":
             return now.replace(hour=0, minute=0, second=0, microsecond=0)
-        elif period == "month":
+        if period == "month":
             return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        elif period == "minute":
+        if period == "minute":
             return now.replace(second=0, microsecond=0)
-        elif period == "hour":
+        if period == "hour":
             return now.replace(minute=0, second=0, microsecond=0)
         return now
 
     async def check_quota(
         self,
         tokens_needed: int = 0,
-        cost_estimate: Decimal = Decimal("0"),
+        cost_estimate: Decimal = Decimal(0),
     ) -> QuotaCheckResult:
         """Check all applicable quotas.
 
@@ -567,7 +562,7 @@ class QuotaManager:
                 self.tenant_id, QuotaType.COST_DAILY, window
             )))
             limit = self.config.daily_cost_limit_usd
-            remaining_cost = max(Decimal("0"), limit - usage - cost_estimate)
+            remaining_cost = max(Decimal(0), limit - usage - cost_estimate)
 
             remaining[QuotaType.COST_DAILY] = remaining_cost
             reset_at[QuotaType.COST_DAILY] = window + timedelta(days=1)
@@ -585,7 +580,7 @@ class QuotaManager:
                 self.tenant_id, QuotaType.COST_MONTHLY, window
             )))
             limit = self.config.monthly_cost_limit_usd
-            remaining_cost = max(Decimal("0"), limit - usage - cost_estimate)
+            remaining_cost = max(Decimal(0), limit - usage - cost_estimate)
 
             remaining[QuotaType.COST_MONTHLY] = remaining_cost
             reset_at[QuotaType.COST_MONTHLY] = (window.replace(day=1) + timedelta(days=32)).replace(day=1)
@@ -639,7 +634,7 @@ class QuotaManager:
     async def record_usage(
         self,
         tokens: int = 0,
-        cost: Decimal = Decimal("0"),
+        cost: Decimal = Decimal(0),
         model: str | None = None,
     ) -> None:
         """Record usage after an operation.
@@ -740,7 +735,7 @@ class QuotaManager:
 
 def require_quota(
     tokens_estimate: int = 0,
-    cost_estimate: Decimal = Decimal("0"),
+    cost_estimate: Decimal = Decimal(0),
 ):
     """Decorator to check quota before executing an async function.
 
@@ -788,7 +783,6 @@ class QuotaExceededError(Exception):
 class RateLimitedError(QuotaExceededError):
     """Raised when rate limit is exceeded."""
 
-    pass
 
 
 # =============================================================================

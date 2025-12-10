@@ -9,7 +9,7 @@ import pytest
 
 from example_service.core.schemas.common import HealthStatus
 from example_service.features.health.providers import ProviderConfig
-from example_service.features.health.task_tracker_provider import (
+from example_service.features.health.providers.task_tracker import (
     TaskTrackerHealthProvider,
 )
 
