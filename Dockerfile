@@ -36,7 +36,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 ###############################################
 # Stage 2: Production - Use matching Python version
 ###############################################
-FROM python:3.13-slim AS production
+FROM python:3.14-slim AS production
 
 # Configurable port (change this value or override with --build-arg APP_PORT=XXXX)
 ARG APP_PORT=8000
