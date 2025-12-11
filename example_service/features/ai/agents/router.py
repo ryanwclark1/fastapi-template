@@ -21,23 +21,31 @@ Endpoints:
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any
-from uuid import UUID
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from example_service.core.database import get_async_session
-from example_service.core.models.user import User
-from example_service.features.auth.dependencies import get_current_user
+from example_service.core.dependencies.auth import AuthUserDep
 from example_service.infra.ai.agents.run_manager import (
     RunFilter,
     RunManager,
 )
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+if TYPE_CHECKING:
+    from datetime import datetime
+    from uuid import UUID
+
+    from sqlalchemy.ext.asyncio import AsyncSession
+
 
 router = APIRouter(prefix="/agents", tags=["AI Agents"])
+
+require_runtime_dependency(AuthUserDep)
+
+SessionDep = Annotated["AsyncSession", Depends(get_async_session)]
 
 
 # =============================================================================
@@ -84,6 +92,7 @@ class RunResponse(BaseModel):
     tags: list[str]
 
     class Config:
+        """Enable ORM mode for API responses."""
         from_attributes = True
 
 
@@ -173,21 +182,21 @@ class CancelRequest(BaseModel):
 
 @router.get("/runs", response_model=RunListResponse)
 async def list_runs(
-    agent_type: str | None = Query(None, description="Filter by agent type"),
-    status: str | None = Query(None, description="Filter by status"),
-    start_date: datetime | None = Query(None, description="Filter by start date"),
-    end_date: datetime | None = Query(None, description="Filter by end date"),
-    min_cost_usd: float | None = Query(None, description="Minimum cost filter"),
-    max_cost_usd: float | None = Query(None, description="Maximum cost filter"),
-    has_error: bool | None = Query(None, description="Filter by error presence"),
-    search: str | None = Query(None, description="Search query"),
-    tags: list[str] | None = Query(None, description="Filter by tags"),
-    page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(20, ge=1, le=100, description="Items per page"),
-    order_by: str = Query("created_at", description="Order by field"),
-    order_desc: bool = Query(True, description="Order descending"),
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    current_user: AuthUserDep,
+    session: SessionDep,
+    agent_type: Annotated[str | None, Query(description="Filter by agent type")] = None,
+    status: Annotated[str | None, Query(description="Filter by status")] = None,
+    start_date: Annotated[datetime | None, Query(description="Filter by start date")] = None,
+    end_date: Annotated[datetime | None, Query(description="Filter by end date")] = None,
+    min_cost_usd: Annotated[float | None, Query(description="Minimum cost filter")] = None,
+    max_cost_usd: Annotated[float | None, Query(description="Maximum cost filter")] = None,
+    has_error: Annotated[bool | None, Query(description="Filter by error presence")] = None,
+    search: Annotated[str | None, Query(description="Search query")] = None,
+    tags: Annotated[list[str] | None, Query(description="Filter by tags")] = None,
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 20,
+    order_by: Annotated[str, Query(description="Order by field")] = "created_at",
+    order_desc: Annotated[bool, Query(description="Order descending")] = True,
 ) -> RunListResponse:
     """List agent runs with filtering and pagination.
 
@@ -236,8 +245,8 @@ async def list_runs(
 @router.get("/runs/{run_id}", response_model=RunDetailResponse)
 async def get_run(
     run_id: UUID,
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+    current_user: AuthUserDep,
 ) -> RunDetailResponse:
     """Get detailed information about a specific run."""
     manager = RunManager(session)
@@ -268,8 +277,8 @@ async def get_run(
 @router.get("/runs/{run_id}/timeline", response_model=list[TimelineEventResponse])
 async def get_run_timeline(
     run_id: UUID,
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+    current_user: AuthUserDep,
 ) -> list[TimelineEventResponse]:
     """Get timeline of events for a run."""
     manager = RunManager(session)
@@ -294,9 +303,9 @@ async def get_run_timeline(
 @router.post("/runs/{run_id}/retry", response_model=RunResponse)
 async def retry_run(
     run_id: UUID,
+    current_user: AuthUserDep,
     request: RetryRequest | None = None,
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    *, session: SessionDep,
 ) -> RunResponse:
     """Retry a failed run.
 
@@ -344,9 +353,9 @@ async def retry_run(
 @router.post("/runs/{run_id}/resume", response_model=RunResponse)
 async def resume_run(
     run_id: UUID,
+    current_user: AuthUserDep,
     request: ResumeRequest | None = None,
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    *, session: SessionDep,
 ) -> RunResponse:
     """Resume a paused run from checkpoint.
 
@@ -393,9 +402,10 @@ async def resume_run(
 @router.post("/runs/{run_id}/cancel", response_model=RunResponse)
 async def cancel_run(
     run_id: UUID,
+    current_user: AuthUserDep,
     request: CancelRequest | None = None,
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    *,
+    session: SessionDep,
 ) -> RunResponse:
     """Cancel a running or pending run."""
     manager = RunManager(session)
@@ -428,11 +438,11 @@ async def cancel_run(
 
 @router.get("/stats", response_model=StatsResponse)
 async def get_stats(
-    agent_type: str | None = Query(None, description="Filter by agent type"),
-    start_date: datetime | None = Query(None, description="Start date"),
-    end_date: datetime | None = Query(None, description="End date"),
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    current_user: AuthUserDep,
+    session: SessionDep,
+    agent_type: Annotated[str | None, Query(description="Filter by agent type")] = None,
+    start_date: Annotated[datetime | None, Query(description="Start date")] = None,
+    end_date: Annotated[datetime | None, Query(description="End date")] = None,
 ) -> StatsResponse:
     """Get run statistics for the tenant."""
     manager = RunManager(session)
@@ -460,11 +470,11 @@ async def get_stats(
 
 @router.get("/costs", response_model=CostSummaryResponse)
 async def get_costs(
-    start_date: datetime | None = Query(None, description="Start date"),
-    end_date: datetime | None = Query(None, description="End date"),
-    include_daily: bool = Query(True, description="Include daily breakdown"),
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    current_user: AuthUserDep,
+    session: SessionDep,
+    start_date: Annotated[datetime | None, Query(description="Start date")] = None,
+    end_date: Annotated[datetime | None, Query(description="End date")] = None,
+    include_daily: Annotated[bool, Query(description="Include daily breakdown")] = True,
 ) -> CostSummaryResponse:
     """Get cost summary for the tenant."""
     manager = RunManager(session)
@@ -492,10 +502,10 @@ async def get_costs(
 
 @router.get("/recent", response_model=list[RunResponse])
 async def get_recent_runs(
-    limit: int = Query(10, ge=1, le=50, description="Maximum runs to return"),
-    include_children: bool = Query(False, description="Include child runs"),
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    current_user: AuthUserDep,
+    session: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=50, description="Maximum runs to return")] = 10,
+    include_children: Annotated[bool, Query(description="Include child runs")] = False,
 ) -> list[RunResponse]:
     """Get recent runs for the tenant."""
     manager = RunManager(session)

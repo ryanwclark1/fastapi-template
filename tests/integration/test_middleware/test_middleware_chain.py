@@ -127,7 +127,7 @@ class TestMiddlewareChain:
 
     @patch("example_service.app.middleware.metrics.http_requests_total")
     async def test_metrics_tracked_for_all_requests(
-        self, mock_metrics: MagicMock, client: AsyncClient
+        self, mock_metrics: MagicMock, client: AsyncClient,
     ):
         """Test that metrics are tracked even with full middleware stack."""
         await client.get("/test")
@@ -175,7 +175,7 @@ class TestMiddlewareChain:
     @patch("example_service.app.middleware.request_logging.logger")
     @patch("example_service.app.middleware.request_id.clear_log_context")
     async def test_context_cleanup_after_request(
-        self, mock_clear: MagicMock, mock_logger: MagicMock, client: AsyncClient
+        self, mock_clear: MagicMock, mock_logger: MagicMock, client: AsyncClient,
     ):
         """Test that logging context is cleaned up after request completes."""
         await client.get("/test")
@@ -258,7 +258,7 @@ class TestMiddlewareChain:
 
         with patch("example_service.app.middleware.request_logging.logger"):
             async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
+                transport=ASGITransport(app=app), base_url="http://test",
             ) as client:
                 # Large payload
                 response = await client.post("/upload", json={"data": "x" * 1000})

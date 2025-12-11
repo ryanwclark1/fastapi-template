@@ -76,7 +76,7 @@ Use 'exit()' or Ctrl+D to exit the shell.
                     "get_session": get_async_session,
                     "get_cache": get_cache,
                     "asyncio": asyncio,
-                }
+                },
             )
 
     except Exception as e:

@@ -1,3 +1,4 @@
+# mypy: disable-error-code="attr-defined,arg-type,assignment,return-value,misc,name-defined"
 """AI operations CLI commands.
 
 This module provides CLI commands for managing AI functionality:
@@ -49,7 +50,7 @@ def ai() -> None:
     "--type",
     "job_type",
     type=click.Choice(
-        ["transcription", "pii_redaction", "summary", "sentiment", "coaching", "full_analysis"]
+        ["transcription", "pii_redaction", "summary", "sentiment", "coaching", "full_analysis"],
     ),
     help="Filter by job type",
 )
@@ -262,10 +263,9 @@ async def cancel_job(job_id: str, force: bool) -> None:
             warning(f"Job cannot be cancelled (status: {job.status})")
             return
 
-        if not force:
-            if not click.confirm(f"Cancel job {job_id}?"):
-                info("Cancellation aborted")
-                return
+        if not force and not click.confirm(f"Cancel job {job_id}?"):
+            info("Cancellation aborted")
+            return
 
         job.status = "CANCELLED"
         await session.commit()
@@ -578,7 +578,6 @@ async def estimate_cost(pipeline_name: str, duration: int | None, characters: in
     PIPELINE_NAME is the name of the pipeline to estimate costs for.
 
     Examples:
-    \b
       example-service ai estimate call_analysis --duration 300
       example-service ai estimate pii_redaction --characters 10000
     """

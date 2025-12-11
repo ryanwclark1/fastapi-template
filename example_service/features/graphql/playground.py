@@ -69,7 +69,8 @@ def _load_assets() -> dict[str, tuple[bytes, str]]:
     for name, media_type in _ASSET_MEDIA_TYPES.items():
         file_ref = base / name
         if not file_ref.is_file():
-            raise RuntimeError(f"Missing GraphQL Playground asset: {name}")
+            msg = f"Missing GraphQL Playground asset: {name}"
+            raise RuntimeError(msg)
         assets[name] = (file_ref.read_bytes(), media_type)
     return assets
 

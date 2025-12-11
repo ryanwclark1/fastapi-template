@@ -94,7 +94,7 @@ def sanitize_html(
         }
 
     # Sanitize with bleach
-    clean = bleach.clean(
+    return bleach.clean(
         text,
         tags=allowed_tags,
         attributes=allowed_attributes,
@@ -102,7 +102,6 @@ def sanitize_html(
         protocols=["http", "https", "mailto"],  # Block javascript:, data:, etc.
     )
 
-    return clean
 
 
 def sanitize_string(text: str, max_length: int | None = None) -> str:
@@ -239,7 +238,8 @@ def validate_url(url: str, allowed_schemes: list[str] | None = None) -> str:
     try:
         parsed = urlparse(url)
     except Exception as e:
-        raise ValueError(f"Invalid URL format: {e}") from e
+        msg = f"Invalid URL format: {e}"
+        raise ValueError(msg) from e
 
     # Check scheme
     if allowed_schemes is None:
@@ -250,9 +250,12 @@ def validate_url(url: str, allowed_schemes: list[str] | None = None) -> str:
         raise ValueError(msg)
 
     if parsed.scheme.lower() not in allowed_schemes:
-        raise ValueError(
+        msg = (
             f"URL scheme '{parsed.scheme}' not allowed. "
             f"Allowed schemes: {', '.join(allowed_schemes)}"
+        )
+        raise ValueError(
+            msg,
         )
 
     # Block localhost/private IPs in production
@@ -303,7 +306,8 @@ def validate_email(email: str) -> str:
         validation = validate_email_address(email, check_deliverability=False)
         return validation.normalized
     except EmailNotValidError as e:
-        raise ValueError(f"Invalid email address: {e!s}") from e
+        msg = f"Invalid email address: {e!s}"
+        raise ValueError(msg) from e
 
 
 # ============================================================================
@@ -339,15 +343,18 @@ def validate_length(
         ValueError: field must be at least 3 characters
     """
     if not isinstance(value, str):
-        raise ValueError(f"{field_name} must be a string")
+        msg = f"{field_name} must be a string"
+        raise TypeError(msg)
 
     length = len(value)
 
     if min_length is not None and length < min_length:
-        raise ValueError(f"{field_name} must be at least {min_length} characters")
+        msg = f"{field_name} must be at least {min_length} characters"
+        raise ValueError(msg)
 
     if max_length is not None and length > max_length:
-        raise ValueError(f"{field_name} must be at most {max_length} characters")
+        msg = f"{field_name} must be at most {max_length} characters"
+        raise ValueError(msg)
 
     return value
 
@@ -473,7 +480,7 @@ def validate_username(username: str) -> str:
             "letters, numbers, underscores, and hyphens"
         )
         raise ValueError(
-            msg
+            msg,
         )
     return username
 

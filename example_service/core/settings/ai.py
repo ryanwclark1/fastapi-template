@@ -155,7 +155,7 @@ class AISettings(BaseSettings):
         description="Azure OpenAI deployment name",
     )
 
-    # Ollama (self-hosted)
+    # Ollama configuration (self-hosted)
     ollama_base_url: str = Field(
         default="http://localhost:11434",
         description="Ollama API base URL for local/self-hosted models",
@@ -193,7 +193,7 @@ class AISettings(BaseSettings):
         description="Cohere embedding model",
     )
     cohere_input_type: Literal[
-        "search_document", "search_query", "classification", "clustering"
+        "search_document", "search_query", "classification", "clustering",
     ] = Field(
         default="search_document",
         description="Cohere input type for embeddings",
@@ -608,7 +608,7 @@ class AISettings(BaseSettings):
         return bool(
             self.has_llm_provider
             or self.has_transcription_provider
-            or self.has_embedding_provider
+            or self.has_embedding_provider,
         )
 
     def get_provider_api_key(self, provider: str) -> SecretStr | None:

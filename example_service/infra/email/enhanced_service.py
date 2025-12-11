@@ -262,7 +262,7 @@ class EnhancedEmailService:
             # Phase 3: Record metrics
             duration_seconds = time.perf_counter() - start_time
             metrics.email_delivery_duration_seconds.labels(
-                provider=config.provider_type.value
+                provider=config.provider_type.value,
             ).observe(duration_seconds)
             metrics.email_delivery_total.labels(
                 provider=config.provider_type.value,
@@ -276,7 +276,7 @@ class EnhancedEmailService:
 
             # Phase 3: Log usage and audit trail
             await self._log_usage(
-                message, result, config, effective_tenant_id, duration_seconds
+                message, result, config, effective_tenant_id, duration_seconds,
             )
             await self._log_audit(message, result, config, effective_tenant_id)
 
@@ -284,8 +284,8 @@ class EnhancedEmailService:
 
         except ValueError as e:
             # Provider not available
-            logger.error(
-                "Provider error: %s", e, extra={"tenant_id": effective_tenant_id}
+            logger.exception(
+                "Provider error: %s", e, extra={"tenant_id": effective_tenant_id},
             )
 
             # Record provider error metrics
@@ -374,7 +374,7 @@ class EnhancedEmailService:
         try:
             html_content, text_content = self._renderer.render(template, **full_context)
         except TemplateNotFoundError:
-            logger.error("Email template not found: %s", template)
+            logger.exception("Email template not found: %s", template)
             raise
 
         # Extract subject from context if not provided
@@ -625,7 +625,7 @@ class EnhancedEmailService:
     # =========================================================================
 
     async def _check_rate_limits(
-        self, config: ResolvedEmailConfig, tenant_id: str
+        self, config: ResolvedEmailConfig, tenant_id: str,
     ) -> None:
         """Check rate limits before sending email.
 

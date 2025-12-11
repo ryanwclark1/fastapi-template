@@ -50,7 +50,7 @@ class AppSettings(BaseSettings):
         description="API version (semver format)",
     )
     environment: Environment = Field(
-        default="development", description="Environment: development|staging|production|test"
+        default="development", description="Environment: development|staging|production|test",
     )
     api_prefix: str = Field(
         default="/api/v1",
@@ -119,7 +119,7 @@ class AppSettings(BaseSettings):
 
     # Server configuration
     host: str = Field(
-        default="0.0.0.0", min_length=1, max_length=255, description="Server bind host"
+        default="0.0.0.0", min_length=1, max_length=255, description="Server bind host",
     )
     port: int = Field(default=8000, ge=1, le=65535, description="Server port")
 
@@ -130,10 +130,10 @@ class AppSettings(BaseSettings):
     )
     cors_allow_credentials: bool = Field(default=True, description="Allow credentials")
     cors_allow_methods: list[str] = Field(
-        default_factory=lambda: ["*"], description="Allowed HTTP methods"
+        default_factory=lambda: ["*"], description="Allowed HTTP methods",
     )
     cors_allow_headers: list[str] = Field(
-        default_factory=lambda: ["*"], description="Allowed headers"
+        default_factory=lambda: ["*"], description="Allowed headers",
     )
     cors_max_age: int = Field(
         default=3600,
@@ -158,7 +158,7 @@ class AppSettings(BaseSettings):
 
     # Middleware configuration
     enable_request_size_limit: bool = Field(
-        default=True, description="Enable request size limit middleware"
+        default=True, description="Enable request size limit middleware",
     )
     request_size_limit: int = Field(
         default=10 * 1024 * 1024,  # 10MB
@@ -167,30 +167,30 @@ class AppSettings(BaseSettings):
         description="Maximum request size in bytes",
     )
     enable_rate_limiting: bool = Field(
-        default=False, description="Enable rate limiting middleware (requires Redis)"
+        default=False, description="Enable rate limiting middleware (requires Redis)",
     )
     rate_limit_per_minute: int = Field(
-        default=100, ge=1, le=10000, description="Rate limit per minute"
+        default=100, ge=1, le=10000, description="Rate limit per minute",
     )
     rate_limit_window_seconds: int = Field(
-        default=60, ge=1, le=3600, description="Rate limit window in seconds"
+        default=60, ge=1, le=3600, description="Rate limit window in seconds",
     )
 
     # Debug middleware configuration (distributed tracing)
     enable_debug_middleware: bool = Field(
-        default=False, description="Enable debug middleware with distributed tracing"
+        default=False, description="Enable debug middleware with distributed tracing",
     )
     debug_log_requests: bool = Field(
-        default=True, description="Log request details in debug middleware"
+        default=True, description="Log request details in debug middleware",
     )
     debug_log_responses: bool = Field(
-        default=True, description="Log response details in debug middleware"
+        default=True, description="Log response details in debug middleware",
     )
     debug_log_timing: bool = Field(
-        default=True, description="Log timing information in debug middleware"
+        default=True, description="Log timing information in debug middleware",
     )
     debug_header_prefix: str = Field(
-        default="X-", description="Header prefix for trace context (X-, Trace-, etc.)"
+        default="X-", description="Header prefix for trace context (X-, Trace-, etc.)",
     )
 
     # Security settings
@@ -217,7 +217,7 @@ class AppSettings(BaseSettings):
         if self.environment == "production" and self.port < 1024:
             msg = "Cannot use privileged port (<1024) in production without proper setup"
             raise ValueError(
-                msg
+                msg,
             )
         return self
 

@@ -16,7 +16,7 @@ from example_service.core.database import TimestampedBase
 from example_service.core.database.search import TSVECTOR
 
 if TYPE_CHECKING:
-    from .post import Post  # noqa: TC004
+    from .post import Post
 
 
 class User(TimestampedBase):
@@ -76,8 +76,8 @@ class User(TimestampedBase):
     )
 
     # Relationships
-    posts: Mapped[list[Post]] = relationship(
-        "Post", back_populates="author", cascade="all, delete-orphan"
+    posts: Mapped[list["Post"]] = relationship(
+        "Post", back_populates="author", cascade="all, delete-orphan",
     )
 
     # Additional indexes

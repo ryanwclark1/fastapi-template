@@ -17,13 +17,20 @@ from uuid import UUID, uuid4
 from sqlalchemy import JSON, Boolean, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from example_service.core.database.base import Base
+from example_service.core.database.base import (
+    Base,
+    UserAuditMixin,
+    UUIDv7TimestampedBase,
+)
 from example_service.core.database.enums import (
     EmailProviderType as EmailProviderTypeEnum,
 )
 from example_service.core.database.types import EncryptedString
 from example_service.core.models.tenant import Tenant
 from example_service.core.models.user import User
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(Tenant, User)
 
 
 def _get_email_encryption_key() -> str | None:
@@ -49,7 +56,7 @@ class EmailProviderType(str, enum.Enum):
     FILE = "file"  # Testing only
 
 
-class EmailConfig(Base):
+class EmailConfig(UUIDv7TimestampedBase, UserAuditMixin):
     """Tenant-specific email provider configuration.
 
     Allows tenants to override default email providers and credentials.
@@ -78,7 +85,6 @@ class EmailConfig(Base):
 
     __tablename__ = "email_configs"
 
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     tenant_id: Mapped[str] = mapped_column(
         String(255),
         ForeignKey("tenants.id", ondelete="CASCADE"),
@@ -92,33 +98,33 @@ class EmailConfig(Base):
         comment="Email provider type (smtp, aws_ses, sendgrid, mailgun, console, file)",
     )
     is_active: Mapped[bool] = mapped_column(
-        Boolean, default=True, nullable=False, comment="Whether this config is active"
+        Boolean, default=True, nullable=False, comment="Whether this config is active",
     )
 
     # SMTP Configuration
     smtp_host: Mapped[str | None] = mapped_column(
-        String(255), comment="SMTP server hostname"
+        String(255), comment="SMTP server hostname",
     )
     smtp_port: Mapped[int | None] = mapped_column(
-        Integer, comment="SMTP server port (587 for TLS, 465 for SSL)"
+        Integer, comment="SMTP server port (587 for TLS, 465 for SSL)",
     )
     smtp_username: Mapped[str | None] = mapped_column(
-        String(255), comment="SMTP authentication username"
+        String(255), comment="SMTP authentication username",
     )
     smtp_password: Mapped[str | None] = mapped_column(
         EncryptedString(key=_get_email_encryption_key(), max_length=500),
         comment="SMTP authentication password (encrypted)",
     )
     smtp_use_tls: Mapped[bool | None] = mapped_column(
-        Boolean, comment="Use STARTTLS (port 587)"
+        Boolean, comment="Use STARTTLS (port 587)",
     )
     smtp_use_ssl: Mapped[bool | None] = mapped_column(
-        Boolean, comment="Use implicit SSL (port 465)"
+        Boolean, comment="Use implicit SSL (port 465)",
     )
 
     # AWS SES Configuration
     aws_region: Mapped[str | None] = mapped_column(
-        String(50), comment="AWS region for SES (e.g., us-east-1)"
+        String(50), comment="AWS region for SES (e.g., us-east-1)",
     )
     aws_access_key: Mapped[str | None] = mapped_column(
         EncryptedString(key=_get_email_encryption_key(), max_length=500),
@@ -129,7 +135,7 @@ class EmailConfig(Base):
         comment="AWS secret access key (encrypted)",
     )
     aws_configuration_set: Mapped[str | None] = mapped_column(
-        String(255), comment="AWS SES configuration set name for tracking"
+        String(255), comment="AWS SES configuration set name for tracking",
     )
 
     # SendGrid/Mailgun API Configuration
@@ -138,65 +144,53 @@ class EmailConfig(Base):
         comment="API key for SendGrid/Mailgun (encrypted)",
     )
     api_endpoint: Mapped[str | None] = mapped_column(
-        String(255), comment="Custom API endpoint (for Mailgun EU, etc.)"
+        String(255), comment="Custom API endpoint (for Mailgun EU, etc.)",
     )
 
     # Sender Configuration
     from_email: Mapped[str | None] = mapped_column(
-        String(255), comment="Default sender email address"
+        String(255), comment="Default sender email address",
     )
     from_name: Mapped[str | None] = mapped_column(
-        String(255), comment="Default sender display name"
+        String(255), comment="Default sender display name",
     )
     reply_to: Mapped[str | None] = mapped_column(
-        String(255), comment="Default reply-to address"
+        String(255), comment="Default reply-to address",
     )
 
     # Rate Limiting (per-tenant overrides)
     rate_limit_per_minute: Mapped[int | None] = mapped_column(
-        Integer, comment="Max emails per minute (None = use system default)"
+        Integer, comment="Max emails per minute (None = use system default)",
     )
     rate_limit_per_hour: Mapped[int | None] = mapped_column(
-        Integer, comment="Max emails per hour (None = use system default)"
+        Integer, comment="Max emails per hour (None = use system default)",
     )
     daily_quota: Mapped[int | None] = mapped_column(
-        Integer, comment="Max emails per day (None = unlimited)"
+        Integer, comment="Max emails per day (None = unlimited)",
     )
 
     # Cost Configuration
     cost_per_email_usd: Mapped[float | None] = mapped_column(
-        Float, comment="Cost per email in USD for billing calculation"
+        Float, comment="Cost per email in USD for billing calculation",
     )
     monthly_budget_usd: Mapped[float | None] = mapped_column(
-        Float, comment="Monthly email spending limit in USD"
+        Float, comment="Monthly email spending limit in USD",
     )
 
     # Provider-specific configuration (JSON blob)
     config_json: Mapped[dict[str, Any] | None] = mapped_column(
-        JSON, comment="Additional provider-specific configuration"
+        JSON, comment="Additional provider-specific configuration",
     )
 
     # Encryption versioning (for key rotation)
     encryption_version: Mapped[int] = mapped_column(
-        Integer, default=1, nullable=False, comment="Encryption key version for rotation"
+        Integer, default=1, nullable=False, comment="Encryption key version for rotation",
     )
 
-    # Metadata
-    created_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(UTC), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
-        nullable=False,
-    )
-    created_by_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL")
-    )
-
-    # Relationships
+    # Relationships (id, timestamps, audit FKs provided by base classes)
     tenant: Mapped[Tenant] = relationship("Tenant", back_populates="email_configs")
-    created_by: Mapped[User | None] = relationship("User")
+    created_by: Mapped[User | None] = relationship("User", foreign_keys="EmailConfig.created_by_id")
+    updated_by: Mapped[User | None] = relationship("User", foreign_keys="EmailConfig.updated_by_id")
 
     __table_args__ = (
         Index("ix_email_configs_tenant_active", "tenant_id", "is_active"),
@@ -204,6 +198,7 @@ class EmailConfig(Base):
     )
 
     def __repr__(self) -> str:
+        """Return email config summary for debugging."""
         return (
             f"<EmailConfig(tenant_id={self.tenant_id}, "
             f"provider={self.provider_type}, active={self.is_active})>"
@@ -270,50 +265,50 @@ class EmailUsageLog(Base):
 
     # Provider information
     provider: Mapped[str] = mapped_column(
-        String(50), nullable=False, comment="Provider used (smtp, sendgrid, etc.)"
+        String(50), nullable=False, comment="Provider used (smtp, sendgrid, etc.)",
     )
     recipients_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=1, comment="Number of recipients"
+        Integer, nullable=False, default=1, comment="Number of recipients",
     )
 
     # Cost tracking
     cost_usd: Mapped[float | None] = mapped_column(
-        Float, comment="Calculated cost in USD"
+        Float, comment="Calculated cost in USD",
     )
 
     # Delivery information
     success: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, comment="Whether delivery succeeded"
+        Boolean, nullable=False, comment="Whether delivery succeeded",
     )
     duration_ms: Mapped[int | None] = mapped_column(
-        Integer, comment="Delivery duration in milliseconds"
+        Integer, comment="Delivery duration in milliseconds",
     )
     message_id: Mapped[str | None] = mapped_column(
-        String(255), comment="Provider message ID for tracking"
+        String(255), comment="Provider message ID for tracking",
     )
     error_category: Mapped[str | None] = mapped_column(
-        String(50), comment="Error category if failed (auth, network, recipient, quota)"
+        String(50), comment="Error category if failed (auth, network, recipient, quota)",
     )
     error_message: Mapped[str | None] = mapped_column(
-        Text, comment="Error details if failed"
+        Text, comment="Error details if failed",
     )
 
     # Correlation
     trace_id: Mapped[str | None] = mapped_column(
-        String(64), comment="OpenTelemetry trace ID for correlation"
+        String(64), comment="OpenTelemetry trace ID for correlation",
     )
     template_name: Mapped[str | None] = mapped_column(
-        String(255), comment="Template used (if any)"
+        String(255), comment="Template used (if any)",
     )
 
     # Additional metadata
     metadata_json: Mapped[dict[str, Any] | None] = mapped_column(
-        JSON, comment="Additional operation metadata"
+        JSON, comment="Additional operation metadata",
     )
 
     # Timestamp
     created_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(UTC), nullable=False
+        default=lambda: datetime.now(UTC), nullable=False,
     )
 
     # Relationships
@@ -326,6 +321,7 @@ class EmailUsageLog(Base):
     )
 
     def __repr__(self) -> str:
+        """Return usage log summary for debugging."""
         return (
             f"<EmailUsageLog(tenant_id={self.tenant_id}, provider={self.provider}, "
             f"success={self.success}, cost=${self.cost_usd or 0:.4f})>"
@@ -362,41 +358,41 @@ class EmailAuditLog(Base):
 
     # Recipient (hashed for privacy)
     recipient_hash: Mapped[str] = mapped_column(
-        String(64), nullable=False, index=True, comment="SHA256 hash of recipient email"
+        String(64), nullable=False, index=True, comment="SHA256 hash of recipient email",
     )
 
     # Email metadata (non-PII)
     template_name: Mapped[str | None] = mapped_column(
-        String(255), comment="Template used"
+        String(255), comment="Template used",
     )
     subject_hash: Mapped[str | None] = mapped_column(
-        String(64), comment="SHA256 hash of subject (for duplicate detection)"
+        String(64), comment="SHA256 hash of subject (for duplicate detection)",
     )
 
     # Status
     status: Mapped[str] = mapped_column(
-        String(50), nullable=False, comment="Status: queued, sent, failed, bounced"
+        String(50), nullable=False, comment="Status: queued, sent, failed, bounced",
     )
     provider: Mapped[str | None] = mapped_column(
-        String(50), comment="Provider used"
+        String(50), comment="Provider used",
     )
     message_id: Mapped[str | None] = mapped_column(
-        String(255), comment="Provider message ID"
+        String(255), comment="Provider message ID",
     )
 
     # Error information
     error_category: Mapped[str | None] = mapped_column(
-        String(50), comment="Error category if failed"
+        String(50), comment="Error category if failed",
     )
 
     # Correlation
     trace_id: Mapped[str | None] = mapped_column(
-        String(64), comment="OpenTelemetry trace ID"
+        String(64), comment="OpenTelemetry trace ID",
     )
 
     # Timestamp
     created_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(UTC), nullable=False, index=True
+        default=lambda: datetime.now(UTC), nullable=False, index=True,
     )
 
     # Relationships
@@ -409,6 +405,7 @@ class EmailAuditLog(Base):
     )
 
     def __repr__(self) -> str:
+        """Return audit log summary for debugging."""
         return (
             f"<EmailAuditLog(tenant_id={self.tenant_id}, "
             f"recipient_hash={self.recipient_hash[:8]}..., status={self.status})>"

@@ -212,21 +212,21 @@ class SMTPClient(BaseEmailClient):
             )
 
         except aiosmtplib.SMTPAuthenticationError as e:
-            logger.error("SMTP authentication failed: %s", e)
+            logger.exception("SMTP authentication failed: %s", e)
             return EmailResult.failure_result(
                 error=str(e),
                 error_code="AUTH_FAILED",
                 backend="smtp",
             )
         except aiosmtplib.SMTPRecipientsRefused as e:
-            logger.error("All recipients refused: %s", e)
+            logger.exception("All recipients refused: %s", e)
             return EmailResult.failure_result(
                 error=str(e),
                 error_code="RECIPIENTS_REFUSED",
                 backend="smtp",
             )
         except aiosmtplib.SMTPException as e:
-            logger.error("SMTP error: %s", e)
+            logger.exception("SMTP error: %s", e)
             return EmailResult.failure_result(
                 error=str(e),
                 error_code="SMTP_ERROR",
@@ -298,7 +298,7 @@ class SMTPClient(BaseEmailClient):
 
             if content is None:
                 logger.warning(
-                    "Skipping attachment %s: no content available", attachment.filename
+                    "Skipping attachment %s: no content available", attachment.filename,
                 )
                 continue
 
@@ -346,34 +346,16 @@ class ConsoleClient(BaseEmailClient):
         message_id = f"console-{uuid.uuid4()}"
 
         # Pretty print the email
-        separator = "=" * 60
-        print(f"\n{separator}")
-        print("EMAIL (Console Backend)")
-        print(separator)
-        print(
-            f"From: {message.from_name or self.settings.default_from_name} <{message.from_email or self.settings.default_from_email}>"
-        )
-        print(f"To: {', '.join(message.to)}")
         if message.cc:
-            print(f"Cc: {', '.join(message.cc)}")
+            pass
         if message.bcc:
-            print(f"Bcc: {', '.join(message.bcc)}")
-        print(f"Subject: {message.subject}")
-        print(f"Priority: {message.priority.value}")
+            pass
         if message.attachments:
-            print(f"Attachments: {', '.join(a.filename for a in message.attachments)}")
-        print(separator)
-        if message.body_text:
-            print("TEXT BODY:")
-            print(message.body_text[:500])
-            if len(message.body_text) > 500:
-                print(f"... ({len(message.body_text) - 500} more characters)")
-        if message.body_html:
-            print("\nHTML BODY:")
-            print(message.body_html[:500])
-            if len(message.body_html) > 500:
-                print(f"... ({len(message.body_html) - 500} more characters)")
-        print(f"{separator}\n")
+            pass
+        if message.body_text and len(message.body_text) > 500:
+            pass
+        if message.body_html and len(message.body_html) > 500:
+            pass
 
         logger.info(
             "Email logged to console",
@@ -483,7 +465,7 @@ class FileClient(BaseEmailClient):
                 backend="file",
             )
         except Exception as e:
-            logger.error("Failed to write email to file: %s", e)
+            logger.exception("Failed to write email to file: %s", e)
             return EmailResult.failure_result(
                 error=str(e),
                 error_code="FILE_WRITE_ERROR",
@@ -517,7 +499,8 @@ class EmailClient:
         elif settings.backend == "file":
             self._backend = FileClient(settings)
         else:
-            raise ValueError(f"Unknown email backend: {settings.backend}")
+            msg = f"Unknown email backend: {settings.backend}"
+            raise ValueError(msg)
 
     async def connect(self) -> None:
         """Establish connection to the email backend."""

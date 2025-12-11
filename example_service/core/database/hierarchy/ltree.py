@@ -83,9 +83,12 @@ class LtreePath:
         """
         for label in self._labels:
             if not LABEL_PATTERN.match(label):
-                raise ValueError(
+                msg = (
                     f"Invalid ltree label: '{label}'. "
                     "Labels must be alphanumeric with underscores, 1-256 chars."
+                )
+                raise ValueError(
+                    msg,
                 )
 
     @property
@@ -168,10 +171,7 @@ class LtreePath:
             >>> [str(a) for a in LtreePath("a.b.c").ancestors]
             ['a', 'a.b']
         """
-        result = []
-        for i in range(1, self.depth):
-            result.append(LtreePath(".".join(self._labels[:i])))
-        return result
+        return [LtreePath(".".join(self._labels[:i])) for i in range(1, self.depth)]
 
     def child(self, label: str) -> LtreePath:
         """Create child path by appending label.

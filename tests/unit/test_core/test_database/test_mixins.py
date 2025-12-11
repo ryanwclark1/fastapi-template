@@ -10,8 +10,8 @@ This module tests the enhanced database layer including:
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import pytest
@@ -28,6 +28,12 @@ from example_service.core.database.base import (
     UUIDPKMixin,
     UUIDv7PKMixin,
 )
+from tests.conftest import ENUM_DEFINITIONS
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+else:  # pragma: no cover - runtime placeholder for typing-only import
+    AsyncGenerator = Any
 
 # ============================================================================
 # Test Models - Using composable mixins to test different combinations
@@ -50,7 +56,7 @@ class AuditedDocument(Base, IntegerPKMixin, TimestampMixin, AuditColumnsMixin):
     __table_args__ = {"extend_existing": True}
 
     title: Mapped[str] = mapped_column(String(255))
-    content: Mapped[str] = mapped_column(String(1000))
+    content: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
 
 class SoftDeletablePost(Base, IntegerPKMixin, TimestampMixin, AuditColumnsMixin, SoftDeleteMixin):
@@ -60,7 +66,7 @@ class SoftDeletablePost(Base, IntegerPKMixin, TimestampMixin, AuditColumnsMixin,
     __table_args__ = {"extend_existing": True}
 
     title: Mapped[str] = mapped_column(String(255))
-    content: Mapped[str] = mapped_column(String(1000))
+    content: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
 
 class UUIDProduct(Base, UUIDPKMixin, TimestampMixin):
@@ -116,63 +122,7 @@ async def async_engine(postgres_container: str):
     async with engine.begin() as conn:
         # Create all enum types that are used by models
         # These must be created before tables that reference them
-        enum_definitions = [
-            (["pending", "processing", "ready", "failed", "deleted"], "filestatus"),
-            (["smtp", "aws_ses", "sendgrid", "mailgun", "console", "file"], "emailprovidertype"),
-            (["pending", "delivered", "failed", "retrying"], "deliverystatus"),
-            (["LLM", "TRANSCRIPTION", "EMBEDDING", "IMAGE", "PII_REDACTION"], "aiprovidertype"),
-            (
-                [
-                    "TRANSCRIPTION",
-                    "PII_REDACTION",
-                    "SUMMARY",
-                    "SENTIMENT",
-                    "COACHING",
-                    "FULL_ANALYSIS",
-                ],
-                "aijobtype",
-            ),
-            (["PENDING", "PROCESSING", "COMPLETED", "FAILED", "CANCELLED"], "aijobstatus"),
-            (
-                [
-                    "pending",
-                    "queued",
-                    "running",
-                    "completed",
-                    "failed",
-                    "cancelled",
-                    "retrying",
-                    "paused",
-                ],
-                "jobstatus",
-            ),
-            (["1", "2", "3", "4"], "jobpriority"),
-            (["enabled", "disabled", "percentage", "targeted"], "flagstatus"),
-            (
-                [
-                    "create",
-                    "read",
-                    "update",
-                    "delete",
-                    "bulk_create",
-                    "bulk_update",
-                    "bulk_delete",
-                    "export",
-                    "import",
-                    "login",
-                    "logout",
-                    "login_failed",
-                    "password_change",
-                    "token_refresh",
-                    "permission_denied",
-                    "acl_check",
-                    "archive",
-                    "restore",
-                    "purge",
-                ],
-                "auditaction",
-            ),
-        ]
+        enum_definitions = ENUM_DEFINITIONS
 
         # Create each enum type if it doesn't exist
         for enum_values, enum_name in enum_definitions:
@@ -182,7 +132,7 @@ async def async_engine(postgres_container: str):
                     SELECT EXISTS (
                         SELECT 1 FROM pg_type WHERE typname = :enum_name
                     )
-                    """
+                    """,
                 ),
                 {"enum_name": enum_name},
             )
@@ -193,7 +143,7 @@ async def async_engine(postgres_container: str):
                 # Capture enum in default argument to avoid closure issue
                 sa_enum = sa.Enum(*enum_values, name=enum_name)
                 await conn.run_sync(
-                    lambda sync_conn, e=sa_enum: e.create(sync_conn, checkfirst=False)
+                    lambda sync_conn, e=sa_enum: e.create(sync_conn, checkfirst=False),
                 )
 
         # Now create all tables
@@ -234,8 +184,8 @@ async def session(async_engine) -> AsyncGenerator[AsyncSession]:
                         WHERE schemaname = 'public'
                         AND tablename NOT LIKE 'pg_%'
                         AND tablename NOT LIKE 'sql_%'
-                        """
-                    )
+                        """,
+                    ),
                 )
                 tables = [row[0] for row in result]
                 if tables:

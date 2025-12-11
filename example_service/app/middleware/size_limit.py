@@ -52,17 +52,17 @@ class RequestSizeLimitMiddleware:
                                 "type": "http.response.start",
                                 "status": 413,
                                 "headers": [[b"content-type", b"application/json"]],
-                            }
+                            },
                         )
                         await send(
                             {
                                 "type": "http.response.body",
                                 "body": json.dumps(
                                     {
-                                        "detail": f"Request size {content_length} exceeds maximum {self.max_size} bytes"
-                                    }
+                                        "detail": f"Request size {content_length} exceeds maximum {self.max_size} bytes",
+                                    },
                                 ).encode(),
-                            }
+                            },
                         )
                         return
                 except (ValueError, UnicodeDecodeError):

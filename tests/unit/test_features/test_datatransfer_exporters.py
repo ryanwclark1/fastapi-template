@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timezone
 import json
-from pathlib import Path
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import pytest
 
 from example_service.features.datatransfer import exporters
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_serialize_value_handles_common_types() -> None:

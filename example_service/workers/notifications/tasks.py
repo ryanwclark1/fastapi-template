@@ -8,13 +8,26 @@ This module provides:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 import logging
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import select, update
 
 from example_service.core.settings import get_email_settings
+from example_service.features.notifications.channels.dispatcher import (
+    get_notification_dispatcher,
+)
+from example_service.features.notifications.metrics import (
+    notification_retry_exhausted_total,
+    notification_retry_total,
+)
+from example_service.features.notifications.repository import (
+    get_notification_delivery_repository,
+    get_notification_repository,
+)
+from example_service.features.notifications.service import get_notification_service
 from example_service.infra.database.session import get_async_session
 from example_service.infra.email import get_email_service
 from example_service.infra.email.schemas import EmailPriority
@@ -54,8 +67,8 @@ if broker is not None:
             # Find due reminders that haven't been notified
             stmt = select(Reminder).where(
                 Reminder.remind_at <= now,
-                Reminder.is_completed == False,  # noqa: E712
-                Reminder.notification_sent == False,  # noqa: E712
+                not Reminder.is_completed,
+                not Reminder.notification_sent,
             )
             result = await session.execute(stmt)
             due_reminders = result.scalars().all()
@@ -405,7 +418,7 @@ if broker is not None:
                         "to": email_data["to"],
                         "success": result.success,
                         "message_id": result.message_id,
-                    }
+                    },
                 )
                 if result.success:
                     success_count += 1
@@ -417,7 +430,7 @@ if broker is not None:
                         "to": email_data.get("to"),
                         "success": False,
                         "error": str(e),
-                    }
+                    },
                 )
                 failure_count += 1
 
@@ -427,6 +440,332 @@ if broker is not None:
             "failure_count": failure_count,
             "results": results,
         }
+
+    # ==========================================================================
+    # Phase 5: Notification Dispatch Tasks
+    # ==========================================================================
+
+    @broker.task(retry_on_error=True, max_retries=3)
+    async def dispatch_notification_task(notification_id: str) -> dict:
+        """Dispatch notification to all enabled channels.
+
+        This task is queued when a notification is created for immediate delivery.
+        It looks up user preferences and dispatches to all enabled channels
+        (email, websocket, webhook, in_app).
+
+        Args:
+            notification_id: UUID of notification to dispatch.
+
+        Returns:
+            Dispatch result with delivery statistics.
+
+        Raises:
+            ValueError: If notification not found.
+        """
+        try:
+            uuid_id = UUID(notification_id)
+        except ValueError:
+            logger.exception(
+                "Invalid notification_id format",
+                extra={"notification_id": notification_id},
+            )
+            return {"status": "error", "reason": "invalid_uuid"}
+
+        async with get_async_session() as session:
+            repository = get_notification_repository()
+            notification = await repository.get(session, uuid_id)
+
+            if not notification:
+                logger.error(
+                    "Notification not found for dispatch",
+                    extra={"notification_id": notification_id},
+                )
+                return {"status": "error", "reason": "not_found"}
+
+            # Dispatch via service
+            service = get_notification_service()
+            deliveries = await service.dispatch_notification(session, notification)
+
+            await session.commit()
+
+            logger.info(
+                "Notification dispatched successfully",
+                extra={
+                    "notification_id": notification_id,
+                    "deliveries_count": len(deliveries),
+                    "channels": [d.channel for d in deliveries],
+                },
+            )
+
+            return {
+                "status": "dispatched",
+                "notification_id": notification_id,
+                "deliveries_count": len(deliveries),
+                "channels": [d.channel for d in deliveries],
+                "successful": sum(1 for d in deliveries if d.status == "delivered"),
+                "failed": sum(1 for d in deliveries if d.status == "failed"),
+                "pending": sum(1 for d in deliveries if d.status == "pending"),
+            }
+
+    @broker.task(retry_on_error=True, max_retries=3)
+    async def retry_failed_delivery_task(delivery_id: str) -> dict:
+        """Retry a failed notification delivery.
+
+        This task is used to retry deliveries that failed previously.
+        It implements exponential backoff: 2^attempt * 60s, max 1 hour.
+
+        Args:
+            delivery_id: UUID of delivery to retry.
+
+        Returns:
+            Retry result with updated status.
+
+        Raises:
+            ValueError: If delivery not found or max attempts exceeded.
+        """
+        try:
+            uuid_id = UUID(delivery_id)
+        except ValueError:
+            logger.exception(
+                "Invalid delivery_id format",
+                extra={"delivery_id": delivery_id},
+            )
+            return {"status": "error", "reason": "invalid_uuid"}
+
+        async with get_async_session() as session:
+            delivery_repository = get_notification_delivery_repository()
+            delivery = await delivery_repository.get(session, uuid_id)
+
+            if not delivery:
+                logger.error(
+                    "Delivery not found for retry",
+                    extra={"delivery_id": delivery_id},
+                )
+                return {"status": "error", "reason": "not_found"}
+
+            # Check if max attempts reached
+            if delivery.attempt_count >= delivery.max_attempts:
+                delivery.status = "failed"
+                delivery.failed_at = datetime.now(UTC)
+                delivery.error_message = "Max retry attempts exceeded"
+                await session.commit()
+
+                # Track retry exhaustion
+                notification_retry_exhausted_total.labels(
+                    channel=delivery.channel,
+                ).inc()
+
+                logger.warning(
+                    "Delivery retry failed - max attempts exceeded",
+                    extra={
+                        "delivery_id": delivery_id,
+                        "attempts": delivery.attempt_count,
+                        "max_attempts": delivery.max_attempts,
+                    },
+                )
+
+                return {
+                    "status": "failed",
+                    "reason": "max_attempts_exceeded",
+                    "delivery_id": delivery_id,
+                    "attempts": delivery.attempt_count,
+                }
+
+            # Get notification
+            notification_repository = get_notification_repository()
+            notification = await notification_repository.get(session, delivery.notification_id)
+
+            if not notification:
+                logger.error(
+                    "Notification not found for delivery retry",
+                    extra={"delivery_id": delivery_id, "notification_id": str(delivery.notification_id)},
+                )
+                return {"status": "error", "reason": "notification_not_found"}
+
+            # Get appropriate channel dispatcher
+            dispatcher = get_notification_dispatcher()
+            channel_dispatcher = dispatcher._channels.get(delivery.channel)
+
+            if not channel_dispatcher:
+                logger.error(
+                    "No dispatcher found for channel",
+                    extra={"delivery_id": delivery_id, "channel": delivery.channel},
+                )
+                delivery.status = "failed"
+                delivery.failed_at = datetime.now(UTC)
+                delivery.error_message = f"Channel dispatcher not found: {delivery.channel}"
+                await session.commit()
+                return {"status": "error", "reason": "dispatcher_not_found"}
+
+            # Attempt retry
+            logger.info(
+                "Retrying notification delivery",
+                extra={
+                    "delivery_id": delivery_id,
+                    "notification_id": str(notification.id),
+                    "channel": delivery.channel,
+                    "attempt": delivery.attempt_count + 1,
+                },
+            )
+
+            # Track retry attempt
+            notification_retry_total.labels(
+                channel=delivery.channel,
+            ).inc()
+
+            try:
+                result = await channel_dispatcher.send(notification, delivery)
+
+                # Update delivery record
+                delivery.attempt_count += 1
+                delivery.response_status_code = result.status_code
+                delivery.response_body = result.response_body
+                delivery.response_time_ms = result.response_time_ms
+
+                if result.success:
+                    delivery.status = "delivered"
+                    delivery.delivered_at = datetime.now(UTC)
+                    delivery.next_retry_at = None
+
+                    logger.info(
+                        "Delivery retry succeeded",
+                        extra={
+                            "delivery_id": delivery_id,
+                            "channel": delivery.channel,
+                            "attempt": delivery.attempt_count,
+                        },
+                    )
+
+                    await session.commit()
+
+                    return {
+                        "status": "delivered",
+                        "delivery_id": delivery_id,
+                        "channel": delivery.channel,
+                        "attempt": delivery.attempt_count,
+                    }
+                # Retry failed - update error info
+                delivery.error_message = result.error_message
+                delivery.error_category = result.error_category
+
+                # Check if should retry again
+                if delivery.attempt_count >= delivery.max_attempts:
+                    delivery.status = "failed"
+                    delivery.failed_at = datetime.now(UTC)
+                    delivery.next_retry_at = None
+                else:
+                    delivery.status = "retrying"
+                    # Exponential backoff: 2^attempt * 60s, max 1 hour
+                    backoff_seconds = min(2 ** delivery.attempt_count * 60, 3600)
+                    delivery.next_retry_at = datetime.now(UTC) + timedelta(seconds=backoff_seconds)
+
+                logger.warning(
+                    "Delivery retry failed",
+                    extra={
+                        "delivery_id": delivery_id,
+                        "channel": delivery.channel,
+                        "attempt": delivery.attempt_count,
+                        "error": result.error_message,
+                        "next_retry_at": delivery.next_retry_at.isoformat() if delivery.next_retry_at else None,
+                    },
+                )
+
+                await session.commit()
+
+                return {
+                    "status": delivery.status,
+                    "delivery_id": delivery_id,
+                    "channel": delivery.channel,
+                    "attempt": delivery.attempt_count,
+                    "error": result.error_message,
+                    "next_retry_at": delivery.next_retry_at.isoformat() if delivery.next_retry_at else None,
+                }
+
+            except Exception as exc:
+                # Unexpected error
+                delivery.attempt_count += 1
+                delivery.error_message = str(exc)
+                delivery.error_category = "exception"
+
+                if delivery.attempt_count >= delivery.max_attempts:
+                    delivery.status = "failed"
+                    delivery.failed_at = datetime.now(UTC)
+                    delivery.next_retry_at = None
+                else:
+                    delivery.status = "retrying"
+                    backoff_seconds = min(2 ** delivery.attempt_count * 60, 3600)
+                    delivery.next_retry_at = datetime.now(UTC) + timedelta(seconds=backoff_seconds)
+
+                await session.commit()
+
+                logger.exception(
+                    "Exception during delivery retry",
+                    extra={
+                        "delivery_id": delivery_id,
+                        "channel": delivery.channel,
+                        "attempt": delivery.attempt_count,
+                    },
+                )
+
+                raise
+
+    @broker.task()
+    async def process_scheduled_notifications() -> dict:
+        """Process notifications scheduled for delivery.
+
+        Scheduled: Every 1 minute (via APScheduler).
+
+        Finds notifications where:
+        - status = pending
+        - scheduled_for <= now
+        - scheduled_for is not None
+
+        Queues dispatch_notification_task for each found notification.
+
+        Returns:
+            Processing result with count of scheduled notifications.
+        """
+        async with get_async_session() as session:
+            repository = get_notification_repository()
+            notifications = await repository.find_scheduled_pending(session, limit=100)
+
+            if not notifications:
+                logger.debug("No scheduled notifications found")
+                return {"status": "ok", "processed": 0, "queued_tasks": []}
+
+            logger.info(
+                "Found scheduled notifications for processing",
+                extra={"count": len(notifications)},
+            )
+
+            # Queue dispatch task for each notification
+            task_ids = []
+            for notification in notifications:
+                try:
+                    task = await dispatch_notification_task.kiq(
+                        notification_id=str(notification.id),
+                    )
+                    task_ids.append(task.task_id)
+
+                    logger.debug(
+                        "Queued dispatch task for scheduled notification",
+                        extra={
+                            "notification_id": str(notification.id),
+                            "task_id": task.task_id,
+                            "scheduled_for": notification.scheduled_for.isoformat() if notification.scheduled_for else None,
+                        },
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to queue dispatch task for notification",
+                        extra={"notification_id": str(notification.id)},
+                    )
+
+            return {
+                "status": "ok",
+                "processed": len(notifications),
+                "queued_tasks": task_ids,
+            }
 
     # ==========================================================================
     # Tenant-Aware Email Tasks (using EnhancedEmailService)

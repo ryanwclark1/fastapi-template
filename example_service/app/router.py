@@ -11,6 +11,9 @@ from example_service.core.settings import (
     get_websocket_settings,
 )
 from example_service.features.admin.email import router as admin_email_router
+from example_service.features.ai.agents.config_router import (
+    router as agent_config_router,
+)
 from example_service.features.ai.pipeline.router import router as ai_pipeline_router
 from example_service.features.audit.router import router as audit_router
 from example_service.features.datatransfer.router import router as datatransfer_router
@@ -19,6 +22,10 @@ from example_service.features.featureflags.router import router as featureflags_
 from example_service.features.files.router import router as files_router
 from example_service.features.health.router import router as health_router
 from example_service.features.metrics.router import router as metrics_router
+from example_service.features.notifications.router import (
+    admin_router as notifications_admin_router,
+)
+from example_service.features.notifications.router import router as notifications_router
 from example_service.features.reminders.router import router as reminders_router
 from example_service.features.search.router import router as search_router
 from example_service.features.storage.router import router as storage_router
@@ -31,26 +38,44 @@ from example_service.infra.messaging.broker import get_router as get_rabbit_rout
 if TYPE_CHECKING:
     from fastapi import FastAPI
 
+    from example_service.core.settings.app import AppSettings
+    from example_service.core.settings.graphql import GraphQLSettings
+    from example_service.core.settings.websocket import WebSocketSettings
+
 logger = logging.getLogger(__name__)
 
 
-def setup_routers(app: FastAPI) -> None:
+def setup_routers(
+    app: FastAPI,
+    app_settings: AppSettings | None = None,
+    graphql_settings: GraphQLSettings | None = None,
+    websocket_settings: WebSocketSettings | None = None,
+) -> None:
     """Register all feature routers with the application.
 
     Args:
         app: FastAPI application instance.
+        app_settings: Optional application settings override for API prefixes
+            and feature flags.
+        graphql_settings: Optional override controlling GraphQL availability.
+        websocket_settings: Optional override for realtime/WebSocket behavior.
     """
-    settings = get_app_settings()
-    api_prefix = settings.api_prefix
+    app_settings = app_settings or get_app_settings()
+    graphql_settings = graphql_settings or get_graphql_settings()
+    websocket_settings = websocket_settings or get_websocket_settings()
+
+    api_prefix = app_settings.api_prefix
 
     # Include metrics endpoint (no prefix - accessible at /metrics)
     app.include_router(metrics_router, tags=["observability"])
 
     # Include feature routers
     app.include_router(reminders_router, prefix=api_prefix, tags=["reminders"])
+    app.include_router(notifications_router, prefix=api_prefix, tags=["notifications"])
+    app.include_router(notifications_admin_router, prefix=api_prefix, tags=["notifications-admin"])
     app.include_router(tags_router, prefix=api_prefix, tags=["tags"])
     app.include_router(
-        reminder_tags_router, prefix=api_prefix, tags=["reminders", "tags"]
+        reminder_tags_router, prefix=api_prefix, tags=["reminders", "tags"],
     )
     app.include_router(health_router, prefix=api_prefix, tags=["health"])
     app.include_router(files_router, prefix=api_prefix, tags=["files"])
@@ -75,8 +100,11 @@ def setup_routers(app: FastAPI) -> None:
     app.include_router(ai_pipeline_router, prefix=api_prefix, tags=["AI Pipelines"])
     logger.info("AI pipeline router registered at %s/ai/pipelines", api_prefix)
 
+    # AI agent configuration endpoints (manage agent templates and customization)
+    app.include_router(agent_config_router, prefix=api_prefix, tags=["AI Agent Configuration"])
+    logger.info("AI agent configuration router registered at %s/agents", api_prefix)
+
     # Include GraphQL endpoint if enabled (follows same pattern as /docs, /redoc, /asyncapi)
-    graphql_settings = get_graphql_settings()
     if graphql_settings.enabled:
         graphql_prefix = graphql_settings.path or "/graphql"
         try:
@@ -87,7 +115,7 @@ def setup_routers(app: FastAPI) -> None:
 
             if graphql_router is not None:
                 app.include_router(
-                    graphql_router, prefix=graphql_prefix, tags=["graphql"]
+                    graphql_router, prefix=graphql_prefix, tags=["graphql"],
                 )
                 playground_status = (
                     "enabled" if graphql_settings.playground_enabled else "disabled"
@@ -99,17 +127,16 @@ def setup_routers(app: FastAPI) -> None:
                 )
         except ImportError as exc:  # pragma: no cover - optional dependency
             logger.warning(
-                "GraphQL endpoint disabled (strawberry not available): %s", exc
+                "GraphQL endpoint disabled (strawberry not available): %s", exc,
             )
 
     # Include WebSocket realtime router if enabled
-    ws_settings = get_websocket_settings()
-    if ws_settings.enabled:
+    if websocket_settings.enabled:
         from example_service.features.realtime.router import router as realtime_router
 
         app.include_router(realtime_router, prefix=api_prefix, tags=["realtime"])
         logger.info(
-            "WebSocket realtime router included - endpoints at %s/ws", api_prefix
+            "WebSocket realtime router included - endpoints at %s/ws", api_prefix,
         )
 
     # Include RabbitMQ/FastStream router for messaging + AsyncAPI docs
@@ -130,7 +157,7 @@ def setup_routers(app: FastAPI) -> None:
         "Router setup complete - conditional features status",
         extra={
             "graphql_enabled": graphql_settings.enabled,
-            "websocket_enabled": ws_settings.enabled,
+            "websocket_enabled": websocket_settings.enabled,
             "rabbitmq_enabled": rabbit_enabled,
         },
     )

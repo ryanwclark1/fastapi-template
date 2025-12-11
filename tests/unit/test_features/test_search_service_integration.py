@@ -101,7 +101,7 @@ async def test_search_records_analytics_and_handles_low_hits(monkeypatch: pytest
 
     async def stub_dym(*_, **__):
         return DidYouMeanSuggestion(
-            original_query="none", suggested_query="other", confidence=0.9
+            original_query="none", suggested_query="other", confidence=0.9,
         )
 
     monkeypatch.setattr(svc, "_generate_did_you_mean", stub_dym)

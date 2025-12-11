@@ -68,16 +68,20 @@ class WebhookService(BaseService):
 
         # Block private/internal IP ranges
         if ip.is_private:
-            raise ValueError(f"Webhook URL cannot point to private IP address: {hostname}")
+            msg = f"Webhook URL cannot point to private IP address: {hostname}"
+            raise ValueError(msg)
 
         if ip.is_loopback:
-            raise ValueError(f"Webhook URL cannot point to loopback address: {hostname}")
+            msg = f"Webhook URL cannot point to loopback address: {hostname}"
+            raise ValueError(msg)
 
         if ip.is_reserved:
-            raise ValueError(f"Webhook URL cannot point to reserved IP address: {hostname}")
+            msg = f"Webhook URL cannot point to reserved IP address: {hostname}"
+            raise ValueError(msg)
 
         if ip.is_link_local:
-            raise ValueError(f"Webhook URL cannot point to link-local address: {hostname}")
+            msg = f"Webhook URL cannot point to link-local address: {hostname}"
+            raise ValueError(msg)
 
     def generate_secret(self) -> str:
         """Generate a secure HMAC secret.
@@ -144,7 +148,7 @@ class WebhookService(BaseService):
         webhook = await self._webhook_repo.get(self._session, webhook_id)
 
         self._lazy.debug(
-            lambda: f"service.get_webhook({webhook_id}) -> {'found' if webhook else 'not found'}"
+            lambda: f"service.get_webhook({webhook_id}) -> {'found' if webhook else 'not found'}",
         )
         return webhook
 
@@ -173,7 +177,7 @@ class WebhookService(BaseService):
         )
 
         self._lazy.debug(
-            lambda: f"service.list_webhooks(is_active={is_active}, limit={limit}, offset={offset}) -> {len(search_result.items)}/{search_result.total}"
+            lambda: f"service.list_webhooks(is_active={is_active}, limit={limit}, offset={offset}) -> {len(search_result.items)}/{search_result.total}",
         )
         return list(search_result.items), search_result.total
 
@@ -305,7 +309,7 @@ class WebhookService(BaseService):
         )
 
         self._lazy.debug(
-            lambda: f"service.list_deliveries({webhook_id}, limit={limit}, offset={offset}) -> {len(search_result.items)}/{search_result.total}"
+            lambda: f"service.list_deliveries({webhook_id}, limit={limit}, offset={offset}) -> {len(search_result.items)}/{search_result.total}",
         )
         return list(search_result.items), search_result.total
 
@@ -321,7 +325,7 @@ class WebhookService(BaseService):
         delivery = await self._delivery_repo.get(self._session, delivery_id)
 
         self._lazy.debug(
-            lambda: f"service.get_delivery({delivery_id}) -> {'found' if delivery else 'not found'}"
+            lambda: f"service.get_delivery({delivery_id}) -> {'found' if delivery else 'not found'}",
         )
         return delivery
 

@@ -33,6 +33,9 @@ from example_service.features.graphql.types.pydantic_bridge import (
     pydantic_input,
     pydantic_type,
 )
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(PageInfoType)
 
 # ============================================================================
 # Enums
@@ -61,7 +64,7 @@ class TargetingRule:
     operator: str = strawberry.field(description="Comparison operator (eq, in, contains)")
     value: strawberry.scalars.JSON = strawberry.field(description="Value to compare against")
     attribute: str | None = strawberry.field(
-        default=None, description="Attribute name for attribute rules"
+        default=None, description="Attribute name for attribute rules",
     )
 
     @staticmethod
@@ -170,7 +173,7 @@ class FlagEvaluationInput:
     user_id: str | None = strawberry.field(default=None, description="User ID for evaluation")
     tenant_id: str | None = strawberry.field(default=None, description="Tenant ID for evaluation")
     attributes: strawberry.scalars.JSON | None = strawberry.field(
-        default=None, description="Additional attributes for targeting"
+        default=None, description="Additional attributes for targeting",
     )
 
 

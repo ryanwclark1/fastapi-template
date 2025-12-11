@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 from fastapi import Request
 import pytest
-from starlette.types import Scope
 
 from example_service.features.audit import decorators
 from example_service.features.audit.models import AuditAction
+
+if TYPE_CHECKING:
+    from starlette.types import Scope
 
 
 class DummyAsyncSessionCtx:

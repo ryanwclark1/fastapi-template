@@ -61,7 +61,7 @@ RESERVED_KEYWORDS = frozenset(
         "schema",
         "execute",
         "exec",
-    }
+    },
 )
 
 
@@ -101,17 +101,22 @@ def validate_identifier(
         IdentifierValidationError: Invalid identifier characters
     """
     if not name:
-        raise IdentifierValidationError(f"Empty {identifier_type} name not allowed")
+        msg = f"Empty {identifier_type} name not allowed"
+        raise IdentifierValidationError(msg)
 
     if len(name) > MAX_IDENTIFIER_LENGTH:
+        msg = f"{identifier_type} name exceeds maximum length of {MAX_IDENTIFIER_LENGTH}"
         raise IdentifierValidationError(
-            f"{identifier_type} name exceeds maximum length of {MAX_IDENTIFIER_LENGTH}"
+            msg,
         )
 
     if not VALID_IDENTIFIER.match(name):
-        raise IdentifierValidationError(
+        msg = (
             f"Invalid {identifier_type} name: must start with letter or underscore, "
             "contain only letters, digits, underscores, or dollar signs"
+        )
+        raise IdentifierValidationError(
+            msg,
         )
 
     # Check for dangerous patterns that might indicate injection attempts
@@ -119,14 +124,16 @@ def validate_identifier(
     name_lower = name.lower()
     for pattern in dangerous_patterns:
         if pattern in name_lower:
+            msg = f"Dangerous pattern '{pattern}' detected in {identifier_type} name"
             raise IdentifierValidationError(
-                f"Dangerous pattern '{pattern}' detected in {identifier_type} name"
+                msg,
             )
 
     # Check reserved keywords
     if not allow_reserved and name_lower in RESERVED_KEYWORDS:
+        msg = f"'{name}' is a SQL reserved keyword and cannot be used as {identifier_type}"
         raise IdentifierValidationError(
-            f"'{name}' is a SQL reserved keyword and cannot be used as {identifier_type}"
+            msg,
         )
 
     return name

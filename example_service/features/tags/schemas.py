@@ -7,6 +7,10 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(datetime, UUID)
+
 
 class TagBase(BaseModel):
     """Shared attributes for tag payloads."""

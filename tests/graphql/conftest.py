@@ -8,12 +8,17 @@ Provides:
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator, Iterator
 from datetime import UTC, datetime, timedelta
 import os
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Iterator
+else:  # pragma: no cover - runtime placeholders for typing-only imports
+    AsyncGenerator = Iterator = Any
 
 if os.environ.get("RUN_GRAPHQL_TESTS") != "1":  # pragma: no cover - default skip
     pytest.skip("GraphQL tests require RUN_GRAPHQL_TESTS=1", allow_module_level=True)
@@ -57,7 +62,7 @@ def graphql_postgres_container() -> Iterator[str]:
     original_url = container.get_connection_url()
     # Replace any psycopg2 reference with psycopg (psycopg3)
     url = original_url.replace("postgresql+psycopg2://", "postgresql+psycopg://").replace(
-        "postgresql://", "postgresql+psycopg://"
+        "postgresql://", "postgresql+psycopg://",
     )
     yield url
     container.stop()
@@ -148,7 +153,7 @@ async def graphql_session(graphql_postgres_container: str) -> AsyncGenerator[Asy
                     SELECT EXISTS (
                         SELECT 1 FROM pg_type WHERE typname = :enum_name
                     )
-                    """
+                    """,
                 ),
                 {"enum_name": enum_name},
             )
@@ -159,7 +164,7 @@ async def graphql_session(graphql_postgres_container: str) -> AsyncGenerator[Asy
                 # Capture enum in default argument to avoid closure issue
                 sa_enum = sa.Enum(*enum_values, name=enum_name)
                 await conn.run_sync(
-                    lambda sync_conn, e=sa_enum: e.create(sync_conn, checkfirst=False)
+                    lambda sync_conn, e=sa_enum: e.create(sync_conn, checkfirst=False),
                 )
 
         # Now create all tables

@@ -103,7 +103,7 @@ class TestQueryBuilding:
 
         def build_insert():
             return insert(test_table).values(
-                [{"name": r["title"], "description": r["description"]} for r in mock_records]
+                [{"name": r["title"], "description": r["description"]} for r in mock_records],
             )
 
         result = benchmark(build_insert)

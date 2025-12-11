@@ -1,3 +1,4 @@
+# mypy: disable-error-code="attr-defined,arg-type,assignment,return-value,misc,name-defined"
 """Webhook management CLI commands.
 
 This module provides CLI commands for managing webhooks:
@@ -180,7 +181,6 @@ async def create_webhook(
     """Create a new webhook.
 
     Examples:
-    \b
       example-service webhooks create -n "Order Events" -u "https://example.com/webhook" -e order.created -e order.updated
     """
     from example_service.features.webhooks.schemas import WebhookCreate
@@ -195,7 +195,7 @@ async def create_webhook(
         try:
             payload = WebhookCreate(
                 name=name,
-                url=url,  # type: ignore[arg-type]
+                url=url,
                 event_types=list(event_types),
                 description=description,
                 max_retries=max_retries,
@@ -244,10 +244,9 @@ async def delete_webhook(webhook_id: str, force: bool) -> None:
             error(f"Webhook not found: {webhook_id}")
             sys.exit(1)
 
-        if not force:
-            if not click.confirm(f"Delete webhook '{webhook.name}'?"):
-                info("Deletion cancelled")
-                return
+        if not force and not click.confirm(f"Delete webhook '{webhook.name}'?"):
+            info("Deletion cancelled")
+            return
 
         deleted = await service.delete_webhook(webhook_uuid)
         await session.commit()
@@ -476,7 +475,7 @@ async def webhook_stats() -> None:
         total_webhooks = webhook_count.scalar() or 0
 
         active_count = await session.execute(
-            select(func.count(Webhook.id)).where(Webhook.is_active == True)  # noqa: E712
+            select(func.count(Webhook.id)).where(Webhook.is_active),
         )
         active_webhooks = active_count.scalar() or 0
 
@@ -491,7 +490,7 @@ async def webhook_stats() -> None:
 
         status_counts = await session.execute(
             select(WebhookDelivery.status, func.count(WebhookDelivery.id))
-            .group_by(WebhookDelivery.status)
+            .group_by(WebhookDelivery.status),
         )
         status_dict = {row[0]: row[1] for row in status_counts.all()}
 

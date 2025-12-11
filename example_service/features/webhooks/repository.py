@@ -73,7 +73,7 @@ class WebhookRepository(TenantAwareRepository[Webhook]):
         """
         stmt = (
             select(Webhook)
-            .where(Webhook.is_active == True)  # noqa: E712
+            .where(Webhook.is_active)
             .order_by(Webhook.created_at.desc())
             .limit(limit)
             .offset(offset)
@@ -83,7 +83,7 @@ class WebhookRepository(TenantAwareRepository[Webhook]):
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.find_active: Webhook(tenant={tenant_id}, limit={limit}, offset={offset}) -> {len(items)} items"
+            lambda: f"db.find_active: Webhook(tenant={tenant_id}, limit={limit}, offset={offset}) -> {len(items)} items",
         )
         return items
 
@@ -113,7 +113,7 @@ class WebhookRepository(TenantAwareRepository[Webhook]):
         stmt = self._apply_tenant_filter(stmt, tenant_id)
 
         if active_only:
-            stmt = stmt.where(Webhook.is_active == True)  # noqa: E712
+            stmt = stmt.where(Webhook.is_active)
 
         stmt = stmt.order_by(Webhook.created_at.desc())
 
@@ -121,7 +121,7 @@ class WebhookRepository(TenantAwareRepository[Webhook]):
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.find_by_event_type: event_type={event_type!r}, tenant={tenant_id}, active_only={active_only} -> {len(items)} items"
+            lambda: f"db.find_by_event_type: event_type={event_type!r}, tenant={tenant_id}, active_only={active_only} -> {len(items)} items",
         )
         return items
 
@@ -162,7 +162,7 @@ class WebhookRepository(TenantAwareRepository[Webhook]):
         search_result = await self.search(session, stmt, limit=limit, offset=offset)
 
         self._lazy.debug(
-            lambda: f"db.search_webhooks: tenant={tenant_id}, is_active={is_active} -> {len(search_result.items)}/{search_result.total}"
+            lambda: f"db.search_webhooks: tenant={tenant_id}, is_active={is_active} -> {len(search_result.items)}/{search_result.total}",
         )
         return search_result
 
@@ -215,7 +215,7 @@ class WebhookDeliveryRepository(BaseRepository[WebhookDelivery]):
         search_result = await self.search(session, stmt, limit=limit, offset=offset)
 
         self._lazy.debug(
-            lambda: f"db.find_by_webhook: webhook_id={webhook_id} -> {len(search_result.items)}/{search_result.total}"
+            lambda: f"db.find_by_webhook: webhook_id={webhook_id} -> {len(search_result.items)}/{search_result.total}",
         )
         return search_result
 
@@ -344,7 +344,7 @@ class WebhookDeliveryRepository(BaseRepository[WebhookDelivery]):
         await session.refresh(delivery)
 
         self._lazy.debug(
-            lambda: f"db.update_status({delivery_id}) -> status={status}, attempt={delivery.attempt_count}"
+            lambda: f"db.update_status({delivery_id}) -> status={status}, attempt={delivery.attempt_count}",
         )
         return delivery
 

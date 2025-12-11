@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
 
 pytest.importorskip("dateutil.rrule", reason="Reminder schemas require python-dateutil")
 
 from example_service.features.reminders.schemas import ReminderCreate
 from example_service.features.reminders.service import ReminderService
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.mark.asyncio

@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
 
 pytest.importorskip("dateutil.rrule", reason="Reminder models require python-dateutil")
 
 from example_service.features.reminders.models import Reminder
 from example_service.features.reminders.repository import ReminderRepository
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def _persist(db_session: AsyncSession, **kwargs) -> Reminder:

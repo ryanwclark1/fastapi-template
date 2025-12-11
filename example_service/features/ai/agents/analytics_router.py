@@ -17,20 +17,26 @@ Endpoints:
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from example_service.core.database import get_async_session
-from example_service.core.models.user import User
-from example_service.features.auth.dependencies import get_current_user
+from example_service.core.dependencies.auth import AuthUserDep
 from example_service.infra.ai.agents.analytics import (
     AgentAnalytics,
     AgentMetrics,
     UsageMetrics,
 )
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+SessionDep = Annotated["AsyncSession", Depends(get_async_session)]
+
+require_runtime_dependency(AuthUserDep)
 
 router = APIRouter(prefix="/analytics", tags=["AI Analytics"])
 
@@ -157,17 +163,12 @@ class TrendsResponse(BaseModel):
 
 @router.get("/usage", response_model=UsageMetricsResponse)
 async def get_usage_metrics(
-    start_date: datetime | None = Query(
-        None,
-        description="Start date (defaults to 30 days ago)",
-    ),
-    end_date: datetime | None = Query(
-        None,
-        description="End date (defaults to now)",
-    ),
-    agent_type: str | None = Query(None, description="Filter by agent type"),
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    start_date: Annotated[datetime | None, Query(description="Start date (defaults to 30 days ago)")] = None,
+    end_date: Annotated[datetime | None, Query(description="End date (defaults to now)")] = None,
+    agent_type: Annotated[str | None, Query(description="Filter by agent type")] = None,
+    *,
+    session: SessionDep,
+    current_user: AuthUserDep,
 ) -> UsageMetricsResponse:
     """Get usage metrics for a time period.
 
@@ -185,7 +186,7 @@ async def get_usage_metrics(
     analytics = AgentAnalytics(session)
 
     metrics = await analytics.get_usage_metrics(
-        tenant_id=str(current_user.tenant_id),
+        tenant_id=str(current_user.tenant_id),  # type: ignore[arg-type]
         start_date=start,
         end_date=end,
         agent_type=agent_type,
@@ -196,10 +197,11 @@ async def get_usage_metrics(
 
 @router.get("/agents", response_model=list[AgentMetricsResponse])
 async def list_agent_metrics(
-    start_date: datetime | None = Query(None),
-    end_date: datetime | None = Query(None),
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    start_date: Annotated[datetime | None, Query()] = None,
+    end_date: Annotated[datetime | None, Query()] = None,
+    *,
+    session: SessionDep,
+    current_user: AuthUserDep,
 ) -> list[AgentMetricsResponse]:
     """Get metrics for all agent types used by the tenant."""
     from sqlalchemy import func, select
@@ -214,7 +216,7 @@ async def list_agent_metrics(
     query = (
         select(func.distinct(AIAgentRun.agent_type))
         .where(
-            AIAgentRun.tenant_id == current_user.tenant_id,
+            AIAgentRun.tenant_id == current_user.tenant_id,  # type: ignore[arg-type]
             AIAgentRun.created_at >= start,
             AIAgentRun.created_at <= end,
         )
@@ -227,7 +229,7 @@ async def list_agent_metrics(
 
     for agent_type in agent_types:
         metrics = await analytics.get_agent_metrics(
-            tenant_id=str(current_user.tenant_id),
+            tenant_id=str(current_user.tenant_id),  # type: ignore[arg-type]
             agent_type=agent_type,
             start_date=start,
             end_date=end,
@@ -240,10 +242,11 @@ async def list_agent_metrics(
 @router.get("/agents/{agent_type}", response_model=AgentMetricsResponse)
 async def get_agent_metrics(
     agent_type: str,
-    start_date: datetime | None = Query(None),
-    end_date: datetime | None = Query(None),
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    start_date: Annotated[datetime | None, Query()] = None,
+    end_date: Annotated[datetime | None, Query()] = None,
+    *,
+    session: SessionDep,
+    current_user: AuthUserDep,
 ) -> AgentMetricsResponse:
     """Get detailed metrics for a specific agent type.
 
@@ -261,7 +264,7 @@ async def get_agent_metrics(
     analytics = AgentAnalytics(session)
 
     metrics = await analytics.get_agent_metrics(
-        tenant_id=str(current_user.tenant_id),
+        tenant_id=str(current_user.tenant_id),  # type: ignore[arg-type]
         agent_type=agent_type,
         start_date=start,
         end_date=end,
@@ -272,16 +275,11 @@ async def get_agent_metrics(
 
 @router.get("/costs", response_model=CostAnalysisResponse)
 async def get_cost_analysis(
-    start_date: datetime | None = Query(
-        None,
-        description="Start date (defaults to 30 days ago)",
-    ),
-    end_date: datetime | None = Query(
-        None,
-        description="End date (defaults to now)",
-    ),
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    start_date: Annotated[datetime | None, Query(description="Start date (defaults to 30 days ago)")] = None,
+    end_date: Annotated[datetime | None, Query(description="End date (defaults to now)")] = None,
+    *,
+    session: SessionDep,
+    current_user: AuthUserDep,
 ) -> CostAnalysisResponse:
     """Get detailed cost analysis.
 
@@ -299,7 +297,7 @@ async def get_cost_analysis(
     analytics = AgentAnalytics(session)
 
     analysis = await analytics.get_cost_analysis(
-        tenant_id=str(current_user.tenant_id),
+        tenant_id=str(current_user.tenant_id),  # type: ignore[arg-type]
         start_date=start,
         end_date=end,
     )
@@ -324,20 +322,12 @@ async def get_cost_analysis(
 
 @router.get("/report", response_model=UsageReportResponse)
 async def get_usage_report(
-    start_date: datetime | None = Query(
-        None,
-        description="Report start date (defaults to 30 days ago)",
-    ),
-    end_date: datetime | None = Query(
-        None,
-        description="Report end date (defaults to now)",
-    ),
-    include_recommendations: bool = Query(
-        True,
-        description="Include optimization recommendations",
-    ),
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    start_date: Annotated[datetime | None, Query(description="Report start date (defaults to 30 days ago)")] = None,
+    end_date: Annotated[datetime | None, Query(description="Report end date (defaults to now)")] = None,
+    include_recommendations: Annotated[bool, Query(description="Include optimization recommendations")] = True,
+    *,
+    session: SessionDep,
+    current_user: AuthUserDep,
 ) -> UsageReportResponse:
     """Generate comprehensive usage report.
 
@@ -354,7 +344,7 @@ async def get_usage_report(
     analytics = AgentAnalytics(session)
 
     report = await analytics.get_usage_report(
-        tenant_id=str(current_user.tenant_id),
+        tenant_id=str(current_user.tenant_id),  # type: ignore[arg-type]
         start_date=start,
         end_date=end,
         include_recommendations=include_recommendations,
@@ -387,7 +377,7 @@ async def get_usage_report(
                 daily_trend=report.cost_analysis.daily_trend,
                 projected_monthly=float(report.cost_analysis.projected_monthly),
                 cost_per_successful_run=float(
-                    report.cost_analysis.cost_per_successful_run
+                    report.cost_analysis.cost_per_successful_run,
                 ),
                 wasted_cost=float(report.cost_analysis.wasted_cost),
             )
@@ -400,22 +390,13 @@ async def get_usage_report(
 
 @router.get("/trends", response_model=TrendsResponse)
 async def get_usage_trends(
-    start_date: datetime | None = Query(
-        None,
-        description="Start date (defaults to 30 days ago)",
-    ),
-    end_date: datetime | None = Query(
-        None,
-        description="End date (defaults to now)",
-    ),
-    granularity: str = Query(
-        "daily",
-        regex="^(hourly|daily|weekly)$",
-        description="Time granularity",
-    ),
-    agent_type: str | None = Query(None, description="Filter by agent type"),
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    start_date: Annotated[datetime | None, Query(description="Start date (defaults to 30 days ago)")] = None,
+    end_date: Annotated[datetime | None, Query(description="End date (defaults to now)")] = None,
+    granularity: Annotated[str, Query(regex="^(hourly|daily|weekly)$", description="Time granularity")] = "daily",
+    agent_type: Annotated[str | None, Query(description="Filter by agent type")] = None,
+    *,
+    session: SessionDep,
+    current_user: AuthUserDep,
 ) -> TrendsResponse:
     """Get usage trends over time.
 
@@ -443,7 +424,7 @@ async def get_usage_trends(
 
     # Build query conditions
     conditions = [
-        AIAgentRun.tenant_id == current_user.tenant_id,
+        AIAgentRun.tenant_id == current_user.tenant_id,  # type: ignore[arg-type]
         AIAgentRun.created_at >= start,
         AIAgentRun.created_at <= end,
     ]
@@ -457,10 +438,10 @@ async def get_usage_trends(
             func.count(AIAgentRun.id).label("total_runs"),
             func.sum(AIAgentRun.total_cost_usd).label("total_cost"),
             func.sum(
-                case((AIAgentRun.status == "completed", 1), else_=0)
+                case((AIAgentRun.status == "completed", 1), else_=0),
             ).label("successful_runs"),
             func.sum(
-                AIAgentRun.total_input_tokens + AIAgentRun.total_output_tokens
+                AIAgentRun.total_input_tokens + AIAgentRun.total_output_tokens,
             ).label("total_tokens"),
         )
         .where(and_(*conditions))
@@ -489,10 +470,10 @@ async def get_usage_trends(
             TrendDataPoint(
                 timestamp=timestamp,
                 value=(successful_runs / total_runs * 100) if total_runs > 0 else 0,
-            )
+            ),
         )
         token_usage_trend.append(
-            TrendDataPoint(timestamp=timestamp, value=total_tokens)
+            TrendDataPoint(timestamp=timestamp, value=total_tokens),
         )
 
     return TrendsResponse(

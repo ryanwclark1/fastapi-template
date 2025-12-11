@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
 import contextlib
 import json
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi import FastAPI, status
@@ -19,6 +19,11 @@ from example_service.features.realtime.schemas import (
     ClientMessageType,
 )
 from example_service.infra.realtime import get_connection_manager
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+else:  # pragma: no cover - runtime placeholder for typing-only import
+    AsyncGenerator = Any
 
 
 @pytest.fixture
@@ -50,7 +55,7 @@ async def realtime_client(
         mock_get.return_value = mock_connection_manager
 
         with patch(
-            "example_service.features.realtime.router.get_websocket_settings"
+            "example_service.features.realtime.router.get_websocket_settings",
         ) as mock_settings:
             mock_settings.return_value = MagicMock(
                 enabled=True,
@@ -59,7 +64,7 @@ async def realtime_client(
             )
 
             async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
+                transport=ASGITransport(app=app), base_url="http://test",
             ) as client:
                 yield client
 
@@ -82,7 +87,7 @@ class TestWebSocketEndpoint:
 
     @pytest.mark.asyncio
     async def test_websocket_disabled_closes_connection(
-        self, realtime_client_disabled: AsyncClient
+        self, realtime_client_disabled: AsyncClient,
     ) -> None:
         """Test that WebSocket closes when disabled."""
         # WebSocket connections can't be tested with httpx directly
@@ -110,7 +115,7 @@ class TestGetStats:
 
     @pytest.mark.asyncio
     async def test_get_stats_success(
-        self, realtime_client: AsyncClient, mock_connection_manager: MagicMock
+        self, realtime_client: AsyncClient, mock_connection_manager: MagicMock,
     ) -> None:
         """Test successfully getting connection statistics."""
         mock_connection_manager.connection_count = 5
@@ -150,7 +155,7 @@ class TestBroadcast:
 
     @pytest.mark.asyncio
     async def test_broadcast_success(
-        self, realtime_client: AsyncClient, mock_connection_manager: MagicMock
+        self, realtime_client: AsyncClient, mock_connection_manager: MagicMock,
     ) -> None:
         """Test successfully broadcasting a message."""
         mock_connection_manager.broadcast.return_value = 3
@@ -245,7 +250,7 @@ class TestWebSocketMessageHandling:
 
             async def mock_iter_text():
                 yield json.dumps(
-                    {"type": ClientMessageType.SUBSCRIBE, "channels": ["test-channel"]}
+                    {"type": ClientMessageType.SUBSCRIBE, "channels": ["test-channel"]},
                 )
 
             mock_websocket.iter_text = mock_iter_text
@@ -289,7 +294,7 @@ class TestWebSocketMessageHandling:
                     "type": ClientMessageType.MESSAGE,
                     "channel": "test-channel",
                     "data": {"content": "Hello"},
-                }
+                },
             )
 
         mock_websocket.iter_text = mock_iter_text

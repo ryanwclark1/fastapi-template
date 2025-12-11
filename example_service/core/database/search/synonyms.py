@@ -261,18 +261,17 @@ class SynonymDictionary:
         lines.append("")
 
         for group in self.groups:
+            canonical = group.canonical or group.terms[0]
             if group.bidirectional:
                 # All terms map to canonical
-                canonical = group.canonical or group.terms[0]
-                for term in group.terms:
-                    if term != canonical:
-                        lines.append(f"{term} : {canonical}")
+                lines.extend(
+                    f"{term} : {canonical}" for term in group.terms if term != canonical
+                )
             else:
                 # Only non-canonical terms map to canonical
-                canonical = group.canonical or group.terms[0]
-                for term in group.terms:
-                    if term != canonical:
-                        lines.append(f"{term} : {canonical}")
+                lines.extend(
+                    f"{term} : {canonical}" for term in group.terms if term != canonical
+                )
 
         path.write_text("\n".join(lines))
         logger.info("Written thesaurus file to %s", path)
@@ -334,8 +333,8 @@ class SynonymDictionary:
             return cls.from_dict(data, name=name)
 
         # Parse line-based format
-        for line in content.splitlines():
-            line = line.strip()
+        for raw_line in content.splitlines():
+            line = raw_line.strip()
 
             # Skip comments and empty lines
             if not line or line.startswith("#"):
@@ -462,10 +461,9 @@ def create_synonym_dictionary_sql(
         SQL statements.
     """
     # Generate synonym file content
-    syn_entries = []
-    for canonical, aliases in synonyms.items():
-        for alias in aliases:
-            syn_entries.append(f"{alias} {canonical}")
+    syn_entries = [
+        f"{alias} {canonical}" for canonical, aliases in synonyms.items() for alias in aliases
+    ]
 
     syn_content = "\n".join(syn_entries)
 

@@ -89,7 +89,8 @@ class AlembicCommandConfig:
         alembic_ini_path = project_root / "alembic.ini"
 
         if not alembic_ini_path.exists():
-            raise FileNotFoundError(f"alembic.ini not found at {alembic_ini_path}")
+            msg = f"alembic.ini not found at {alembic_ini_path}"
+            raise FileNotFoundError(msg)
 
         config = Config(str(alembic_ini_path), stdout=output_buffer or io.StringIO())
         config.set_main_option("script_location", self.script_location)
@@ -97,7 +98,7 @@ class AlembicCommandConfig:
         # Set the database URL from engine (overrides alembic.ini placeholder)
         # Use render_as_string to include the password (str() masks it)
         config.set_main_option(
-            "sqlalchemy.url", self.engine.url.render_as_string(hide_password=False)
+            "sqlalchemy.url", self.engine.url.render_as_string(hide_password=False),
         )
 
         # Store attributes for env.py access via config.attributes
@@ -339,7 +340,7 @@ class AlembicCommands:
         return output.getvalue()
 
     async def heads(
-        self, *, verbose: bool = False, resolve_dependencies: bool = False
+        self, *, verbose: bool = False, resolve_dependencies: bool = False,
     ) -> str:
         """Show available migration heads.
 
@@ -602,10 +603,11 @@ class AlembicCommands:
                     context = MigrationContext.configure(conn)
                     current = context.get_current_revision()
 
-                    pending = []
-                    for rev in script.iterate_revisions("head", current):
-                        if rev.revision != current:
-                            pending.append(rev.revision)
+                    pending = [
+                        rev.revision
+                        for rev in script.iterate_revisions("head", current)
+                        if rev.revision != current
+                    ]
                     return list(reversed(pending))
             finally:
                 sync_engine.dispose()

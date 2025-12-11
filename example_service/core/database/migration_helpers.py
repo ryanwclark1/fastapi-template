@@ -142,7 +142,7 @@ def create_gist_index(
 
     op.execute(
         f"CREATE {unique_clause}INDEX {index_name} ON {table_ref} "
-        f"USING GIST ({column}){where_clause}"
+        f"USING GIST ({column}){where_clause}",
     )
 
 
@@ -271,7 +271,7 @@ def create_exclusion_constraint(
 
     op.execute(
         f"ALTER TABLE {table_ref} ADD CONSTRAINT {constraint_name} "
-        f"EXCLUDE USING {using} ({exclusion_expr}){where_clause}"
+        f"EXCLUDE USING {using} ({exclusion_expr}){where_clause}",
     )
 
 
@@ -450,19 +450,19 @@ def ensure_btree_gist() -> None:
 
 
 __all__ = [
+    # Exclusion constraint helpers
+    "create_exclusion_constraint",
     # Extension helpers
     "create_extension",
-    "drop_extension",
     # GiST index helpers
     "create_gist_index",
     "create_gist_index_multi",
-    "drop_gist_index",
-    # Exclusion constraint helpers
-    "create_exclusion_constraint",
-    "drop_exclusion_constraint",
     # Convenience functions
     "create_ltree_indexes",
     "create_no_overlap_constraint",
+    "drop_exclusion_constraint",
+    "drop_extension",
+    "drop_gist_index",
     "drop_ltree_indexes",
     "ensure_btree_gist",
 ]

@@ -981,9 +981,6 @@ class PipelineLogContext:
             if step_ctx.result_recorded:
                 self.completed_steps.append(step.name)
                 self.total_cost_usd += step_ctx.cost_usd
-        except Exception:
-            # Failure already logged by step_ctx.record_failure
-            raise
         finally:
             self.current_step = None
 

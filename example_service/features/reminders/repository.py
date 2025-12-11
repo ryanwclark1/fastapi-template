@@ -77,7 +77,7 @@ class ReminderRepository(TenantAwareRepository[Reminder]):
         """
         stmt = (
             select(Reminder)
-            .where(Reminder.is_completed == False)  # noqa: E712
+            .where(Reminder.is_completed.is_(False))
             .order_by(
                 Reminder.remind_at.asc().nullslast(),
                 Reminder.created_at.desc(),
@@ -90,7 +90,7 @@ class ReminderRepository(TenantAwareRepository[Reminder]):
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.find_pending: Reminder(tenant={tenant_id}, limit={limit}, offset={offset}) -> {len(items)} items"
+            lambda: f"db.find_pending: Reminder(tenant={tenant_id}, limit={limit}, offset={offset}) -> {len(items)} items",
         )
         return items
 
@@ -116,7 +116,7 @@ class ReminderRepository(TenantAwareRepository[Reminder]):
         stmt = (
             select(Reminder)
             .where(
-                Reminder.is_completed == False,  # noqa: E712
+                Reminder.is_completed.is_(False),
                 Reminder.remind_at.is_not(None),
                 Reminder.remind_at < now,
             )
@@ -163,8 +163,8 @@ class ReminderRepository(TenantAwareRepository[Reminder]):
         stmt = (
             select(Reminder)
             .where(
-                Reminder.is_completed == False,  # noqa: E712
-                Reminder.notification_sent == False,  # noqa: E712
+                Reminder.is_completed.is_(False),
+                Reminder.notification_sent.is_(False),
                 Reminder.remind_at.is_not(None),
                 Reminder.remind_at <= now,
             )
@@ -220,7 +220,7 @@ class ReminderRepository(TenantAwareRepository[Reminder]):
 
         # Status filter
         if not include_completed:
-            stmt = stmt.where(Reminder.is_completed == False)  # noqa: E712
+            stmt = stmt.where(Reminder.is_completed.is_(False))
 
         # Date range
         if after:
@@ -240,7 +240,7 @@ class ReminderRepository(TenantAwareRepository[Reminder]):
         # DEBUG level - search context (useful for debugging search issues)
         self._lazy.debug(
             lambda: f"db.search_reminders: query={query!r}, tenant={tenant_id}, include_completed={include_completed}, "
-            f"before={before}, after={after} -> {len(search_result.items)}/{search_result.total}"
+            f"before={before}, after={after} -> {len(search_result.items)}/{search_result.total}",
         )
         return search_result
 
@@ -298,7 +298,7 @@ class ReminderRepository(TenantAwareRepository[Reminder]):
         stmt = self._apply_tenant_filter(stmt, tenant_id)
 
         if not include_completed:
-            stmt = stmt.where(Reminder.is_completed == False)  # noqa: E712
+            stmt = stmt.where(Reminder.is_completed.is_(False))
 
         # Smart ordering: pending first, by date, newest created first
         stmt = stmt.order_by(
@@ -311,7 +311,7 @@ class ReminderRepository(TenantAwareRepository[Reminder]):
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.list_all: tenant={tenant_id}, include_completed={include_completed} -> {len(items)} items"
+            lambda: f"db.list_all: tenant={tenant_id}, include_completed={include_completed} -> {len(items)} items",
         )
         return items
 
@@ -343,7 +343,7 @@ class ReminderRepository(TenantAwareRepository[Reminder]):
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.find_broken_out_occurrences({parent_id}, tenant={tenant_id}) -> {len(items)} items"
+            lambda: f"db.find_broken_out_occurrences({parent_id}, tenant={tenant_id}) -> {len(items)} items",
         )
         # Filter ensures occurrence_date is not None (query already filters, but type checker needs help)
         return {r.occurrence_date: r for r in items if r.occurrence_date is not None}
@@ -469,7 +469,7 @@ class ReminderRepository(TenantAwareRepository[Reminder]):
 
         self._lazy.debug(
             lambda: f"db.search_sorted: query={query!r}, tenant={tenant_id}, sort_by={sort_by}, "
-            f"sort_order={sort_order} -> {len(items)} items"
+            f"sort_order={sort_order} -> {len(items)} items",
         )
         return items
 
@@ -539,7 +539,7 @@ class ReminderRepository(TenantAwareRepository[Reminder]):
             ts_query = func.plainto_tsquery("english", query)
 
         stmt = stmt.add_columns(
-            func.ts_rank(Reminder.search_vector, ts_query).label("search_rank")
+            func.ts_rank(Reminder.search_vector, ts_query).label("search_rank"),
         )
 
         # Pagination
@@ -557,7 +557,7 @@ class ReminderRepository(TenantAwareRepository[Reminder]):
 
         self._lazy.debug(
             lambda: f"db.search_fulltext: query={query!r}, tenant={tenant_id}, mode={mode}, "
-            f"prefix={prefix} -> {len(search_results)} results"
+            f"prefix={prefix} -> {len(search_results)} results",
         )
         return search_results
 
@@ -587,7 +587,7 @@ class ReminderRepository(TenantAwareRepository[Reminder]):
         reminder = result.scalar_one_or_none()
 
         self._lazy.debug(
-            lambda: f"db.get_with_tags({reminder_id}, tenant={tenant_id}) -> {'found' if reminder else 'not found'}"
+            lambda: f"db.get_with_tags({reminder_id}, tenant={tenant_id}) -> {'found' if reminder else 'not found'}",
         )
         return reminder
 
@@ -651,14 +651,14 @@ class ReminderRepository(TenantAwareRepository[Reminder]):
         stmt = self._apply_tenant_filter(stmt, tenant_id)
 
         if not include_completed:
-            stmt = stmt.where(Reminder.is_completed == False)  # noqa: E712
+            stmt = stmt.where(Reminder.is_completed.is_(False))
 
         result = await session.execute(stmt)
         items = result.scalars().all()
 
         self._lazy.debug(
             lambda: f"db.find_by_tag_id({tag_id}, tenant={tenant_id}, include_completed={include_completed}) "
-            f"-> {len(items)} items"
+            f"-> {len(items)} items",
         )
         return items
 

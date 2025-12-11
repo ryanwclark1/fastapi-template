@@ -19,6 +19,7 @@ import strawberry
 from strawberry.scalars import JSON
 
 from example_service.features.graphql.types.base import PageInfoType
+from example_service.utils.runtime_dependencies import require_runtime_dependency
 
 if TYPE_CHECKING:
     from example_service.features.ai.models import (
@@ -27,6 +28,8 @@ if TYPE_CHECKING:
         TenantAIConfig,
         TenantAIFeature,
     )
+
+require_runtime_dependency(datetime, strawberry, JSON, PageInfoType)
 
 
 # --- Enums ---
@@ -280,16 +283,16 @@ class AIJobFilterInput:
     """Filter input for AI jobs query."""
 
     status: AIJobStatusEnum | None = strawberry.field(
-        default=None, description="Filter by status"
+        default=None, description="Filter by status",
     )
     job_type: AIJobTypeEnum | None = strawberry.field(
-        default=None, description="Filter by job type"
+        default=None, description="Filter by job type",
     )
     created_after: datetime | None = strawberry.field(
-        default=None, description="Jobs created after this time"
+        default=None, description="Jobs created after this time",
     )
     created_before: datetime | None = strawberry.field(
-        default=None, description="Jobs created before this time"
+        default=None, description="Jobs created before this time",
     )
 
 
@@ -298,19 +301,19 @@ class AIUsageFilterInput:
     """Filter input for AI usage logs query."""
 
     provider_name: str | None = strawberry.field(
-        default=None, description="Filter by provider"
+        default=None, description="Filter by provider",
     )
     operation_type: str | None = strawberry.field(
-        default=None, description="Filter by operation type"
+        default=None, description="Filter by operation type",
     )
     success: bool | None = strawberry.field(
-        default=None, description="Filter by success status"
+        default=None, description="Filter by success status",
     )
     created_after: datetime | None = strawberry.field(
-        default=None, description="Logs created after this time"
+        default=None, description="Logs created after this time",
     )
     created_before: datetime | None = strawberry.field(
-        default=None, description="Logs created before this time"
+        default=None, description="Logs created before this time",
     )
 
 
@@ -331,7 +334,7 @@ class AIJobError:
     code: str = strawberry.field(description="Error code")
     message: str = strawberry.field(description="Human-readable error message")
     field: str | None = strawberry.field(
-        default=None, description="Field that caused the error"
+        default=None, description="Field that caused the error",
     )
 
 

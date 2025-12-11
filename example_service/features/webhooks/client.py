@@ -69,13 +69,12 @@ class WebhookClient:
         message = f"{timestamp}.{payload}"
 
         # Generate HMAC-SHA256 signature
-        signature = hmac.new(
+        return hmac.new(
             secret.encode("utf-8"),
             message.encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
 
-        return signature
 
     async def deliver(
         self,
@@ -122,7 +121,7 @@ class WebhookClient:
                 headers.update(webhook.custom_headers)
 
             lazy_logger.debug(
-                lambda: f"client.deliver: webhook_id={webhook.id}, event_type={event_type}, url={webhook.url}"
+                lambda: f"client.deliver: webhook_id={webhook.id}, event_type={event_type}, url={webhook.url}",
             )
 
             # Send HTTP POST request

@@ -123,7 +123,7 @@ class TestBaseTool:
                 limit: int = 10
 
             async def execute(
-                self, query: str, limit: int = 10
+                self, query: str, limit: int = 10,
             ) -> ToolResult[dict[str, object]]:
                 return ToolResult.success(data={"query": query, "limit": limit})
 
@@ -265,7 +265,8 @@ class TestFunctionTool:
 
         @tool(description="Failing tool")
         async def failing_tool() -> None:
-            raise ValueError("Intentional error")
+            msg = "Intentional error"
+            raise ValueError(msg)
 
         result = await failing_tool()
         assert result.is_failure

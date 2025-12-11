@@ -27,12 +27,14 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 import logging
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -209,10 +211,11 @@ class CircuitBreaker:
         if self._state == CircuitState.HALF_OPEN:
             # Failure in half-open: reopen circuit
             self._transition_to(CircuitState.OPEN)
-        elif self._state == CircuitState.CLOSED:
+        elif (
+            self._state == CircuitState.CLOSED and self._failure_count >= self.threshold
+        ):
             # Check if we should open
-            if self._failure_count >= self.threshold:
-                self._transition_to(CircuitState.OPEN)
+            self._transition_to(CircuitState.OPEN)
 
     def reset(self) -> None:
         """Reset the circuit breaker to closed state."""
@@ -268,7 +271,7 @@ class CircuitBreaker:
                     return fallback  # type: ignore
 
                 try:
-                    result = await func(*args, **kwargs)
+                    result = await func(*args, **kwargs)  # type: ignore[misc]
                     self.record_success()
                     return result
                 except Exception:
@@ -295,7 +298,7 @@ class CircuitBreaker:
 
             if asyncio.iscoroutinefunction(func):
                 return async_wrapper  # type: ignore
-            return sync_wrapper  # type: ignore
+            return sync_wrapper
 
         return decorator
 

@@ -273,7 +273,7 @@ def log_error(error: GraphQLError, execution_context: ExecutionContext | None) -
                     type(error.original_error),
                     error.original_error,
                     error.original_error.__traceback__,
-                )
+                ),
             )
 
     # Log at appropriate level
@@ -429,7 +429,7 @@ class GraphQLValidationError(Exception):
             raise GraphQLValidationError("Title too long", field="title")
     """
 
-    def __init__(self, message: str, field: str | None = None):
+    def __init__(self, message: str, field: str | None = None) -> None:
         self.message = message
         self.field = field
         super().__init__(message)
@@ -448,7 +448,7 @@ class GraphQLNotFoundError(Exception):
             raise GraphQLNotFoundError("Reminder", id)
     """
 
-    def __init__(self, resource_type: str, resource_id: str | None = None):
+    def __init__(self, resource_type: str, resource_id: str | None = None) -> None:
         self.resource_type = resource_type
         self.resource_id = resource_id
         message = f"{resource_type} not found"

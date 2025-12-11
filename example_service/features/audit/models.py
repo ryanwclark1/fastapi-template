@@ -20,6 +20,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from example_service.core.database.base import Base, UUIDv7PKMixin
 from example_service.core.database.enums import AuditAction as AuditActionEnum
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(datetime)
 
 
 class AuditAction(StrEnum):

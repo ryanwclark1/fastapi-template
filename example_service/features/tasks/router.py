@@ -10,13 +10,12 @@ This module provides REST API endpoints for task management operations:
 
 from __future__ import annotations
 
-from datetime import datetime  # noqa: TC003
+import datetime as dt
 import logging
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from example_service.core.database import NotFoundError
 from example_service.core.exceptions import (
     InternalServerException,
     ServiceUnavailableException,
@@ -52,10 +51,23 @@ from example_service.features.tasks.service import (
     TaskServiceError,
     get_task_service,
 )
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(dt.datetime)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
+
+
+def _raise_not_found(error_code: str, message: str, **extra: Any) -> None:
+    """Raise standardized 404 response for reusable endpoints."""
+    extra_info = ""
+    if extra:
+        joined = ", ".join(f"{key}={value}" for key, value in extra.items())
+        extra_info = f" ({joined})"
+    detail = f"{message}{extra_info}"
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
 
 
 # ──────────────────────────────────────────────────────────────
@@ -86,22 +98,22 @@ async def search_tasks(
     service: TaskServiceDep,
     task_name: Annotated[str | None, Query(description="Filter by exact task name")] = None,
     task_name_like: Annotated[
-        str | None, Query(description="Filter by task name (contains)")
+        str | None, Query(description="Filter by task name (contains)"),
     ] = None,
     status: Annotated[TaskStatus | None, Query(description="Filter by status")] = None,
     worker_id: Annotated[str | None, Query(description="Filter by worker ID")] = None,
     error_type: Annotated[str | None, Query(description="Filter by error type")] = None,
     created_after: Annotated[
-        datetime | None, Query(description="Tasks created after this time")
+        dt.datetime | None, Query(description="Tasks created after this time"),
     ] = None,
     created_before: Annotated[
-        datetime | None, Query(description="Tasks created before this time")
+        dt.datetime | None, Query(description="Tasks created before this time"),
     ] = None,
     min_duration_ms: Annotated[
-        int | None, Query(ge=0, description="Minimum duration in ms")
+        int | None, Query(ge=0, description="Minimum duration in ms"),
     ] = None,
     max_duration_ms: Annotated[
-        int | None, Query(ge=0, description="Maximum duration in ms")
+        int | None, Query(ge=0, description="Maximum duration in ms"),
     ] = None,
     order_by: Annotated[
         Literal["created_at", "duration_ms", "task_name", "status"],
@@ -207,8 +219,11 @@ async def get_task_details(
     """
     result = await service.get_task_details(task_id)
     if not result:
-        msg = "TaskExecution"
-        raise NotFoundError(msg, {"task_id": task_id})
+        _raise_not_found(
+            "task_not_found",
+            f"Task '{task_id}' not found",
+            task_id=task_id,
+        )
     return result
 
 
@@ -325,8 +340,11 @@ async def get_scheduled_job(
     """
     result = service.get_scheduled_job(job_id)
     if not result:
-        msg = "ScheduledJob"
-        raise NotFoundError(msg, {"job_id": job_id})
+        _raise_not_found(
+            "scheduled_job_not_found",
+            f"Scheduled job '{job_id}' not found",
+            job_id=job_id,
+        )
     return result
 
 
@@ -346,8 +364,11 @@ async def pause_scheduled_job(
     """
     success = service.pause_job(job_id)
     if not success:
-        msg = "ScheduledJob"
-        raise NotFoundError(msg, {"job_id": job_id})
+        _raise_not_found(
+            "scheduled_job_not_found",
+            f"Scheduled job '{job_id}' not found",
+            job_id=job_id,
+        )
     return {"job_id": job_id, "paused": True, "message": "Job paused successfully"}
 
 
@@ -367,8 +388,11 @@ async def resume_scheduled_job(
     """
     success = service.resume_job(job_id)
     if not success:
-        msg = "ScheduledJob"
-        raise NotFoundError(msg, {"job_id": job_id})
+        _raise_not_found(
+            "scheduled_job_not_found",
+            f"Scheduled job '{job_id}' not found",
+            job_id=job_id,
+        )
     return {"job_id": job_id, "resumed": True, "message": "Job resumed successfully"}
 
 
@@ -419,8 +443,11 @@ async def get_dlq_entry(
     """
     result = await service.get_dlq_entry(task_id)
     if not result:
-        msg = "DLQEntry"
-        raise NotFoundError(msg, {"task_id": task_id})
+        _raise_not_found(
+            "dlq_entry_not_found",
+            f"DLQ entry '{task_id}' not found",
+            task_id=task_id,
+        )
     return result
 
 
@@ -541,6 +568,9 @@ async def get_task_progress(
     """
     result = await service.get_task_progress(task_id)
     if not result:
-        msg = "TaskProgress"
-        raise NotFoundError(msg, {"task_id": task_id})
+        _raise_not_found(
+            "task_progress_not_found",
+            f"No progress recorded for task '{task_id}'",
+            task_id=task_id,
+        )
     return result

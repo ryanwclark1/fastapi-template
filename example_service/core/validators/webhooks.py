@@ -17,7 +17,7 @@ RESERVED_WEBHOOK_HEADERS: frozenset[str] = frozenset(
         "x-webhook-event-id",
         "content-type",
         "user-agent",
-    }
+    },
 )
 
 
@@ -63,7 +63,8 @@ def validate_custom_headers(headers: dict[str, str]) -> dict[str, str]:
     """
     for header_name in headers:
         if header_name.lower() in RESERVED_WEBHOOK_HEADERS:
-            raise ValueError(f"Cannot override reserved header: {header_name}")
+            msg = f"Cannot override reserved header: {header_name}"
+            raise ValueError(msg)
     return headers
 
 

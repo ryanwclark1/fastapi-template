@@ -10,10 +10,10 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import APIRouter, Depends, Query, status
 
 from example_service.core.database import NotFoundError
-from example_service.core.dependencies.accent_auth import get_current_user
+from example_service.core.dependencies.auth import AuthUserDep
 from example_service.core.dependencies.database import get_db_session
 from example_service.core.exceptions import ConflictException
-from example_service.core.schemas.auth import AuthUser
+from example_service.utils.runtime_dependencies import require_runtime_dependency
 
 from .dependencies import FeatureFlags, get_feature_flags
 from .models import FlagStatus
@@ -32,7 +32,10 @@ from .service import FeatureFlagService
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+
 router = APIRouter(prefix="/feature-flags", tags=["feature-flags"])
+
+require_runtime_dependency(AuthUserDep)
 
 
 # Flag management endpoints
@@ -48,12 +51,13 @@ router = APIRouter(prefix="/feature-flags", tags=["feature-flags"])
 async def create_flag(
     data: FeatureFlagCreate,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
 ) -> FeatureFlagResponse:
     """Create a new feature flag.
 
     Args:
         data: Flag configuration.
+        session: Async database session.
 
     Returns:
         Created feature flag.
@@ -81,7 +85,7 @@ async def create_flag(
 )
 async def list_flags(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
     flag_status: Annotated[FlagStatus | None, Query(alias="status")] = None,
     enabled: Annotated[bool | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=1000)] = 100,
@@ -90,6 +94,7 @@ async def list_flags(
     """List feature flags.
 
     Args:
+        session: Async database session.
         flag_status: Filter by status.
         enabled: Filter by enabled state.
         limit: Maximum flags to return.
@@ -116,12 +121,13 @@ async def list_flags(
 async def get_flag(
     key: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
 ) -> FeatureFlagResponse:
     """Get a feature flag.
 
     Args:
         key: Flag key.
+        session: Async database session.
 
     Returns:
         Feature flag.
@@ -146,13 +152,14 @@ async def update_flag(
     key: str,
     data: FeatureFlagUpdate,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
 ) -> FeatureFlagResponse:
     """Update a feature flag.
 
     Args:
         key: Flag key.
         data: Update data.
+        session: Async database session.
 
     Returns:
         Updated feature flag.
@@ -176,12 +183,13 @@ async def update_flag(
 async def delete_flag(
     key: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
 ) -> None:
     """Delete a feature flag.
 
     Args:
         key: Flag key.
+        session: Async database session.
     """
     service = FeatureFlagService(session)
     deleted = await service.delete(key)
@@ -200,12 +208,13 @@ async def delete_flag(
 async def enable_flag(
     key: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
 ) -> FeatureFlagResponse:
     """Enable a feature flag globally.
 
     Args:
         key: Flag key.
+        session: Async database session.
 
     Returns:
         Updated feature flag.
@@ -232,12 +241,13 @@ async def enable_flag(
 async def disable_flag(
     key: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
 ) -> FeatureFlagResponse:
     """Disable a feature flag globally.
 
     Args:
         key: Flag key.
+        session: Async database session.
 
     Returns:
         Updated feature flag.
@@ -268,12 +278,13 @@ async def disable_flag(
 async def create_override(
     data: FlagOverrideCreate,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
 ) -> FlagOverrideResponse:
     """Create a flag override.
 
     Args:
         data: Override configuration.
+        session: Async database session.
 
     Returns:
         Created override.
@@ -298,7 +309,7 @@ async def create_override(
 )
 async def list_overrides(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
     flag_key: Annotated[str | None, Query()] = None,
     entity_type: Annotated[str | None, Query()] = None,
     entity_id: Annotated[str | None, Query()] = None,
@@ -306,6 +317,7 @@ async def list_overrides(
     """List flag overrides.
 
     Args:
+        session: Async database session.
         flag_key: Filter by flag key.
         entity_type: Filter by entity type.
         entity_id: Filter by entity ID.
@@ -333,7 +345,7 @@ async def delete_override(
     entity_type: str,
     entity_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
 ) -> None:
     """Delete a flag override.
 
@@ -341,6 +353,7 @@ async def delete_override(
         flag_key: Flag key.
         entity_type: Entity type.
         entity_id: Entity ID.
+        session: Async database session.
     """
     service = FeatureFlagService(session)
     deleted = await service.delete_override(flag_key, entity_type, entity_id)
@@ -365,7 +378,7 @@ async def delete_override(
 async def evaluate_flags(
     context: FlagEvaluationRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
     keys: Annotated[list[str] | None, Query()] = None,
     include_details: Annotated[bool, Query()] = False,
 ) -> FlagEvaluationResponse:
@@ -373,6 +386,7 @@ async def evaluate_flags(
 
     Args:
         context: Evaluation context.
+        session: Async database session.
         keys: Specific flag keys to evaluate.
         include_details: Include evaluation details.
 
@@ -420,9 +434,10 @@ async def check_flag(
 
     Args:
         key: Flag key.
+        flags: Resolved feature flag context.
 
     Returns:
         Simple enabled status.
     """
     enabled = await flags.is_enabled(key)
-    return {"key": key, "enabled": enabled} # type: ignore[dict-item]
+    return {"key": key, "enabled": enabled}  # type: ignore[dict-item]

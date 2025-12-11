@@ -22,6 +22,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
+from defusedxml import ElementTree as DefusedET
 from sqlalchemy import String, Text, TypeDecorator, types
 from sqlalchemy.types import TypeEngine
 
@@ -75,7 +76,7 @@ class EncryptedString(TypeDecorator):
         *,
         max_length: int = 255,
         **kwargs: Any,
-    ):
+    ) -> None:
         """Initialize encrypted string type.
 
         Args:
@@ -340,7 +341,7 @@ class XMLType(types.UserDefinedType[str]):
         return process
 
     def result_processor(
-        self, dialect: Any, coltype: Any
+        self, dialect: Any, coltype: Any,
     ) -> Callable[[Any], Any] | None:
         """Process value received from database.
 
@@ -372,16 +373,15 @@ class XMLType(types.UserDefinedType[str]):
 
             etree.fromstring(value.encode("utf-8"))
         except ImportError:
-            # Fall back to stdlib
-            # Note: XML is from database (trusted source), not user input
-            import xml.etree.ElementTree as ET
-
+            # Fall back to defusedxml for safe parsing when lxml is unavailable
             try:
-                ET.fromstring(value)  # noqa: S314
-            except ET.ParseError as e:
-                raise ValueError(f"Invalid XML: {e}") from e
+                DefusedET.fromstring(value)
+            except DefusedET.ParseError as e:
+                msg = f"Invalid XML: {e}"
+                raise ValueError(msg) from e
         except Exception as e:
-            raise ValueError(f"Invalid XML: {e}") from e
+            msg = f"Invalid XML: {e}"
+            raise ValueError(msg) from e
 
 
 class INETType(types.UserDefinedType[str]):
@@ -473,7 +473,7 @@ class INETType(types.UserDefinedType[str]):
         return process
 
     def result_processor(
-        self, dialect: Any, coltype: Any
+        self, dialect: Any, coltype: Any,
     ) -> Callable[[Any], Any] | None:
         """Process value received from database.
 
@@ -508,7 +508,8 @@ class INETType(types.UserDefinedType[str]):
                 # Try as single address
                 ipaddress.ip_address(value)
         except ValueError as e:
-            raise ValueError(f"Invalid IP address '{value}': {e}") from e
+            msg = f"Invalid IP address '{value}': {e}"
+            raise ValueError(msg) from e
 
 
 class CIDRType(types.UserDefinedType[str]):
@@ -548,7 +549,7 @@ class CIDRType(types.UserDefinedType[str]):
         return None
 
     def result_processor(
-        self, dialect: Any, coltype: Any
+        self, dialect: Any, coltype: Any,
     ) -> Callable[[Any], Any] | None:
         """Pass-through processor."""
         _ = dialect, coltype
@@ -589,7 +590,7 @@ class MACAddrType(types.UserDefinedType[str]):
         return None
 
     def result_processor(
-        self, dialect: Any, coltype: Any
+        self, dialect: Any, coltype: Any,
     ) -> Callable[[Any], Any] | None:
         """Pass-through processor."""
         _ = dialect, coltype
@@ -668,7 +669,7 @@ class LtreeType(types.UserDefinedType[str]):
         return process
 
     def result_processor(
-        self, dialect: Any, coltype: Any
+        self, dialect: Any, coltype: Any,
     ) -> Callable[[Any], Any] | None:
         """Process value received from database - wrap in LtreePath."""
         _ = dialect, coltype
@@ -845,7 +846,8 @@ class EmailType(TypeDecorator[str]):
             )
             return result.normalized if self._normalize else value
         except EmailNotValidError as e:
-            raise ValueError(f"Invalid email address: {e}") from e
+            msg = f"Invalid email address: {e}"
+            raise ValueError(msg) from e
 
     def process_result_value(self, value: str | None, dialect: Dialect) -> str | None:
         """Pass-through on read."""
@@ -935,21 +937,26 @@ class URLType(TypeDecorator[str]):
         value = value.strip()
 
         if len(value) > self.max_length:
-            raise ValueError(f"URL exceeds maximum length of {self.max_length}")
+            msg = f"URL exceeds maximum length of {self.max_length}"
+            raise ValueError(msg)
 
         try:
             parsed = urlparse(value)
         except Exception as e:
-            raise ValueError(f"Invalid URL format: {e}") from e
+            msg = f"Invalid URL format: {e}"
+            raise ValueError(msg) from e
 
         if not parsed.scheme:
             msg = "URL must include a scheme (e.g., https://)"
             raise ValueError(msg)
 
         if parsed.scheme.lower() not in [s.lower() for s in self.allowed_schemes]:
-            raise ValueError(
+            msg = (
                 f"URL scheme '{parsed.scheme}' not allowed. "
                 f"Allowed: {', '.join(self.allowed_schemes)}"
+            )
+            raise ValueError(
+                msg,
             )
 
         if self._require_host and not parsed.netloc:
@@ -1050,7 +1057,8 @@ class PhoneNumberType(TypeDecorator[str]):
         try:
             parsed = phonenumbers.parse(value, self._default_region)
         except phonenumbers.NumberParseException as e:
-            raise ValueError(f"Invalid phone number: {e}") from e
+            msg = f"Invalid phone number: {e}"
+            raise ValueError(msg) from e
 
         if self._validate and self._strict and not phonenumbers.is_valid_number(parsed):
             msg = "Phone number is not valid for region"
@@ -1058,7 +1066,7 @@ class PhoneNumberType(TypeDecorator[str]):
 
         # Return E.164 format
         return str(
-            phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+            phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164),
         )
 
     def process_result_value(self, value: str | None, dialect: Dialect) -> str | None:
@@ -1090,7 +1098,7 @@ def format_phone_national(e164: str, region: str = "US") -> str:
 
     parsed = phonenumbers.parse(e164, region)
     return str(
-        phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.NATIONAL)
+        phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.NATIONAL),
     )
 
 
@@ -1111,7 +1119,7 @@ def format_phone_international(e164: str) -> str:
 
     parsed = phonenumbers.parse(e164)
     return str(
-        phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL)
+        phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL),
     )
 
 

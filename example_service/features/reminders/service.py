@@ -60,7 +60,7 @@ class ReminderService(BaseService):
 
         # DEBUG level - routine list operation
         self._lazy.debug(
-            lambda: f"service.list_reminders(limit={limit}, offset={offset}) -> {len(result)} items"
+            lambda: f"service.list_reminders(limit={limit}, offset={offset}) -> {len(result)} items",
         )
         return result
 
@@ -70,7 +70,7 @@ class ReminderService(BaseService):
 
         # DEBUG level - routine get
         self._lazy.debug(
-            lambda: f"service.get_reminder({reminder_id}) -> {'found' if reminder else 'not found'}"
+            lambda: f"service.get_reminder({reminder_id}) -> {'found' if reminder else 'not found'}",
         )
         return reminder
 

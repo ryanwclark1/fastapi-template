@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 import pytest
 
 from example_service.app.middleware.metrics import MetricsMiddleware
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 
 class StubMetric:
@@ -81,7 +83,7 @@ async def client(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[AsyncClient]
         return {"item_id": item_id}
 
     async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
+        transport=ASGITransport(app=app), base_url="http://test",
     ) as async_client:
         async_client._duration_metric = duration_metric  # type: ignore[attr-defined]
         async_client._total_metric = total_metric  # type: ignore[attr-defined]
@@ -91,7 +93,7 @@ async def client(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[AsyncClient]
 
 @pytest.mark.asyncio
 async def test_metrics_record_without_trace(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
         "example_service.app.middleware.metrics.trace.get_current_span",
@@ -115,7 +117,7 @@ async def test_metrics_record_without_trace(
 
 @pytest.mark.asyncio
 async def test_metrics_include_exemplar_when_trace_present(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
         "example_service.app.middleware.metrics.trace.get_current_span",

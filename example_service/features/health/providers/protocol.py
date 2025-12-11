@@ -26,9 +26,10 @@ Example:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-from example_service.core.schemas.common import HealthStatus
+if TYPE_CHECKING:
+    from example_service.core.schemas.common import HealthStatus
 
 # Latency threshold for degraded status (milliseconds)
 DEGRADED_LATENCY_THRESHOLD_MS = 1000.0

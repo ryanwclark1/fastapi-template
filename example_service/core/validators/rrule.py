@@ -26,7 +26,8 @@ def validate_rrule_string(value: str) -> str:
 
     is_valid, error = validate_rrule(value)
     if not is_valid:
-        raise ValueError(f"Invalid RRULE: {error}")
+        msg = f"Invalid RRULE: {error}"
+        raise ValueError(msg)
     return value
 
 

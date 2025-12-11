@@ -90,20 +90,20 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             # Exemplars enable click-through from Prometheus/Grafana to Tempo
             if trace_id:
                 http_request_duration_seconds.labels(
-                    method=method, endpoint=endpoint
+                    method=method, endpoint=endpoint,
                 ).observe(duration, exemplar={"trace_id": trace_id})
 
                 http_requests_total.labels(
-                    method=method, endpoint=endpoint, status=status_code
+                    method=method, endpoint=endpoint, status=status_code,
                 ).inc(exemplar={"trace_id": trace_id})
             else:
                 # Fallback without exemplar if tracing unavailable
                 http_request_duration_seconds.labels(
-                    method=method, endpoint=endpoint
+                    method=method, endpoint=endpoint,
                 ).observe(duration)
 
                 http_requests_total.labels(
-                    method=method, endpoint=endpoint, status=status_code
+                    method=method, endpoint=endpoint, status=status_code,
                 ).inc()
 
             # Decrement in-progress gauge
@@ -154,7 +154,7 @@ def _patch_fastapi_middleware_ordering() -> None:
     }
 
     def add_middleware(
-        self: FastAPI, middleware_class: type[Any], *args: Any, **kwargs: Any
+        self: FastAPI, middleware_class: type[Any], *args: Any, **kwargs: Any,
     ) -> None:
         if self.middleware_stack is not None:
             msg = "Cannot add middleware after an application has started"

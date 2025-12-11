@@ -2,11 +2,23 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
-from example_service.core.settings.datatransfer import DataTransferSettings
+from example_service.core.settings.datatransfer import (
+    DEFAULT_EXPORT_DIR,
+    DataTransferSettings,
+)
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+
+@pytest.fixture(autouse=True)
+def _clear_datatransfer_env(monkeypatch: pytest.MonkeyPatch):
+    """Ensure DATATRANSFER_* env vars don't override defaults during tests."""
+    monkeypatch.setenv("DATATRANSFER_EXPORT_DIR", str(DEFAULT_EXPORT_DIR))
 
 
 class TestDataTransferSettings:
@@ -16,7 +28,7 @@ class TestDataTransferSettings:
         """Test default settings values."""
         settings = DataTransferSettings()
 
-        assert settings.export_dir == "/tmp/exports"
+        assert settings.export_dir == str(DEFAULT_EXPORT_DIR)
         assert settings.export_retention_hours == 24
         assert settings.enable_compression is False
         assert settings.compression_level == 6
@@ -29,7 +41,7 @@ class TestDataTransferSettings:
     def test_export_path_property(self):
         """Test export_path computed property."""
         settings = DataTransferSettings()
-        assert settings.export_path == Path("/tmp/exports")
+        assert settings.export_path == DEFAULT_EXPORT_DIR
 
     def test_max_import_size_bytes_property(self):
         """Test max_import_size_bytes computed property."""

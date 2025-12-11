@@ -108,7 +108,7 @@ def create_pydantic_edge[T: "BaseModel"](
         description=f"{type_name_prefix} node in the connection",
     )
     class NodeType:
-        """Node type auto-generated from Pydantic model"""
+        """Node type auto-generated from Pydantic model."""
 
     # Create the Edge type
     @strawberry.type(
@@ -117,10 +117,10 @@ def create_pydantic_edge[T: "BaseModel"](
     )
     class Edge:
         node: NodeType = strawberry.field(  # type: ignore
-            description="The node containing the actual data"
+            description="The node containing the actual data",
         )
         cursor: str = strawberry.field(
-            description="Opaque cursor for this edge used in pagination"
+            description="Opaque cursor for this edge used in pagination",
         )
 
     return Edge
@@ -177,10 +177,10 @@ def create_pydantic_connection[T: "BaseModel"](
     )
     class Connection:
         edges: list[edge_type] = strawberry.field(  # type: ignore
-            description="List of edges containing nodes and their cursors"
+            description="List of edges containing nodes and their cursors",
         )
         page_info: page_info_type = strawberry.field(  # type: ignore
-            description="Pagination information including hasNextPage, hasPreviousPage, etc."
+            description="Pagination information including hasNextPage, hasPreviousPage, etc.",
         )
 
     return Connection

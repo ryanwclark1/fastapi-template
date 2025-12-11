@@ -104,6 +104,7 @@ Usage:
     parsed = parser.parse('title:python author:"John Doe" -draft')
 """
 
+from example_service.core.database.repository import SearchResult
 from example_service.core.database.search.analytics import (
     SearchAnalytics,
     SearchInsight,
@@ -171,40 +172,31 @@ from example_service.core.database.search.utils import (
 )
 
 __all__ = [
-    # Synonyms
     "DEFAULT_PROGRAMMING_SYNONYMS",
-    # Types
     "TSVECTOR",
-    # Filters (explicit API)
     "BoostedSearchFilter",
-    # Migration utilities
     "FTSMigrationHelper",
     "FullTextSearchFilter",
     "FuzzySearchFilter",
     "HybridSearchFilter",
     "MultiFieldSearchFilter",
-    # Mixins
     "MultiLanguageSearchMixin",
-    # Parser
     "ParsedQuery",
     "PhraseProximityFilter",
     "QueryRewriter",
-    # Ranking
     "RankNormalization",
     "RankingOptions",
-    # Analytics
     "SearchAnalytics",
     "SearchFieldConfig",
     "SearchInsight",
-    # Automation (dev mode)
     "SearchManager",
     "SearchQuery",
     "SearchQueryParser",
+    "SearchResult",
     "SearchStats",
     "SearchSuggestionLog",
     "SearchableConfig",
     "SearchableMixin",
-    # Simple search API
     "SearchableSelect",
     "SynonymDictionary",
     "SynonymGroup",
@@ -214,7 +206,6 @@ __all__ = [
     "UnaccentMigrationHelper",
     "WebSearchFilter",
     "build_ts_query_sql",
-    # Vector utilities
     "combine_vectors",
     "create_synonym_config_sql",
     "create_synonym_dictionary_sql",
@@ -230,3 +221,4 @@ __all__ = [
     "searchable",
     "weighted_vector",
 ]
+

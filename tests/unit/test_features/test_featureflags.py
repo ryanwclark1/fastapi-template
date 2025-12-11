@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta, timezone
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 from fastapi import HTTPException, status
 import pytest
 from starlette.requests import Request
-from starlette.types import Scope
 
 from example_service.features.featureflags import dependencies as deps
 from example_service.features.featureflags.models import FlagStatus
@@ -18,6 +18,9 @@ from example_service.features.featureflags.schemas import (
     FlagEvaluationResponse,
 )
 from example_service.features.featureflags.service import FeatureFlagService
+
+if TYPE_CHECKING:
+    from starlette.types import Scope
 
 
 class DummyFlag:
@@ -70,7 +73,7 @@ async def test_feature_flags_is_enabled_and_get_all_uses_service(
         (
             "cool_feature",
             {"user_id": None, "tenant_id": None, "attributes": {}, "default": False},
-        )
+        ),
     ]
 
 
@@ -147,7 +150,7 @@ def test_matches_rule_handles_user_tenant_and_attributes() -> None:
     assert service._matches_rule({"type": "user_id", "operator": "eq", "value": "u1"}, context)
     assert service._matches_rule({"type": "tenant_id", "operator": "eq", "value": "t1"}, context)
     assert service._matches_rule(
-        {"type": "attribute", "attribute": "plan", "operator": "eq", "value": "pro"}, context
+        {"type": "attribute", "attribute": "plan", "operator": "eq", "value": "pro"}, context,
     )
     assert not service._matches_rule({"type": "unknown"}, context)
 
@@ -187,12 +190,12 @@ def test_percentage_based_evaluation(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_targeted_rule_matching(monkeypatch: pytest.MonkeyPatch) -> None:
     service = _build_service()
     context = FlagEvaluationRequest(
-        user_id=None, tenant_id=None, attributes={"role": "admin", "plan": "pro"}
+        user_id=None, tenant_id=None, attributes={"role": "admin", "plan": "pro"},
     )
     flag = DummyFlag(
         status=FlagStatus.TARGETED.value,
         targeting_rules=[
-            {"type": "attribute", "attribute": "role", "operator": "eq", "value": "admin"}
+            {"type": "attribute", "attribute": "role", "operator": "eq", "value": "admin"},
         ],
     )
 

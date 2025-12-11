@@ -62,8 +62,7 @@ class BaseAPIUser(HttpUser):
         # Add authentication headers if using auth
         self.auth_headers = {
             "Content-Type": "application/json",
-            # Add auth token if needed:
-            # "Authorization": "Bearer <token>",
+            # Add Authorization header when load testing authenticated endpoints.
         }
 
 
@@ -247,20 +246,14 @@ def log_request(
 ):
     """Log request details for debugging."""
     if exception:
-        print(f"Request failed: {name} - {exception}")
+        pass
 
 
 @events.test_start.add_listener
 def on_test_start(environment, **kwargs):
     """Called when test starts."""
-    print(f"Load test starting against {environment.host}")
 
 
 @events.test_stop.add_listener
 def on_test_stop(environment, **kwargs):
     """Called when test stops."""
-    print("Load test completed")
-    stats = environment.stats
-    print(f"Total requests: {stats.total.num_requests}")
-    print(f"Failures: {stats.total.num_failures}")
-    print(f"Median response time: {stats.total.median_response_time}ms")

@@ -20,7 +20,9 @@ from example_service.core.settings import get_storage_settings
 from example_service.infra.database.session import get_async_session
 from example_service.infra.storage import get_storage_service
 from example_service.infra.storage.client import (
-    FileNotFoundError,
+    FileNotFoundError as StorageFileNotFoundError,
+)
+from example_service.infra.storage.client import (
     InvalidFileError,
     StorageClientError,
 )
@@ -45,7 +47,7 @@ async def get_file_from_storage(file_id: str) -> dict[str, Any]:
         Dictionary containing file metadata and content.
 
     Raises:
-        FileNotFoundError: If file does not exist.
+        StorageFileNotFoundError: If file does not exist.
     """
     from example_service.features.files.models import File
 
@@ -54,7 +56,8 @@ async def get_file_from_storage(file_id: str) -> dict[str, Any]:
         file = result.scalar_one_or_none()
 
         if not file:
-            raise FileNotFoundError(f"File {file_id} not found")
+            msg = f"File {file_id} not found"
+            raise StorageFileNotFoundError(msg)
 
         return {
             "id": str(file.id),
@@ -85,7 +88,7 @@ async def update_file_status(
         file = result.scalar_one_or_none()
         if not file:
             logger.warning(
-                "File not found while updating status", extra={"file_id": file_id}
+                "File not found while updating status", extra={"file_id": file_id},
             )
             return
 
@@ -120,12 +123,14 @@ def _validate_file_metadata(file_data: dict[str, Any]) -> None:
         settings.allowed_content_types
         and content_type not in settings.allowed_content_types
     ):
-        raise InvalidFileError(f"Content type '{content_type}' not allowed")
+        msg = f"Content type '{content_type}' not allowed"
+        raise InvalidFileError(msg)
 
     size_bytes = file_data.get("size_bytes")
     if size_bytes is not None and size_bytes > settings.max_file_size_bytes:
+        msg = f"File size {size_bytes} exceeds max {settings.max_file_size_bytes} bytes"
         raise InvalidFileError(
-            f"File size {size_bytes} exceeds max {settings.max_file_size_bytes} bytes"
+            msg,
         )
     if size_bytes is not None and size_bytes <= 0:
         msg = "File size must be greater than 0"
@@ -152,7 +157,8 @@ async def download_from_s3(s3_key: str) -> bytes:
     try:
         return await storage.download_file(s3_key)
     except StorageClientError as e:
-        raise FileProcessingError(f"Failed to download {s3_key}: {e}") from e
+        msg = f"Failed to download {s3_key}: {e}"
+        raise FileProcessingError(msg) from e
 
 
 async def upload_to_s3(s3_key: str, content: bytes, content_type: str) -> str:
@@ -184,7 +190,8 @@ async def upload_to_s3(s3_key: str, content: bytes, content_type: str) -> str:
         bucket = result.get("bucket", storage.settings.bucket)
         return f"s3://{bucket}/{s3_key}"
     except StorageClientError as e:
-        raise FileProcessingError(f"Failed to upload {s3_key}: {e}") from e
+        msg = f"Failed to upload {s3_key}: {e}"
+        raise FileProcessingError(msg) from e
 
 
 async def create_thumbnail_record(
@@ -248,7 +255,7 @@ async def find_expired_files(expiry_days: int = 30) -> list[dict[str, Any]]:
                     | (File.expires_at.is_(None) & (File.created_at < cutoff))
                 ),
                 File.status == FileStatus.READY,
-            )
+            ),
         )
         files = result.scalars().all()
 
@@ -272,7 +279,7 @@ async def delete_file_from_storage(s3_key: str) -> None:
     storage = get_storage_service()
     if not storage.is_ready:
         logger.warning(
-            "Storage not available; skipping delete", extra={"s3_key": s3_key}
+            "Storage not available; skipping delete", extra={"s3_key": s3_key},
         )
         return
 
@@ -305,7 +312,7 @@ async def delete_thumbnails(thumbnail_keys: list[str]) -> None:
             logger.debug("Deleted thumbnail", extra={"s3_key": key})
         except StorageClientError as e:
             logger.warning(
-                "Failed to delete thumbnail", extra={"s3_key": key, "error": str(e)}
+                "Failed to delete thumbnail", extra={"s3_key": key, "error": str(e)},
             )
 
 
@@ -405,8 +412,8 @@ if broker is not None:
 
             return result
 
-        except FileNotFoundError as e:
-            logger.error(
+        except StorageFileNotFoundError as e:
+            logger.exception(
                 "File not found",
                 extra={"file_id": file_id, "error": str(e)},
             )
@@ -415,7 +422,8 @@ if broker is not None:
                 status="failed",
                 error_message="File not found",
             )
-            raise FileProcessingError(f"File not found: {file_id}") from e
+            msg = f"File not found: {file_id}"
+            raise FileProcessingError(msg) from e
 
         except Exception as e:
             logger.exception(
@@ -427,7 +435,8 @@ if broker is not None:
                 status="failed",
                 error_message=str(e),
             )
-            raise FileProcessingError(f"Failed to process file {file_id}: {e}") from e
+            msg = f"Failed to process file {file_id}: {e}"
+            raise FileProcessingError(msg) from e
 
     @broker.task(retry_on_error=True, max_retries=2)
     async def generate_thumbnails(file_id: str) -> dict[str, Any]:
@@ -458,15 +467,16 @@ if broker is not None:
 
         try:
             # Import Pillow
-            from PIL import Image  # type: ignore[import-not-found]
+            from PIL import Image
 
             # Step 1: Retrieve file metadata
             file_data = await get_file_from_storage(file_id)
 
             # Step 2: Validate it's an image
             if not file_data["content_type"].startswith("image/"):
+                msg = f"File is not an image: {file_data['content_type']}"
                 raise FileProcessingError(
-                    f"File is not an image: {file_data['content_type']}"
+                    msg,
                 )
 
             # Step 3: Download image from S3
@@ -562,7 +572,7 @@ if broker is not None:
             return result
 
         except ImportError as e:
-            logger.error(
+            logger.exception(
                 "Pillow not installed",
                 extra={"file_id": file_id, "error": str(e)},
             )
@@ -574,8 +584,9 @@ if broker is not None:
                 "Thumbnail generation failed",
                 extra={"file_id": file_id, "error": str(e)},
             )
+            msg = f"Failed to generate thumbnails for file {file_id}: {e}"
             raise FileProcessingError(
-                f"Failed to generate thumbnails for file {file_id}: {e}"
+                msg,
             ) from e
 
     @broker.task()

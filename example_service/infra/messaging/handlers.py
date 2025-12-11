@@ -108,9 +108,7 @@ if router is not None:
                 },
             )
 
-            # Emit metrics for observability
-            # from example_service.infra.metrics.prometheus import REGISTRY
-            # entity_created_counter.labels(entity_type="example").inc()
+            # Emit metrics for observability (hook into Prometheus counters here).
 
             logger.info(
                 "Successfully processed example.created event",
@@ -118,7 +116,7 @@ if router is not None:
             )
         except ValueError as e:
             # Validation errors are permanent failures - don't retry
-            logger.error(
+            logger.exception(
                 "Validation failed for example.created event",
                 extra={"event_id": event.event_id, "error": str(e)},
             )
@@ -184,7 +182,7 @@ if router is not None:
                 extra={"event_id": event.event_id, "entity_id": entity_id},
             )
         except ValueError as e:
-            logger.error(
+            logger.exception(
                 "Validation failed for example.updated event",
                 extra={"event_id": event.event_id, "error": str(e)},
             )
@@ -248,7 +246,7 @@ if router is not None:
                 extra={"event_id": event.event_id, "entity_id": entity_id},
             )
         except ValueError as e:
-            logger.error(
+            logger.exception(
                 "Validation failed for example.deleted event",
                 extra={"event_id": event.event_id, "error": str(e)},
             )
@@ -459,5 +457,5 @@ if router is not None:
             )
         except Exception as e:
             logger.debug(
-                "Failed to record DLQ routing metrics: %s", str(e)
+                "Failed to record DLQ routing metrics: %s", str(e),
             )  # Metrics are best-effort

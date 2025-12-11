@@ -204,7 +204,7 @@ async def test_get_running_tasks_queries_running(tracker):
             worker_id="worker-1",
             created_at=now - timedelta(minutes=1),
             started_at=now - timedelta(seconds=10),
-        )
+        ),
     ]
     session = FakeSession(results=[FakeResult(scalars_list=executions)])
     tracker._session_factory = lambda: session

@@ -1,3 +1,5 @@
+"""Public interface for retry utilities."""
+
 from __future__ import annotations
 
 from example_service.utils.retry.decorator import retry

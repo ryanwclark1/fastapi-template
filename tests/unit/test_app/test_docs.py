@@ -5,12 +5,15 @@ from __future__ import annotations
 import html
 import sys
 from types import ModuleType, SimpleNamespace
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
-import pytest
 from starlette.routing import Mount
 
 from example_service.app import docs as docs_module
+
+if TYPE_CHECKING:
+    import pytest
 
 
 def test_path_helpers_normalize_and_join() -> None:

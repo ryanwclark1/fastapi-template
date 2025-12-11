@@ -264,7 +264,7 @@ class SearchAnalytics:
 
         # Total searches
         total_stmt = select(func.count()).select_from(SearchQuery).where(
-            SearchQuery.created_at >= since
+            SearchQuery.created_at >= since,
         )
         total_result = await self.session.execute(total_stmt)
         total_searches = total_result.scalar() or 0
@@ -274,7 +274,7 @@ class SearchAnalytics:
 
         # Unique queries
         unique_stmt = select(func.count(func.distinct(SearchQuery.query_hash))).where(
-            SearchQuery.created_at >= since
+            SearchQuery.created_at >= since,
         )
         unique_result = await self.session.execute(unique_stmt)
         unique_queries = unique_result.scalar() or 0
@@ -290,14 +290,14 @@ class SearchAnalytics:
 
         # Average results
         avg_stmt = select(func.avg(SearchQuery.results_count)).where(
-            SearchQuery.created_at >= since
+            SearchQuery.created_at >= since,
         )
         avg_result = await self.session.execute(avg_stmt)
         avg_results = float(avg_result.scalar() or 0)
 
         # Average response time
         time_stmt = select(func.avg(SearchQuery.took_ms)).where(
-            SearchQuery.created_at >= since
+            SearchQuery.created_at >= since,
         )
         time_result = await self.session.execute(time_stmt)
         avg_time = float(time_result.scalar() or 0)
@@ -511,7 +511,7 @@ class SearchAnalytics:
                         "Review zero-result queries to identify content gaps "
                         "or add synonyms and spelling corrections"
                     ),
-                )
+                ),
             )
         elif stats.zero_result_rate < 0.05:
             insights.append(
@@ -521,7 +521,7 @@ class SearchAnalytics:
                     description=f"Only {stats.zero_result_rate:.1%} of searches return no results",
                     metric="zero_result_rate",
                     value=stats.zero_result_rate,
-                )
+                ),
             )
 
         # Click-through rate insight
@@ -537,7 +537,7 @@ class SearchAnalytics:
                         "Improve result ranking or snippets to make results "
                         "more relevant and appealing"
                     ),
-                )
+                ),
             )
 
         # Response time insight
@@ -553,7 +553,7 @@ class SearchAnalytics:
                         "Consider adding more indexes or optimizing "
                         "the search query for better performance"
                     ),
-                )
+                ),
             )
 
         # Popular queries insight
@@ -566,7 +566,7 @@ class SearchAnalytics:
                     description=f'"{top_query["query"]}" searched {top_query["count"]} times',
                     metric="top_query_count",
                     value=top_query["count"],
-                )
+                ),
             )
 
         # Zero-result queries needing attention
@@ -580,7 +580,7 @@ class SearchAnalytics:
                     title="Content Gaps Detected",
                     description=f"Frequently searched but no results: {queries_str}",
                     recommendation="Consider adding content or synonyms for these terms",
-                )
+                ),
             )
 
         return insights
@@ -614,7 +614,7 @@ class SearchAnalytics:
                 func.count().label("count"),
                 func.count(func.distinct(SearchQuery.query_hash)).label("unique_queries"),
                 func.sum(
-                    func.cast(SearchQuery.results_count == 0, Integer)
+                    func.cast(SearchQuery.results_count == 0, Integer),
                 ).label("zero_results"),
             )
             .where(SearchQuery.created_at >= since)

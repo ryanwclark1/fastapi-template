@@ -76,7 +76,7 @@ if broker is not None:
                     stmt = (
                         select(func.count())
                         .select_from(Reminder)
-                        .where(Reminder.is_completed == False)  # noqa: E712
+                        .where(not Reminder.is_completed)
                     )
                     query_result = await session.execute(stmt)
                     active_count = query_result.scalar() or 0
@@ -93,7 +93,7 @@ if broker is not None:
                         .select_from(Reminder)
                         .where(
                             Reminder.remind_at <= now,
-                            Reminder.is_completed == False,  # noqa: E712
+                            not Reminder.is_completed,
                         )
                     )
                     due_result = await session.execute(due_stmt)

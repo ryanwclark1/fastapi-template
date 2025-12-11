@@ -128,7 +128,7 @@ class AITracer:
         if not OTEL_AVAILABLE and enabled:
             logger.warning(
                 "OpenTelemetry not available. Install with: "
-                "pip install opentelemetry-api opentelemetry-sdk"
+                "pip install opentelemetry-api opentelemetry-sdk",
             )
 
     @asynccontextmanager
@@ -452,15 +452,15 @@ class ProviderSpan:
             # Standard token attributes
             if "input_tokens" in result.usage:
                 self._span.set_attribute(
-                    f"{self._prefix}.tokens.input", result.usage["input_tokens"]
+                    f"{self._prefix}.tokens.input", result.usage["input_tokens"],
                 )
             if "output_tokens" in result.usage:
                 self._span.set_attribute(
-                    f"{self._prefix}.tokens.output", result.usage["output_tokens"]
+                    f"{self._prefix}.tokens.output", result.usage["output_tokens"],
                 )
             if "total_tokens" in result.usage:
                 self._span.set_attribute(
-                    f"{self._prefix}.tokens.total", result.usage["total_tokens"]
+                    f"{self._prefix}.tokens.total", result.usage["total_tokens"],
                 )
             # Cache-related tokens (for Claude/Anthropic)
             if "cache_creation_input_tokens" in result.usage:
@@ -495,32 +495,32 @@ class NoOpPipelineSpan:
     """No-op pipeline span when tracing is disabled."""
 
     def set_attribute(self, key: str, value: Any) -> None:
-        pass
+        """Ignore attribute calls when tracing is disabled."""
 
     def record_success(self, *args: Any, **kwargs: Any) -> None:
-        pass
+        """Ignore success recording when tracing is disabled."""
 
     def record_failure(self, *args: Any, **kwargs: Any) -> None:
-        pass
+        """Ignore failure recording when tracing is disabled."""
 
     def record_error(self, exception: Exception) -> None:
-        pass
+        """Ignore error recording when tracing is disabled."""
 
 
 class NoOpStepSpan:
     """No-op step span when tracing is disabled."""
 
     def set_attribute(self, key: str, value: Any) -> None:
-        pass
+        """Ignore attribute calls when tracing is disabled."""
 
     def record_result(self, result: Any) -> None:
-        pass
+        """Ignore result recording when tracing is disabled."""
 
     def record_skip(self, reason: str) -> None:
-        pass
+        """Ignore skip events when tracing is disabled."""
 
     def record_error(self, exception: Exception) -> None:
-        pass
+        """Ignore error recording when tracing is disabled."""
 
 
 class CompensationSpan:
@@ -568,7 +568,7 @@ class CompensationSpan:
         """Record successful compensation."""
         self._span.set_attribute(f"{self._prefix}.success", True)
         self._span.set_attribute(
-            f"{self._prefix}.compensated_steps", len(compensated_steps)
+            f"{self._prefix}.compensated_steps", len(compensated_steps),
         )
         self._span.set_attribute(f"{self._prefix}.duration_ms", duration_ms)
         self._span.set_status(Status(StatusCode.OK))
@@ -583,7 +583,7 @@ class CompensationSpan:
         self._span.set_attribute(f"{self._prefix}.success", False)
         self._span.set_attribute(f"{self._prefix}.error", error)
         self._span.set_attribute(
-            f"{self._prefix}.compensated_steps", len(compensated_steps)
+            f"{self._prefix}.compensated_steps", len(compensated_steps),
         )
         self._span.set_attribute(f"{self._prefix}.failed_steps", len(failed_steps))
         self._span.set_status(Status(StatusCode.ERROR, error))
@@ -598,41 +598,41 @@ class NoOpProviderSpan:
     """No-op provider span when tracing is disabled."""
 
     def set_attribute(self, key: str, value: Any) -> None:
-        pass
+        """Ignore attribute calls when tracing is disabled."""
 
     def set_request_attributes(self, *args: Any, **kwargs: Any) -> None:
-        pass
+        """Ignore request attribute recording when tracing is disabled."""
 
     def set_fallback_info(self, *args: Any, **kwargs: Any) -> None:
-        pass
+        """Ignore fallback metadata when tracing is disabled."""
 
     def record_result(self, result: Any) -> None:
-        pass
+        """Ignore result recording when tracing is disabled."""
 
     def record_error(self, exception: Exception) -> None:
-        pass
+        """Ignore error recording when tracing is disabled."""
 
 
 class NoOpCompensationSpan:
     """No-op compensation span when tracing is disabled."""
 
     def set_attribute(self, key: str, value: Any) -> None:
-        pass
+        """Ignore attribute calls when tracing is disabled."""
 
     def record_step_started(self, *args: Any, **kwargs: Any) -> None:
-        pass
+        """Ignore step start recording when tracing is disabled."""
 
     def record_step_completed(self, *args: Any, **kwargs: Any) -> None:
-        pass
+        """Ignore step completion recording when tracing is disabled."""
 
     def record_success(self, *args: Any, **kwargs: Any) -> None:
-        pass
+        """Ignore success recording when tracing is disabled."""
 
     def record_failure(self, *args: Any, **kwargs: Any) -> None:
-        pass
+        """Ignore failure recording when tracing is disabled."""
 
     def record_error(self, exception: Exception) -> None:
-        pass
+        """Ignore error recording when tracing is disabled."""
 
 
 # Singleton instance

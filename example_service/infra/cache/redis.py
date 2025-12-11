@@ -11,7 +11,6 @@ This module provides a high-level Redis cache client that includes:
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator  # noqa: TC003
 from contextlib import asynccontextmanager
 import json
 import logging
@@ -41,7 +40,9 @@ from example_service.infra.metrics.prometheus import (
 from example_service.utils.retry import retry
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable
+    from collections.abc import AsyncIterator, Awaitable
+else:  # pragma: no cover - typing fallback
+    AsyncIterator = Any
 
 logger = logging.getLogger(__name__)
 redis_settings = get_redis_settings()
@@ -179,13 +180,13 @@ class RedisCache:
             if value is not None:
                 if trace_id:
                     cache_hits_total.labels(cache_name=cache_name).inc(
-                        exemplar={"trace_id": trace_id}
+                        exemplar={"trace_id": trace_id},
                     )
                 else:
                     cache_hits_total.labels(cache_name=cache_name).inc()
             elif trace_id:
                 cache_misses_total.labels(cache_name=cache_name).inc(
-                    exemplar={"trace_id": trace_id}
+                    exemplar={"trace_id": trace_id},
                 )
             else:
                 cache_misses_total.labels(cache_name=cache_name).inc()
@@ -193,11 +194,11 @@ class RedisCache:
             # Record operation duration
             if trace_id:
                 cache_operation_duration_seconds.labels(
-                    operation="get", cache_name=cache_name
+                    operation="get", cache_name=cache_name,
                 ).observe(duration, exemplar={"trace_id": trace_id})
             else:
                 cache_operation_duration_seconds.labels(
-                    operation="get", cache_name=cache_name
+                    operation="get", cache_name=cache_name,
                 ).observe(duration)
 
             if value is None:
@@ -209,7 +210,7 @@ class RedisCache:
             except (json.JSONDecodeError, TypeError):
                 return value
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Failed to get value from cache",
                 extra={"key": key, "error": str(e)},
             )
@@ -261,16 +262,16 @@ class RedisCache:
             # Record operation duration
             if trace_id:
                 cache_operation_duration_seconds.labels(
-                    operation="set", cache_name=cache_name
+                    operation="set", cache_name=cache_name,
                 ).observe(duration, exemplar={"trace_id": trace_id})
             else:
                 cache_operation_duration_seconds.labels(
-                    operation="set", cache_name=cache_name
+                    operation="set", cache_name=cache_name,
                 ).observe(duration)
 
             return bool(result)
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Failed to set value in cache",
                 extra={"key": key, "error": str(e)},
             )
@@ -346,16 +347,16 @@ class RedisCache:
             # Record operation duration
             if trace_id:
                 cache_operation_duration_seconds.labels(
-                    operation="delete", cache_name=cache_name
+                    operation="delete", cache_name=cache_name,
                 ).observe(duration, exemplar={"trace_id": trace_id})
             else:
                 cache_operation_duration_seconds.labels(
-                    operation="delete", cache_name=cache_name
+                    operation="delete", cache_name=cache_name,
                 ).observe(duration)
 
             return bool(result)
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Failed to delete value from cache",
                 extra={"key": key, "error": str(e)},
             )
@@ -396,16 +397,16 @@ class RedisCache:
             # Record operation duration
             if trace_id:
                 cache_operation_duration_seconds.labels(
-                    operation="exists", cache_name=cache_name
+                    operation="exists", cache_name=cache_name,
                 ).observe(duration, exemplar={"trace_id": trace_id})
             else:
                 cache_operation_duration_seconds.labels(
-                    operation="exists", cache_name=cache_name
+                    operation="exists", cache_name=cache_name,
                 ).observe(duration)
 
             return bool(result)
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Failed to check key existence in cache",
                 extra={"key": key, "error": str(e)},
             )
@@ -421,7 +422,7 @@ class RedisCache:
             await cast("Awaitable[bool]", self.client.ping())
             return True
         except Exception as e:
-            logger.error("Redis health check failed", extra={"error": str(e)})
+            logger.exception("Redis health check failed", extra={"error": str(e)})
             return False
 
     async def collect_stats(self, cache_name: str = "redis") -> dict[str, Any]:

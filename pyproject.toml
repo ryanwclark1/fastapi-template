@@ -30,32 +30,24 @@ dependencies = [
     # Core FastAPI framework
     "fastapi>=0.122.0",
     "uvicorn[standard]>=0.34.0",
-
     # Data validation and settings
     "pydantic[email]>=2.9.0",
     "pydantic-settings>=2.5.0",
-
     # Database and ORM
     "alembic-postgresql-enum>=1.8.0",
     "alembic>=1.17.2",
     "psycopg[binary,pool]>=3.2.0",
     "sqlalchemy[asyncio]>=2.0.44",
-
     # Caching
     "redis[hiredis]>=5.1.0",
-
     # HTTP clients
     "httpx>=0.28.1",
-
     # Monitoring and metrics
     "prometheus-client>=0.21.0",
-
     # File uploads
     "python-multipart>=0.0.12",
-
     # CLI framework
     "click>=8.1.0",
-
     # OpenTelemetry
     "opentelemetry-api>=1.28.0",
     "opentelemetry-exporter-otlp>=1.28.0",
@@ -65,7 +57,6 @@ dependencies = [
     "opentelemetry-instrumentation-sqlalchemy>=0.49b0",
     "opentelemetry-exporter-otlp-proto-grpc>=1.29.0",
     "opentelemetry-sdk>=1.28.0",
-
     # Messaging and Tasks
     "apscheduler>=3.10.0",
     "faststream[otel,prometheus,rabbit]>=0.6.0",
@@ -74,56 +65,52 @@ dependencies = [
     "taskiq-postgresql>=0.4.0",
     "taskiq-redis>=1.1.2",
     "taskiq>=0.11.0",
-
     # GraphQL
     "strawberry-graphql[fastapi]>=0.235.0",
-
+    # Sanitization helpers
+    "bleach>=6.2.0",
+    "defusedxml>=0.7.1",
     # Date and time utilities
     "python-dateutil>=2.9.0",
-
     # Authentication and security
-    "pwdlib[argon2]>=0.3.0",
 
+    "pwdlib[argon2]>=0.3.0",
     # Email
     "aiosmtplib>=3.0.0",
     "jinja2>=3.1.0",
-
+    "aioboto3>=13.2.0",
     # Utilities
     "frozendict>=2.4.0",
+    "netifaces>=0.11.0",
+    "uuid-utils>=0.7.0",
+    "ipython>=8.28.0",
     "phonenumbers>=9.0.19",
-
+    # File processing
+    "pillow>=10.4.0",
+    # YAML support
+    "pyyaml>=6.0.0",
     # AI/ML
     "instructor>=1.13.0",
 ]
 
 [project.optional-dependencies]
-# Development dependencies (for local development)
-dev = ["ruff>=0.7.0", "mypy>=1.13.0", "pre-commit>=4.0.0"]
-# Testing dependencies
-tests = [
-    "pytest>=8.3.5",
-    "pytest-asyncio>=0.26.0",
-    "pytest-cov>=6.1.1",
-    "pytest-xdist>=3.6.0",                            # Parallel test execution
-    "pytest-timeout>=2.3.0",                          # Test timeout support
-    "pytest-benchmark>=4.0.0",
-    "aiosqlite>=0.20.0",
-    "testcontainers[postgres,redis,rabbitmq]>=4.9.0",
-    "httpx>=0.28.1",
-]
-# YAML support
-yaml = ["pyyaml>=6.0.0"]
+auth = ["accent-auth-client"]
 # Excel support
 excel = ["openpyxl>=3.1.0"]
 # AI/ML dependencies
 ai = ["openai>=1.50.0", "anthropic>=0.39.0", "deepgram-sdk>=3.7.0"]
 # Cryptographic support for EncryptedString/EncryptedText types
 crypto = ["cryptography>=41.0.0"]
-# Load testing
-loadtest = ["locust>=2.29.0"]
 
-# Dependency groups (uv-specific, more flexible than optional-dependencies)
-# These can include type stubs and development tools
+
+# === UV Configuration ===
+[tool.uv]
+default-groups = ["dev", "tests", "loadtest"]
+
+[tool.uv.sources]
+accent-auth-client = { path = "../accent-voice2/library/accent-auth-client" }
+
+
 [dependency-groups]
 dev = [
     "ruff>=0.7.0",
@@ -135,6 +122,7 @@ dev = [
     "types-redis>=4.6.0.20241004",
     "types-openpyxl>=3.1.0",
     "types-requests>=2.32.0.20241016",
+    "types-aioboto3>=15.5.0",
 ]
 tests = [
     "pytest>=8.3.5",
@@ -150,8 +138,24 @@ tests = [
 loadtest = ["locust>=2.29.0"]
 
 [project.scripts]
+# === Console Scripts ===
+# Main entry points for the application
+#
+# Usage:
+#   uv run example-service <command>              # CLI with all commands
+#   uv run example-service-server                 # Run FastAPI server
+#
+# Examples:
+#   uv run example-service-server                 # Start FastAPI app
+#   uv run example-service --help                 # Show all commands
+#   uv run example-service db upgrade             # Database migrations
+#   uv run example-service config validate        # Validate configuration
+#   uv run example-service dev quality            # Run quality checks
+#   uv run example-service cache clear            # Clear Redis cache
+#   uv run example-service tasks list             # List background tasks
+
 example-service = "example_service.cli:main"
-example-service-main = "example_service.main:main"
+example-service-server = "example_service.main:run_fastapi_server"
 
 [project.entry-points.taskiq_cli]
 track = "example_service.infra.tasks.cli:TrackingCommand"
@@ -173,6 +177,7 @@ include = ["example_service"]
 packages = ["example_service"]
 
 [tool.pytest.ini_options]
+minversion = "8.0"
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py", "tests.py"]
 python_functions = ["test_*", "*_test"]
@@ -180,23 +185,39 @@ python_classes = ["Test*", "*Tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 addopts = [
+    # Verbose output
+    "-v",
+    # Show extra test summary info
+    "-ra",
+    # Strict markers (fail on unknown markers)
     "--strict-markers",
+    # Strict config (fail on unknown config options)
     "--strict-config",
+    # Show local variables in tracebacks
+    "--showlocals",
+    # Shorter tracebacks
     "--tb=short",
+    # Show durations of slowest tests
+    "--durations=10",
+    # Coverage options
     "--cov=example_service",
     "--cov-report=term-missing:skip-covered",
-    "--cov-report=html:coverage",
-    "--cov-report=xml:coverage.xml",
+    "--cov-report=html:coverage/html",
+    "--cov-report=xml:coverage/coverage.xml",
     "--cov-branch",
-    "--cov-fail-under=70",
+    "--cov-fail-under=80",
+    # Disable pytest-cov warning on failure
+    "--no-cov-on-fail",
+    # Parallel execution
     "-n=auto",
     "--dist=worksteal",
-    "--durations=10",
+    # Other options
     "--maxfail=5",
     "--color=yes",
     "--timeout=300",
     "--ignore=**/examples/*",
 ]
+console_output_style = "progress"
 markers = [
     # Basic categories
     "unit: Unit tests (fast, isolated, <100ms)",
@@ -244,30 +265,57 @@ norecursedirs = [
     "examples",
 ]
 
+# Logging configuration
+log_cli = false
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)8s] %(name)s - %(message)s"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+
+# Filter warnings
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+    "ignore:.*unclosed.*:ResourceWarning",
+    "ignore:.*coroutine.*was never awaited:RuntimeWarning",
+    "ignore::pytest.PytestUnraisableExceptionWarning",
+    "ignore:.*sqlalchemy.*:UserWarning",
+    "ignore:.*SAWarning.*:sqlalchemy.exc.SAWarning",
+    "ignore:.*pydantic.*:UserWarning",
+]
+
 [tool.coverage.run]
-source = ["example_service"]
+source_pkgs = [
+    "example_service.app",
+    "example_service.core",
+    "example_service.features",
+]
 branch = true
 parallel = true
 concurrency = ["multiprocessing"]
 omit = [
     "*/tests/*",
-    "*/__pycache__/*",
-    "*/.venv/*",
-    "example_service/cli/*",
-    "example_service/tasks/*",
-    "example_service/infra/*",
-    "example_service/workers/*",
-    "example_service/main.py",
-    "example_service/core/*",
-    "example_service/features/admin/*",
-    "example_service/features/metrics/*",
-    "example_service/features/status/*",
-    "example_service/features/health/*",
-    "example_service/features/reminders/*",
-    "example_service/features/files/*",
-    "example_service/features/graphql/*",
-    "example_service/features/webhooks/*",
-    "example_service/utils/*",
+    "**/tests/*",
+    "**/test_*.py",
+    "**/conftest.py",
+    "**/main.py",
+    "**/init_db.py",
+    "**/migrations/*",
+    "**/alembic/*",
+    "**/__init__.py",
+    "*/example_service/cli/*",
+    "*/example_service/workers/*",
+    "*/example_service/infra/messaging/*",
+    "*/example_service/infra/tasks/*",
+    "*/example_service/infra/storage/*",
+    "*/example_service/infra/email/*",
+    "*/example_service/infra/logging/*",
+    "*/example_service/infra/tracing/*",
+    "*/example_service/infra/metrics/*",
+    "*/example_service/infra/realtime/*",
+    "*/example_service/infra/discovery/*",
+    "*/example_service/infra/results/*",
 ]
 
 [tool.coverage.report]
@@ -280,19 +328,23 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "if typing.TYPE_CHECKING:",
     "@abstractmethod",
+    "@abc.abstractmethod",
     "@overload",
+    # Debug/logging
+    "logger.debug",
+    "if settings.debug",
 ]
 precision = 2
 show_missing = true
 skip_covered = false
 skip_empty = true
-fail_under = 70
+fail_under = 80
 
 [tool.coverage.html]
-directory = "coverage"
+directory = "coverage/html"
 
 [tool.coverage.xml]
-output = "coverage.xml"
+output = "coverage/coverage.xml"
 
 [tool.ruff]
 line-length = 88
@@ -335,6 +387,7 @@ exclude = [
     "scripts",
     "**/alembic/**",
     "**/migrations/**",
+    "temp",
     # Other
     "node_modules",
     "buck-out",
@@ -356,62 +409,109 @@ fixable = ["ALL"]
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 ignore = [
     # Documentation - add incrementally
-    "D100", # Missing docstring in public module
-    "D101", # Missing docstring in public class
-    "D102", # Missing docstring in public method
-    "D103", # Missing docstring in public function
-    "D104", # Missing docstring in public package
-    "D105", # Missing docstring in magic method
-    "D203", # One blank line before class docstring
-    "D211", # No blank line before class docstring
-    "D213", # Multi-line docstring summary on second line
+    "D301", # Escape sequence in docstring - don't force r-strings
     # Type annotations - balanced approach
-    "ANN001", # Missing type annotation for function argument
-    "ANN003", # Missing type annotation for **kwargs
     "ANN401", # Dynamically typed expressions (Any)
     # Formatting
-    "COM812", # Trailing comma (conflicts with formatter)
-    "ISC001", # Implicitly concatenated string literals (conflicts with formatter)
-    "E501",   # Line too long (handled by formatter)
+    "E501", # Line too long (handled by formatter)
     # Security - practical exceptions
     "S104", # Possible binding to all interfaces - intentional for dev
     "S105", # Hardcoded password - false positives
     "S106", # Hardcoded password in function argument
     "S311", # Pseudo-random generator - acceptable for non-crypto
     # Code patterns
-    "PERF401", # Manual list comprehension - readability preference
-    "ERA001",  # Commented-out code - may be intentional
-    "TD003",   # Missing issue link for TODO
-    "FIX002",  # Line contains TODO
     "PLC0415",
+    "FBT001",
+    "FBT002",
+    # Broad exception handling is intentional in CLI/middleware to preserve UX
+    "BLE001",
+    # FastAPI dependencies often need many parameters
+    "PLR0913",
+    # Logging consistently uses f-strings with contextual data
+    "G004",
+    # Graceful fallbacks frequently use try/except without else blocks
+    "TRY300",
+    # Magic-value checks are explicit for readability
+    "PLR2004",
+    # Global configuration switches rely on module-level state
+    "PLW0603",
+    # Tests and schema factories often mirror builtin names for clarity
+    "A002",
+    # Verbose log messages are expected in operational tooling
+    "TRY401",
+    # Private attributes are accessed intentionally when extending frameworks
+    "SLF001",
+    # Blanket ignores are used to manage optional dependencies in tests
+    "PGH003",
+    # Complex middleware and routers naturally have additional branches/returns
+    "PLR0912",
+    "PLR0911",
+    "PLR0915",
+    # Datetime helpers manage tzinfo explicitly elsewhere
+    "DTZ003",
+    "DTZ001",
+    # CLI commands use pathlib.open sparingly inside sync helpers
+    "PTH123",
+    # Some async commands shell out to blocking helpers by design
+    "ASYNC230",
+    # Dynamic model factories intentionally use capitalized temporary names
+    "N806",
+    # Large router/middleware implementations exceed cyclomatic heuristics
+    "C901",
+    # Boolean positional args are used heavily in CLI/middleware factories
+    "FBT003",
+    # Public __init__ docstrings add little value; prefer class docs
+    "D107",
+    # FastAPI dependencies intentionally leverage direct callables
+    "FAST002",
+    # Some try/except blocks purposefully raise inside for context preservation
+    "TRY301",
+    # CLI helpers accept unused args to match Click signatures
+    "ARG001",
+    "ARG002",
+    # Logging helpers intentionally capture exception info manually
+    "G201",
+    # Custom exceptions often derive directly from Exception
+    "TRY002",
+    # Global state toggles may be declared prior to assignment
+    "PLW0602",
+    # Mutable class vars intentionally used for registries
+    "RUF012",
+    # Datetime tzinfo handled at higher layers
+    "DTZ005",
+    "DTZ007",
+    # Tests purposely redefine fixtures and functions
+    "F811",
+    # Structured logging merges context that overlaps with reserved keys
+    "G101",
+    # Runtime stubs for typing leverage simplified annotations
+    "PYI036",
+    # Builtin names reused intentionally in tests/factories
+    "A001",
+    # Async helpers may wrap blocking operations with instrumentation
+    "ASYNC109",
+    "ASYNC221",
+    # Naming patterns follow framework conventions
+    "N802",
+    "N801",
+    "N811",
+    "N818",
+    # pytest asserts intentionally catch general Exception types
+    "B017",
+    # Type stubs follow runtime conventions rather than strict PEP 563
+    "PYI063",
+    # Assert statements used deliberately for invariants
+    "S101",
+    # Raw SQL helpers validated elsewhere
+    "S608",
+    # CLI utilities intentionally shell out with precise commands
+    "S603",
+    "S607",
+    # pytest parameters frequently specify defaults for readability
+    "PT028",
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# SQLAlchemy models evaluate annotations at runtime, so keep imports available
-"**/models.py" = [
-    "TC001", # typing-only first-party import
-    "TC002", # typing-only third-party import
-    "TC003", # typing-only standard-library import
-]
-# Pydantic schemas evaluate annotations at runtime, so keep imports available
-"**/schemas.py" = [
-    "TC001", # typing-only first-party import
-    "TC002", # typing-only third-party import
-    "TC003", # typing-only standard-library import
-]
-# Strawberry GraphQL types evaluate annotations at runtime, so keep imports available
-"**/graphql/types/*.py" = [
-    "TC001", # typing-only first-party import
-    "TC002", # typing-only third-party import
-    "TC003", # typing-only standard-library import
-]
-# Strawberry GraphQL resolvers evaluate annotations at runtime, so keep imports available
-"**/graphql/resolvers/*.py" = [
-    "TC001", # typing-only first-party import
-    "TC002", # typing-only third-party import
-    "TC003", # typing-only standard-library import
-]
-
 # Lifespan module: lifecycle management uses global state and broad exception handling
 "**/app/lifespan.py" = [
     "BLE001",  # Blind exception handling - intentional for graceful degradation
@@ -429,17 +529,13 @@ ignore = [
     "E501",   # Line too long - autogenerated table definitions
     "I001",   # Import block is unsorted/unformatted
     "UP007",  # Use X | Y for type annotations (migrations may target older Python)
-    "TC001",  # Move application import into TYPE_CHECKING block
-    "TC002",  # Move third-party import into TYPE_CHECKING block
-    "TC003",  # Move standard library import into TYPE_CHECKING block
     "INP001", # Implicit namespace package - Alembic discovers migrations dynamically, no __init__.py needed
     "D415",   # First line should end with punctuation - autogenerated docstrings
 ]
 # Alembic env.py: configuration file with specific patterns
 "alembic/env.py" = [
-    "F401",  # Unused imports - may be used in generated migrations
-    "E402",  # Module level import not at top of file
-    "TC001", # typing-only first-party import
+    "F401", # Unused imports - may be used in generated migrations
+    "E402", # Module level import not at top of file
 ]
 # Test files: more relaxed rules for fixtures and test patterns
 "tests/**/*.py" = [
@@ -482,9 +578,6 @@ ignore = [
     "SIM116",  # Use a dictionary instead of consecutive if - readability in test mocks
     "SIM117",  # Use single with statement - readability in tests
     "RUF012",  # Mutable ClassVar - false positive for SQLAlchemy __table_args__
-    "TC001",   # Move application import into TYPE_CHECKING block
-    "TC002",   # Move third-party import into TYPE_CHECKING block
-    "TC003",   # Move standard library import into TYPE_CHECKING block
     "ANN204",  # Missing return type annotation for special method
     "FBT003",  # Boolean positional value in function call
     "PLR0913", # Too many arguments in function definition
@@ -705,9 +798,6 @@ file_template = "%%(year)d%%(month).2d%%(day).2d_%%(hour).2d%%(minute).2d_%%(rev
 truncate_slug_length = 40
 timezone = "UTC"
 
-# === UV Configuration ===
-[tool.uv]
-default-groups = ["dev", "tests"]
 
 [tool.pyright]
 exclude = ["**/.venv", "**/*.tmpl"]

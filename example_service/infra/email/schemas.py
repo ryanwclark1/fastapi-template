@@ -31,7 +31,7 @@ class EmailStatus(StrEnum):
 
 
 class EmailAttachment(BaseModel):
-    """Email attachment model.
+    r"""Email attachment model.
 
     Supports both inline content and file paths.
 

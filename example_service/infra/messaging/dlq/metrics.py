@@ -196,7 +196,7 @@ def record_dlq_routing(
 
     if message_age_seconds is not None:
         dlq_message_age_at_routing_seconds.labels(queue=queue).observe(
-            message_age_seconds
+            message_age_seconds,
         )
 
 

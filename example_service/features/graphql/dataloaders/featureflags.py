@@ -36,7 +36,7 @@ class FeatureFlagDataLoader:
         """
         self._session = session
         self._loader: DataLoader[UUID, FeatureFlag | None] = DataLoader(
-            load_fn=self._batch_load_flags
+            load_fn=self._batch_load_flags,
         )
 
     async def _batch_load_flags(
@@ -102,7 +102,7 @@ class FeatureFlagByKeyDataLoader:
         """
         self._session = session
         self._loader: DataLoader[str, FeatureFlag | None] = DataLoader(
-            load_fn=self._batch_load_flags_by_key
+            load_fn=self._batch_load_flags_by_key,
         )
 
     async def _batch_load_flags_by_key(

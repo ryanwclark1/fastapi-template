@@ -9,8 +9,10 @@ Provides memory-efficient upload operations for large files with:
 from __future__ import annotations
 
 import logging
-from pathlib import Path  # noqa: TC003
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+_UPLOAD_MODULE_ROOT = Path(__file__).resolve().parent
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
@@ -25,7 +27,7 @@ async def upload_stream(
     content_type: str | None = None,
     metadata: dict[str, str] | None = None,
     bucket: str | None = None,
-    chunk_size: int = 1024 * 1024,  # noqa: ARG001
+    chunk_size: int = 1024 * 1024,
 ) -> dict[str, Any]:
     """Upload file from an async byte stream.
 

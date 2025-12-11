@@ -39,7 +39,6 @@ router = APIRouter(prefix="/storage", tags=["storage"])
 
 @router.post(
     "/buckets",
-    response_model=BucketResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a storage bucket",
     description="Create a new storage bucket with optional region and ACL settings. Admin only.",
@@ -75,7 +74,7 @@ async def create_bucket(
             detail=str(e),
         ) from e
     except StorageError as e:
-        logger.error("Failed to create bucket: %s", e)
+        logger.exception("Failed to create bucket: %s", e)
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e),
@@ -84,7 +83,6 @@ async def create_bucket(
 
 @router.delete(
     "/buckets/{bucket_name}",
-    response_model=SuccessResponse,
     summary="Delete a storage bucket",
     description="Delete a storage bucket. Use force=true to delete non-empty buckets. Admin only.",
 )
@@ -112,7 +110,7 @@ async def delete_bucket(
             detail=str(e),
         ) from e
     except StorageError as e:
-        logger.error("Failed to delete bucket: %s", e)
+        logger.exception("Failed to delete bucket: %s", e)
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e),
@@ -121,7 +119,6 @@ async def delete_bucket(
 
 @router.get(
     "/buckets",
-    response_model=BucketListResponse,
     summary="List all buckets",
     description="List all accessible storage buckets. Admin only.",
 )
@@ -153,7 +150,7 @@ async def list_buckets(
         )
 
     except StorageError as e:
-        logger.error("Failed to list buckets: %s", e)
+        logger.exception("Failed to list buckets: %s", e)
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e),
@@ -162,7 +159,6 @@ async def list_buckets(
 
 @router.get(
     "/buckets/{bucket_name}",
-    response_model=BucketResponse,
     summary="Get bucket information",
     description="Get information about a specific bucket. Admin only.",
 )
@@ -179,8 +175,9 @@ async def get_bucket_info(
         exists = await storage.bucket_exists(bucket_name)
 
         if not exists:
+            msg = f"Bucket '{bucket_name}' not found"
             raise StorageFileNotFoundError(
-                f"Bucket '{bucket_name}' not found",
+                msg,
                 metadata={"bucket": bucket_name},
             )
 
@@ -190,8 +187,9 @@ async def get_bucket_info(
         bucket = next((b for b in buckets if b["name"] == bucket_name), None)
 
         if not bucket:
+            msg = f"Bucket '{bucket_name}' not found"
             raise StorageFileNotFoundError(
-                f"Bucket '{bucket_name}' not found",
+                msg,
                 metadata={"bucket": bucket_name},
             )
 
@@ -209,7 +207,7 @@ async def get_bucket_info(
             detail=str(e),
         ) from e
     except StorageError as e:
-        logger.error("Failed to get bucket info: %s", e)
+        logger.exception("Failed to get bucket info: %s", e)
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e),
@@ -223,7 +221,6 @@ async def get_bucket_info(
 
 @router.get(
     "/objects",
-    response_model=ObjectListResponse,
     summary="List objects in a bucket",
     description="List objects with optional prefix filtering and pagination. Admin only.",
 )
@@ -233,13 +230,13 @@ async def list_objects(
     _tenant: TenantContextDep,
     prefix: Annotated[str, Query(description="Filter by key prefix")] = "",
     bucket: Annotated[
-        str | None, Query(description="Bucket name (uses default if not specified)")
+        str | None, Query(description="Bucket name (uses default if not specified)"),
     ] = None,
     max_keys: Annotated[
-        int, Query(ge=1, le=10000, description="Maximum keys to return")
+        int, Query(ge=1, le=10000, description="Maximum keys to return"),
     ] = 1000,
     continuation_token: Annotated[
-        str | None, Query(description="Token for next page")
+        str | None, Query(description="Token for next page"),
     ] = None,
 ) -> ObjectListResponse:
     """List objects in a bucket.
@@ -285,7 +282,7 @@ async def list_objects(
         )
 
     except StorageError as e:
-        logger.error("Failed to list objects: %s", e)
+        logger.exception("Failed to list objects: %s", e)
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e),
@@ -294,7 +291,6 @@ async def list_objects(
 
 @router.post(
     "/objects/{key:path}",
-    response_model=ObjectUploadResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Upload an object",
     description="Upload an object to storage. Admin only.",
@@ -306,10 +302,10 @@ async def upload_object(
     _tenant: TenantContextDep,
     file: Annotated[UploadFile, File(description="File to upload")],
     bucket: Annotated[
-        str | None, Query(description="Bucket name (uses default if not specified)")
+        str | None, Query(description="Bucket name (uses default if not specified)"),
     ] = None,
     content_type: Annotated[
-        str | None, Query(description="Content type override")
+        str | None, Query(description="Content type override"),
     ] = None,
     acl: Annotated[str | None, Query(description="ACL setting")] = None,
     storage_class: Annotated[str | None, Query(description="Storage class")] = None,
@@ -342,7 +338,7 @@ async def upload_object(
         )
 
     except StorageError as e:
-        logger.error("Failed to upload object: %s", e)
+        logger.exception("Failed to upload object: %s", e)
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e),
@@ -356,7 +352,6 @@ async def upload_object(
 
 @router.put(
     "/objects/{key:path}/acl",
-    response_model=SuccessResponse,
     summary="Set object ACL",
     description="Set Access Control List on an object. Admin only.",
 )
@@ -367,7 +362,7 @@ async def set_object_acl(
     _user: AdminUser,
     _tenant: TenantContextDep,
     bucket: Annotated[
-        str | None, Query(description="Bucket name (uses default if not specified)")
+        str | None, Query(description="Bucket name (uses default if not specified)"),
     ] = None,
 ) -> SuccessResponse:
     """Set ACL on an object.
@@ -393,7 +388,7 @@ async def set_object_acl(
             detail=str(e),
         ) from e
     except StorageError as e:
-        logger.error("Failed to set object ACL: %s", e)
+        logger.exception("Failed to set object ACL: %s", e)
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e),
@@ -402,7 +397,6 @@ async def set_object_acl(
 
 @router.get(
     "/objects/{key:path}/acl",
-    response_model=ACLResponse,
     summary="Get object ACL",
     description="Get Access Control List of an object. Admin only.",
 )
@@ -412,7 +406,7 @@ async def get_object_acl(
     _user: AdminUser,
     _tenant: TenantContextDep,
     bucket: Annotated[
-        str | None, Query(description="Bucket name (uses default if not specified)")
+        str | None, Query(description="Bucket name (uses default if not specified)"),
     ] = None,
 ) -> ACLResponse:
     """Get ACL of an object.
@@ -437,7 +431,7 @@ async def get_object_acl(
             detail=str(e),
         ) from e
     except StorageError as e:
-        logger.error("Failed to get object ACL: %s", e)
+        logger.exception("Failed to get object ACL: %s", e)
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e),
@@ -455,7 +449,7 @@ async def download_object(
     _user: AdminUser,
     _tenant: TenantContextDep,
     bucket: Annotated[
-        str | None, Query(description="Bucket name (uses default if not specified)")
+        str | None, Query(description="Bucket name (uses default if not specified)"),
     ] = None,
 ) -> StreamingResponse:
     """Download an object from storage.
@@ -493,7 +487,7 @@ async def download_object(
             detail=str(e),
         ) from e
     except StorageError as e:
-        logger.error("Failed to download object: %s", e)
+        logger.exception("Failed to download object: %s", e)
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e),
@@ -502,7 +496,6 @@ async def download_object(
 
 @router.delete(
     "/objects/{key:path}",
-    response_model=ObjectDeleteResponse,
     summary="Delete an object",
     description="Delete an object from storage. Admin only.",
 )
@@ -512,7 +505,7 @@ async def delete_object(
     _user: AdminUser,
     _tenant: TenantContextDep,
     bucket: Annotated[
-        str | None, Query(description="Bucket name (uses default if not specified)")
+        str | None, Query(description="Bucket name (uses default if not specified)"),
     ] = None,
 ) -> ObjectDeleteResponse:
     """Delete an object from storage.
@@ -533,7 +526,7 @@ async def delete_object(
             detail=str(e),
         ) from e
     except StorageError as e:
-        logger.error("Failed to delete object: %s", e)
+        logger.exception("Failed to delete object: %s", e)
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e),

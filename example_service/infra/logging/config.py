@@ -291,8 +291,15 @@ def _configure_with_dictconfig(
         include_thread_info: Include thread info in logs.
         file_max_bytes: Max file size before rotation.
         file_backup_count: Number of backup files to keep.
+        enable_sampling: Enable sampling filter for noisy modules.
+        sampling_rate_health: Sampling rate for health checks.
+        sampling_rate_metrics: Sampling rate for metrics endpoints.
+        sampling_rate_default: Default sampling rate for other logs.
+        enable_rate_limit: Enable rate limiting filter.
+        rate_limit_max_per_second: Maximum log records per second when rate limiting.
         colorize: Enable console colors (None=auto-detect).
         colorize_message: Colorize entire message vs just level.
+        level_colors: Mapping of log levels to ANSI colors or RGB tuples.
     """
     global _log_queue, _listener
 
@@ -582,7 +589,7 @@ def _setup_queue_logging(
                 JSONFormatter(
                     fmt_keys={"level": "levelname", "logger": "name", "message": "message"},
                     static={"service": "example-service"},
-                )
+                ),
             )
         else:
             # Use colored formatter for human-readable logs
@@ -593,7 +600,7 @@ def _setup_queue_logging(
                     colorize=colorize,
                     colorize_message=colorize_message,
                     level_colors=level_colors,
-                )
+                ),
             )
         handlers.append(console_handler)
 
@@ -612,14 +619,14 @@ def _setup_queue_logging(
                 JSONFormatter(
                     fmt_keys={"level": "levelname", "logger": "name", "message": "message"},
                     static={"service": "example-service"},
-                )
+                ),
             )
         else:
             file_handler.setFormatter(
                 logging.Formatter(
                     fmt="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
                     datefmt="%Y-%m-%d %H:%M:%S",
-                )
+                ),
             )
         handlers.append(file_handler)
 

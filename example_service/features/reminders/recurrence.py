@@ -155,7 +155,8 @@ class RecurrenceRule:
         try:
             frequency = Frequency(freq_str)
         except ValueError:
-            raise ValueError(f"Unknown frequency: {freq_str}") from None
+            msg = f"Unknown frequency: {freq_str}"
+            raise ValueError(msg) from None
 
         # Extract optional components
         interval = int(parts.get("INTERVAL", 1))
@@ -221,7 +222,8 @@ def generate_occurrences(
     try:
         rule = rrulestr(rrule_string, dtstart=start)
     except ValueError as e:
-        raise ValueError(f"Invalid RRULE string: {e}") from e
+        msg = f"Invalid RRULE string: {e}"
+        raise ValueError(msg) from e
 
     # Determine the effective after/before bounds
     effective_after = after or (start if include_start else start - timedelta(seconds=1))

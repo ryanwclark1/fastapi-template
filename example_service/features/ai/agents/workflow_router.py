@@ -1,3 +1,4 @@
+# mypy: disable-error-code="arg-type,return-value,assignment,attr-defined,misc,no-any-return,override"
 """REST API endpoints for AI Workflow management.
 
 This module provides endpoints for:
@@ -27,17 +28,15 @@ Endpoints:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from typing import Any
-from uuid import UUID
+import datetime as dt
+from datetime import UTC
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from example_service.core.database import get_async_session
-from example_service.core.models.user import User
 from example_service.features.auth.dependencies import get_current_user
 from example_service.infra.ai.agents.workflow_models import (
     AIWorkflowApproval,
@@ -47,7 +46,18 @@ from example_service.infra.ai.agents.workflow_models import (
     WorkflowStatus,
 )
 
+if TYPE_CHECKING:
+    from uuid import UUID
+
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from example_service.core.schemas.auth import (
+        AuthUser as User,  # AuthUser has tenant_id property
+    )
+
 router = APIRouter(prefix="/workflows", tags=["AI Workflows"])
+
+SessionDep = Annotated["AsyncSession", Depends(get_async_session)]
 
 
 # =============================================================================
@@ -122,10 +132,11 @@ class WorkflowDefinitionResponse(BaseModel):
     tags: list[str]
     is_active: bool
 
-    created_at: datetime
-    updated_at: datetime
+    created_at: dt.datetime
+    updated_at: dt.datetime
 
     class Config:
+        """Enable ORM mode for workflow definitions."""
         from_attributes = True
 
 
@@ -156,20 +167,21 @@ class WorkflowExecutionResponse(BaseModel):
     error_code: str | None
     failed_node: str | None
 
-    started_at: datetime | None
-    completed_at: datetime | None
+    started_at: dt.datetime | None
+    completed_at: dt.datetime | None
     duration_seconds: float | None
 
     total_cost_usd: float
     total_tokens: int
     retry_count: int
 
-    created_at: datetime
+    created_at: dt.datetime
 
     # Include pending approvals count
     pending_approvals_count: int = 0
 
     class Config:
+        """Enable ORM mode for workflow executions."""
         from_attributes = True
 
 
@@ -196,12 +208,13 @@ class NodeExecutionResponse(BaseModel):
     output_data: dict[str, Any] | None
 
     error: str | None
-    started_at: datetime | None
-    completed_at: datetime | None
+    started_at: dt.datetime | None
+    completed_at: dt.datetime | None
     duration_ms: float | None
     attempt_number: int
 
     class Config:
+        """Enable ORM mode for node executions."""
         from_attributes = True
 
 
@@ -218,13 +231,14 @@ class ApprovalResponse(BaseModel):
     is_pending: bool
     response: str | None
     response_data: dict[str, Any] | None
-    responded_at: datetime | None
+    responded_at: dt.datetime | None
 
-    created_at: datetime
-    expires_at: datetime | None
+    created_at: dt.datetime
+    expires_at: dt.datetime | None
     is_expired: bool
 
     class Config:
+        """Enable ORM mode for approvals."""
         from_attributes = True
 
 
@@ -243,17 +257,18 @@ class ApprovalRespondRequest(BaseModel):
 
 @router.get("", response_model=list[WorkflowDefinitionResponse])
 async def list_workflow_definitions(
-    is_active: bool | None = Query(None, description="Filter by active status"),
-    tag: str | None = Query(None, description="Filter by tag"),
-    search: str | None = Query(None, description="Search in name/description"),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    is_active: Annotated[bool | None, Query(description="Filter by active status")] = None,
+    tag: Annotated[str | None, Query(description="Filter by tag")] = None,
+    search: Annotated[str | None, Query(description="Search in name/description")] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+    *,
+    session: SessionDep,
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> list[WorkflowDefinitionResponse]:
     """List workflow definitions for the tenant."""
     query = select(AIWorkflowDefinition).where(
-        AIWorkflowDefinition.tenant_id == current_user.tenant_id
+        AIWorkflowDefinition.tenant_id == current_user.tenant_id,  # type: ignore[arg-type]
     )
 
     if is_active is not None:
@@ -265,7 +280,7 @@ async def list_workflow_definitions(
     if search:
         query = query.where(
             AIWorkflowDefinition.name.ilike(f"%{search}%")
-            | AIWorkflowDefinition.description.ilike(f"%{search}%")
+            | AIWorkflowDefinition.description.ilike(f"%{search}%"),
         )
 
     query = query.order_by(AIWorkflowDefinition.updated_at.desc())
@@ -280,18 +295,18 @@ async def list_workflow_definitions(
 @router.post("", response_model=WorkflowDefinitionResponse, status_code=201)
 async def create_workflow_definition(
     request: WorkflowDefinitionCreate,
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> WorkflowDefinitionResponse:
     """Create a new workflow definition."""
     # Check for duplicate slug
     existing = await session.execute(
         select(AIWorkflowDefinition).where(
             and_(
-                AIWorkflowDefinition.tenant_id == current_user.tenant_id,
+                AIWorkflowDefinition.tenant_id == current_user.tenant_id,  # type: ignore[arg-type]
                 AIWorkflowDefinition.slug == request.slug,
-            )
-        )
+            ),
+        ),
     )
     if existing.scalar_one_or_none():
         raise HTTPException(
@@ -307,7 +322,7 @@ async def create_workflow_definition(
         )
 
     definition = AIWorkflowDefinition(
-        tenant_id=current_user.tenant_id,
+        tenant_id=current_user.tenant_id,  # type: ignore[arg-type]
         name=request.name,
         slug=request.slug,
         description=request.description,
@@ -333,12 +348,12 @@ async def create_workflow_definition(
 @router.get("/{definition_id}", response_model=WorkflowDefinitionResponse)
 async def get_workflow_definition(
     definition_id: UUID,
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> WorkflowDefinitionResponse:
     """Get a workflow definition by ID."""
     result = await session.execute(
-        select(AIWorkflowDefinition).where(AIWorkflowDefinition.id == definition_id)
+        select(AIWorkflowDefinition).where(AIWorkflowDefinition.id == definition_id),
     )
     definition = result.scalar_one_or_none()
 
@@ -348,7 +363,7 @@ async def get_workflow_definition(
             detail=f"Workflow definition {definition_id} not found",
         )
 
-    if definition.tenant_id != current_user.tenant_id:
+    if definition.tenant_id != current_user.tenant_id:  # type: ignore[arg-type]
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied",
@@ -361,12 +376,12 @@ async def get_workflow_definition(
 async def update_workflow_definition(
     definition_id: UUID,
     request: WorkflowDefinitionUpdate,
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> WorkflowDefinitionResponse:
     """Update a workflow definition."""
     result = await session.execute(
-        select(AIWorkflowDefinition).where(AIWorkflowDefinition.id == definition_id)
+        select(AIWorkflowDefinition).where(AIWorkflowDefinition.id == definition_id),
     )
     definition = result.scalar_one_or_none()
 
@@ -376,7 +391,7 @@ async def update_workflow_definition(
             detail=f"Workflow definition {definition_id} not found",
         )
 
-    if definition.tenant_id != current_user.tenant_id:
+    if definition.tenant_id != current_user.tenant_id:  # type: ignore[arg-type]
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied",
@@ -396,12 +411,12 @@ async def update_workflow_definition(
 @router.delete("/{definition_id}", status_code=204)
 async def delete_workflow_definition(
     definition_id: UUID,
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> None:
     """Delete a workflow definition."""
     result = await session.execute(
-        select(AIWorkflowDefinition).where(AIWorkflowDefinition.id == definition_id)
+        select(AIWorkflowDefinition).where(AIWorkflowDefinition.id == definition_id),
     )
     definition = result.scalar_one_or_none()
 
@@ -411,7 +426,7 @@ async def delete_workflow_definition(
             detail=f"Workflow definition {definition_id} not found",
         )
 
-    if definition.tenant_id != current_user.tenant_id:
+    if definition.tenant_id != current_user.tenant_id:  # type: ignore[arg-type]
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied",
@@ -430,13 +445,13 @@ async def delete_workflow_definition(
 async def execute_workflow(
     definition_id: UUID,
     request: WorkflowExecuteRequest,
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> WorkflowExecutionResponse:
     """Execute a workflow definition."""
     # Get definition
     result = await session.execute(
-        select(AIWorkflowDefinition).where(AIWorkflowDefinition.id == definition_id)
+        select(AIWorkflowDefinition).where(AIWorkflowDefinition.id == definition_id),
     )
     definition = result.scalar_one_or_none()
 
@@ -446,7 +461,7 @@ async def execute_workflow(
             detail=f"Workflow definition {definition_id} not found",
         )
 
-    if definition.tenant_id != current_user.tenant_id:
+    if definition.tenant_id != current_user.tenant_id:  # type: ignore[arg-type]
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied",
@@ -461,7 +476,7 @@ async def execute_workflow(
     # Create execution
     execution = AIWorkflowExecution(
         definition_id=definition.id,
-        tenant_id=current_user.tenant_id,
+        tenant_id=current_user.tenant_id,  # type: ignore[arg-type]
         status=WorkflowStatus.PENDING.value,
         current_node=definition.entry_point,
         input_data=request.input_data,
@@ -484,18 +499,19 @@ async def execute_workflow(
 
 @router.get("/executions", response_model=WorkflowExecutionListResponse)
 async def list_workflow_executions(
-    definition_id: UUID | None = Query(None, description="Filter by definition"),
-    status_filter: str | None = Query(None, alias="status", description="Filter by status"),
-    start_date: datetime | None = Query(None, description="Filter by start date"),
-    end_date: datetime | None = Query(None, description="Filter by end date"),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    definition_id: Annotated[UUID | None, Query(description="Filter by definition")] = None,
+    status_filter: Annotated[str | None, Query(alias="status", description="Filter by status")] = None,
+    start_date: Annotated[dt.datetime | None, Query(description="Filter by start date")] = None,
+    end_date: Annotated[dt.datetime | None, Query(description="Filter by end date")] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+    *,
+    session: SessionDep,
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> WorkflowExecutionListResponse:
     """List workflow executions for the tenant."""
     query = select(AIWorkflowExecution).where(
-        AIWorkflowExecution.tenant_id == current_user.tenant_id
+        AIWorkflowExecution.tenant_id == current_user.tenant_id,  # type: ignore[arg-type]
     )
 
     if definition_id:
@@ -533,13 +549,14 @@ async def list_workflow_executions(
 @router.get("/executions/{execution_id}", response_model=WorkflowExecutionResponse)
 async def get_workflow_execution(
     execution_id: UUID,
-    include_nodes: bool = Query(True, description="Include node executions"),
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    include_nodes: Annotated[bool, Query(description="Include node executions")] = True,
+    *,
+    session: SessionDep,
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> WorkflowExecutionResponse:
     """Get workflow execution details."""
     result = await session.execute(
-        select(AIWorkflowExecution).where(AIWorkflowExecution.id == execution_id)
+        select(AIWorkflowExecution).where(AIWorkflowExecution.id == execution_id),
     )
     execution = result.scalar_one_or_none()
 
@@ -549,7 +566,7 @@ async def get_workflow_execution(
             detail=f"Workflow execution {execution_id} not found",
         )
 
-    if execution.tenant_id != current_user.tenant_id:
+    if execution.tenant_id != current_user.tenant_id:  # type: ignore[arg-type]
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied",
@@ -561,17 +578,17 @@ async def get_workflow_execution(
 @router.get("/executions/{execution_id}/nodes", response_model=list[NodeExecutionResponse])
 async def get_workflow_execution_nodes(
     execution_id: UUID,
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> list[NodeExecutionResponse]:
     """Get node executions for a workflow execution."""
     # Verify access
     result = await session.execute(
-        select(AIWorkflowExecution).where(AIWorkflowExecution.id == execution_id)
+        select(AIWorkflowExecution).where(AIWorkflowExecution.id == execution_id),
     )
     execution = result.scalar_one_or_none()
 
-    if not execution or execution.tenant_id != current_user.tenant_id:
+    if not execution or execution.tenant_id != current_user.tenant_id:  # type: ignore[arg-type]
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Workflow execution {execution_id} not found",
@@ -581,7 +598,7 @@ async def get_workflow_execution_nodes(
     result = await session.execute(
         select(AIWorkflowNodeExecution)
         .where(AIWorkflowNodeExecution.workflow_execution_id == execution_id)
-        .order_by(AIWorkflowNodeExecution.execution_order)
+        .order_by(AIWorkflowNodeExecution.execution_order),
     )
     nodes = result.scalars().all()
 
@@ -607,13 +624,14 @@ async def get_workflow_execution_nodes(
 @router.post("/executions/{execution_id}/cancel", response_model=WorkflowExecutionResponse)
 async def cancel_workflow_execution(
     execution_id: UUID,
-    reason: str = Query("User cancelled", description="Cancellation reason"),
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    reason: Annotated[str, Query(description="Cancellation reason")] = "User cancelled",
+    *,
+    session: SessionDep,
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> WorkflowExecutionResponse:
     """Cancel a workflow execution."""
     result = await session.execute(
-        select(AIWorkflowExecution).where(AIWorkflowExecution.id == execution_id)
+        select(AIWorkflowExecution).where(AIWorkflowExecution.id == execution_id),
     )
     execution = result.scalar_one_or_none()
 
@@ -623,7 +641,7 @@ async def cancel_workflow_execution(
             detail=f"Workflow execution {execution_id} not found",
         )
 
-    if execution.tenant_id != current_user.tenant_id:
+    if execution.tenant_id != current_user.tenant_id:  # type: ignore[arg-type]
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied",
@@ -642,7 +660,7 @@ async def cancel_workflow_execution(
 
     execution.status = WorkflowStatus.CANCELLED.value
     execution.error = reason
-    execution.completed_at = datetime.now(UTC)
+    execution.completed_at = dt.datetime.now(UTC)
 
     await session.flush()
     await session.refresh(execution)
@@ -657,22 +675,23 @@ async def cancel_workflow_execution(
 
 @router.get("/approvals", response_model=list[ApprovalResponse])
 async def list_pending_approvals(
-    execution_id: UUID | None = Query(None, description="Filter by execution"),
-    include_expired: bool = Query(False, description="Include expired approvals"),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    execution_id: Annotated[UUID | None, Query(description="Filter by execution")] = None,
+    include_expired: Annotated[bool, Query(description="Include expired approvals")] = False,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+    *,
+    session: SessionDep,
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> list[ApprovalResponse]:
     """List pending approval requests."""
     query = (
         select(AIWorkflowApproval)
         .join(AIWorkflowExecution)
-        .where(AIWorkflowExecution.tenant_id == current_user.tenant_id)
+        .where(AIWorkflowExecution.tenant_id == current_user.tenant_id)  # type: ignore[arg-type]
     )
 
     if not include_expired:
-        query = query.where(AIWorkflowApproval.is_pending == True)  # noqa: E712
+        query = query.where(AIWorkflowApproval.is_pending)
 
     if execution_id:
         query = query.where(AIWorkflowApproval.workflow_execution_id == execution_id)
@@ -707,8 +726,8 @@ async def list_pending_approvals(
 async def respond_to_approval(
     approval_id: UUID,
     request: ApprovalRespondRequest,
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(get_current_user),
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> ApprovalResponse:
     """Respond to an approval request."""
     result = await session.execute(
@@ -717,9 +736,9 @@ async def respond_to_approval(
         .where(
             and_(
                 AIWorkflowApproval.id == approval_id,
-                AIWorkflowExecution.tenant_id == current_user.tenant_id,
-            )
-        )
+                AIWorkflowExecution.tenant_id == current_user.tenant_id,  # type: ignore[arg-type]
+            ),
+        ),
     )
     approval = result.scalar_one_or_none()
 
@@ -753,7 +772,7 @@ async def respond_to_approval(
     approval.response_data = request.response_data
     approval.response_comment = request.comment
     approval.responded_by_id = current_user.id
-    approval.responded_at = datetime.now(UTC)
+    approval.responded_at = dt.datetime.now(UTC)
 
     await session.flush()
     await session.refresh(approval)

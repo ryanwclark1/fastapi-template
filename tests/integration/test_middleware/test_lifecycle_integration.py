@@ -83,7 +83,7 @@ class TestFullLifecycleIntegration:
 
     @patch("example_service.app.middleware.request_logging.logger")
     async def test_pii_masking_in_full_chain_context(
-        self, mock_logger: MagicMock, client: AsyncClient
+        self, mock_logger: MagicMock, client: AsyncClient,
     ):
         """Test that sensitive data is masked when all middleware active.
 
@@ -151,7 +151,7 @@ class TestFullLifecycleIntegration:
 
     @patch("example_service.app.middleware.request_logging.logger")
     async def test_log_context_contains_all_fields(
-        self, mock_logger: MagicMock, client: AsyncClient
+        self, mock_logger: MagicMock, client: AsyncClient,
     ):
         """Test that log context has request_id, method, path.
 
@@ -218,7 +218,7 @@ class TestFullLifecycleIntegration:
 
     @patch("example_service.app.middleware.request_logging.logger")
     async def test_nested_json_pii_masking_in_chain(
-        self, mock_logger: MagicMock, client: AsyncClient
+        self, mock_logger: MagicMock, client: AsyncClient,
     ):
         """Test PII masking handles nested structures in full chain.
 
@@ -281,7 +281,7 @@ class TestFullLifecycleIntegration:
 
     @patch("example_service.app.middleware.request_logging.logger")
     async def test_request_and_response_both_logged(
-        self, mock_logger: MagicMock, client: AsyncClient
+        self, mock_logger: MagicMock, client: AsyncClient,
     ):
         """Test that both request and response are logged.
 
@@ -326,8 +326,8 @@ class TestFullLifecycleIntegration:
         async def error_endpoint():
             raise HTTPException(status_code=500, detail="Test error")
 
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get("/error")
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as http_client:
+            response = await http_client.get("/error")
 
         assert response.status_code == 500
 

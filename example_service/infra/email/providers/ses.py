@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 # Check for aioboto3 at import time
 try:
-    import aioboto3  # type: ignore[import-not-found]
+    import aioboto3
 
     AIOBOTO3_AVAILABLE = True
 except ImportError:
@@ -85,7 +85,7 @@ class SESProvider(BaseEmailProvider):
                 "Install with: pip install aioboto3"
             )
             raise ImportError(
-                msg
+                msg,
             )
 
         super().__init__(config)
@@ -94,7 +94,7 @@ class SESProvider(BaseEmailProvider):
         if not config.aws_access_key or not config.aws_secret_key:
             msg = "AWS SES provider requires aws_access_key and aws_secret_key"
             raise ValueError(
-                msg
+                msg,
             )
 
         self._region = config.aws_region or self.DEFAULT_REGION
@@ -219,7 +219,7 @@ class SESProvider(BaseEmailProvider):
                     "region": self._region,
                     "configuration_set": self._configuration_set,
                     "aws_request_id": response.get("ResponseMetadata", {}).get(
-                        "RequestId"
+                        "RequestId",
                     ),
                 },
             )

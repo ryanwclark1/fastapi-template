@@ -351,7 +351,7 @@ def get_primary_key(instance: Any) -> tuple[Any, ...]:
     mapper = state.mapper
 
     return tuple(
-        mapper.primary_key_from_instance(instance)
+        mapper.primary_key_from_instance(instance),
     )
 
 

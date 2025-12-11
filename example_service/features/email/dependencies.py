@@ -57,7 +57,7 @@ try:
     from example_service.infra.email.enhanced_service import EnhancedEmailService
 
     EnhancedEmailServiceDep = Annotated[
-        EnhancedEmailService, Depends(_lazy_get_enhanced_email_service)
+        EnhancedEmailService, Depends(_lazy_get_enhanced_email_service),
     ]
 except ImportError:
     # Circular import detected - use Any as fallback type
@@ -68,13 +68,13 @@ except ImportError:
 
 # Repository dependencies
 EmailConfigRepositoryDep = Annotated[
-    EmailConfigRepository, Depends(get_email_config_repository)
+    EmailConfigRepository, Depends(get_email_config_repository),
 ]
 EmailUsageLogRepositoryDep = Annotated[
-    EmailUsageLogRepository, Depends(get_email_usage_log_repository)
+    EmailUsageLogRepository, Depends(get_email_usage_log_repository),
 ]
 EmailAuditLogRepositoryDep = Annotated[
-    EmailAuditLogRepository, Depends(get_email_audit_log_repository)
+    EmailAuditLogRepository, Depends(get_email_audit_log_repository),
 ]
 
 

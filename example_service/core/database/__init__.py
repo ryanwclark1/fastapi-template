@@ -104,6 +104,16 @@ Example (Direct SQLAlchemy):
 
 from __future__ import annotations
 
+from example_service.core.database.admin_utils import (
+    calculate_cache_hit_ratio,
+    check_connection_limit,
+    format_bytes,
+    generate_confirmation_token,
+    sanitize_query_text,
+    validate_index_name,
+    validate_table_name,
+    verify_confirmation_token,
+)
 from example_service.core.database.base import (
     NAMING_CONVENTION,
     AuditColumnsMixin,
@@ -117,6 +127,7 @@ from example_service.core.database.base import (
     UUIDPKMixin,
     UUIDTimestampedBase,
     UUIDv7PKMixin,
+    UUIDv7TimestampedBase,
 )
 from example_service.core.database.choices import (
     ChoiceType,
@@ -214,40 +225,30 @@ from example_service.core.database.validation import (
     safe_table_reference,
     validate_identifier,
 )
+from example_service.infra.database.session import get_async_session
 
 __all__ = [
     "NAMING_CONVENTION",
-    # Audit mixins
     "AuditColumnsMixin",
     "AuditedBase",
-    # Base and metadata
     "Base",
-    # Repository
     "BaseRepository",
-    # Filters
     "BeforeAfter",
-    # Custom types - Choices
     "ChoiceType",
     "CollectionFilter",
-    # Exceptions
     "DatabaseError",
-    # Custom types - Ranges
     "DateRange",
     "DateRangeType",
     "DateTimeRangeType",
     "DecimalRange",
-    # Custom types - Validated
     "EmailType",
-    # Custom types - Encryption
     "EncryptedString",
     "EncryptedText",
     "FilterGroup",
-    # Custom types - Hierarchical
     "HierarchicalMixin",
     "IdentifierValidationError",
     "IntRange",
     "IntRangeType",
-    # Primary key mixins
     "IntegerPKMixin",
     "LabeledChoiceMixin",
     "LabeledIntEnum",
@@ -265,23 +266,36 @@ __all__ = [
     "SearchResult",
     "SoftDeleteMixin",
     "StatementFilter",
-    # Multi-tenancy
     "TenantAwareRepository",
     "TenantMixin",
     "TimestampMixin",
     "TimestampRange",
-    # Convenience bases
     "TimestampedBase",
     "URLType",
     "UUIDPKMixin",
     "UUIDTimestampedBase",
     "UUIDv7PKMixin",
+    "UUIDv7TimestampedBase",
+    "calculate_cache_hit_ratio",
+    "check_connection_limit",
     "create_choices",
+    "create_exclusion_constraint",
+    "create_extension",
+    "create_gist_index",
+    "create_gist_index_multi",
+    "create_ltree_indexes",
+    "create_no_overlap_constraint",
+    "drop_exclusion_constraint",
+    "drop_extension",
+    "drop_gist_index",
+    "drop_ltree_indexes",
+    "ensure_btree_gist",
+    "format_bytes",
     "format_phone_international",
     "format_phone_national",
-    # UUID utilities
+    "generate_confirmation_token",
     "generate_uuid7",
-    # Change tracking / Inspection
+    "get_async_session",
     "get_changed_attributes",
     "get_identity_key",
     "get_instance_state",
@@ -301,22 +315,13 @@ __all__ = [
     "range_left_of",
     "range_overlaps",
     "range_right_of",
-    # Validation
     "safe_table_reference",
+    "sanitize_query_text",
     "short_uuid",
     "uuid_to_timestamp",
     "validate_identifier",
+    "validate_index_name",
+    "validate_table_name",
+    "verify_confirmation_token",
     "with_labels",
-    # Migration helpers
-    "create_exclusion_constraint",
-    "create_extension",
-    "create_gist_index",
-    "create_gist_index_multi",
-    "create_ltree_indexes",
-    "create_no_overlap_constraint",
-    "drop_exclusion_constraint",
-    "drop_extension",
-    "drop_gist_index",
-    "drop_ltree_indexes",
-    "ensure_btree_gist",
 ]

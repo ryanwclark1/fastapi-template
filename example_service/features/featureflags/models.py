@@ -13,7 +13,7 @@ from sqlalchemy import Boolean, DateTime, Index, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from example_service.core.database.base import Base, TimestampMixin, UUIDv7PKMixin
+from example_service.core.database.base import UUIDv7TimestampedBase
 from example_service.core.database.enums import FlagStatus as FlagStatusEnum
 
 
@@ -26,7 +26,7 @@ class FlagStatus(StrEnum):
     TARGETED = "targeted"  # Specific users/tenants
 
 
-class FeatureFlag(Base, UUIDv7PKMixin, TimestampMixin):
+class FeatureFlag(UUIDv7TimestampedBase):
     """Feature flag configuration.
 
     Stores feature flags with support for:
@@ -137,7 +137,7 @@ class FeatureFlag(Base, UUIDv7PKMixin, TimestampMixin):
         return not (self.ends_at and now > self.ends_at)
 
 
-class FlagOverride(Base, UUIDv7PKMixin, TimestampMixin):
+class FlagOverride(UUIDv7TimestampedBase):
     """User or tenant-specific flag override.
 
     Allows overriding flag values for specific users or tenants.

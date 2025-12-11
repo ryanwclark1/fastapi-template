@@ -29,12 +29,11 @@ Usage:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 
-if TYPE_CHECKING:
-    from example_service.infra.discovery import ConsulService
+from example_service.infra.discovery import ConsulService
 
 
 def get_discovery_service_dep() -> ConsulService | None:
@@ -96,10 +95,6 @@ async def optional_discovery_service(
     return service
 
 
-# Type aliases for cleaner route signatures
-# Import at runtime after function definitions to avoid circular dependencies
-from example_service.infra.discovery import ConsulService  # noqa: E402
-
 DiscoveryServiceDep = Annotated[ConsulService, Depends(require_discovery_service)]
 """Discovery service dependency that requires Consul to be available.
 
@@ -110,7 +105,7 @@ Example:
 """
 
 OptionalDiscoveryService = Annotated[
-    ConsulService | None, Depends(optional_discovery_service)
+    ConsulService | None, Depends(optional_discovery_service),
 ]
 """Discovery service dependency that is optional.
 

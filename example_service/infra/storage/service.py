@@ -396,7 +396,7 @@ class StorageService:
         storage_presigned_urls_generated.labels(type="download").inc()
 
         return await backend.generate_presigned_download_url(
-            key, bucket, expires_in or self._settings.presigned_url_expiry_seconds
+            key, bucket, expires_in or self._settings.presigned_url_expiry_seconds,
         )
 
     async def generate_presigned_upload(
@@ -424,7 +424,7 @@ class StorageService:
         storage_presigned_urls_generated.labels(type="upload").inc()
 
         return await backend.generate_presigned_upload_url(
-            key, bucket, content_type, expires_in or self._settings.presigned_url_expiry_seconds
+            key, bucket, content_type, expires_in or self._settings.presigned_url_expiry_seconds,
         )
 
     async def copy_file(

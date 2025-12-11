@@ -62,7 +62,7 @@ class TestConnectionManager:
         from example_service.infra.realtime.manager import ConnectionManager
 
         with patch(
-            "example_service.infra.realtime.manager.get_websocket_settings"
+            "example_service.infra.realtime.manager.get_websocket_settings",
         ) as mock_settings:
             mock_settings.return_value = MagicMock(
                 max_connections=100,
@@ -285,7 +285,7 @@ class TestConnectionManager:
         from example_service.infra.realtime.manager import ConnectionManager
 
         with patch(
-            "example_service.infra.realtime.manager.get_websocket_settings"
+            "example_service.infra.realtime.manager.get_websocket_settings",
         ) as mock_settings:
             mock_settings.return_value = MagicMock(
                 max_connections=2,

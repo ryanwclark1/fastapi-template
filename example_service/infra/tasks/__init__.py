@@ -39,6 +39,7 @@ except ImportError:
     broker = None
 
     async def get_broker() -> AsyncIterator[AioPikaBrokerType | None]:
+        """Yield None when the broker backend is unavailable."""
         yield None
 
 
@@ -56,22 +57,23 @@ except ImportError:
     scheduler = None
 
     def get_job_status() -> list[dict[Any, Any]]:
+        """Return an empty job list when scheduler is unavailable."""
         return []
 
-    def pause_job(job_id: str) -> None:  # noqa: ARG001
-        return None
+    def pause_job(job_id: str) -> None:
+        """No-op pause function when scheduler is unavailable."""
 
-    def resume_job(job_id: str) -> None:  # noqa: ARG001
-        return None
+    def resume_job(job_id: str) -> None:
+        """No-op resume function when scheduler is unavailable."""
 
     def setup_scheduled_jobs() -> None:
-        return None
+        """No-op scheduled job setup when scheduler is unavailable."""
 
     async def start_scheduler() -> None:
-        return None
+        """No-op scheduler startup when scheduler is unavailable."""
 
     async def stop_scheduler() -> None:
-        return None
+        """No-op scheduler shutdown when scheduler is unavailable."""
 
 
 __all__ = [

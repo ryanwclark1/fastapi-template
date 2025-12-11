@@ -563,7 +563,7 @@ class PipelineExecutor:
             return [providers[0].provider_name] if providers else []
 
         # Build chain from registry
-        chain = self.registry.build_fallback_chain(
+        return self.registry.build_fallback_chain(
             capability=step.capability,
             primary_provider=step.provider_preference[0] if step.provider_preference else None,
             max_fallbacks=step.fallback_config.max_fallbacks,
@@ -571,7 +571,6 @@ class PipelineExecutor:
             prefer_same_quality=step.fallback_config.prefer_same_quality,
         )
 
-        return chain
 
     def _get_adapter(
         self,
@@ -652,7 +651,7 @@ class PipelineExecutor:
             except TimeoutError:
                 error_msg = f"Compensation timed out: {step_name}"
                 context.compensation_errors.append(error_msg)
-                logger.error(
+                logger.exception(
                     error_msg,
                     extra={
                         "execution_id": context.execution_id,

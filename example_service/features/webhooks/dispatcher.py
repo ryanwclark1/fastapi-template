@@ -60,7 +60,7 @@ async def dispatch_event(
 
     if not webhooks:
         lazy_logger.debug(
-            lambda: f"dispatcher.dispatch_event: event_type={event_type!r}, event_id={event_id!r} -> no subscribed webhooks"
+            lambda: f"dispatcher.dispatch_event: event_type={event_type!r}, event_id={event_id!r} -> no subscribed webhooks",
         )
         return 0
 
@@ -96,9 +96,7 @@ async def dispatch_event(
     )
 
     # Note: In production, you would queue background tasks here
-    # Example with Celery:
-    # for delivery in created:
-    #     deliver_webhook_task.delay(delivery.id)
+    # Hook Celery, Dramatiq, or another worker system here if needed.
 
     return len(created)
 

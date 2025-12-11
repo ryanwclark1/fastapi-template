@@ -246,7 +246,7 @@ class TestCorrelationIDMiddleware:
 
         # Service A calls Service B with same correlation ID
         response_b = client.get(
-            "/service-b", headers={"X-Correlation-ID": data_a["correlation_id"]}
+            "/service-b", headers={"X-Correlation-ID": data_a["correlation_id"]},
         )
         data_b = response_b.json()
 

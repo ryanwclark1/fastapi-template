@@ -6,46 +6,30 @@ This module provides FastAPI dependencies for:
 - Caching validated tokens to reduce external calls
 - Checking ACL permissions
 - Managing tenant context
-- Mock mode with multiple personas for development/testing
 
 Type Alias Pattern (recommended for cleaner code):
     ```python
     from typing import Annotated
     from fastapi import Depends
     from example_service.core.dependencies.accent_auth import (
-        get_current_user,
+        get_auth_user,
         require_acl,
     )
     from example_service.core.schemas.auth import AuthUser
 
     # Common patterns
-    CurrentUser = Annotated[AuthUser, Depends(get_current_user)]
+    AuthUserDep = Annotated[AuthUser, Depends(get_auth_user)]
     AdminUser = Annotated[AuthUser, Depends(require_acl("#"))]
 
     # Usage in routes
     @router.get("/me")
-    async def get_profile(user: CurrentUser):
+    async def get_profile(user: AuthUserDep):
         return {"email": user.email}
 
     @router.get("/admin/settings")
     async def admin_settings(user: AdminUser):
         return {"settings": "..."}
     ```
-
-Mock Mode:
-    Enable mock mode for local testing without Accent-Auth service:
-
-    ```bash
-    # In .env or environment
-    MOCK_MODE=true
-    MOCK_PERSONA=admin  # admin, user, readonly, service, multitenant_admin, limited_user
-
-    # Quick persona switching
-    export MOCK_MODE=true
-    export MOCK_PERSONA=readonly
-    ```
-
-    WARNING: Mock mode is automatically blocked in production environments!
 """
 
 from __future__ import annotations
@@ -55,11 +39,12 @@ from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import Depends, Header, HTTPException, Request, status
 
+from example_service.core.dependencies.auth_client import get_auth_client
 from example_service.core.schemas.auth import AuthUser
-from example_service.core.settings import get_auth_settings, get_mock_settings
-from example_service.infra.auth.accent_auth import (
+from example_service.core.settings import get_auth_settings
+from example_service.infra.auth import (
     AccentAuthACL,
-    get_accent_auth_client,
+    to_auth_user,
 )
 from example_service.infra.cache.redis import RedisCache, get_cache
 from example_service.infra.logging.context import set_log_context
@@ -70,92 +55,22 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 auth_settings = get_auth_settings()
-mock_settings = get_mock_settings()
 
 
-def _get_mock_user() -> AuthUser | None:
-    """Get mock user for mock mode based on active persona.
-
-    Returns None if mock mode disabled, otherwise returns configured mock user.
-    Uses MOCK_PERSONA environment variable for quick persona switching.
-
-    Returns:
-        Mock AuthUser if mock mode enabled, None otherwise.
-
-    """
-    if not mock_settings.enabled:
-        return None
-
-    persona_name = mock_settings.persona
-
-    try:
-        # Get the active persona's user configuration
-        mock_user_settings = mock_settings.get_active_user()
-
-        # Convert to AuthUser schema
-        mock_user = AuthUser(
-            user_id=mock_user_settings.user_id,
-            email=mock_user_settings.email or "",
-            roles=mock_user_settings.roles,
-            permissions=mock_user_settings.permissions,
-            metadata={
-                "tenant_uuid": mock_user_settings.tenant_id,
-                "tenant_slug": mock_user_settings.tenant_slug,
-                "session_uuid": mock_user_settings.session_id,
-                **mock_user_settings.metadata,
-            },
-        )
-
-        logger.warning(
-            "MOCK MODE: Using mock authentication with persona '%s'",
-            persona_name,
-            extra={
-                "persona": persona_name,
-                "user_id": mock_user.user_id,
-                "tenant_uuid": mock_user_settings.tenant_id,
-                "acl_count": len(mock_user_settings.permissions),
-            },
-        )
-
-        # Add user context to logs
-        set_log_context(
-            user_id=mock_user.user_id,
-            tenant_id=mock_user_settings.tenant_id,
-            mock_mode=True,
-        )
-
-        return mock_user
-
-    except ValueError as e:
-        logger.error("Mock mode configuration error: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Mock mode misconfigured: {e}",
-        ) from e
-
-
-async def get_current_user(
+async def get_auth_user(
     request: Request,
     x_auth_token: Annotated[str | None, Header(alias="X-Auth-Token")] = None,
     accent_tenant: Annotated[str | None, Header(alias="Accent-Tenant")] = None,
     cache: Annotated[RedisCache | None, Depends(get_cache)] = None,
 ) -> AuthUser:
-    """Get currently authenticated user from Accent-Auth.
-
-    In mock mode (MOCK_MODE=true), this returns a mock user based on the
-    active persona without validating the X-Auth-Token header. Mock users
-    include realistic ACL patterns for testing different permission levels.
-
-    WARNING: Mock mode bypasses all authentication. It is automatically
-    blocked in production environments via settings validation.
+    """Get authenticated user from Accent-Auth.
 
     This dependency:
-    1. Checks for mock mode (returns mock user if enabled)
-    2. Extracts X-Auth-Token from request headers
-    3. Extracts Accent-Tenant header (optional)
-    4. Validates token with Accent-Auth service
-    5. Caches validation results in Redis
-    6. Returns AuthUser with ACL permissions
+    1. Extracts X-Auth-Token from request headers
+    2. Extracts Accent-Tenant header (optional)
+    3. Validates token with Accent-Auth service
+    4. Caches validation results in Redis
+    5. Returns AuthUser with ACL permissions
 
     Args:
         request: FastAPI request
@@ -172,20 +87,15 @@ async def get_current_user(
     Example:
         @router.get("/protected")
         async def protected_endpoint(
-            user: Annotated[AuthUser, Depends(get_current_user)]
+            user: Annotated[AuthUser, Depends(get_auth_user)]
         ):
             return {"user_id": user.user_id}
     """
-    # Mock mode: Return mock user immediately (production safety in settings validator)
-    mock_user = _get_mock_user()
-    if mock_user is not None:
-        # Store in request state for consistency
-        request.state.user = mock_user
-        request.state.tenant_uuid = mock_user.tenant_id
-        return mock_user
-
-    # Normal authentication flow
+    # Authentication flow
     if not x_auth_token:
+        dev_user = _maybe_get_dev_mode_user(request)
+        if dev_user is not None:
+            return dev_user
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing X-Auth-Token header",
@@ -222,11 +132,11 @@ async def get_current_user(
 
     # Validate with Accent-Auth
     try:
-        client = get_accent_auth_client()
+        client = get_auth_client()
         token_info = await client.validate_token(x_auth_token, accent_tenant)
 
         # Convert to AuthUser
-        auth_user = client.to_auth_user(token_info)
+        auth_user = to_auth_user(token_info)
 
         # Cache the result
         if cache is not None:
@@ -269,15 +179,15 @@ async def get_current_user(
         ) from e
 
 
-async def get_current_user_optional(
+async def get_auth_user_optional(
     request: Request,
     x_auth_token: Annotated[str | None, Header(alias="X-Auth-Token")] = None,
     accent_tenant: Annotated[str | None, Header(alias="Accent-Tenant")] = None,
     cache: Annotated[RedisCache | None, Depends(get_cache)] = None,
 ) -> AuthUser | None:
-    """Get currently authenticated user (optional).
+    """Get authenticated user (optional).
 
-    Similar to get_current_user but returns None instead of raising
+    Similar to get_auth_user but returns None instead of raising
     an exception if no token is provided. Useful for endpoints
     that have optional authentication.
 
@@ -293,19 +203,52 @@ async def get_current_user_optional(
     Example:
         @router.get("/optional-auth")
         async def optional_auth_endpoint(
-            user: Annotated[AuthUser | None, Depends(get_current_user_optional)]
+            user: Annotated[AuthUser | None, Depends(get_auth_user_optional)]
         ):
             if user:
                 return {"message": f"Hello, {user.user_id}"}
             return {"message": "Hello, anonymous"}
     """
     if not x_auth_token:
+        dev_user = _maybe_get_dev_mode_user(request)
+        if dev_user is not None:
+            return dev_user
         return None
 
     try:
-        return await get_current_user(request, x_auth_token, accent_tenant, cache)
+        return await get_auth_user(request, x_auth_token, accent_tenant, cache)
     except HTTPException:
         return None
+
+
+async def get_current_user(
+    request: Request,
+    x_auth_token: Annotated[str | None, Header(alias="X-Auth-Token")] = None,
+    accent_tenant: Annotated[str | None, Header(alias="Accent-Tenant")] = None,
+    cache: Annotated[RedisCache | None, Depends(get_cache)] = None,
+) -> AuthUser:
+    """Backward-compatible alias for get_auth_user."""
+    return await get_auth_user(
+        request=request,
+        x_auth_token=x_auth_token,
+        accent_tenant=accent_tenant,
+        cache=cache,
+    )
+
+
+async def get_current_user_optional(
+    request: Request,
+    x_auth_token: Annotated[str | None, Header(alias="X-Auth-Token")] = None,
+    accent_tenant: Annotated[str | None, Header(alias="Accent-Tenant")] = None,
+    cache: Annotated[RedisCache | None, Depends(get_cache)] = None,
+) -> AuthUser | None:
+    """Backward-compatible alias for get_auth_user_optional."""
+    return await get_auth_user_optional(
+        request=request,
+        x_auth_token=x_auth_token,
+        accent_tenant=accent_tenant,
+        cache=cache,
+    )
 
 
 def require_acl(required_acl: str) -> Callable[[Request, AuthUser], Coroutine[Any, Any, AuthUser]]:
@@ -345,19 +288,34 @@ def require_acl(required_acl: str) -> Callable[[Request, AuthUser], Coroutine[An
 
     async def acl_checker(
         request: Request,
-        user: Annotated[AuthUser, Depends(get_current_user)],
+        user: Annotated[AuthUser | None, Depends(get_auth_user)] = None,
     ) -> AuthUser:
-        # Format ACL pattern with path parameters if any
-        formatted_acl = required_acl.format(**request.path_params)
+        actual_request = request if isinstance(request, Request) else None
+        if actual_request is None and isinstance(request, AuthUser) and user is None:
+            user = request
 
-        # Get session ID from metadata if available
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+            )
+
+        path_params = actual_request.path_params if actual_request else {}
+        try:
+            formatted_acl = required_acl.format(**path_params)
+        except KeyError:
+            formatted_acl = required_acl
+
+        # Get session ID and tenant ID from metadata if available
         session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
+        tenant_id = user.metadata.get("tenant_uuid")
 
         # Create ACL checker with user context for reserved word substitution
         acl = AccentAuthACL(
             user.permissions,
             auth_id=user.user_id,
             session_id=session_id,
+            tenant_id=tenant_id,
         )
 
         if not acl.has_permission(formatted_acl):
@@ -407,19 +365,36 @@ def require_any_acl(*required_acls: str) -> Callable[[Request, AuthUser], Corout
 
     async def acl_checker(
         request: Request,
-        user: Annotated[AuthUser, Depends(get_current_user)],
+        user: Annotated[AuthUser | None, Depends(get_auth_user)] = None,
     ) -> AuthUser:
-        # Format ACL patterns with path parameters
-        formatted_acls = [acl.format(**request.path_params) for acl in required_acls]
+        actual_request = request if isinstance(request, Request) else None
+        if actual_request is None and isinstance(request, AuthUser) and user is None:
+            user = request
 
-        # Get session ID from metadata if available
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+            )
+
+        path_params = actual_request.path_params if actual_request else {}
+        formatted_acls = []
+        for acl in required_acls:
+            try:
+                formatted_acls.append(acl.format(**path_params))
+            except KeyError:
+                formatted_acls.append(acl)
+
+        # Get session ID and tenant ID from metadata if available
         session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
+        tenant_id = user.metadata.get("tenant_uuid")
 
         # Create ACL checker with user context
         acl = AccentAuthACL(
             user.permissions,
             auth_id=user.user_id,
             session_id=session_id,
+            tenant_id=tenant_id,
         )
 
         if not acl.has_any_permission(*formatted_acls):
@@ -468,19 +443,21 @@ def require_all_acls(*required_acls: str) -> Callable[[Request, AuthUser], Corou
 
     async def acl_checker(
         request: Request,
-        user: Annotated[AuthUser, Depends(get_current_user)],
+        user: Annotated[AuthUser, Depends(get_auth_user)],
     ) -> AuthUser:
         # Format ACL patterns with path parameters
         formatted_acls = [acl.format(**request.path_params) for acl in required_acls]
 
-        # Get session ID from metadata if available
+        # Get session ID and tenant ID from metadata if available
         session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
+        tenant_id = user.metadata.get("tenant_uuid")
 
         # Create ACL checker with user context
         acl = AccentAuthACL(
             user.permissions,
             auth_id=user.user_id,
             session_id=session_id,
+            tenant_id=tenant_id,
         )
 
         missing_acls = [required for required in formatted_acls if not acl.has_permission(required)]
@@ -555,3 +532,36 @@ def get_tenant_uuid() -> str | None:
         return getattr(request.state, "tenant_uuid", None)
     except Exception:
         return None
+
+
+def _maybe_get_dev_mode_user(request: Request) -> AuthUser | None:
+    """Return mock user when dev mode is enabled and no token provided."""
+    if not getattr(auth_settings, "is_dev_mode", False):
+        return None
+
+    try:
+        config = auth_settings.get_mock_user_config()
+    except Exception as exc:  # pragma: no cover
+        logger.exception("DEV MODE misconfigured", extra={"error": str(exc)})
+        return None
+
+    user = AuthUser(**config)
+
+    request.state.user = user
+    request.state.tenant_uuid = user.metadata.get("tenant_uuid")
+
+    set_log_context(
+        user_id=user.user_id or user.service_id,
+        tenant_id=user.metadata.get("tenant_uuid"),
+    )
+
+    logger.warning(
+        "DEV MODE: returning mock Accent-Auth user",
+        extra={
+            "persona": auth_settings.dev_mock_user,
+            "user_id": user.user_id,
+            "service_id": user.service_id,
+        },
+    )
+
+    return user

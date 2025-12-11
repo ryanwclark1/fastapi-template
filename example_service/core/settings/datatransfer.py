@@ -8,9 +8,12 @@ Example: DATATRANSFER_EXPORT_DIR="/data/exports"
 from __future__ import annotations
 
 from pathlib import Path
+from tempfile import gettempdir
 
 from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+DEFAULT_EXPORT_DIR = Path(gettempdir()) / "example_service_exports"
 
 
 class DataTransferSettings(BaseSettings):
@@ -31,7 +34,7 @@ class DataTransferSettings(BaseSettings):
     # ──────────────────────────────────────────────────────────────
 
     export_dir: str = Field(
-        default="/tmp/exports",  # noqa: S108
+        default=str(DEFAULT_EXPORT_DIR),
         description="Directory for storing export files (use proper directory in production)",
     )
 
@@ -52,6 +55,34 @@ class DataTransferSettings(BaseSettings):
         ge=1,
         le=9,
         description="Gzip compression level (1=fastest, 9=best compression)",
+    )
+
+    # ──────────────────────────────────────────────────────────────
+    # Async Execution Configuration (Option D Integration)
+    # ──────────────────────────────────────────────────────────────
+
+    default_execution_mode: str = Field(
+        default="sync",
+        description="Default execution mode: 'sync' (immediate), 'async' (background), 'auto' (threshold-based)",
+    )
+
+    async_threshold: int = Field(
+        default=10000,
+        ge=100,
+        le=1000000,
+        description="Record count threshold for 'auto' execution mode (above this = async)",
+    )
+
+    enable_export_acl: bool = Field(
+        default=True,
+        description="Require ACL permissions for export/import operations",
+    )
+
+    export_expiration_days: int = Field(
+        default=7,
+        ge=1,
+        le=90,
+        description="Days before completed export jobs are auto-deleted (via cleanup task)",
     )
 
     # ──────────────────────────────────────────────────────────────

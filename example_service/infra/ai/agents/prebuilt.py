@@ -145,19 +145,19 @@ class RAGResponse(BaseModel):
 
     answer: str = Field(..., description="The answer to the user's question")
     confidence: float = Field(
-        ..., ge=0, le=1, description="Confidence score (0-1)"
+        ..., ge=0, le=1, description="Confidence score (0-1)",
     )
     sources: list[str] = Field(
-        default_factory=list, description="Source document references"
+        default_factory=list, description="Source document references",
     )
     citations: list[dict[str, str]] = Field(
-        default_factory=list, description="Inline citations with quotes"
+        default_factory=list, description="Inline citations with quotes",
     )
     needs_clarification: bool = Field(
-        False, description="Whether the question needs clarification"
+        False, description="Whether the question needs clarification",
     )
     follow_up_questions: list[str] = Field(
-        default_factory=list, description="Suggested follow-up questions"
+        default_factory=list, description="Suggested follow-up questions",
     )
 
 
@@ -168,16 +168,16 @@ class CodeGenerationResponse(BaseModel):
     language: str = Field(..., description="Programming language")
     explanation: str = Field(..., description="Explanation of the code")
     test_cases: list[str] = Field(
-        default_factory=list, description="Test cases for the code"
+        default_factory=list, description="Test cases for the code",
     )
     dependencies: list[str] = Field(
-        default_factory=list, description="Required dependencies"
+        default_factory=list, description="Required dependencies",
     )
     complexity: str = Field(
-        "medium", description="Estimated complexity (low/medium/high)"
+        "medium", description="Estimated complexity (low/medium/high)",
     )
     security_notes: list[str] = Field(
-        default_factory=list, description="Security considerations"
+        default_factory=list, description="Security considerations",
     )
 
 
@@ -186,19 +186,19 @@ class DataAnalysisResponse(BaseModel):
 
     summary: str = Field(..., description="Summary of the analysis")
     insights: list[str] = Field(
-        default_factory=list, description="Key insights discovered"
+        default_factory=list, description="Key insights discovered",
     )
     statistics: dict[str, Any] = Field(
-        default_factory=dict, description="Computed statistics"
+        default_factory=dict, description="Computed statistics",
     )
     visualizations: list[dict[str, Any]] = Field(
-        default_factory=list, description="Visualization specifications"
+        default_factory=list, description="Visualization specifications",
     )
     recommendations: list[str] = Field(
-        default_factory=list, description="Action recommendations"
+        default_factory=list, description="Action recommendations",
     )
     data_quality_notes: list[str] = Field(
-        default_factory=list, description="Data quality observations"
+        default_factory=list, description="Data quality observations",
     )
 
 
@@ -207,20 +207,20 @@ class CustomerSupportResponse(BaseModel):
 
     response: str = Field(..., description="Response to the customer")
     sentiment: str = Field(
-        ..., description="Detected customer sentiment (positive/neutral/negative)"
+        ..., description="Detected customer sentiment (positive/neutral/negative)",
     )
     intent: str = Field(..., description="Detected customer intent")
     resolution_status: str = Field(
-        ..., description="Resolution status (resolved/pending/escalate)"
+        ..., description="Resolution status (resolved/pending/escalate)",
     )
     suggested_actions: list[str] = Field(
-        default_factory=list, description="Suggested follow-up actions"
+        default_factory=list, description="Suggested follow-up actions",
     )
     related_articles: list[str] = Field(
-        default_factory=list, description="Related help articles"
+        default_factory=list, description="Related help articles",
     )
     escalation_reason: str | None = Field(
-        None, description="Reason for escalation if needed"
+        None, description="Reason for escalation if needed",
     )
 
 
@@ -231,13 +231,13 @@ class ContentCreationResponse(BaseModel):
     title: str = Field(..., description="Suggested title")
     meta_description: str = Field(..., description="Meta description for SEO")
     keywords: list[str] = Field(
-        default_factory=list, description="SEO keywords"
+        default_factory=list, description="SEO keywords",
     )
     tone: str = Field(..., description="Content tone")
     word_count: int = Field(..., description="Word count")
     reading_time_minutes: int = Field(..., description="Estimated reading time")
     suggested_images: list[str] = Field(
-        default_factory=list, description="Suggested image descriptions"
+        default_factory=list, description="Suggested image descriptions",
     )
 
 
@@ -899,21 +899,21 @@ SEO Guidelines:
 
 
 __all__ = [
+    # Configuration
+    "AgentConfig",
     # Enums
     "AgentType",
     # Protocols
     "CodeExecutor",
-    "DataSource",
-    "Retriever",
     # Schemas
     "CodeGenerationResponse",
     "ContentCreationResponse",
     "CustomerSupportResponse",
     "DataAnalysisResponse",
-    "RAGResponse",
-    # Configuration
-    "AgentConfig",
+    "DataSource",
     "PrebuiltAgent",
+    "RAGResponse",
+    "Retriever",
     # Factory functions
     "create_code_agent",
     "create_content_agent",

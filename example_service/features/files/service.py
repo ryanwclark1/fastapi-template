@@ -114,17 +114,21 @@ class FileService(BaseService):
 
         # Validate content type
         if not settings.is_content_type_allowed(content_type):
-            raise InvalidFileError(
+            msg = (
                 f"Content type '{content_type}' not allowed. "
                 f"Allowed types: {', '.join(settings.allowed_content_types)}"
+            )
+            raise InvalidFileError(
+                msg,
             )
 
         # Validate file size
         if size_bytes > settings.max_file_size_bytes:
             max_mb = settings.max_file_size_mb
             actual_mb = size_bytes / (1024 * 1024)
+            msg = f"File size {actual_mb:.2f}MB exceeds maximum allowed size of {max_mb}MB"
             raise InvalidFileError(
-                f"File size {actual_mb:.2f}MB exceeds maximum allowed size of {max_mb}MB"
+                msg,
             )
 
         if size_bytes <= 0:
@@ -357,7 +361,8 @@ class FileService(BaseService):
         file = await self._repository.get_or_raise(self._session, file_id)
 
         if file.status != FileStatus.PENDING.value:
-            raise ValueError(f"File {file_id} is not pending upload (status: {file.status})")
+            msg = f"File {file_id} is not pending upload (status: {file.status})"
+            raise ValueError(msg)
 
         # Verify file exists in storage
         storage = self._ensure_storage()
@@ -366,7 +371,8 @@ class FileService(BaseService):
             # File not found - mark as failed
             file.status = FileStatus.FAILED
             await self._session.flush()
-            raise StorageClientError(f"Uploaded file not found in storage: {file.storage_key}")
+            msg = f"Uploaded file not found in storage: {file.storage_key}"
+            raise StorageClientError(msg)
 
         # Update file record with storage info
         if etag:
@@ -408,7 +414,7 @@ class FileService(BaseService):
         file = await self._repository.get(self._session, file_id)
 
         self._lazy.debug(
-            lambda: f"service.get_file({file_id}) -> {'found' if file else 'not found'}"
+            lambda: f"service.get_file({file_id}) -> {'found' if file else 'not found'}",
         )
         return file
 
@@ -444,7 +450,7 @@ class FileService(BaseService):
 
         result = list(files)
         self._lazy.debug(
-            lambda: f"service.list_files(owner_id={owner_id}, limit={limit}, offset={offset}) -> {len(result)} items"
+            lambda: f"service.list_files(owner_id={owner_id}, limit={limit}, offset={offset}) -> {len(result)} items",
         )
         return result
 
@@ -463,7 +469,8 @@ class FileService(BaseService):
         file = await self._repository.get_or_raise(self._session, file_id)
 
         if file.status != FileStatus.READY.value:
-            raise ValueError(f"File {file_id} is not ready for download (status: {file.status})")
+            msg = f"File {file_id} is not ready for download (status: {file.status})"
+            raise ValueError(msg)
 
         # Generate presigned download URL
         storage = self._ensure_storage()
@@ -595,7 +602,7 @@ class FileService(BaseService):
                         "file_id": created_file.id,
                         "success": True,
                         "error": None,
-                    }
+                    },
                 )
                 successful += 1
             except (InvalidFileError, StorageClientError) as e:
@@ -605,7 +612,7 @@ class FileService(BaseService):
                         "file_id": None,
                         "success": False,
                         "error": str(e),
-                    }
+                    },
                 )
                 failed += 1
 
@@ -652,7 +659,7 @@ class FileService(BaseService):
                             "size_bytes": None,
                             "success": False,
                             "error": "File not found",
-                        }
+                        },
                     )
                     failed += 1
                     continue
@@ -667,7 +674,7 @@ class FileService(BaseService):
                             "size_bytes": file.size_bytes,
                             "success": False,
                             "error": f"File not ready (status: {file.status})",
-                        }
+                        },
                     )
                     failed += 1
                     continue
@@ -683,7 +690,7 @@ class FileService(BaseService):
                         "size_bytes": file.size_bytes,
                         "success": True,
                         "error": None,
-                    }
+                    },
                 )
                 successful += 1
 
@@ -697,7 +704,7 @@ class FileService(BaseService):
                         "size_bytes": None,
                         "success": False,
                         "error": str(e),
-                    }
+                    },
                 )
                 failed += 1
 
@@ -751,7 +758,7 @@ class FileService(BaseService):
                             "deleted": None,
                             "success": False,
                             "error": "File not found",
-                        }
+                        },
                     )
                     failed += 1
                     continue
@@ -766,7 +773,7 @@ class FileService(BaseService):
                             "deleted": None,
                             "success": True,
                             "error": None,
-                        }
+                        },
                     )
                     successful += 1
                 else:
@@ -780,7 +787,7 @@ class FileService(BaseService):
                             "deleted": True,
                             "success": True,
                             "error": None,
-                        }
+                        },
                     )
                     successful += 1
 
@@ -793,7 +800,7 @@ class FileService(BaseService):
                         "deleted": None,
                         "success": False,
                         "error": str(e),
-                    }
+                    },
                 )
                 failed += 1
 
@@ -839,8 +846,9 @@ class FileService(BaseService):
         source_file = await self._repository.get_or_raise(self._session, file_id)
 
         if source_file.status != FileStatus.READY.value:
+            msg = f"Cannot copy file {file_id} - not ready (status: {source_file.status})"
             raise ValueError(
-                f"Cannot copy file {file_id} - not ready (status: {source_file.status})"
+                msg,
             )
 
         # Generate new filename

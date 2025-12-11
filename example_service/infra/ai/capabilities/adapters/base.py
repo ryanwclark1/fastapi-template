@@ -19,7 +19,7 @@ from abc import ABC, abstractmethod
 from decimal import Decimal
 import logging
 import time
-from typing import Any
+from typing import Any, Self
 
 from example_service.infra.ai.capabilities.types import (
     Capability,
@@ -309,10 +309,12 @@ class TimedExecution:
         self.end_time: float = 0
         self.elapsed_ms: float = 0
 
-    async def __aenter__(self) -> TimedExecution:
+    async def __aenter__(self) -> Self:
+        """Start the timer when entering the context."""
         self.start_time = time.perf_counter()
         return self
 
     async def __aexit__(self, *args: object) -> None:
+        """Stop the timer and compute elapsed time."""
         self.end_time = time.perf_counter()
         self.elapsed_ms = (self.end_time - self.start_time) * 1000

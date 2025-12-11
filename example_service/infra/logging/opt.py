@@ -120,7 +120,7 @@ class OptLoggerAdapter(logging.LoggerAdapter):
         return new_adapter
 
     def process(
-        self, msg: object, kwargs: MutableMapping[str, object]
+        self, msg: object, kwargs: MutableMapping[str, object],
     ) -> tuple[object, MutableMapping[str, object]]:
         """Process log message and kwargs with configured options.
 

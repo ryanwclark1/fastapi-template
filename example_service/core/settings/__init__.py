@@ -29,6 +29,7 @@ Configuration precedence (highest to lowest):
 from __future__ import annotations
 
 from .loader import (
+    get_admin_settings,
     get_ai_settings,
     get_app_settings,
     get_auth_settings,
@@ -40,14 +41,16 @@ from .loader import (
     get_graphql_settings,
     get_health_settings,
     get_i18n_settings,
+    get_job_settings,
     get_logging_settings,
-    get_mock_settings,
     get_otel_settings,
     get_pagination_settings,
     get_rabbit_settings,
     get_redis_settings,
+    get_search_settings,
     get_storage_settings,
     get_task_settings,
+    get_webhook_settings,
     get_websocket_settings,
 )
 from .unified import Settings, get_settings
@@ -56,6 +59,7 @@ __all__ = [
     # Unified settings (convenient for development/testing)
     "Settings",
     # Individual domain loaders (recommended for production)
+    "get_admin_settings",
     "get_ai_settings",
     "get_app_settings",
     "get_auth_settings",
@@ -67,14 +71,16 @@ __all__ = [
     "get_graphql_settings",
     "get_health_settings",
     "get_i18n_settings",
+    "get_job_settings",
     "get_logging_settings",
-    "get_mock_settings",
     "get_otel_settings",
     "get_pagination_settings",
     "get_rabbit_settings",
     "get_redis_settings",
+    "get_search_settings",
     "get_settings",
     "get_storage_settings",
     "get_task_settings",
+    "get_webhook_settings",
     "get_websocket_settings",
 ]

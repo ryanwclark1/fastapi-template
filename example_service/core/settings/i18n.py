@@ -124,9 +124,12 @@ class I18nSettings(BaseSettings):
 
         for locale in v:
             if not re.match(locale_pattern, locale):
-                raise ValueError(
+                msg = (
                     f"Invalid locale format: {locale}. "
                     f"Expected ISO 639-1 format (e.g., 'en', 'es', 'en-US')"
+                )
+                raise ValueError(
+                    msg,
                 )
 
         # Remove duplicates while preserving order
@@ -161,7 +164,8 @@ class I18nSettings(BaseSettings):
         if "supported_locales" in info.data:
             supported = info.data["supported_locales"]
             if supported and v not in supported:
-                raise ValueError(f"Default locale '{v}' must be in supported_locales: {supported}")
+                msg = f"Default locale '{v}' must be in supported_locales: {supported}"
+                raise ValueError(msg)
         return v
 
     @property

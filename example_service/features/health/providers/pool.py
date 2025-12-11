@@ -65,19 +65,24 @@ class DatabasePoolHealthProvider:
             ValueError: If thresholds are invalid or degraded >= unhealthy
         """
         if not (0.0 <= degraded_threshold <= 1.0):
+            msg = f"degraded_threshold must be between 0.0 and 1.0, got {degraded_threshold}"
             raise ValueError(
-                f"degraded_threshold must be between 0.0 and 1.0, got {degraded_threshold}"
+                msg,
             )
 
         if not (0.0 <= unhealthy_threshold <= 1.0):
+            msg = f"unhealthy_threshold must be between 0.0 and 1.0, got {unhealthy_threshold}"
             raise ValueError(
-                f"unhealthy_threshold must be between 0.0 and 1.0, got {unhealthy_threshold}"
+                msg,
             )
 
         if degraded_threshold >= unhealthy_threshold:
-            raise ValueError(
+            msg = (
                 f"degraded_threshold ({degraded_threshold}) must be less than "
                 f"unhealthy_threshold ({unhealthy_threshold})"
+            )
+            raise ValueError(
+                msg,
             )
 
         self._engine = engine

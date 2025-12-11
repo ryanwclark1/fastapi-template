@@ -107,8 +107,7 @@ class SearchCache:
         """
         # Sort params for consistent key generation
         sorted_params = json.dumps(params, sort_keys=True, default=str)
-        # MD5 used for non-cryptographic cache key hashing
-        param_hash = hashlib.md5(sorted_params.encode()).hexdigest()[:16]  # noqa: S324
+        param_hash = hashlib.sha256(sorted_params.encode()).hexdigest()[:16]
 
         return f"{self.config.cache_prefix}:{prefix}:{param_hash}"
 
@@ -343,18 +342,19 @@ class SearchCache:
 
         try:
             # Count cached keys
-            search_keys = []
-            suggest_keys = []
+            search_keys = [
+                key
+                async for key in self.redis.scan_iter(
+                    match=f"{self.config.cache_prefix}:results:*",
+                )
+            ]
 
-            async for key in self.redis.scan_iter(
-                match=f"{self.config.cache_prefix}:results:*"
-            ):
-                search_keys.append(key)
-
-            async for key in self.redis.scan_iter(
-                match=f"{self.config.cache_prefix}:suggest:*"
-            ):
-                suggest_keys.append(key)
+            suggest_keys = [
+                key
+                async for key in self.redis.scan_iter(
+                    match=f"{self.config.cache_prefix}:suggest:*",
+                )
+            ]
 
             stats["cached_search_results"] = len(search_keys)
             stats["cached_suggestions"] = len(suggest_keys)

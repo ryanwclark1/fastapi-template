@@ -21,13 +21,11 @@ Endpoints:
 
 from __future__ import annotations
 
-from typing import Any
-from uuid import UUID
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from example_service.core.models.user import User
 from example_service.features.auth.dependencies import get_current_user
 from example_service.infra.ai.agents.memory import (
     BufferMemory,
@@ -40,6 +38,13 @@ from example_service.infra.ai.agents.state_store import (
     ScopedStateStore,
     get_state_store,
 )
+
+if TYPE_CHECKING:
+    from uuid import UUID
+
+    from example_service.core.schemas.auth import (
+        AuthUser as User,  # AuthUser has tenant_id property
+    )
 
 router = APIRouter(prefix="/memory", tags=["AI Memory"])
 
@@ -153,8 +158,9 @@ class StateListResponse(BaseModel):
 @router.get("/{namespace}", response_model=MemoryStateResponse)
 async def get_memory_state(
     namespace: str,
-    include_messages: bool = Query(True, description="Include message list"),
-    current_user: User = Depends(get_current_user),
+    include_messages: Annotated[bool, Query(description="Include message list")] = True,
+    *,
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> MemoryStateResponse:
     """Get memory state for a namespace.
 
@@ -164,7 +170,7 @@ async def get_memory_state(
     - Messages (if include_messages is True)
     - Summary (for summary memory)
     """
-    key = get_memory_key(current_user.tenant_id, namespace)
+    key = get_memory_key(current_user.tenant_id, namespace)  # type: ignore[arg-type]
 
     if key not in _memory_store:
         raise HTTPException(
@@ -183,19 +189,21 @@ async def get_memory_state(
     elif isinstance(memory, ConversationMemory):
         memory_type = "conversation"
 
-    messages = []
-    if include_messages:
-        for msg in memory.get_messages():
-            messages.append(
-                MessageSchema(
-                    role=msg.get("role", ""),
-                    content=msg.get("content"),
-                    name=msg.get("name"),
-                    function_call=msg.get("function_call"),
-                    tool_calls=msg.get("tool_calls"),
-                    tool_call_id=msg.get("tool_call_id"),
-                )
+    messages = (
+        [
+            MessageSchema(
+                role=msg.get("role", ""),
+                content=msg.get("content"),
+                name=msg.get("name"),
+                function_call=msg.get("function_call"),
+                tool_calls=msg.get("tool_calls"),
+                tool_call_id=msg.get("tool_call_id"),
             )
+            for msg in memory.get_messages()
+        ]
+        if include_messages
+        else []
+    )
 
     response = MemoryStateResponse(
         namespace=namespace,
@@ -217,16 +225,17 @@ async def get_memory_state(
 async def add_messages(
     namespace: str,
     request: AddMessagesRequest,
-    memory_type: str = Query("buffer", description="Memory type to create if doesn't exist"),
-    max_messages: int = Query(100, ge=1, le=10000),
-    current_user: User = Depends(get_current_user),
+    memory_type: Annotated[str, Query(description="Memory type to create if doesn't exist")] = "buffer",
+    max_messages: Annotated[int, Query(ge=1, le=10000)] = 100,
+    *,
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> MemoryStateResponse:
     """Add messages to memory.
 
     Creates the memory namespace if it doesn't exist.
     """
     memory = get_or_create_memory(
-        current_user.tenant_id,
+        current_user.tenant_id,  # type: ignore[arg-type]
         namespace,
         memory_type=memory_type,
         max_messages=max_messages,
@@ -241,10 +250,10 @@ async def add_messages(
 @router.delete("/{namespace}", status_code=204)
 async def clear_memory(
     namespace: str,
-    current_user: User = Depends(get_current_user),
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> None:
     """Clear all messages from a memory namespace."""
-    key = get_memory_key(current_user.tenant_id, namespace)
+    key = get_memory_key(current_user.tenant_id, namespace)  # type: ignore[arg-type]
 
     if key not in _memory_store:
         raise HTTPException(
@@ -259,13 +268,13 @@ async def clear_memory(
 async def configure_memory(
     namespace: str,
     config: MemoryConfigRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> MemoryStateResponse:
     """Configure or reconfigure a memory namespace.
 
     Warning: This will reset the memory if the type changes.
     """
-    key = get_memory_key(current_user.tenant_id, namespace)
+    key = get_memory_key(current_user.tenant_id, namespace)  # type: ignore[arg-type]
 
     # Create new memory with configuration
     _memory_store[key] = create_memory(
@@ -282,14 +291,14 @@ async def configure_memory(
 @router.get("/{namespace}/export")
 async def export_memory(
     namespace: str,
-    current_user: User = Depends(get_current_user),
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> dict[str, Any]:
     """Export memory state for persistence.
 
     Returns a serializable representation of the memory
     that can be used to restore state later.
     """
-    key = get_memory_key(current_user.tenant_id, namespace)
+    key = get_memory_key(current_user.tenant_id, namespace)  # type: ignore[arg-type]
 
     if key not in _memory_store:
         raise HTTPException(
@@ -304,13 +313,13 @@ async def export_memory(
 async def import_memory(
     namespace: str,
     data: dict[str, Any],
-    current_user: User = Depends(get_current_user),
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> MemoryStateResponse:
     """Import memory state from exported data.
 
     Restores memory from a previously exported state.
     """
-    key = get_memory_key(current_user.tenant_id, namespace)
+    key = get_memory_key(current_user.tenant_id, namespace)  # type: ignore[arg-type]
 
     # Determine type and restore
     memory_type = data.get("type", "buffer")
@@ -352,10 +361,10 @@ def get_scoped_store(tenant_id: UUID, namespace: str) -> ScopedStateStore:
 async def get_state_value(
     namespace: str,
     key: str,
-    current_user: User = Depends(get_current_user),
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> StateValueResponse:
     """Get a state value by key."""
-    store = get_scoped_store(current_user.tenant_id, namespace)
+    store = get_scoped_store(current_user.tenant_id, namespace)  # type: ignore[arg-type]
     value = await store.get(key)
 
     return StateValueResponse(
@@ -370,13 +379,13 @@ async def set_state_value(
     namespace: str,
     key: str,
     request: StateValueRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> StateValueResponse:
     """Set a state value.
 
     Optionally set a TTL for automatic expiration.
     """
-    store = get_scoped_store(current_user.tenant_id, namespace)
+    store = get_scoped_store(current_user.tenant_id, namespace)  # type: ignore[arg-type]
 
     await store.set(
         key,
@@ -397,10 +406,10 @@ async def set_state_value(
 async def delete_state_value(
     namespace: str,
     key: str,
-    current_user: User = Depends(get_current_user),
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> None:
     """Delete a state value."""
-    store = get_scoped_store(current_user.tenant_id, namespace)
+    store = get_scoped_store(current_user.tenant_id, namespace)  # type: ignore[arg-type]
     deleted = await store.delete(key)
 
     if not deleted:
@@ -413,11 +422,12 @@ async def delete_state_value(
 @state_router.get("/{namespace}", response_model=StateListResponse)
 async def list_state_keys(
     namespace: str,
-    pattern: str | None = Query(None, description="Key pattern filter"),
-    current_user: User = Depends(get_current_user),
+    pattern: Annotated[str | None, Query(description="Key pattern filter")] = None,
+    *,
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> StateListResponse:
     """List all keys in a state namespace."""
-    store = get_scoped_store(current_user.tenant_id, namespace)
+    store = get_scoped_store(current_user.tenant_id, namespace)  # type: ignore[arg-type]
     keys = await store.list_keys(pattern=pattern)
 
     return StateListResponse(
@@ -430,10 +440,10 @@ async def list_state_keys(
 @state_router.delete("/{namespace}", status_code=204)
 async def clear_state_namespace(
     namespace: str,
-    current_user: User = Depends(get_current_user),
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> None:
     """Clear all state in a namespace."""
-    store = get_scoped_store(current_user.tenant_id, namespace)
+    store = get_scoped_store(current_user.tenant_id, namespace)  # type: ignore[arg-type]
     await store.clear()
 
 
@@ -441,14 +451,15 @@ async def clear_state_namespace(
 async def increment_state_value(
     namespace: str,
     key: str,
-    amount: int = Query(1, description="Amount to increment by"),
-    current_user: User = Depends(get_current_user),
+    amount: Annotated[int, Query(description="Amount to increment by")] = 1,
+    *,
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> StateValueResponse:
     """Increment a numeric state value.
 
     Creates the key with initial value if it doesn't exist.
     """
-    store = get_scoped_store(current_user.tenant_id, namespace)
+    store = get_scoped_store(current_user.tenant_id, namespace)  # type: ignore[arg-type]
 
     # Get current value
     current = await store.get(key)

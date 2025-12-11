@@ -37,7 +37,7 @@ _DEFAULT_NON_RETRYABLE: frozenset[str] = frozenset(
         # Generic programming errors
         "NotImplementedError",
         "RuntimeError",
-    }
+    },
 )
 
 # Mutable set for runtime additions (protected by lock)

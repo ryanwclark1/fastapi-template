@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated
-from uuid import UUID
+from typing import TYPE_CHECKING, Annotated, Any
+import uuid
 
 from fastapi import APIRouter, Depends, status
-from sqlalchemy.ext.asyncio import AsyncSession  # noqa: TC002
 
 from example_service.core.database import NotFoundError
 from example_service.core.dependencies.database import get_db_session
@@ -31,6 +30,11 @@ from example_service.infra.metrics.tracking import (
     track_feature_usage,
     track_user_action,
 )
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+else:  # pragma: no cover - typing fallback
+    AsyncSession = Any
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -126,7 +130,7 @@ async def list_webhooks(
     responses={404: {"description": "Webhook not found"}},
 )
 async def get_webhook(
-    webhook_id: UUID,
+    webhook_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> WebhookRead:
     """Get a single webhook by ID.
@@ -159,7 +163,7 @@ async def get_webhook(
     responses={404: {"description": "Webhook not found"}},
 )
 async def update_webhook(
-    webhook_id: UUID,
+    webhook_id: uuid.UUID,
     payload: WebhookUpdate,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> WebhookRead:
@@ -204,7 +208,7 @@ async def update_webhook(
     responses={404: {"description": "Webhook not found"}},
 )
 async def delete_webhook(
-    webhook_id: UUID,
+    webhook_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> None:
     """Delete a webhook permanently.
@@ -243,7 +247,7 @@ async def delete_webhook(
     responses={404: {"description": "Webhook not found"}},
 )
 async def test_webhook(
-    webhook_id: UUID,
+    webhook_id: uuid.UUID,
     test_request: WebhookTestRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> WebhookTestResponse:
@@ -271,7 +275,7 @@ async def test_webhook(
     delivery = WebhookDelivery(
         webhook_id=webhook.id,
         event_type=test_request.event_type,
-        event_id="test-" + str(UUID()),
+        event_id="test-" + str(uuid.uuid4()),
         payload=test_request.payload or {"test": True},
         status="pending",
         attempt_count=0,
@@ -336,7 +340,7 @@ async def test_webhook(
     responses={404: {"description": "Webhook not found"}},
 )
 async def regenerate_secret(
-    webhook_id: UUID,
+    webhook_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> SecretRegenerateResponse:
     """Regenerate HMAC secret for a webhook.
@@ -374,7 +378,7 @@ async def regenerate_secret(
     responses={404: {"description": "Webhook not found"}},
 )
 async def list_deliveries(
-    webhook_id: UUID,
+    webhook_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     limit: int = 100,
     offset: int = 0,
@@ -422,8 +426,8 @@ async def list_deliveries(
     responses={404: {"description": "Webhook or delivery not found"}},
 )
 async def retry_delivery(
-    webhook_id: UUID,
-    delivery_id: UUID,
+    webhook_id: uuid.UUID,
+    delivery_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> WebhookDeliveryRead:
     """Manually retry a failed delivery.

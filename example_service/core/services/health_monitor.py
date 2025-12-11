@@ -29,15 +29,18 @@ Example:
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable, Coroutine
+import contextlib
 import logging
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from example_service.core.services.availability import (
     ServiceName,
     get_service_registry,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +90,7 @@ class HealthMonitor:
         self._check_interval = check_interval
         self._check_timeout = check_timeout
         self._health_checks: dict[
-            ServiceName, Callable[[], Coroutine[Any, Any, bool]]
+            ServiceName, Callable[[], Coroutine[Any, Any, bool]],
         ] = {}
         self._task: asyncio.Task | None = None
         self._running = False
@@ -164,7 +167,7 @@ class HealthMonitor:
 
         # Update metrics
         service_health_check_duration_seconds.labels(
-            service_name=service.value
+            service_name=service.value,
         ).observe(duration)
         service_health_check_total.labels(
             service_name=service.value,
@@ -267,7 +270,7 @@ class HealthMonitor:
                 try:
                     await self._run_health_checks()
                 except Exception as e:
-                    logger.error(
+                    logger.exception(
                         "Health check cycle failed",
                         extra={"error": str(e)},
                     )
@@ -316,10 +319,8 @@ class HealthMonitor:
                 await asyncio.wait_for(self._task, timeout=5.0)
             except TimeoutError:
                 self._task.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await self._task
-                except asyncio.CancelledError:
-                    pass
             self._task = None
 
         logger.info("Health monitor stopped")

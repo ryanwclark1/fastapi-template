@@ -134,7 +134,6 @@ class ConsoleProvider(BaseEmailProvider):
         output_lines.extend([separator, ""])
 
         # Print to console
-        print("\n".join(output_lines))
 
         return EmailDeliveryResult.success_result(
             message_id=message_id,

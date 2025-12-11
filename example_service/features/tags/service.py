@@ -73,7 +73,7 @@ class TagService:
 
         lazy_logger.debug(
             lambda: f"service.list_tags(search={search!r}, include_counts={include_counts}) "
-            f"-> {len(tags)} tags"
+            f"-> {len(tags)} tags",
         )
         return tags, counts
 
@@ -113,7 +113,7 @@ class TagService:
         count = await self._repo.get_reminder_count_for_tag(self._session, tag_id)
 
         lazy_logger.debug(
-            lambda: f"service.get_tag_with_count({tag_id}) -> count={count}"
+            lambda: f"service.get_tag_with_count({tag_id}) -> count={count}",
         )
         return tag, count
 

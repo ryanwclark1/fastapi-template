@@ -117,7 +117,7 @@ async def require_email_service(
 
 async def require_enhanced_email_service(
     service: Annotated[
-        EnhancedEmailService | None, Depends(get_enhanced_email_service_dep)
+        EnhancedEmailService | None, Depends(get_enhanced_email_service_dep),
     ],
 ) -> EnhancedEmailService:
     """Dependency that requires enhanced email service to be available.
@@ -147,7 +147,7 @@ async def require_enhanced_email_service(
 
 async def optional_enhanced_email_service(
     service: Annotated[
-        EnhancedEmailService | None, Depends(get_enhanced_email_service_dep)
+        EnhancedEmailService | None, Depends(get_enhanced_email_service_dep),
     ],
 ) -> EnhancedEmailService | None:
     """Dependency that optionally provides enhanced email service.
@@ -205,7 +205,7 @@ Example:
 """
 
 EnhancedEmailServiceDep = Annotated[
-    _EnhancedEmailService, Depends(require_enhanced_email_service)
+    _EnhancedEmailService, Depends(require_enhanced_email_service),
 ]
 """Enhanced multi-tenant email service dependency.
 
@@ -223,7 +223,7 @@ Example:
 """
 
 OptionalEnhancedEmailService = Annotated[
-    _EnhancedEmailService | None, Depends(optional_enhanced_email_service)
+    _EnhancedEmailService | None, Depends(optional_enhanced_email_service),
 ]
 """Optional enhanced email service dependency.
 
@@ -244,7 +244,7 @@ Example:
 """
 
 TemplateRendererDep = Annotated[
-    _EmailTemplateRenderer, Depends(require_template_renderer)
+    _EmailTemplateRenderer, Depends(require_template_renderer),
 ]
 """Email template renderer dependency.
 

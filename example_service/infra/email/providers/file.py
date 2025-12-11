@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 import json
 import logging
 from pathlib import Path
+from tempfile import gettempdir
 from typing import TYPE_CHECKING
 import uuid
 
@@ -44,7 +45,7 @@ class FileProvider(BaseEmailProvider):
         # File created: /tmp/emails/20241202_120000_file-abc123.json
     """
 
-    DEFAULT_OUTPUT_DIR = "/tmp/emails"  # noqa: S108
+    DEFAULT_OUTPUT_DIR = Path(gettempdir()) / "example_service_emails"
 
     def __init__(self, config: ResolvedEmailConfig) -> None:
         """Initialize file provider.
@@ -56,8 +57,11 @@ class FileProvider(BaseEmailProvider):
         super().__init__(config)
 
         # Get output directory from config or use default
-        self._output_dir = Path(
-            (config.config_json or {}).get("file_path", self.DEFAULT_OUTPUT_DIR)
+        file_path_override = (config.config_json or {}).get("file_path")
+        self._output_dir = (
+            Path(file_path_override)
+            if file_path_override
+            else self.DEFAULT_OUTPUT_DIR
         )
 
         logger.info(

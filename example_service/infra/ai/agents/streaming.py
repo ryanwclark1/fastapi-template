@@ -1,4 +1,4 @@
-"""Streaming responses for AI agents.
+r"""Streaming responses for AI agents.
 
 This module provides streaming capabilities for long-running agent tasks:
 - Server-Sent Events (SSE) streaming
@@ -31,16 +31,24 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import asyncio
-from collections.abc import AsyncGenerator, Callable
+import contextlib
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 import json
 import logging
-from typing import Any, TypeVar
+from types import TracebackType
+from typing import TYPE_CHECKING, Any, Self, TypeVar
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
+
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Callable
+
+require_runtime_dependency(TracebackType)
 
 logger = logging.getLogger(__name__)
 
@@ -325,12 +333,17 @@ class StreamingContext:
         self._sequence = 0
         self._cancelled = False
 
-    async def __aenter__(self) -> StreamingContext:
+    async def __aenter__(self) -> Self:
         """Enter context."""
         await self._start_heartbeat()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         """Exit context."""
         await self._stop_heartbeat()
         if exc_type is not None:
@@ -346,10 +359,8 @@ class StreamingContext:
         """Stop heartbeat task."""
         if self._heartbeat_task:
             self._heartbeat_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._heartbeat_task
-            except asyncio.CancelledError:
-                pass
 
     async def _heartbeat_loop(self) -> None:
         """Emit heartbeat events periodically."""
@@ -744,22 +755,22 @@ async def create_json_stream(
 
 
 __all__ = [
-    # Event types
-    "EventType",
-    "StreamEvent",
-    # Stream state
-    "StreamState",
-    "StreamStatus",
     # Handlers
     "AsyncGeneratorHandler",
     "CallbackHandler",
-    "StreamHandler",
-    # Context
-    "StreamingContext",
+    # Event types
+    "EventType",
     # Configuration
     "StreamConfig",
+    "StreamEvent",
+    "StreamHandler",
+    # Stream state
+    "StreamState",
+    "StreamStatus",
     # Mixin
     "StreamingAgentMixin",
+    # Context
+    "StreamingContext",
     # Utilities
     "create_json_stream",
     "create_sse_response",

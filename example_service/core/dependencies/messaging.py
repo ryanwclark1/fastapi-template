@@ -47,12 +47,10 @@ Usage:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Any, Protocol, runtime_checkable
+from typing import Annotated, Any, Protocol, runtime_checkable
 
 from fastapi import Depends, HTTPException, status
-
-if TYPE_CHECKING:
-    from faststream.rabbit import RabbitBroker
+from faststream.rabbit import RabbitBroker
 
 
 @runtime_checkable
@@ -308,9 +306,9 @@ def get_message_broker() -> RabbitBroker | None:
     Returns:
         RabbitBroker | None: The broker instance, or None if not initialized.
     """
-    from example_service.infra.messaging import broker
+    from example_service.infra.messaging.broker import broker as rabbit_broker
 
-    return broker
+    return rabbit_broker
 
 
 async def require_message_broker(
@@ -362,9 +360,6 @@ async def optional_message_broker(
     return broker
 
 
-# Import at runtime after function definitions to avoid circular dependencies
-from faststream.rabbit import RabbitBroker  # noqa: E402
-
 MessageBroker = Annotated[RabbitBroker, Depends(require_message_broker)]
 """DEPRECATED: Use RequiredBusPublisher instead.
 
@@ -384,14 +379,14 @@ __all__ = [
     # New Protocol-based API (recommended)
     "BusPublisher",
     "BusPublisherDep",
-    "RabbitBusPublisher",
-    "RequiredBusPublisher",
-    "get_bus_publisher",
-    "require_bus_publisher",
     # Legacy API (backward compatibility)
     "MessageBroker",
     "OptionalMessageBroker",
+    "RabbitBusPublisher",
+    "RequiredBusPublisher",
+    "get_bus_publisher",
     "get_message_broker",
     "optional_message_broker",
+    "require_bus_publisher",
     "require_message_broker",
 ]

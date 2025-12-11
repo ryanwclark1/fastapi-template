@@ -60,8 +60,11 @@ docs/
 logs/
 
 # Development environment files
+.env
 .env.local
 .env.development
+.env.*
+!.env.example
 
 # Build artifacts
 dist/
@@ -104,6 +107,11 @@ memory_profiler/
 *.profiler
 *.perf
 
+# Type checking and linting caches
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+
 # AI Assistant files
 .claude/
 .mcp.json
@@ -128,8 +136,6 @@ credentials/
 
 # Frontend build artifacts (not needed in backend containers)
 node_modules/
-dist/
-build/
 static/dist/
 
 # IMPORTANT: Keep essential files for devcontainers

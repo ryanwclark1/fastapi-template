@@ -76,15 +76,18 @@ class ProviderFactory:
         """
         # Get configuration
         config = await self.config_manager.get_transcription_config(
-            tenant_id, provider_name
+            tenant_id, provider_name,
         )
 
         # Get provider class
         provider_class = self._transcription_registry.get(config.provider_name)
         if not provider_class:
-            raise ValueError(
+            msg = (
                 f"Transcription provider '{config.provider_name}' not found. "
                 f"Available: {list(self._transcription_registry.keys())}"
+            )
+            raise ValueError(
+                msg,
             )
 
         # Instantiate provider
@@ -100,8 +103,9 @@ class ProviderFactory:
             )
             return provider
         except Exception as e:
+            msg = f"Failed to create {config.provider_name} transcription provider: {e}"
             raise ProviderError(
-                f"Failed to create {config.provider_name} transcription provider: {e}",
+                msg,
                 provider=config.provider_name,
                 operation="instantiation",
                 original_error=e,
@@ -131,9 +135,12 @@ class ProviderFactory:
         # Get provider class
         provider_class = self._llm_registry.get(config.provider_name)
         if not provider_class:
-            raise ValueError(
+            msg = (
                 f"LLM provider '{config.provider_name}' not found. "
                 f"Available: {list(self._llm_registry.keys())}"
+            )
+            raise ValueError(
+                msg,
             )
 
         # Instantiate provider
@@ -149,8 +156,9 @@ class ProviderFactory:
             )
             return provider
         except Exception as e:
+            msg = f"Failed to create {config.provider_name} LLM provider: {e}"
             raise ProviderError(
-                f"Failed to create {config.provider_name} LLM provider: {e}",
+                msg,
                 provider=config.provider_name,
                 operation="instantiation",
                 original_error=e,
@@ -177,7 +185,8 @@ class ProviderFactory:
         provider_class = self._pii_registry.get(provider_name)
 
         if not provider_class:
-            raise ValueError(f"PII provider '{provider_name}' not found")
+            msg = f"PII provider '{provider_name}' not found"
+            raise ValueError(msg)
 
         # Instantiate provider
         try:
@@ -188,8 +197,9 @@ class ProviderFactory:
             )
             return provider
         except Exception as e:
+            msg = f"Failed to create {provider_name} PII provider: {e}"
             raise ProviderError(
-                f"Failed to create {provider_name} PII provider: {e}",
+                msg,
                 provider=provider_name,
                 operation="instantiation",
                 original_error=e,
@@ -480,5 +490,5 @@ async def close_all_providers() -> None:
     _factory_instances.clear()
 
     logger.info(
-        "Cleared factory cache. Individual provider cleanup should be managed per-request."
+        "Cleared factory cache. Individual provider cleanup should be managed per-request.",
     )

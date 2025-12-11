@@ -529,7 +529,7 @@ class SagaCoordinator:
                                 "error": result.error,
                                 "next_provider": fallback_chain[len(fallbacks_attempted)],
                             },
-                        )
+                        ),
                     )
 
             except Exception as e:
@@ -562,7 +562,7 @@ class SagaCoordinator:
                 failed_step=context.failed_step or "unknown",
                 steps_to_compensate=steps_to_compensate,
                 failure_reason=context.failure_error or "Unknown",
-            )
+            ),
         )
 
         compensated: list[str] = []
@@ -592,7 +592,7 @@ class SagaCoordinator:
                             step_name=step_name,
                             success=True,
                             duration_ms=duration_ms,
-                        )
+                        ),
                     )
                 else:
                     failed.append(step_name)
@@ -604,7 +604,7 @@ class SagaCoordinator:
                             success=False,
                             error="Compensation returned False",
                             duration_ms=duration_ms,
-                        )
+                        ),
                     )
 
             except TimeoutError:
@@ -616,7 +616,7 @@ class SagaCoordinator:
                         step_name=step_name,
                         success=False,
                         error=f"Timeout after {step.compensation.timeout_seconds}s",
-                    )
+                    ),
                 )
 
             except Exception as e:
@@ -628,7 +628,7 @@ class SagaCoordinator:
                         step_name=step_name,
                         success=False,
                         error=str(e),
-                    )
+                    ),
                 )
 
         # Update context
@@ -643,7 +643,7 @@ class SagaCoordinator:
                 compensated_steps=compensated,
                 failed_compensations=failed,
                 full_rollback=len(failed) == 0,
-            )
+            ),
         )
 
     async def _emit_step_skipped(
@@ -661,7 +661,7 @@ class SagaCoordinator:
                 tenant_id=context.tenant_id,
                 step_name=step.name,
                 reason=reason,
-            )
+            ),
         )
 
     async def _emit_checkpoint(
@@ -681,7 +681,7 @@ class SagaCoordinator:
                 step_name=step_name,
                 percent=percent,
                 data_snapshot_keys=list(context.data.keys()),
-            )
+            ),
         )
 
     async def _emit_budget_exceeded(
@@ -701,7 +701,7 @@ class SagaCoordinator:
                 current_spend_usd=current,
                 exceeded_by_usd=current - budget,
                 action_taken="warned",  # Could be "blocked" in stricter mode
-            )
+            ),
         )
 
     def _create_failure_result(

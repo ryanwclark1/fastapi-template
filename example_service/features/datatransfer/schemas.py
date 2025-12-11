@@ -8,6 +8,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(datetime)
+
 
 class FilterOperator(StrEnum):
     """Supported filter operators for export queries."""
@@ -30,7 +34,7 @@ class FilterCondition(BaseModel):
 
     field: str = Field(description="Field name to filter on")
     operator: FilterOperator = Field(
-        default=FilterOperator.EQ, description="Filter operator"
+        default=FilterOperator.EQ, description="Filter operator",
     )
     value: Any = Field(default=None, description="Value to compare against")
 
@@ -41,8 +45,8 @@ class FilterCondition(BaseModel):
                 {"field": "created_at", "operator": "gte", "value": "2024-01-01"},
                 {"field": "title", "operator": "contains", "value": "urgent"},
                 {"field": "status", "operator": "in", "value": ["active", "pending"]},
-            ]
-        }
+            ],
+        },
     }
 
 
@@ -96,10 +100,17 @@ class ExportRequest(BaseModel):
         description="Advanced filter conditions with operators (gt, lt, contains, in, etc.)",
     )
     fields: list[str] | None = Field(
-        default=None, description="Specific fields to export (all if not specified)"
+        default=None, description="Specific fields to export (all if not specified)",
     )
     include_headers: bool = Field(default=True, description="Include column headers (CSV/Excel)")
     upload_to_storage: bool = Field(default=False, description="Upload to object storage after export")
+
+    # Async execution support
+    execution_mode: str = Field(
+        default="sync",
+        description="Execution mode: 'sync' (immediate), 'async' (via workers), 'auto' (threshold-based)",
+        pattern="^(sync|async|auto)$",
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -113,8 +124,8 @@ class ExportRequest(BaseModel):
                         {"field": "created_at", "operator": "gte", "value": "2024-01-01"},
                     ],
                 },
-            ]
-        }
+            ],
+        },
     }
 
 
@@ -135,6 +146,16 @@ class ExportResult(BaseModel):
     completed_at: datetime | None = None
     error_message: str | None = None
 
+    # Async job tracking
+    job_id: str | None = Field(
+        default=None,
+        description="Job ID for async exports (poll for status via /jobs/{job_id} endpoint)",
+    )
+    poll_url: str | None = Field(
+        default=None,
+        description="URL to poll for job status and results",
+    )
+
     model_config = {"from_attributes": True}
 
 
@@ -144,15 +165,22 @@ class ImportRequest(BaseModel):
     entity_type: str = Field(description="Type of entity to import")
     format: ImportFormat = Field(description="Import file format")
     validate_only: bool = Field(
-        default=False, description="Only validate, don't actually import"
+        default=False, description="Only validate, don't actually import",
     )
     skip_errors: bool = Field(
-        default=False, description="Continue importing even if some records fail"
+        default=False, description="Continue importing even if some records fail",
     )
     update_existing: bool = Field(
-        default=False, description="Update existing records instead of skipping"
+        default=False, description="Update existing records instead of skipping",
     )
     batch_size: int = Field(default=100, ge=1, le=1000, description="Records to process per batch")
+
+    # Async execution support
+    execution_mode: str = Field(
+        default="sync",
+        description="Execution mode: 'sync' (immediate), 'async' (via workers), 'auto' (threshold-based)",
+        pattern="^(sync|async|auto)$",
+    )
 
 
 class ImportValidationError(BaseModel):
@@ -177,11 +205,21 @@ class ImportResult(BaseModel):
     failed_rows: int = Field(default=0, description="Rows that failed")
     skipped_rows: int = Field(default=0, description="Rows skipped (duplicates, etc.)")
     validation_errors: list[ImportValidationError] = Field(
-        default_factory=list, description="Validation errors (limited to first 100)"
+        default_factory=list, description="Validation errors (limited to first 100)",
     )
     started_at: datetime | None = None
     completed_at: datetime | None = None
     error_message: str | None = None
+
+    # Async job tracking
+    job_id: str | None = Field(
+        default=None,
+        description="Job ID for async imports (poll for status via /jobs/{job_id} endpoint)",
+    )
+    poll_url: str | None = Field(
+        default=None,
+        description="URL to poll for job status and results",
+    )
 
     model_config = {"from_attributes": True}
 
@@ -202,7 +240,7 @@ class SupportedEntity(BaseModel):
     importable: bool = Field(default=True, description="Whether entity can be imported")
     fields: list[str] = Field(default_factory=list, description="Available fields")
     required_fields: list[str] = Field(
-        default_factory=list, description="Required fields for import"
+        default_factory=list, description="Required fields for import",
     )
 
 

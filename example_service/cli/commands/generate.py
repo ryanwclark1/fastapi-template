@@ -575,7 +575,14 @@ def resource(
         example-service generate resource Order --model --schema --crud
 
     Args:
-        model_name: Name of the model (e.g., 'Product', 'Order', 'user_profile')
+        model_name: Base name for generated files (e.g., `Product`).
+        generate_all: Whether to generate every artifact regardless of flags.
+        model: Whether to generate the SQLAlchemy model file.
+        schema: Whether to generate the Pydantic schema file.
+        crud: Whether to scaffold CRUD helpers.
+        router: Whether to generate the FastAPI router boilerplate.
+        tests: Whether to generate basic test coverage.
+        force: Whether to overwrite any existing files.
     """
     # If no specific flags, generate all by default
     if not any([model, schema, crud, router, tests]):
@@ -673,7 +680,7 @@ def resource(
             click.echo("4. Import CRUD functions in example_service/core/crud/__init__.py")
         if model:
             click.echo(
-                f"5. Create database migration: example-service db revision -m 'add {ctx['table_name']}'"
+                f"5. Create database migration: example-service db revision -m 'add {ctx['table_name']}'",
             )
         if tests:
             click.echo(f"6. Run tests: pytest tests/test_api/test_{ctx['model_plural']}.py")
@@ -692,7 +699,9 @@ def router(name: str, prefix: str, tag: str | None) -> None:
         example-service generate router webhooks --prefix /webhooks
 
     Args:
-        name: Router name (e.g., 'webhooks', 'reports')
+        name: Router name (e.g., 'webhooks', 'reports').
+        prefix: URL prefix to mount the router under.
+        tag: Optional OpenAPI tag to group the endpoints.
     """
     router_name = to_snake_case(name)
     tag = tag or name
@@ -1665,7 +1674,17 @@ def get_feature_context(name: str, description: str | None = None) -> dict[str, 
     """Generate template context for feature scaffolding.
 
     Args:
-        name: Feature name (e.g., 'products', 'orders', 'user_profiles')
+        name: Feature name (e.g., 'products', 'orders', 'user_profiles').
+        description: Optional text used in generated module docstrings.
+        generate_all: Whether to scaffold every component regardless of flags.
+        model: Whether to generate SQLAlchemy models.
+        schema: Whether to generate Pydantic schemas.
+        repository: Whether to add repository boilerplate.
+        service: Whether to scaffold the service layer.
+        router: Whether to create FastAPI routes.
+        tests: Whether to create placeholder tests.
+        multitenant: Whether to include tenant-specific mixins and dependencies.
+        force: Whether to overwrite existing files.
         description: Optional feature description
 
     Returns:
@@ -1761,7 +1780,17 @@ def feature(
         example-service generate feature invoices --all --multitenant
 
     Args:
-        name: Feature name (e.g., 'products', 'orders', 'user_profiles')
+        name: Feature name (e.g., 'products', 'orders', 'user_profiles').
+        description: Optional text used in generated module docstrings.
+        generate_all: Whether to scaffold every component regardless of flags.
+        model: Whether to generate SQLAlchemy models.
+        schema: Whether to generate Pydantic schemas.
+        repository: Whether to add repository boilerplate.
+        service: Whether to scaffold the service layer.
+        router: Whether to create FastAPI routes.
+        tests: Whether to create placeholder tests.
+        multitenant: Whether to include tenant-specific mixins and dependencies.
+        force: Whether to overwrite existing files.
     """
     # If no specific flags, generate all
     if not any([model, schema, repository, service, router, tests]):

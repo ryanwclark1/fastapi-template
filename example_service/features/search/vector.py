@@ -35,7 +35,7 @@ from enum import StrEnum
 import logging
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import text
+from sqlalchemy import text as sql_text
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -218,7 +218,7 @@ class VectorSearchService:
 
         try:
             result = await self.session.execute(
-                text("SELECT 1 FROM pg_extension WHERE extname = 'vector'")
+                sql_text("SELECT 1 FROM pg_extension WHERE extname = 'vector'"),
             )
             return result.scalar() is not None
         except Exception as e:
@@ -290,7 +290,7 @@ class VectorSearchService:
         """
 
         try:
-            result = await self.session.execute(text(query))
+            result = await self.session.execute(sql_text(query))
             rows = result.all()
 
             return [
@@ -379,7 +379,7 @@ class VectorSearchService:
         """
 
         try:
-            result = await self.session.execute(text(hybrid_query), {"query": query})
+            result = await self.session.execute(sql_text(hybrid_query), {"query": query})
             rows = result.all()
 
             return [
@@ -437,7 +437,7 @@ class VectorSearchService:
 
         try:
             await self.session.execute(
-                text(upsert_query),
+                sql_text(upsert_query),
                 {
                     "entity_type": entity_type,
                     "entity_id": entity_id,
@@ -467,7 +467,7 @@ class VectorSearchService:
         """
         try:
             await self.session.execute(
-                text("DELETE FROM search_embeddings WHERE entity_type = $1 AND entity_id = $2"),
+                sql_text("DELETE FROM search_embeddings WHERE entity_type = $1 AND entity_id = $2"),
                 {"entity_type": entity_type, "entity_id": entity_id},
             )
             await self.session.flush()

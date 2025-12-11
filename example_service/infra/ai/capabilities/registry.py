@@ -387,10 +387,12 @@ class CapabilityRegistry:
             ValueError: If provider not found or no factory registered
         """
         if provider_name not in self._providers:
-            raise ValueError(f"Provider '{provider_name}' not registered")
+            msg = f"Provider '{provider_name}' not registered"
+            raise ValueError(msg)
 
         if provider_name not in self._adapter_factories:
-            raise ValueError(f"No adapter factory registered for '{provider_name}'")
+            msg = f"No adapter factory registered for '{provider_name}'"
+            raise ValueError(msg)
 
         factory = self._adapter_factories[provider_name]
         return factory(api_key=api_key, model_name=model_name, **kwargs)

@@ -11,7 +11,7 @@ This module provides reusable fixtures for integration testing including:
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -19,11 +19,25 @@ from fastapi import FastAPI, Request
 from httpx import ASGITransport, AsyncClient
 import pytest
 import pytest_asyncio
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
+from example_service.core.dependencies.accent_auth import (
+    get_auth_user,
+    get_current_user,
+)
+from example_service.core.dependencies.auth_client import get_auth_client
+from example_service.core.dependencies.database import get_db_session
+from example_service.core.models.tenant import Tenant
+from example_service.core.schemas.auth import AuthUser
+from example_service.features.ai.models import Agent
+from example_service.infra.cache.redis import get_cache
+
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import AsyncGenerator, Generator
+else:  # pragma: no cover - runtime placeholders for typing-only imports
+    AsyncGenerator = Generator = Any
 
 
 @pytest.fixture(scope="session")
@@ -56,7 +70,7 @@ def mock_accent_auth_client() -> MagicMock:
                 auth_id="test-auth",
             ),
             acls=["read", "write"],
-        )
+        ),
     )
     mock.check_acl = AsyncMock(return_value=True)
     return mock
@@ -82,8 +96,7 @@ def test_app_minimal() -> FastAPI:
 
     @app.post("/echo")
     async def echo_endpoint(request: Request):
-        body = await request.json()
-        return body
+        return await request.json()
 
     return app
 
@@ -117,19 +130,42 @@ def test_app_with_state() -> FastAPI:
 
 
 @pytest_asyncio.fixture
-async def async_client(test_app_minimal: FastAPI) -> AsyncGenerator[AsyncClient]:
-    """Create async HTTP client for testing.
+async def async_client(
+    app: FastAPI,
+    db_session: AsyncSession,
+    mock_auth_admin,
+    mock_cache,
+    test_tenant_id: str,
+) -> AsyncGenerator[AsyncClient]:
+    """Create async HTTP client bound to the real application."""
 
-    Args:
-        test_app_minimal: FastAPI app fixture.
+    async def _override_db_session():
+        yield db_session
 
-    Yields:
-        Configured AsyncClient instance.
-    """
+    auth_user = AuthUser(
+        user_id="admin-user-id",
+        permissions=["#"],
+        metadata={
+            "tenant_uuid": test_tenant_id,
+            "tenant_slug": f"{test_tenant_id}-slug",
+        },
+    )
+
+    async def _override_auth_user() -> AuthUser:
+        return auth_user
+
+    app.dependency_overrides[get_auth_client] = lambda: mock_auth_admin
+    app.dependency_overrides[get_db_session] = _override_db_session
+    app.dependency_overrides[get_cache] = lambda: mock_cache
+    app.dependency_overrides[get_auth_user] = _override_auth_user
+    app.dependency_overrides[get_current_user] = _override_auth_user
+
     async with AsyncClient(
-        transport=ASGITransport(app=test_app_minimal), base_url="http://test"
+        transport=ASGITransport(app=app), base_url="http://test",
     ) as client:
         yield client
+
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -222,6 +258,67 @@ def mock_storage_client() -> MagicMock:
     return client
 
 
+@pytest_asyncio.fixture
+async def test_tenant_id(db_session: AsyncSession) -> str:
+    """Ensure a tenant exists for integration tests."""
+    tenant_id = "tenant-integration"
+    tenant = await db_session.get(Tenant, tenant_id)
+    if tenant is None:
+        tenant = Tenant(id=tenant_id, name="Integration Tenant")
+        db_session.add(tenant)
+        await db_session.commit()
+    return tenant_id
+
+
+@pytest_asyncio.fixture
+async def prebuilt_agent(db_session: AsyncSession) -> Agent:
+    """Ensure a system prebuilt agent exists for template-related tests."""
+    result = await db_session.execute(
+        select(Agent).where(Agent.agent_key == "system:rag_agent"),
+    )
+    agent = result.scalar_one_or_none()
+    if agent is not None:
+        return agent
+
+    agent = Agent(
+        agent_key="system:rag_agent",
+        name="RAG Agent Template",
+        description="Prebuilt retrieval-augmented generation agent for tests",
+        tenant_id=None,
+        agent_type="rag",
+        model="gpt-4o-mini",
+        provider="openai",
+        system_prompt="You are a helpful retrieval-augmented assistant.",
+        temperature=0.2,
+        max_tokens=4096,
+        tools={
+            "search_knowledge_base": {
+                "enabled": True,
+                "config": {"index": "main"},
+            },
+        },
+        is_prebuilt=True,
+        is_active=True,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+    db_session.add(agent)
+    await db_session.commit()
+    await db_session.refresh(agent)
+    return agent
+
+
+@pytest.fixture
+def auth_headers(test_tenant_id: str) -> dict[str, str]:
+    """Standard auth headers for hitting protected endpoints."""
+    return {
+        "X-Auth-Token": "integration-test-token",
+        "Accent-Tenant": test_tenant_id,
+        "X-Tenant-ID": test_tenant_id,
+        "Content-Type": "application/json",
+    }
+
+
 @pytest.fixture
 def translation_provider() -> dict[str, dict[str, str]]:
     """Translation provider for I18n testing.
@@ -277,7 +374,7 @@ class IntegrationTestHelper:
 
     @staticmethod
     async def wait_for_condition(
-        condition: callable, timeout: float = 5.0, interval: float = 0.1
+        condition: callable, timeout: float = 5.0, interval: float = 0.1,
     ) -> bool:
         """Wait for a condition to become true.
 

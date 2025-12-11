@@ -164,7 +164,7 @@ def sanitize_path_component(component: str) -> str:
 
 
 def validate_path(path: str) -> None:
-    """Validate storage path format and security.
+    r"""Validate storage path format and security.
 
     Performs comprehensive validation to prevent security issues like
     directory traversal, null byte injection, and path manipulation.

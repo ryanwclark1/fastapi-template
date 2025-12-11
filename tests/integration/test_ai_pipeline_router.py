@@ -144,7 +144,7 @@ def mock_event_store():
             "total_duration_ms": 1500,
             "started_at": datetime.now(UTC),
             "completed_at": datetime.now(UTC),
-        }
+        },
     )
     return store
 
@@ -162,7 +162,7 @@ def mock_budget_service():
             percent_used=5.0,
             period=BudgetPeriod.MONTHLY,
             message="Budget OK",
-        )
+        ),
     )
     service.get_spend_summary = AsyncMock(
         return_value={
@@ -171,7 +171,7 @@ def mock_budget_service():
             "by_pipeline": {"test_pipeline": Decimal("3.00")},
             "by_provider": {"mock_openai": Decimal("5.00")},
             "by_capability": {"transcription": Decimal("2.00")},
-        }
+        },
     )
     service.set_budget = AsyncMock()
     return service
@@ -182,6 +182,12 @@ def mock_orchestrator(mock_pipeline_result):
     """Create a mock instrumented orchestrator."""
     orchestrator = AsyncMock()
     orchestrator.execute = AsyncMock(return_value=mock_pipeline_result)
+    orchestrator.get_workflow_state = AsyncMock(
+        return_value={
+            "status": "running",
+            "completed_steps": ["step_1"],
+        },
+    )
     return orchestrator
 
 
@@ -240,7 +246,7 @@ async def ai_client(
             return_value=mock_budget_service,
         ),
         patch(
-            "example_service.features.ai.pipeline.router.get_pipeline", return_value=mock_pipeline
+            "example_service.features.ai.pipeline.router.get_pipeline", return_value=mock_pipeline,
         ),
         patch(
             "example_service.features.ai.pipeline.router.list_pipelines",
@@ -596,7 +602,7 @@ async def test_budget_exceeded_blocks_execution(
             percent_used=110.0,
             period=BudgetPeriod.MONTHLY,
             message="Monthly budget exceeded",
-        )
+        ),
     )
 
     # Create minimal app with only the pipeline router
@@ -627,7 +633,7 @@ async def test_budget_exceeded_blocks_execution(
             return_value=blocked_budget_service,
         ),
         patch(
-            "example_service.features.ai.pipeline.router.get_pipeline", return_value=mock_pipeline
+            "example_service.features.ai.pipeline.router.get_pipeline", return_value=mock_pipeline,
         ),
     ):
         async with AsyncClient(
@@ -760,7 +766,7 @@ async def test_websocket_event_stream_connection(
     mock_event_store.get_workflow_state = AsyncMock(
         return_value={
             "status": "completed",
-        }
+        },
     )
 
     async def mock_subscribe(execution_id, event_types=None):
@@ -798,7 +804,7 @@ async def test_websocket_event_stream_connection(
             return_value=mock_budget_service,
         ),
         patch(
-            "example_service.features.ai.pipeline.router.get_pipeline", return_value=mock_pipeline
+            "example_service.features.ai.pipeline.router.get_pipeline", return_value=mock_pipeline,
         ),
         patch(
             "example_service.features.ai.pipeline.router.list_pipelines",

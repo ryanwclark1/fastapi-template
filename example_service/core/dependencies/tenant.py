@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends, Header
 from frozendict import frozendict
-from sqlalchemy.ext.asyncio import AsyncSession  # noqa: TC002
 
 from example_service.app.middleware.tenant import (
     set_tenant_context as set_middleware_tenant_context,
@@ -27,6 +26,8 @@ from .accent_auth import get_current_user
 from .database import get_db_session
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
     from example_service.core.schemas.auth import AuthUser
 
 logger = logging.getLogger(__name__)
@@ -126,7 +127,7 @@ async def _lookup_tenant(
 
     # Query database - try by ID first (most common case)
     stmt = select(Tenant).where(
-        (Tenant.id == tenant_id) & (Tenant.is_active == True)  # noqa: E712
+        (Tenant.id == tenant_id) & (Tenant.is_active),
     )
     result = await session.execute(stmt)
     tenant = result.scalar_one_or_none()
@@ -295,3 +296,5 @@ def get_tenant_context(
 # Use this type alias in endpoint signatures for cleaner code:
 # tenant: TenantContextDep instead of tenant: Annotated[TenantContext | None, Depends(get_tenant_context)]
 TenantContextDep = Annotated[TenantContext | None, Depends(get_tenant_context)]
+# Backwards compatibility alias
+TenantDep = TenantContextDep

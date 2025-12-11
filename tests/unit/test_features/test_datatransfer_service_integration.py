@@ -36,7 +36,7 @@ class DummySession:
 
 @pytest.mark.asyncio
 async def test_export_uses_exporter_and_returns_result(
-    monkeypatch: pytest.MonkeyPatch, tmp_path
+    monkeypatch: pytest.MonkeyPatch, tmp_path,
 ) -> None:
     records = [SimpleNamespace(id=1)]
     session = DummySession(records)
@@ -74,7 +74,7 @@ async def test_export_to_bytes_success(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(dt_service, "select", lambda *_: None)
 
     data, content_type, filename = await svc.export_to_bytes(
-        ExportRequest(entity_type="any", format=ExportFormat.CSV)
+        ExportRequest(entity_type="any", format=ExportFormat.CSV),
     )
     assert data == b"bytes"
     assert content_type == "text/csv"
@@ -86,7 +86,7 @@ async def test_export_to_bytes_handles_not_exportable(monkeypatch: pytest.Monkey
     session = DummySession([])
     svc = dt_service.DataTransferService(session=session)
     monkeypatch.setattr(
-        svc, "_get_entity_config", lambda *_: {"exportable": False, "fields": [], "model_path": "x"}
+        svc, "_get_entity_config", lambda *_: {"exportable": False, "fields": [], "model_path": "x"},
     )
 
     req = ExportRequest(entity_type="any", format=ExportFormat.CSV)

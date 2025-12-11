@@ -37,7 +37,7 @@ class ReminderTagsDataLoader:
         """
         self._session = session
         self._loader: DataLoader[UUID, list[Tag]] = DataLoader(
-            load_fn=self._batch_load_tags_by_reminder
+            load_fn=self._batch_load_tags_by_reminder,
         )
 
     async def _batch_load_tags_by_reminder(

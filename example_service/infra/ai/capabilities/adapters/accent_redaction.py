@@ -78,7 +78,7 @@ class AccentRedactionAdapter(ProviderAdapter):
         confidence_threshold: float = 0.7,
         redaction_method: str = "mask",
         timeout: int = 60,
-        **kwargs: Any,  # noqa: ARG002
+        **kwargs: Any,
     ) -> None:
         """Initialize Accent Redaction adapter.
 
@@ -89,6 +89,7 @@ class AccentRedactionAdapter(ProviderAdapter):
             confidence_threshold: Minimum confidence (0.0-1.0)
             redaction_method: How to redact (mask|replace|hash|remove)
             timeout: Request timeout in seconds
+            **kwargs: Additional provider-specific options.
         """
         self.service_url = service_url
         self.api_key = api_key

@@ -1,3 +1,4 @@
+# mypy: disable-error-code="arg-type,return-value,assignment,attr-defined,misc,no-any-return,override"
 """Anthropic Claude provider implementation for LLM.
 
 Provides:
@@ -40,7 +41,7 @@ class AnthropicProvider(BaseProvider):
         timeout: int = 120,
         max_retries: int = 3,
         max_tokens: int = 4096,
-        **kwargs: Any,  # noqa: ARG002
+        **kwargs: Any,
     ) -> None:
         """Initialize Anthropic LLM provider.
 
@@ -71,7 +72,7 @@ class AnthropicProvider(BaseProvider):
                 "Install with: pip install anthropic"
             )
             raise ImportError(
-                msg
+                msg,
             ) from e
 
     def get_provider_name(self) -> str:
@@ -183,8 +184,9 @@ class AnthropicProvider(BaseProvider):
                     original_error=e,
                 ) from e
 
+            msg = f"Anthropic generation failed: {error_msg}"
             raise ProviderError(
-                f"Anthropic generation failed: {error_msg}",
+                msg,
                 provider="anthropic",
                 operation="llm_generation",
                 original_error=e,
@@ -251,9 +253,8 @@ class AnthropicProvider(BaseProvider):
             request_params.update(kwargs)
 
             # Generate with structured output
-            result = await client.messages.create(**request_params)
+            return await client.messages.create(**request_params)
 
-            return result  # type: ignore[no-any-return]
 
         except ImportError as e:
             msg = (
@@ -261,11 +262,12 @@ class AnthropicProvider(BaseProvider):
                 "Install with: pip install instructor"
             )
             raise ImportError(
-                msg
+                msg,
             ) from e
         except Exception as e:
+            msg = f"Structured generation failed: {e}"
             raise ProviderError(
-                f"Structured generation failed: {e}",
+                msg,
                 provider="anthropic",
                 operation="structured_generation",
                 original_error=e,

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from example_service.features.audit.models import AuditAction, AuditLog
 from example_service.features.audit.repository import (
@@ -13,6 +13,9 @@ from example_service.features.audit.repository import (
     get_audit_repository,
 )
 from example_service.features.audit.schemas import AuditLogQuery
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.fixture
@@ -40,7 +43,7 @@ async def test_get_audit_repository_returns_singleton() -> None:
 
 @pytest.mark.asyncio
 async def test_create_audit_log(
-    db_session: AsyncSession, repository: AuditRepository
+    db_session: AsyncSession, repository: AuditRepository,
 ) -> None:
     """Test creating an audit log entry."""
     log = AuditLog(
@@ -69,7 +72,7 @@ async def test_create_audit_log(
 
 @pytest.mark.asyncio
 async def test_get_audit_log(
-    db_session: AsyncSession, repository: AuditRepository
+    db_session: AsyncSession, repository: AuditRepository,
 ) -> None:
     """Test retrieving an audit log by ID."""
     log = AuditLog(
@@ -91,7 +94,7 @@ async def test_get_audit_log(
 
 @pytest.mark.asyncio
 async def test_query_logs_by_entity_type(
-    db_session: AsyncSession, repository: AuditRepository
+    db_session: AsyncSession, repository: AuditRepository,
 ) -> None:
     """Test querying logs by entity type."""
     # Create logs for different entity types
@@ -129,7 +132,7 @@ async def test_query_logs_by_entity_type(
 
 @pytest.mark.asyncio
 async def test_query_logs_by_entity_id(
-    db_session: AsyncSession, repository: AuditRepository
+    db_session: AsyncSession, repository: AuditRepository,
 ) -> None:
     """Test querying logs by entity ID."""
     log1 = AuditLog(
@@ -166,7 +169,7 @@ async def test_query_logs_by_entity_id(
 
 @pytest.mark.asyncio
 async def test_query_logs_by_user_id(
-    db_session: AsyncSession, repository: AuditRepository
+    db_session: AsyncSession, repository: AuditRepository,
 ) -> None:
     """Test querying logs by user ID."""
     log1 = AuditLog(
@@ -203,7 +206,7 @@ async def test_query_logs_by_user_id(
 
 @pytest.mark.asyncio
 async def test_query_logs_by_tenant_id(
-    db_session: AsyncSession, repository: AuditRepository
+    db_session: AsyncSession, repository: AuditRepository,
 ) -> None:
     """Test querying logs by tenant ID."""
     log1 = AuditLog(
@@ -243,7 +246,7 @@ async def test_query_logs_by_tenant_id(
 
 @pytest.mark.asyncio
 async def test_query_logs_by_action(
-    db_session: AsyncSession, repository: AuditRepository
+    db_session: AsyncSession, repository: AuditRepository,
 ) -> None:
     """Test querying logs by action."""
     log1 = AuditLog(
@@ -280,7 +283,7 @@ async def test_query_logs_by_action(
 
 @pytest.mark.asyncio
 async def test_query_logs_by_multiple_actions(
-    db_session: AsyncSession, repository: AuditRepository
+    db_session: AsyncSession, repository: AuditRepository,
 ) -> None:
     """Test querying logs by multiple actions."""
     log1 = AuditLog(
@@ -319,7 +322,7 @@ async def test_query_logs_by_multiple_actions(
 
 @pytest.mark.asyncio
 async def test_query_logs_by_success_status(
-    db_session: AsyncSession, repository: AuditRepository
+    db_session: AsyncSession, repository: AuditRepository,
 ) -> None:
     """Test querying logs by success status."""
     log1 = AuditLog(
@@ -360,7 +363,7 @@ async def test_query_logs_by_success_status(
 
 @pytest.mark.asyncio
 async def test_query_logs_by_request_id(
-    db_session: AsyncSession, repository: AuditRepository
+    db_session: AsyncSession, repository: AuditRepository,
 ) -> None:
     """Test querying logs by request ID."""
     log1 = AuditLog(
@@ -400,7 +403,7 @@ async def test_query_logs_by_request_id(
 
 @pytest.mark.asyncio
 async def test_query_logs_by_time_range(
-    db_session: AsyncSession, repository: AuditRepository
+    db_session: AsyncSession, repository: AuditRepository,
 ) -> None:
     """Test querying logs by time range."""
     now = datetime.now(UTC)
@@ -445,7 +448,7 @@ async def test_query_logs_by_time_range(
 
 @pytest.mark.asyncio
 async def test_query_logs_pagination(
-    db_session: AsyncSession, repository: AuditRepository
+    db_session: AsyncSession, repository: AuditRepository,
 ) -> None:
     """Test pagination in query_logs."""
     # Create multiple logs
@@ -477,7 +480,7 @@ async def test_query_logs_pagination(
 
 @pytest.mark.asyncio
 async def test_query_logs_ordering(
-    db_session: AsyncSession, repository: AuditRepository
+    db_session: AsyncSession, repository: AuditRepository,
 ) -> None:
     """Test ordering in query_logs."""
     now = datetime.now(UTC)
@@ -527,7 +530,7 @@ async def test_query_logs_ordering(
 
 @pytest.mark.asyncio
 async def test_get_entity_history(
-    db_session: AsyncSession, repository: AuditRepository
+    db_session: AsyncSession, repository: AuditRepository,
 ) -> None:
     """Test getting audit history for a specific entity."""
     entity_type = "reminder"
@@ -582,7 +585,7 @@ async def test_get_entity_history(
 
 @pytest.mark.asyncio
 async def test_get_entity_history_respects_limit(
-    db_session: AsyncSession, repository: AuditRepository
+    db_session: AsyncSession, repository: AuditRepository,
 ) -> None:
     """Test that get_entity_history respects limit parameter."""
     entity_type = "reminder"
@@ -600,7 +603,7 @@ async def test_get_entity_history_respects_limit(
     await db_session.commit()
 
     history = await repository.get_entity_history(
-        db_session, entity_type, entity_id, limit=5
+        db_session, entity_type, entity_id, limit=5,
     )
 
     assert len(history) == 5
@@ -608,7 +611,7 @@ async def test_get_entity_history_respects_limit(
 
 @pytest.mark.asyncio
 async def test_get_summary_stats(
-    db_session: AsyncSession, repository: AuditRepository
+    db_session: AsyncSession, repository: AuditRepository,
 ) -> None:
     """Test getting summary statistics."""
     # Create various audit logs
@@ -642,7 +645,7 @@ async def test_get_summary_stats(
             user_id="user-2",
             tenant_id="tenant-123",
             success=False,
-        )
+        ),
     )
 
     for log in logs:
@@ -664,7 +667,7 @@ async def test_get_summary_stats(
 
 @pytest.mark.asyncio
 async def test_get_summary_stats_with_time_filter(
-    db_session: AsyncSession, repository: AuditRepository
+    db_session: AsyncSession, repository: AuditRepository,
 ) -> None:
     """Test summary statistics with time filter."""
     now = datetime.now(UTC)
@@ -706,7 +709,7 @@ async def test_get_summary_stats_with_time_filter(
 
 @pytest.mark.asyncio
 async def test_delete_before(
-    db_session: AsyncSession, repository: AuditRepository
+    db_session: AsyncSession, repository: AuditRepository,
 ) -> None:
     """Test deleting logs before a specified date."""
     now = datetime.now(UTC)
@@ -753,7 +756,7 @@ async def test_delete_before(
 
 @pytest.mark.asyncio
 async def test_delete_before_with_tenant_filter(
-    db_session: AsyncSession, repository: AuditRepository
+    db_session: AsyncSession, repository: AuditRepository,
 ) -> None:
     """Test deleting logs before date with tenant filter."""
     now = datetime.now(UTC)
@@ -779,7 +782,7 @@ async def test_delete_before_with_tenant_filter(
     await db_session.commit()
 
     deleted = await repository.delete_before(
-        db_session, now - timedelta(days=7), tenant_id="tenant-123"
+        db_session, now - timedelta(days=7), tenant_id="tenant-123",
     )
     await db_session.commit()
 
@@ -794,7 +797,7 @@ async def test_delete_before_with_tenant_filter(
 
 @pytest.mark.asyncio
 async def test_query_logs_with_all_filters(
-    db_session: AsyncSession, repository: AuditRepository
+    db_session: AsyncSession, repository: AuditRepository,
 ) -> None:
     """Test query_logs with all filters combined."""
     now = datetime.now(UTC)

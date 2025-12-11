@@ -14,9 +14,10 @@ This module provides REST API endpoints for managing tenant email configurations
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import datetime as dt
+from datetime import UTC
 import logging
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 
@@ -29,7 +30,7 @@ from example_service.features.email.exceptions import (
     EmailConfigValidationError,
     EmailSendError,
 )
-from example_service.features.email.models import EmailConfig
+from example_service.utils.runtime_dependencies import require_runtime_dependency
 
 from .schemas import (
     EmailAuditLogResponse,
@@ -48,6 +49,11 @@ from .schemas import (
     TestEmailRequest,
     TestEmailResponse,
 )
+
+require_runtime_dependency(EmailConfigServiceDep, EnhancedEmailServiceDep)
+
+if TYPE_CHECKING:
+    from example_service.features.email.models import EmailConfig
 
 logger = logging.getLogger(__name__)
 
@@ -242,12 +248,12 @@ async def check_health(
                 provider="configured",
                 tenant_id=tenant_id,
                 healthy=is_healthy,
-                last_checked=datetime.now(UTC),
+                last_checked=dt.datetime.now(UTC),
                 response_time_ms=response_time_ms,
                 error=error,
-            )
+            ),
         ],
-        timestamp=datetime.now(UTC),
+        timestamp=dt.datetime.now(UTC),
     )
 
 
@@ -266,10 +272,10 @@ async def get_usage_stats(
     tenant_id: TenantIdPath,
     service: EmailConfigServiceDep,
     start_date: Annotated[
-        datetime | None, Query(description="Start date (default: 30 days ago)")
+        dt.datetime | None, Query(description="Start date (default: 30 days ago)"),
     ] = None,
     end_date: Annotated[
-        datetime | None, Query(description="End date (default: now)")
+        dt.datetime | None, Query(description="End date (default: now)"),
     ] = None,
 ) -> EmailUsageStats:
     """Get email usage statistics for a tenant."""

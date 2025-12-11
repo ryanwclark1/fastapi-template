@@ -63,7 +63,7 @@ class EmailConfigRepository(TenantAwareRepository[EmailConfig]):
         """
         result = await self.get_by(session, EmailConfig.tenant_id, tenant_id)
         self._lazy.debug(
-            lambda: f"db.get_by_tenant_id({tenant_id}) -> {'found' if result else 'not found'}"
+            lambda: f"db.get_by_tenant_id({tenant_id}) -> {'found' if result else 'not found'}",
         )
         return result
 
@@ -83,13 +83,13 @@ class EmailConfigRepository(TenantAwareRepository[EmailConfig]):
         """
         stmt = select(EmailConfig).where(
             EmailConfig.tenant_id == tenant_id,
-            EmailConfig.is_active == True,  # noqa: E712
+            EmailConfig.is_active,
         )
         result = await session.execute(stmt)
         config = result.scalar_one_or_none()
 
         self._lazy.debug(
-            lambda: f"db.get_active_by_tenant_id({tenant_id}) -> {'found' if config else 'not found'}"
+            lambda: f"db.get_active_by_tenant_id({tenant_id}) -> {'found' if config else 'not found'}",
         )
         return config
 
@@ -112,7 +112,7 @@ class EmailConfigRepository(TenantAwareRepository[EmailConfig]):
         """
         stmt = (
             select(EmailConfig)
-            .where(EmailConfig.is_active == True)  # noqa: E712
+            .where(EmailConfig.is_active)
             .order_by(EmailConfig.created_at.desc())
             .limit(limit)
             .offset(offset)
@@ -121,7 +121,7 @@ class EmailConfigRepository(TenantAwareRepository[EmailConfig]):
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.list_active_configs(limit={limit}, offset={offset}) -> {len(items)} items"
+            lambda: f"db.list_active_configs(limit={limit}, offset={offset}) -> {len(items)} items",
         )
         return items
 
@@ -155,7 +155,7 @@ class EmailConfigRepository(TenantAwareRepository[EmailConfig]):
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.list_by_provider_type({provider_type}) -> {len(items)} items"
+            lambda: f"db.list_by_provider_type({provider_type}) -> {len(items)} items",
         )
         return items
 
@@ -183,7 +183,7 @@ class EmailConfigRepository(TenantAwareRepository[EmailConfig]):
         await session.refresh(config)
 
         self._lazy.debug(
-            lambda: f"db.update_config({config.tenant_id}) -> updated {len(update_data)} fields"
+            lambda: f"db.update_config({config.tenant_id}) -> updated {len(update_data)} fields",
         )
         return config
 
@@ -241,7 +241,7 @@ class EmailUsageLogRepository(TenantAwareRepository[EmailUsageLog]):
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.get_usage_logs({tenant_id}, {start_date} to {end_date}) -> {len(items)} items"
+            lambda: f"db.get_usage_logs({tenant_id}, {start_date} to {end_date}) -> {len(items)} items",
         )
         return items
 
@@ -336,7 +336,7 @@ class EmailUsageLogRepository(TenantAwareRepository[EmailUsageLog]):
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.get_all_usage_logs({start_date} to {end_date}) -> {len(items)} items"
+            lambda: f"db.get_all_usage_logs({start_date} to {end_date}) -> {len(items)} items",
         )
         return items
 
@@ -540,7 +540,7 @@ class EmailAuditLogRepository(TenantAwareRepository[EmailAuditLog]):
                 prev_cursor = make_cursor(items[0])
 
         self._lazy.debug(
-            lambda: f"db.get_audit_logs_cursor({tenant_id}, cursor={cursor is not None}) -> {len(items)} items"
+            lambda: f"db.get_audit_logs_cursor({tenant_id}, cursor={cursor is not None}) -> {len(items)} items",
         )
 
         return items, next_cursor, prev_cursor, has_more
@@ -581,7 +581,7 @@ class EmailAuditLogRepository(TenantAwareRepository[EmailAuditLog]):
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.get_by_recipient_hash({recipient_hash[:8]}...) -> {len(items)} items"
+            lambda: f"db.get_by_recipient_hash({recipient_hash[:8]}...) -> {len(items)} items",
         )
         return items
 
@@ -619,7 +619,7 @@ class EmailAuditLogRepository(TenantAwareRepository[EmailAuditLog]):
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.get_by_status({status}, tenant={tenant_id}) -> {len(items)} items"
+            lambda: f"db.get_by_status({status}, tenant={tenant_id}) -> {len(items)} items",
         )
         return items
 

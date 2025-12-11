@@ -80,11 +80,7 @@ async def trigger_task_mutation(
         )
 
     try:
-        # In production, this would import and trigger the actual Taskiq task
-        # from taskiq import AsyncBroker
-        # task = broker.task(task_path)
-        # result = await task.kiq(**(input.params or {}))
-
+        # In production, this would import and trigger the actual Taskiq task.
         # Mock implementation
         import uuid
         task_id = str(uuid.uuid4())
@@ -171,7 +167,7 @@ async def bulk_cancel_tasks_mutation(
                     success=False,
                     message="Maximum 100 tasks can be cancelled at once",
                     previous_status=None,
-                )
+                ),
             ],
         )
 
@@ -188,7 +184,7 @@ async def bulk_cancel_tasks_mutation(
                     success=True,
                     message="Task cancellation requested",
                     previous_status=TaskStatusEnum.RUNNING,
-                )
+                ),
             )
             successful += 1
         except Exception as e:
@@ -198,7 +194,7 @@ async def bulk_cancel_tasks_mutation(
                     success=False,
                     message=str(e),
                     previous_status=None,
-                )
+                ),
             )
             failed += 1
 
@@ -281,7 +277,7 @@ async def bulk_retry_dlq_tasks_mutation(
                     success=False,
                     message="Maximum 100 tasks can be retried at once",
                     previous_status=None,
-                )
+                ),
             ],
         )
 
@@ -298,7 +294,7 @@ async def bulk_retry_dlq_tasks_mutation(
                     success=True,
                     message="Task has been re-queued",
                     previous_status=None,
-                )
+                ),
             )
             successful += 1
         except Exception as e:
@@ -308,7 +304,7 @@ async def bulk_retry_dlq_tasks_mutation(
                     success=False,
                     message=str(e),
                     previous_status=None,
-                )
+                ),
             )
             failed += 1
 

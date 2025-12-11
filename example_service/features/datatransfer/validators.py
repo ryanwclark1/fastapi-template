@@ -42,6 +42,7 @@ class ValidationError:
         self.code = code or "validation_error"
 
     def __repr__(self) -> str:
+        """Return debugging-friendly representation."""
         return f"ValidationError(field={self.field}, message={self.message})"
 
 
@@ -145,9 +146,11 @@ class ReminderValidator(EntityValidator):
 
     @property
     def entity_type(self) -> str:
+        """Return the entity type handled by this validator."""
         return "reminders"
 
     def validate(self, data: dict[str, Any]) -> ValidationResult:
+        """Validate reminder data."""
         result = ValidationResult()
 
         # Validate title length
@@ -178,7 +181,7 @@ class ReminderValidator(EntityValidator):
         if remind_at:
             if isinstance(remind_at, str):
                 try:
-                    remind_at = datetime.fromisoformat(remind_at.replace("Z", "+00:00"))
+                    remind_at = datetime.fromisoformat(remind_at)
                 except ValueError:
                     result.add_error(
                         "remind_at",
@@ -190,7 +193,7 @@ class ReminderValidator(EntityValidator):
 
             if remind_at < datetime.now(UTC):
                 result.add_warning(
-                    f"Reminder date {remind_at} is in the past"
+                    f"Reminder date {remind_at} is in the past",
                 )
 
         return result
@@ -213,9 +216,11 @@ class WebhookValidator(EntityValidator):
 
     @property
     def entity_type(self) -> str:
+        """Return the entity type handled by this validator."""
         return "webhooks"
 
     def validate(self, data: dict[str, Any]) -> ValidationResult:
+        """Validate webhook data."""
         result = ValidationResult()
 
         # Validate name
@@ -248,7 +253,7 @@ class WebhookValidator(EntityValidator):
                 for internal in ["localhost", "127.0.0.1", "0.0.0.0", "internal"]
             ):
                 result.add_warning(
-                    f"URL '{url}' appears to point to an internal address"
+                    f"URL '{url}' appears to point to an internal address",
                 )
 
         # Validate events is a list

@@ -37,6 +37,7 @@ if TYPE_CHECKING:
         EmailConfigCreate,
         EmailConfigUpdate,
         EmailUsageStats,
+        SendEmailResponse,
         TestEmailResponse,
     )
     from example_service.infra.email.enhanced_service import EnhancedEmailService
@@ -110,8 +111,9 @@ class EmailConfigService(BaseService):
         ]
 
         if missing_fields:
+            msg = f"Missing required fields for {provider_type.value}: {', '.join(missing_fields)}"
             raise EmailConfigValidationError(
-                f"Missing required fields for {provider_type.value}: {', '.join(missing_fields)}",
+                msg,
                 provider_type=provider_type.value,
                 missing_fields=missing_fields,
             )
@@ -155,7 +157,7 @@ class EmailConfigService(BaseService):
         self.validate_provider_config(config_data.provider_type, config_dict)
 
         existing_config = await self._config_repo.get_by_tenant_id(
-            self._session, tenant_id
+            self._session, tenant_id,
         )
 
         if existing_config:
@@ -208,7 +210,7 @@ class EmailConfigService(BaseService):
         """
         config = await self._config_repo.get_by_tenant_id(self._session, tenant_id)
         self._lazy.debug(
-            lambda: f"service.get_config({tenant_id}) -> {'found' if config else 'not found'}"
+            lambda: f"service.get_config({tenant_id}) -> {'found' if config else 'not found'}",
         )
         return config
 
@@ -564,8 +566,9 @@ class EmailConfigService(BaseService):
             raise EmailConfigNotFoundError(tenant_id)
 
         if not config.is_active:
+            msg = "Email configuration is disabled"
             raise EmailSendError(
-                "Email configuration is disabled",
+                msg,
                 tenant_id=tenant_id,
                 error_code="CONFIG_DISABLED",
             )

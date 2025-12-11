@@ -149,7 +149,7 @@ class DLQAlert:
                     "Message Preview:",
                     "-" * 30,
                     self.message_preview,
-                ]
+                ],
             )
 
         if self.metadata:
@@ -158,7 +158,7 @@ class DLQAlert:
                     "",
                     "Metadata:",
                     "-" * 30,
-                ]
+                ],
             )
             for key, value in self.metadata.items():
                 lines.append(f"  {key}: {value}")
@@ -328,7 +328,7 @@ class DLQAlerter:
                 import json
 
                 message_preview = self._truncate_message(
-                    json.dumps(message_body, indent=2, default=str)
+                    json.dumps(message_body, indent=2, default=str),
                 )
             else:
                 message_preview = self._truncate_message(str(message_body))
@@ -463,7 +463,7 @@ class DLQAlerter:
                                 "short": False,
                             },
                         ],
-                    }
+                    },
                 ],
                 # Also include structured data for non-Slack webhooks
                 "alert": alert.to_dict(),

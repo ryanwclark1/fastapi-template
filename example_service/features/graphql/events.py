@@ -68,7 +68,7 @@ async def publish_event(
                 {
                     "event_type": event_type,
                     **data,
-                }
+                },
             )
 
             await redis.publish(channel, payload)

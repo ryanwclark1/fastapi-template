@@ -83,7 +83,7 @@ class TagRepository(BaseRepository[Tag]):
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.list_with_search(search={search!r}) -> {len(items)} items"
+            lambda: f"db.list_with_search(search={search!r}) -> {len(items)} items",
         )
         return items
 
@@ -157,7 +157,7 @@ class TagRepository(BaseRepository[Tag]):
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.get_tags_by_ids({len(tag_ids)} ids) -> {len(items)} found"
+            lambda: f"db.get_tags_by_ids({len(tag_ids)} ids) -> {len(items)} found",
         )
         return items
 

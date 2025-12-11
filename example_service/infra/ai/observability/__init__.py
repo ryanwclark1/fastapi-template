@@ -81,29 +81,12 @@ from example_service.infra.ai.observability.tracing import (
 )
 
 __all__ = [
-    # Logging
-    "AIObservabilityLogger",
-    "LogContext",
-    "PipelineLogContext",
-    "StepLogContext",
-    "configure_ai_logger",
-    "get_ai_logger",
     # Metrics
     "AIMetrics",
-    "configure_ai_metrics",
-    "get_ai_metrics",
+    # Logging
+    "AIObservabilityLogger",
     # Tracing
     "AITracer",
-    "CompensationSpan",
-    "NoOpCompensationSpan",
-    "NoOpPipelineSpan",
-    "NoOpProviderSpan",
-    "NoOpStepSpan",
-    "PipelineSpan",
-    "ProviderSpan",
-    "StepSpan",
-    "configure_ai_tracer",
-    "get_ai_tracer",
     # Budget
     "BudgetAction",
     "BudgetCheckResult",
@@ -112,7 +95,24 @@ __all__ = [
     "BudgetPeriod",
     "BudgetPolicy",
     "BudgetService",
+    "CompensationSpan",
+    "LogContext",
+    "NoOpCompensationSpan",
+    "NoOpPipelineSpan",
+    "NoOpProviderSpan",
+    "NoOpStepSpan",
+    "PipelineLogContext",
+    "PipelineSpan",
+    "ProviderSpan",
     "SpendRecord",
+    "StepLogContext",
+    "StepSpan",
+    "configure_ai_logger",
+    "configure_ai_metrics",
+    "configure_ai_tracer",
     "configure_budget_service",
+    "get_ai_logger",
+    "get_ai_metrics",
+    "get_ai_tracer",
     "get_budget_service",
 ]

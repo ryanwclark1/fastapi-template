@@ -45,11 +45,16 @@ from enum import Enum
 import hashlib
 import hmac
 import logging
-from typing import Any
+from types import TracebackType
+from typing import Any, Self
 from uuid import uuid4
 
 import httpx
 from pydantic import BaseModel, Field, HttpUrl
+
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(TracebackType)
 
 logger = logging.getLogger(__name__)
 
@@ -154,15 +159,15 @@ class WebhookConfig(BaseModel):
 
     # Headers
     custom_headers: dict[str, str] = Field(
-        default_factory=dict, description="Custom HTTP headers"
+        default_factory=dict, description="Custom HTTP headers",
     )
 
     # Filtering
     tenant_ids: list[str] | None = Field(
-        None, description="Filter by tenant IDs (None = all)"
+        None, description="Filter by tenant IDs (None = all)",
     )
     workflow_ids: list[str] | None = Field(
-        None, description="Filter by workflow IDs (None = all)"
+        None, description="Filter by workflow IDs (None = all)",
     )
 
     # Options
@@ -197,7 +202,8 @@ def generate_signature(
     elif algorithm == "sha512":
         mac = hmac.new(secret.encode(), payload.encode(), hashlib.sha512)
     else:
-        raise ValueError(f"Unsupported algorithm: {algorithm}")
+        msg = f"Unsupported algorithm: {algorithm}"
+        raise ValueError(msg)
 
     return f"{algorithm}={mac.hexdigest()}"
 
@@ -218,7 +224,7 @@ def verify_signature(
         True if signature is valid
     """
     try:
-        algorithm, hex_digest = signature.split("=", 1)
+        algorithm, _hex_digest = signature.split("=", 1)
         expected = generate_signature(payload, secret, algorithm)
         return hmac.compare_digest(signature, expected)
     except (ValueError, KeyError):
@@ -255,15 +261,20 @@ class WebhookClient:
         self._client = http_client
         self._owns_client = http_client is None
 
-    async def __aenter__(self) -> WebhookClient:
+    async def __aenter__(self) -> Self:
         """Enter context."""
         if self._client is None:
             self._client = httpx.AsyncClient(
-                timeout=httpx.Timeout(self.config.timeout_seconds)
+                timeout=httpx.Timeout(self.config.timeout_seconds),
             )
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         """Exit context."""
         if self._owns_client and self._client:
             await self._client.aclose()
@@ -316,7 +327,7 @@ class WebhookClient:
                 # Ensure client is available
                 if self._client is None:
                     self._client = httpx.AsyncClient(
-                        timeout=httpx.Timeout(self.config.timeout_seconds)
+                        timeout=httpx.Timeout(self.config.timeout_seconds),
                     )
                     self._owns_client = True
 
@@ -832,21 +843,21 @@ def reset_webhook_registry() -> None:
 
 
 __all__ = [
-    # Events
-    "WebhookEvent",
+    # Client
+    "WebhookClient",
     # Models
     "WebhookConfig",
     "WebhookDelivery",
+    # Events
+    "WebhookEvent",
     "WebhookPayload",
-    # Client
-    "WebhookClient",
-    # Handler
-    "WorkflowWebhookHandler",
     # Registry
     "WebhookRegistry",
-    "get_webhook_registry",
-    "reset_webhook_registry",
+    # Handler
+    "WorkflowWebhookHandler",
     # Utilities
     "generate_signature",
+    "get_webhook_registry",
+    "reset_webhook_registry",
     "verify_signature",
 ]

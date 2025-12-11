@@ -70,7 +70,7 @@ class SearchFilter(StatementFilter):
         *,
         case_insensitive: bool = True,
         operator: Literal["and", "or"] = "or",
-    ):
+    ) -> None:
         """Initialize search filter.
 
         Args:
@@ -119,7 +119,7 @@ class OrderBy(StatementFilter):
         self,
         fields: InstrumentedAttribute[Any] | Sequence[InstrumentedAttribute[Any]],
         sort_order: Literal["asc", "desc"] | Sequence[Literal["asc", "desc"]] = "asc",
-    ):
+    ) -> None:
         """Initialize ordering filter.
 
         Args:
@@ -157,7 +157,7 @@ class LimitOffset(StatementFilter):
         stmt = LimitOffset(limit=50, offset=50).apply(stmt)
     """
 
-    def __init__(self, limit: int, offset: int = 0):
+    def __init__(self, limit: int, offset: int = 0) -> None:
         """Initialize pagination filter.
 
         Args:
@@ -191,7 +191,7 @@ class CollectionFilter(StatementFilter):
         values: Sequence[Any],
         *,
         invert: bool = False,
-    ):
+    ) -> None:
         """Initialize collection filter.
 
         Args:
@@ -235,7 +235,7 @@ class BeforeAfter(StatementFilter):
         *,
         before: datetime | None = None,
         after: datetime | None = None,
-    ):
+    ) -> None:
         """Initialize date range filter.
 
         Args:
@@ -277,7 +277,7 @@ class OnBeforeAfter(StatementFilter):
         *,
         on_or_before: datetime | None = None,
         on_or_after: datetime | None = None,
-    ):
+    ) -> None:
         """Initialize inclusive date range filter.
 
         Args:
@@ -321,7 +321,7 @@ class FilterGroup(StatementFilter):
         self,
         filters: Sequence[StatementFilter],
         operator: Literal["and", "or"] = "and",
-    ):
+    ) -> None:
         """Initialize filter group.
 
         Args:

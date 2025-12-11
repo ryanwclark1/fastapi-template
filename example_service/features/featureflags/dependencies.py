@@ -5,13 +5,17 @@ Provides injectable dependencies for feature flag evaluation.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import Depends, HTTPException, Request, status
 
 from example_service.core.dependencies.database import get_db_session
+from example_service.utils.runtime_dependencies import require_runtime_dependency
 
 from .service import FeatureFlagService
+
+require_runtime_dependency(Awaitable, Callable)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -139,7 +143,9 @@ async def get_feature_flags(
     )
 
 
-def require_feature(flag_key: str, allow_missing: bool = False): # type: ignore[no-untyped-def]
+def require_feature(
+    flag_key: str, allow_missing: bool = False,
+) -> Callable[[FeatureFlags], Awaitable[None]]:
     """Dependency factory that requires a feature flag to be enabled.
 
     Usage:
@@ -159,7 +165,7 @@ def require_feature(flag_key: str, allow_missing: bool = False): # type: ignore[
     """
 
     async def dependency(
-        flags: Annotated[FeatureFlags, Depends(get_feature_flags)]
+        flags: Annotated[FeatureFlags, Depends(get_feature_flags)],
     ) -> None:
         """Check if feature is enabled."""
         is_enabled = await flags.is_enabled(flag_key, default=allow_missing)

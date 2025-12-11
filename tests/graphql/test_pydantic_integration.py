@@ -477,9 +477,8 @@ class TestTwoStageConversion:
         sample_reminder: Reminder,
     ) -> None:
         """Test that query resolver uses two-stage conversion correctly."""
-        # This tests the pattern in queries.py:
-        # reminder_pydantic = ReminderResponse.from_model(reminder)
-        # return ReminderType.from_pydantic(reminder_pydantic)
+        # Mirrors the queries.py pattern where Reminder models are converted to
+        # ReminderResponse and then to ReminderType.
 
         result = await schema.execute(
             REMINDER_QUERY,
@@ -503,11 +502,8 @@ class TestTwoStageConversion:
         graphql_context: GraphQLContext,
     ) -> None:
         """Test that mutation resolver converts input through Pydantic correctly."""
-        # This tests the pattern in mutations.py:
-        # create_data = input.to_pydantic()  # GraphQL → Pydantic
-        # reminder = Reminder(title=create_data.title, ...)  # Pydantic → SQLAlchemy
-        # reminder_pydantic = ReminderResponse.from_model(reminder)  # SQLAlchemy → Pydantic
-        # return ReminderSuccess(reminder=ReminderType.from_pydantic(reminder_pydantic))  # Pydantic → GraphQL
+        # Mirrors the mutations flow where inputs become Pydantic objects, then
+        # SQLAlchemy models, and finally GraphQL types via ReminderResponse.
 
         result = await schema.execute(
             CREATE_REMINDER_MUTATION,
@@ -515,7 +511,7 @@ class TestTwoStageConversion:
                 "input": {
                     "title": "Integration Test",
                     "description": "Testing two-stage conversion",
-                }
+                },
             },
             context_value=graphql_context,
         )
@@ -535,12 +531,8 @@ class TestTwoStageConversion:
         graphql_context: GraphQLContext,
     ) -> None:
         """Test that Pydantic validation is applied through to_pydantic() conversion."""
-        # Test that validation errors are caught during input.to_pydantic()
-        # In mutations.py:
-        # try:
-        #     create_data = input.to_pydantic()
-        # except Exception as e:
-        #     return ReminderError(code=VALIDATION_ERROR, message=f"Invalid input: {e}")
+        # Ensures validation errors raised during `input.to_pydantic()` propagate
+        # back to the client as ReminderError responses.
 
         result = await schema.execute(
             CREATE_REMINDER_MUTATION,
@@ -548,7 +540,7 @@ class TestTwoStageConversion:
                 "input": {
                     "title": "",  # Empty title should fail validation
                     "description": "Test",
-                }
+                },
             },
             context_value=graphql_context,
         )
@@ -603,7 +595,7 @@ class TestPydanticEdgeCases:
                 "input": {
                     "title": "Updated via Pydantic",
                     "description": "New description",
-                }
+                },
             },
             context_value=graphql_context,
         )
@@ -621,8 +613,7 @@ class TestPydanticEdgeCases:
         sample_reminders: list[Reminder],
     ) -> None:
         """Test that list queries convert all items through Pydantic."""
-        # Tests the list comprehension in queries.py:
-        # [ReminderType.from_pydantic(ReminderResponse.from_model(r)) for r in reminders]
+        # Mirrors the queries.py list comprehension converting reminders to GraphQL types.
 
         result = await schema.execute(
             REMINDERS_QUERY,

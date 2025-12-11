@@ -126,7 +126,7 @@ class EventBridge:
 
         # Register the handler
         @broker.subscriber(queue, exchange)
-        async def handle_websocket_event(body: dict[str, Any], msg: Any) -> None:  # noqa: ARG001
+        async def handle_websocket_event(body: dict[str, Any], msg: Any) -> None:
             """Handle incoming events and broadcast to WebSocket clients.
 
             Args:

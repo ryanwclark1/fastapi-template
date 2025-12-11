@@ -90,67 +90,67 @@ from .vector import (
 )
 
 __all__ = [
-    # Cache
-    "SearchCache",
-    "SearchCacheConfig",
-    "get_search_cache",
-    "init_search_cache",
     # Circuit Breaker
     "CircuitBreaker",
     "CircuitBreakerStats",
     "CircuitState",
-    "get_circuit_breaker",
-    "get_circuit_stats",
+    # Ranking
+    "ClickBoostRanker",
+    "ClickSignal",
+    # Vector Search
+    "DistanceMetric",
+    "EmbeddingProvider",
     # Configuration
     "EntitySearchConfig",
-    "SearchConfiguration",
-    "SearchEntityRegistry",
-    "SearchFeature",
-    "SearchSettings",
-    "create_default_configuration",
-    "get_search_config",
-    "set_search_config",
+    # Schemas
+    "EntitySearchResult",
     # Experiments
     "ExperimentConfig",
     "ExperimentManager",
     "ExperimentResults",
     "ExperimentStatus",
-    "SearchExperiment",
+    "HybridSearchResult",
     # Intent
     "IntentClassifier",
     "IntentType",
-    "QueryIntent",
-    "classify_query_intent",
     # Profiler
     "PerformanceStats",
+    "QueryIntent",
     "QueryProfile",
     "QueryProfiler",
-    # Ranking
-    "ClickBoostRanker",
-    "ClickSignal",
     "RankingConfig",
-    # Router
-    "router",
-    # Schemas
-    "EntitySearchResult",
+    # Cache
+    "SearchCache",
+    "SearchCacheConfig",
     "SearchCapabilitiesResponse",
+    "SearchConfiguration",
+    "SearchEntityRegistry",
+    "SearchExperiment",
+    "SearchFeature",
     "SearchFilter",
     "SearchHit",
     "SearchRequest",
     "SearchResponse",
+    # Service
+    "SearchService",
+    "SearchSettings",
     "SearchSuggestion",
     "SearchSuggestionRequest",
     "SearchSuggestionsResponse",
     "SearchSyntax",
     "SearchableEntity",
-    # Service
-    "SearchService",
-    "get_search_service",
-    # Vector Search
-    "DistanceMetric",
-    "EmbeddingProvider",
-    "HybridSearchResult",
     "VectorSearchConfig",
     "VectorSearchResult",
     "VectorSearchService",
+    "classify_query_intent",
+    "create_default_configuration",
+    "get_circuit_breaker",
+    "get_circuit_stats",
+    "get_search_cache",
+    "get_search_config",
+    "get_search_service",
+    "init_search_cache",
+    # Router
+    "router",
+    "set_search_config",
 ]

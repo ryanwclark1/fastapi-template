@@ -39,7 +39,7 @@ class TestDateTimeTypeHandling:
     def test_iso_format_datetime(self):
         """Test ISO format datetime parsing."""
         importer = importers.CSVImporter(
-            field_types={"created_at": datetime}
+            field_types={"created_at": datetime},
         )
         record = importer.validate_record(
             {"created_at": "2024-01-15T10:30:00"},
@@ -53,7 +53,7 @@ class TestDateTimeTypeHandling:
     def test_iso_format_with_z_suffix(self):
         """Test ISO format with Z timezone."""
         importer = importers.CSVImporter(
-            field_types={"created_at": datetime}
+            field_types={"created_at": datetime},
         )
         record = importer.validate_record(
             {"created_at": "2024-01-15T10:30:00Z"},
@@ -65,7 +65,7 @@ class TestDateTimeTypeHandling:
     def test_common_date_formats(self):
         """Test common date format parsing."""
         importer = importers.CSVImporter(
-            field_types={"date": datetime}
+            field_types={"date": datetime},
         )
 
         # YYYY-MM-DD
@@ -79,7 +79,7 @@ class TestDateTimeTypeHandling:
     def test_invalid_datetime_format(self):
         """Test invalid datetime format produces error."""
         importer = importers.CSVImporter(
-            field_types={"date": datetime}
+            field_types={"date": datetime},
         )
         record = importer.validate_record(
             {"date": "not-a-date"},
@@ -95,7 +95,7 @@ class TestUUIDTypeHandling:
     def test_valid_uuid_string(self):
         """Test valid UUID string parsing."""
         importer = importers.CSVImporter(
-            field_types={"id": UUID}
+            field_types={"id": UUID},
         )
         record = importer.validate_record(
             {"id": "12345678-1234-5678-1234-567812345678"},
@@ -107,7 +107,7 @@ class TestUUIDTypeHandling:
     def test_invalid_uuid_string(self):
         """Test invalid UUID string produces error."""
         importer = importers.CSVImporter(
-            field_types={"id": UUID}
+            field_types={"id": UUID},
         )
         record = importer.validate_record(
             {"id": "not-a-uuid"},
@@ -123,7 +123,7 @@ class TestBooleanTypeHandling:
     def test_boolean_string_values(self):
         """Test various boolean string representations."""
         importer = importers.CSVImporter(
-            field_types={"active": bool}
+            field_types={"active": bool},
         )
 
         for true_val in ["true", "True", "1", "yes", "on"]:
@@ -141,7 +141,7 @@ class TestRequiredFieldValidation:
     def test_missing_required_field(self):
         """Test missing required field produces error."""
         importer = importers.CSVImporter(
-            required_fields=["name", "email"]
+            required_fields=["name", "email"],
         )
         record = importer.validate_record(
             {"name": "Test"},  # missing email
@@ -153,10 +153,51 @@ class TestRequiredFieldValidation:
     def test_empty_required_field(self):
         """Test empty required field produces error."""
         importer = importers.CSVImporter(
-            required_fields=["name"]
+            required_fields=["name"],
         )
         record = importer.validate_record(
             {"name": ""},
             row_number=1,
         )
         assert len(record.errors) == 1
+
+
+class TestFieldValidatorsAndRecords:
+    """Tests for custom validators and ParsedRecord helpers."""
+
+    def test_field_validator_rejects_value(self):
+        importer = importers.CSVImporter(
+            field_validators={"email": lambda value: "invalid" if value and "@" not in value else True},
+        )
+        record = importer.validate_record({"email": "not-email"}, row_number=1)
+        assert record.errors
+        assert record.errors[0][0] == "email"
+
+    def test_parsed_record_is_valid_property(self):
+        record = importers.ParsedRecord(row_number=1, data={"name": "ok"})
+        assert record.is_valid is True
+        record_with_errors = importers.ParsedRecord(
+            row_number=2,
+            data={"name": None},
+            errors=[("name", "required")],
+        )
+        assert record_with_errors.is_valid is False
+
+
+class TestImporterParsing:
+    """Tests for parse_bytes behavior."""
+
+    def test_csv_importer_parse_bytes(self):
+        importer = importers.CSVImporter(field_types={"age": int})
+        csv_bytes = b"name,age\nAlice,30\nBob,25\n"
+        records = importer.parse_bytes(csv_bytes)
+        assert len(records) == 2
+        assert records[0].data["name"] == "Alice"
+        assert records[0].data["age"] == 30
+
+    def test_json_importer_parse_bytes_array(self):
+        importer = importers.JSONImporter(required_fields=["name"])
+        payload = b'[{"name": "Alice"}, {"name": ""}]'
+        records = importer.parse_bytes(payload)
+        assert records[0].is_valid
+        assert not records[1].is_valid

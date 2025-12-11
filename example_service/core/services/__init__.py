@@ -44,21 +44,21 @@ from example_service.core.services.requirements import (
 )
 
 __all__ = [
+    # Requirements
+    "FEATURE_SERVICE_REQUIREMENTS",
+    # Health Monitor
+    "HealthMonitor",
     # Availability
     "OverrideMode",
     "ServiceAvailabilityRegistry",
     "ServiceName",
     "ServiceStatus",
-    "get_service_registry",
-    # Health Monitor
-    "HealthMonitor",
+    "get_all_features_for_service",
+    "get_feature_requirements",
     "get_health_monitor",
+    "get_service_impact_summary",
+    "get_service_registry",
     "start_health_monitor",
     "stop_health_monitor",
     "trigger_health_check",
-    # Requirements
-    "FEATURE_SERVICE_REQUIREMENTS",
-    "get_all_features_for_service",
-    "get_feature_requirements",
-    "get_service_impact_summary",
 ]

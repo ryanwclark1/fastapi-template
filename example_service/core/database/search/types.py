@@ -160,7 +160,8 @@ def weighted_vector(
         combined = combine_vectors(title_vector, body_vector)
     """
     if weight not in ("A", "B", "C", "D"):
-        raise ValueError(f"Weight must be A, B, C, or D, got: {weight}")
+        msg = f"Weight must be A, B, C, or D, got: {weight}"
+        raise ValueError(msg)
 
     tsvector = func.to_tsvector(config, func.coalesce(text_column, literal("")))
     return func.setweight(tsvector, weight)

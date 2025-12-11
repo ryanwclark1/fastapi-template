@@ -131,7 +131,7 @@ class HealthService(BaseService):
                 self._aggregator.add_provider(
                     DatabaseHealthProvider(
                         engine=engine,
-                    )
+                    ),
                 )
 
                 # Database connection pool monitoring
@@ -141,7 +141,7 @@ class HealthService(BaseService):
                         engine=engine,
                         degraded_threshold=0.7,  # Alert at 70% utilization
                         unhealthy_threshold=0.9,  # Critical at 90% utilization
-                    )
+                    ),
                 )
             except Exception as e:
                 logger.warning("Could not configure database health provider: %s", e)
@@ -162,7 +162,7 @@ class HealthService(BaseService):
                     self._aggregator.add_provider(
                         RedisHealthProvider(
                             cache=global_cache,
-                        )
+                        ),
                     )
             except Exception as e:
                 logger.warning("Could not configure Redis health provider: %s", e)
@@ -198,11 +198,11 @@ class HealthService(BaseService):
                     ExternalServiceHealthProvider(
                         name="auth_service",
                         base_url=str(self._auth_settings.service_url),
-                    )
+                    ),
                 )
             except Exception as e:
                 logger.warning(
-                    "Could not configure auth service health provider: %s", e
+                    "Could not configure auth service health provider: %s", e,
                 )
 
         # S3 storage provider
@@ -217,7 +217,7 @@ class HealthService(BaseService):
                 self._aggregator.add_provider(
                     S3StorageHealthProvider(
                         s3_client=s3_client,
-                    )
+                    ),
                 )
             except Exception as e:
                 logger.warning("Could not configure S3 health provider: %s", e)
@@ -249,12 +249,12 @@ class HealthService(BaseService):
                             consul_client=discovery_service._client,  # type: ignore[arg-type]
                             service_name=self._app_settings.service_name,
                             config=config,
-                        )
+                        ),
                     )
                     logger.info("Consul health provider configured")
                 else:
                     logger.debug(
-                        "Consul health provider not configured: discovery service not started"
+                        "Consul health provider not configured: discovery service not started",
                     )
             except Exception as e:
                 logger.warning("Could not configure Consul health provider: %s", e)
@@ -307,7 +307,7 @@ class HealthService(BaseService):
         }
 
     async def check_health_detailed(
-        self, force_refresh: bool = False
+        self, force_refresh: bool = False,
     ) -> dict[str, Any]:
         """Perform health check with detailed provider information.
 

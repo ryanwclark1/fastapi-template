@@ -32,7 +32,7 @@ class MessageResponse(BaseModel):
 
     model_config = ConfigDict(
         json_schema_extra={
-            "example": {"message": "Operation completed successfully", "success": True}
+            "example": {"message": "Operation completed successfully", "success": True},
         },
         str_strip_whitespace=True,
     )

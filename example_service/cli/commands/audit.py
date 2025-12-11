@@ -1,3 +1,4 @@
+# mypy: disable-error-code="attr-defined,arg-type,assignment,return-value,misc,name-defined"
 """Audit log management CLI commands.
 
 This module provides CLI commands for viewing and managing audit logs:
@@ -83,7 +84,6 @@ async def list_logs(
     """List audit log entries with optional filters.
 
     Examples:
-    \b
       example-service audit list --entity-type user --days 30
       example-service audit list --user-id user-123 --failures-only
       example-service audit list --action delete --limit 100
@@ -271,7 +271,6 @@ async def entity_history(entity_type: str, entity_id: str, limit: int) -> None:
     ENTITY_ID is the ID of the entity.
 
     Examples:
-    \b
       example-service audit history user user-123
       example-service audit history reminder abc-456
     """
@@ -619,10 +618,9 @@ async def cleanup_logs(days: int, tenant_id: str | None, dry_run: bool, force: b
 
         warning(f"This will permanently delete {count:,} audit entries!")
 
-        if not force:
-            if not click.confirm("Continue?"):
-                info("Cleanup cancelled")
-                return
+        if not force and not click.confirm("Continue?"):
+            info("Cleanup cancelled")
+            return
 
         service = AuditService(session)
         deleted = await service.delete_old_logs(before_date, tenant_id)

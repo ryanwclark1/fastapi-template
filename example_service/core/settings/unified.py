@@ -33,19 +33,30 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 if TYPE_CHECKING:
+    from .admin import AdminSettings
     from .app import AppSettings
     from .auth import AuthSettings
     from .backup import BackupSettings
     from .consul import ConsulSettings
+    from .jobs import JobSettings
     from .logs import LoggingSettings
-    from .mock import MockModeSettings
     from .otel import OtelSettings
     from .pagination import PaginationSettings
     from .postgres import PostgresSettings
     from .rabbit import RabbitSettings
     from .redis import RedisSettings
+    from .search import SearchSettings
     from .storage import StorageSettings
     from .tasks import TaskSettings
+    from .webhooks import WebhookSettings
+    from .websocket import WebSocketSettings
+
+
+def _get_admin_settings() -> AdminSettings:
+    """Lazy import to avoid circular dependencies."""
+    from .admin import AdminSettings
+
+    return AdminSettings()
 
 
 def _get_app_settings() -> AppSettings:
@@ -132,11 +143,32 @@ def _get_pagination_settings() -> PaginationSettings:
     return PaginationSettings()
 
 
-def _get_mock_settings() -> MockModeSettings:
+def _get_job_settings() -> JobSettings:
     """Lazy import to avoid circular dependencies."""
-    from .mock import MockModeSettings
+    from .jobs import JobSettings
 
-    return MockModeSettings()
+    return JobSettings()
+
+
+def _get_websocket_settings() -> WebSocketSettings:
+    """Lazy import to avoid circular dependencies."""
+    from .websocket import WebSocketSettings
+
+    return WebSocketSettings()
+
+
+def _get_search_settings() -> SearchSettings:
+    """Lazy import to avoid circular dependencies."""
+    from .search import SearchSettings
+
+    return SearchSettings()
+
+
+def _get_webhook_settings() -> WebhookSettings:
+    """Lazy import to avoid circular dependencies."""
+    from .webhooks import WebhookSettings
+
+    return WebhookSettings()
 
 
 class Settings(BaseSettings):
@@ -160,6 +192,7 @@ class Settings(BaseSettings):
     )
 
     # Domain settings - each uses default_factory to create fresh instances
+    admin: AdminSettings = Field(default_factory=_get_admin_settings)
     app: AppSettings = Field(default_factory=_get_app_settings)
     db: PostgresSettings = Field(default_factory=_get_db_settings)
     redis: RedisSettings = Field(default_factory=_get_redis_settings)
@@ -172,7 +205,10 @@ class Settings(BaseSettings):
     storage: StorageSettings = Field(default_factory=_get_storage_settings)
     task: TaskSettings = Field(default_factory=_get_task_settings)
     pagination: PaginationSettings = Field(default_factory=_get_pagination_settings)
-    mock: MockModeSettings = Field(default_factory=_get_mock_settings)
+    jobs: JobSettings = Field(default_factory=_get_job_settings)
+    websocket: WebSocketSettings = Field(default_factory=_get_websocket_settings)
+    search: SearchSettings = Field(default_factory=_get_search_settings)
+    webhooks: WebhookSettings = Field(default_factory=_get_webhook_settings)
 
 
 def _rebuild_model() -> None:
@@ -182,22 +218,27 @@ def _rebuild_model() -> None:
     nested settings classes. Before instantiating Settings, we
     must rebuild the model with the actual types available.
     """
+    from .admin import AdminSettings
     from .app import AppSettings
     from .auth import AuthSettings
     from .backup import BackupSettings
     from .consul import ConsulSettings
+    from .jobs import JobSettings
     from .logs import LoggingSettings
-    from .mock import MockModeSettings
     from .otel import OtelSettings
     from .pagination import PaginationSettings
     from .postgres import PostgresSettings
     from .rabbit import RabbitSettings
     from .redis import RedisSettings
+    from .search import SearchSettings
     from .storage import StorageSettings
     from .tasks import TaskSettings
+    from .webhooks import WebhookSettings
+    from .websocket import WebSocketSettings
 
     Settings.model_rebuild(
         _types_namespace={
+            "AdminSettings": AdminSettings,
             "AppSettings": AppSettings,
             "PostgresSettings": PostgresSettings,
             "RedisSettings": RedisSettings,
@@ -210,8 +251,11 @@ def _rebuild_model() -> None:
             "StorageSettings": StorageSettings,
             "TaskSettings": TaskSettings,
             "PaginationSettings": PaginationSettings,
-            "MockModeSettings": MockModeSettings,
-        }
+            "JobSettings": JobSettings,
+            "WebSocketSettings": WebSocketSettings,
+            "SearchSettings": SearchSettings,
+            "WebhookSettings": WebhookSettings,
+        },
     )
 
 

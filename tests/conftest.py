@@ -19,11 +19,10 @@ When adding new features:
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator, Iterator
 import contextlib
 from datetime import UTC, datetime
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
 from httpx import ASGITransport, AsyncClient
@@ -32,9 +31,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Iterator
+
     from sqlalchemy.ext.asyncio import AsyncEngine
 
     from example_service.core.database.base import Base
+else:  # pragma: no cover - runtime placeholders for typing-only imports
+    AsyncGenerator = Iterator = Any
 
 # Ensure tests run without external infrastructure
 os.environ.setdefault("APP_ROOT_PATH", "")
@@ -46,6 +49,13 @@ os.environ.setdefault("AUTH_SERVICE_URL", "")
 os.environ.setdefault("OTEL_ENABLED", "false")
 os.environ.setdefault("GRAPHQL_ENABLED", "false")
 
+# ============================================================================
+# Pytest Plugins (Auto-discover fixtures)
+# ============================================================================
+
+pytest_plugins = [
+    "tests.fixtures.auth_fixtures",
+]
 
 # ============================================================================
 # Application Fixtures
@@ -197,7 +207,7 @@ def postgres_container() -> Iterator[str]:
     original_url = container.get_connection_url()
     # Replace any psycopg2 reference with psycopg (psycopg3)
     url = original_url.replace("postgresql+psycopg2://", "postgresql+psycopg://").replace(
-        "postgresql://", "postgresql+psycopg://"
+        "postgresql://", "postgresql+psycopg://",
     )
     yield url
     container.stop()
@@ -396,7 +406,7 @@ async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
                     SELECT EXISTS (
                         SELECT 1 FROM pg_type WHERE typname = :enum_name
                     )
-                    """
+                    """,
                 ),
                 {"enum_name": enum_name},
             )
@@ -407,7 +417,7 @@ async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
                 # Capture enum in default argument to avoid closure issue
                 sa_enum = sa.Enum(*enum_values, name=enum_name)
                 await conn.run_sync(
-                    lambda sync_conn, e=sa_enum: e.create(sync_conn, checkfirst=False)
+                    lambda sync_conn, e=sa_enum: e.create(sync_conn, checkfirst=False),
                 )
 
         # Now create all tables

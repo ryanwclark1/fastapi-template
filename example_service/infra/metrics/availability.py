@@ -192,23 +192,23 @@ def update_service_metrics(
         consecutive_successes: Current success count
     """
     service_availability_gauge.labels(service_name=service_name).set(
-        1 if is_available else 0
+        1 if is_available else 0,
     )
     service_health_available_gauge.labels(service_name=service_name).set(
-        1 if health_available else 0
+        1 if health_available else 0,
     )
 
     # Convert override mode to numeric value
     override_value = {"none": 0, "force_enable": 1, "force_disable": -1}.get(
-        override_mode, 0
+        override_mode, 0,
     )
     service_override_mode_gauge.labels(service_name=service_name).set(override_value)
 
     service_consecutive_failures_gauge.labels(service_name=service_name).set(
-        consecutive_failures
+        consecutive_failures,
     )
     service_consecutive_successes_gauge.labels(service_name=service_name).set(
-        consecutive_successes
+        consecutive_successes,
     )
 
 

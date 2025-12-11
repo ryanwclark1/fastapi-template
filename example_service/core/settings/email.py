@@ -6,10 +6,14 @@ Example: EMAIL_ENABLED=true, EMAIL_SMTP_HOST=smtp.example.com
 
 from __future__ import annotations
 
+from pathlib import Path
+from tempfile import gettempdir
 from typing import Literal
 
 from pydantic import EmailStr, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+DEFAULT_EMAIL_FILE_DIR = Path(gettempdir()) / "example_service_emails"
 
 
 class EmailSettings(BaseSettings):
@@ -116,7 +120,7 @@ class EmailSettings(BaseSettings):
 
     # File Backend Settings (for testing)
     file_path: str = Field(
-        default="/tmp/emails",  # noqa: S108
+        default=str(DEFAULT_EMAIL_FILE_DIR),
         description="Directory for file backend to write emails (development/testing only)",
     )
 

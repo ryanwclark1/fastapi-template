@@ -36,6 +36,9 @@ from example_service.core.database.base import Base
 from example_service.core.database.enums import JobPriority as JobPriorityEnum
 from example_service.core.database.enums import JobStatus as JobStatusEnum
 from example_service.infra.tasks.jobs.enums import JobStatus
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(datetime, Decimal)
 
 
 class Job(Base):
@@ -73,15 +76,15 @@ class Job(Base):
 
     # Task identification
     task_name: Mapped[str] = mapped_column(
-        String(255), nullable=False, index=True, comment="Name of the task function"
+        String(255), nullable=False, index=True, comment="Name of the task function",
     )
     task_args: Mapped[dict[str, Any]] = mapped_column(
-        JSONB, nullable=False, default=dict, comment="Task arguments as JSON"
+        JSONB, nullable=False, default=dict, comment="Task arguments as JSON",
     )
 
     # State machine
     status: Mapped[str] = mapped_column(
-        JobStatusEnum, default="pending", nullable=False, index=True
+        JobStatusEnum, default="pending", nullable=False, index=True,
     )
     priority: Mapped[str] = mapped_column(JobPriorityEnum, default="2", nullable=False)
 
@@ -101,53 +104,53 @@ class Job(Base):
         server_default=func.now(),
     )
     queued_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, comment="When job entered queue"
+        DateTime(timezone=True), nullable=True, comment="When job entered queue",
     )
     started_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, comment="When execution started"
+        DateTime(timezone=True), nullable=True, comment="When execution started",
     )
     completed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, comment="When job completed/failed"
+        DateTime(timezone=True), nullable=True, comment="When job completed/failed",
     )
     paused_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, comment="When job was paused"
+        DateTime(timezone=True), nullable=True, comment="When job was paused",
     )
 
     # Timeout and scheduling
     timeout_seconds: Mapped[int | None] = mapped_column(
-        Integer, nullable=True, comment="Auto-cancel if running longer than this"
+        Integer, nullable=True, comment="Auto-cancel if running longer than this",
     )
     scheduled_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, comment="Delayed execution start time"
+        DateTime(timezone=True), nullable=True, comment="Delayed execution start time",
     )
 
     # Resource tracking (basic: duration + cost)
     duration_ms: Mapped[float | None] = mapped_column(
-        nullable=True, comment="Execution duration in milliseconds"
+        nullable=True, comment="Execution duration in milliseconds",
     )
     cost_usd: Mapped[Decimal] = mapped_column(
-        Numeric(10, 6), nullable=False, default=Decimal(0), comment="Total cost in USD"
+        Numeric(10, 6), nullable=False, default=Decimal(0), comment="Total cost in USD",
     )
 
     # Results (PostgreSQL only)
     result_data: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB, nullable=True, comment="Job result data"
+        JSONB, nullable=True, comment="Job result data",
     )
     error_message: Mapped[str | None] = mapped_column(
-        Text, nullable=True, comment="Error message if failed"
+        Text, nullable=True, comment="Error message if failed",
     )
 
     # Retry tracking
     retry_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, comment="Current retry attempt number"
+        Integer, nullable=False, default=0, comment="Current retry attempt number",
     )
     max_retries: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=3, comment="Maximum retry attempts"
+        Integer, nullable=False, default=3, comment="Maximum retry attempts",
     )
 
     # Cancellation
     cancel_reason: Mapped[str | None] = mapped_column(
-        Text, nullable=True, comment="Reason for cancellation"
+        Text, nullable=True, comment="Reason for cancellation",
     )
 
     # Relationships
@@ -186,7 +189,7 @@ class Job(Base):
     )
     parent: Mapped[Job | None] = relationship(
         "Job",
-        remote_side=[id],
+        remote_side="Job.id",
         foreign_keys=[parent_job_id],
         back_populates="children",
     )
@@ -225,6 +228,7 @@ class Job(Base):
     )
 
     def __repr__(self) -> str:
+        """Return concise job summary for debugging."""
         return (
             f"<Job(id={self.id}, task={self.task_name}, "
             f"status={self.status}, priority={self.priority})>"
@@ -260,12 +264,12 @@ class JobAuditLog(Base):
 
     # Job reference
     job_id: Mapped[UUID] = mapped_column(
-        ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True,
     )
 
     # Transition details
     from_status: Mapped[JobStatus | None] = mapped_column(
-        nullable=True, comment="Previous status (None for creation)"
+        nullable=True, comment="Previous status (None for creation)",
     )
     to_status: Mapped[JobStatus] = mapped_column(nullable=False, comment="New status")
 
@@ -276,16 +280,16 @@ class JobAuditLog(Base):
         comment="What triggered the transition: user, system, timeout, dependency",
     )
     actor_id: Mapped[str | None] = mapped_column(
-        String(255), nullable=True, comment="User ID if user-triggered"
+        String(255), nullable=True, comment="User ID if user-triggered",
     )
     reason: Mapped[str | None] = mapped_column(
-        Text, nullable=True, comment="Human-readable reason for transition"
+        Text, nullable=True, comment="Human-readable reason for transition",
     )
     extra_data: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB, nullable=True, comment="Additional context data"
+        JSONB, nullable=True, comment="Additional context data",
     )
 
-    # Timestamp (immutable)
+    # Timestamp metadata is immutable.
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -303,6 +307,7 @@ class JobAuditLog(Base):
     )
 
     def __repr__(self) -> str:
+        """Return job audit transition summary."""
         from_str = self.from_status.value if self.from_status else "None"
         return f"<JobAuditLog(job_id={self.job_id}, {from_str} → {self.to_status.value})>"
 
@@ -336,41 +341,41 @@ class JobProgress(Base):
 
     # Job reference (one-to-one)
     job_id: Mapped[UUID] = mapped_column(
-        ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, unique=True
+        ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, unique=True,
     )
 
     # Overall progress
     percentage: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, comment="0-100 percentage complete"
+        Integer, nullable=False, default=0, comment="0-100 percentage complete",
     )
 
     # Stage tracking
     current_stage: Mapped[str | None] = mapped_column(
-        String(255), nullable=True, comment="Current stage name"
+        String(255), nullable=True, comment="Current stage name",
     )
     total_stages: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=1, comment="Total number of stages"
+        Integer, nullable=False, default=1, comment="Total number of stages",
     )
     completed_stages: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, comment="Completed stages count"
+        Integer, nullable=False, default=0, comment="Completed stages count",
     )
 
     # Item tracking (e.g., "Processing file 23 of 50")
     current_item: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, comment="Current item being processed"
+        Integer, nullable=False, default=0, comment="Current item being processed",
     )
     total_items: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=1, comment="Total items to process"
+        Integer, nullable=False, default=1, comment="Total items to process",
     )
 
     # ETA estimation
     estimated_completion: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, comment="Estimated completion time"
+        DateTime(timezone=True), nullable=True, comment="Estimated completion time",
     )
 
     # Custom UI message
     message: Mapped[str | None] = mapped_column(
-        Text, nullable=True, comment="Custom progress message for display"
+        Text, nullable=True, comment="Custom progress message for display",
     )
 
     # Update tracking
@@ -386,6 +391,7 @@ class JobProgress(Base):
     job: Mapped[Job] = relationship("Job", back_populates="progress")
 
     def __repr__(self) -> str:
+        """Return job progress summary."""
         return f"<JobProgress(job_id={self.job_id}, {self.percentage}%)>"
 
 
@@ -412,7 +418,7 @@ class JobLabel(Base):
 
     # Job reference
     job_id: Mapped[UUID] = mapped_column(
-        ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True,
     )
 
     # Key-value pair
@@ -430,6 +436,7 @@ class JobLabel(Base):
     )
 
     def __repr__(self) -> str:
+        """Return job label summary."""
         return f"<JobLabel(job_id={self.job_id}, {self.key}={self.value})>"
 
 
@@ -462,12 +469,12 @@ class JobDependency(Base):
 
     # The job that has the dependency
     job_id: Mapped[UUID] = mapped_column(
-        ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True,
     )
 
     # The job being depended on
     depends_on_job_id: Mapped[UUID] = mapped_column(
-        ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True,
     )
 
     # Dependency type
@@ -479,16 +486,16 @@ class JobDependency(Base):
 
     # Satisfaction tracking
     satisfied: Mapped[bool] = mapped_column(
-        nullable=False, default=False, comment="Whether dependency is satisfied"
+        nullable=False, default=False, comment="Whether dependency is satisfied",
     )
     satisfied_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, comment="When dependency was satisfied"
+        DateTime(timezone=True), nullable=True, comment="When dependency was satisfied",
     )
 
     # Relationships
     job: Mapped[Job] = relationship("Job", foreign_keys=[job_id], back_populates="dependencies")
     depends_on: Mapped[Job] = relationship(
-        "Job", foreign_keys=[depends_on_job_id], back_populates="dependents"
+        "Job", foreign_keys=[depends_on_job_id], back_populates="dependents",
     )
 
     __table_args__ = (
@@ -499,6 +506,7 @@ class JobDependency(Base):
     )
 
     def __repr__(self) -> str:
+        """Return dependency relationship summary."""
         status = "satisfied" if self.satisfied else "pending"
         return f"<JobDependency(job={self.job_id} depends_on={self.depends_on_job_id}, {status})>"
 
@@ -540,42 +548,43 @@ class JobWebhook(Base):
 
     # Job reference
     job_id: Mapped[UUID] = mapped_column(
-        ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True,
     )
 
     # Webhook configuration
     url: Mapped[str] = mapped_column(String(2048), nullable=False, comment="Webhook endpoint URL")
     secret: Mapped[str | None] = mapped_column(
-        String(255), nullable=True, comment="HMAC secret for signature verification"
+        String(255), nullable=True, comment="HMAC secret for signature verification",
     )
 
     # Event triggers
     on_completed: Mapped[bool] = mapped_column(
-        nullable=False, default=True, comment="Fire on successful completion"
+        nullable=False, default=True, comment="Fire on successful completion",
     )
     on_failed: Mapped[bool] = mapped_column(nullable=False, default=True, comment="Fire on failure")
     on_cancelled: Mapped[bool] = mapped_column(
-        nullable=False, default=False, comment="Fire on cancellation"
+        nullable=False, default=False, comment="Fire on cancellation",
     )
     on_progress: Mapped[bool] = mapped_column(
-        nullable=False, default=False, comment="Fire on progress updates (debounced)"
+        nullable=False, default=False, comment="Fire on progress updates (debounced)",
     )
 
     # Delivery tracking
     last_attempt_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, comment="Last delivery attempt"
+        DateTime(timezone=True), nullable=True, comment="Last delivery attempt",
     )
     last_success_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, comment="Last successful delivery"
+        DateTime(timezone=True), nullable=True, comment="Last successful delivery",
     )
     failure_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, comment="Consecutive failures"
+        Integer, nullable=False, default=0, comment="Consecutive failures",
     )
 
     # Relationship
     job: Mapped[Job] = relationship("Job", back_populates="webhook_subscriptions")
 
     def __repr__(self) -> str:
+        """Return webhook subscription summary."""
         return f"<JobWebhook(job_id={self.job_id}, url={self.url[:50]}...)>"
 
 

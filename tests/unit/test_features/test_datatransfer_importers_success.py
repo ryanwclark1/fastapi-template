@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import io
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from example_service.features.datatransfer import importers
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_csv_importer_parses_rows(tmp_path: Path):

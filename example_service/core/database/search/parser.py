@@ -162,11 +162,11 @@ class SearchQueryParser:
         "field_term": re.compile(r"(\w+):(\S+)"),
         # Quoted phrase: "exact phrase"
         "phrase": re.compile(r'["\']([^"\']+)["\']'),
-        # Prefix: word*
+        # Prefix pattern (word*)
         "prefix": re.compile(r"(\w+)\*"),
-        # Fuzzy: ~word
+        # Fuzzy pattern (~word)
         "fuzzy": re.compile(r"~(\w+)"),
-        # Exclude: -word or !word
+        # Exclusion pattern (-word or !word)
         "exclude": re.compile(r"[-!](\w+)"),
         # OR operator
         "or": re.compile(r"\bOR\b|\|", re.IGNORECASE),
@@ -449,14 +449,10 @@ class SearchQueryParser:
         Returns:
             Normalized query string
         """
-        parts = []
-
-        for part in result.tsquery_parts:
-            parts.append(part)
+        parts = list(result.tsquery_parts)
 
         # Add prefix terms with wildcard notation
-        for prefix in result.prefix_terms:
-            parts.append(f"{prefix}:*")
+        parts.extend(f"{prefix}:*" for prefix in result.prefix_terms)
 
         return " ".join(parts)
 

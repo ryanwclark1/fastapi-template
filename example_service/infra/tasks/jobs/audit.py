@@ -42,7 +42,7 @@ class InvalidTransitionError(Exception):
         self.job_id = job_id
         super().__init__(
             f"Invalid transition from {from_status} to {to_status}"
-            + (f" for job {job_id}" if job_id else "")
+            + (f" for job {job_id}" if job_id else ""),
         )
 
 
@@ -193,7 +193,7 @@ class AuditLogger:
             .where(JobAuditLog.job_id == job_id)
             .order_by(JobAuditLog.created_at.desc())
             .limit(limit)
-            .offset(offset)
+            .offset(offset),
         )
         return list(result.scalars().all())
 
@@ -213,7 +213,7 @@ class AuditLogger:
             select(JobAuditLog)
             .where(JobAuditLog.job_id == job_id)
             .order_by(JobAuditLog.created_at.desc())
-            .limit(1)
+            .limit(1),
         )
         return result.scalar_one_or_none()
 

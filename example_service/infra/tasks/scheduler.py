@@ -17,11 +17,11 @@ from datetime import UTC, datetime
 import logging
 
 from apscheduler.schedulers.asyncio import (
-    AsyncIOScheduler,  # type: ignore[import-untyped]
+    AsyncIOScheduler,
 )
 from apscheduler.triggers.cron import CronTrigger  # type: ignore[import-untyped]
 from apscheduler.triggers.interval import (
-    IntervalTrigger,  # type: ignore[import-untyped]
+    IntervalTrigger,
 )
 
 from example_service.infra.tasks.broker import broker
@@ -219,6 +219,15 @@ async def _schedule_check_reminders() -> None:
     await check_due_reminders.kiq()
 
 
+async def _schedule_process_scheduled_notifications() -> None:
+    """Wrapper for processing scheduled notifications."""
+    from example_service.workers.notifications.tasks import (
+        process_scheduled_notifications,
+    )
+
+    await process_scheduled_notifications.kiq()
+
+
 async def _schedule_cache_warming() -> None:
     """Wrapper for cache warming task."""
     from example_service.workers.cache.tasks import warm_cache
@@ -390,6 +399,15 @@ def setup_scheduled_jobs() -> None:
         replace_existing=True,
     )
 
+    # Process scheduled notifications - every 1 minute
+    scheduler.add_job(
+        func=_schedule_process_scheduled_notifications,
+        trigger=IntervalTrigger(minutes=1),
+        id="process_scheduled_notifications",
+        name="Process scheduled notifications",
+        replace_existing=True,
+    )
+
     # Cache warming - every 30 minutes
     scheduler.add_job(
         func=_schedule_cache_warming,
@@ -524,17 +542,15 @@ def get_job_status() -> list[dict]:
     Returns:
         List of job information dictionaries.
     """
-    jobs = []
-    for job in scheduler.get_jobs():
-        jobs.append(
-            {
-                "id": job.id,
-                "name": job.name,
-                "next_run_time": job.next_run_time.isoformat() if job.next_run_time else None,
-                "trigger": str(job.trigger),
-            }
-        )
-    return jobs
+    return [
+        {
+            "id": job.id,
+            "name": job.name,
+            "next_run_time": job.next_run_time.isoformat() if job.next_run_time else None,
+            "trigger": str(job.trigger),
+        }
+        for job in scheduler.get_jobs()
+    ]
 
 
 def pause_job(job_id: str) -> None:

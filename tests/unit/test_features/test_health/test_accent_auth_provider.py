@@ -1,13 +1,32 @@
 """Tests for Accent-Auth health check provider."""
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from example_service.core.schemas.common import HealthStatus
+from example_service.features.health import accent_auth_provider as compat_module
 from example_service.features.health.providers.accent_auth import (
     AccentAuthHealthProvider,
+    _get_accent_auth_client,
+    _get_auth_settings,
+    _perform_head_request,
 )
+
+
+@pytest.fixture(autouse=True)
+def _mock_auth_settings(monkeypatch: pytest.MonkeyPatch):
+    """Ensure AccentAuth has a service URL configured by default."""
+    settings = SimpleNamespace(
+        service_url="http://accent-auth:9497",
+        request_timeout=5.0,
+    )
+    monkeypatch.setattr(
+        "example_service.features.health.accent_auth_provider.get_auth_settings",
+        lambda: settings,
+    )
+    return settings
 
 
 @pytest.mark.asyncio
@@ -19,7 +38,7 @@ class TestAccentAuthHealthProvider:
         provider = AccentAuthHealthProvider()
 
         with patch(
-            "example_service.features.health.accent_auth_provider.get_accent_auth_client"
+            "example_service.features.health.accent_auth_provider.get_accent_auth_client",
         ) as mock_get_client:
             # Mock the client and response
             mock_client = AsyncMock()
@@ -50,7 +69,7 @@ class TestAccentAuthHealthProvider:
         provider = AccentAuthHealthProvider()
 
         with patch(
-            "example_service.features.health.accent_auth_provider.get_accent_auth_client"
+            "example_service.features.health.accent_auth_provider.get_accent_auth_client",
         ) as mock_get_client:
             mock_client = AsyncMock()
             mock_client.base_url = "http://accent-auth:9497"
@@ -80,13 +99,13 @@ class TestAccentAuthHealthProvider:
         provider = AccentAuthHealthProvider()
 
         with patch(
-            "example_service.features.health.accent_auth_provider.get_accent_auth_client"
+            "example_service.features.health.accent_auth_provider.get_accent_auth_client",
         ) as mock_get_client:
             mock_client = AsyncMock()
             mock_client.base_url = "http://accent-auth:9497"
             mock_client._client = AsyncMock()
             mock_client._client.head = AsyncMock(
-                side_effect=httpx.ConnectError("Connection refused")
+                side_effect=httpx.ConnectError("Connection refused"),
             )
 
             mock_get_client.return_value = mock_client
@@ -106,13 +125,13 @@ class TestAccentAuthHealthProvider:
         provider = AccentAuthHealthProvider()
 
         with patch(
-            "example_service.features.health.accent_auth_provider.get_accent_auth_client"
+            "example_service.features.health.accent_auth_provider.get_accent_auth_client",
         ) as mock_get_client:
             mock_client = AsyncMock()
             mock_client.base_url = "http://accent-auth:9497"
             mock_client._client = AsyncMock()
             mock_client._client.head = AsyncMock(
-                side_effect=httpx.TimeoutException("Request timeout")
+                side_effect=httpx.TimeoutException("Request timeout"),
             )
 
             mock_get_client.return_value = mock_client
@@ -128,7 +147,7 @@ class TestAccentAuthHealthProvider:
     async def test_unhealthy_status_no_url_configured(self):
         """Test unhealthy status when AUTH_SERVICE_URL not configured."""
         with patch(
-            "example_service.features.health.accent_auth_provider.get_auth_settings"
+            "example_service.features.health.accent_auth_provider.get_auth_settings",
         ) as mock_get_settings:
             # Mock settings with no service_url
             mock_settings = MagicMock()
@@ -147,7 +166,7 @@ class TestAccentAuthHealthProvider:
         provider = AccentAuthHealthProvider()
 
         with patch(
-            "example_service.features.health.accent_auth_provider.get_accent_auth_client"
+            "example_service.features.health.accent_auth_provider.get_accent_auth_client",
         ) as mock_get_client:
             mock_client = AsyncMock()
             mock_client.base_url = "http://accent-auth:9497"
@@ -167,3 +186,79 @@ class TestAccentAuthHealthProvider:
             assert provider.name == "accent-auth"
             assert health.status == HealthStatus.UNHEALTHY
             assert health.metadata["status_code"] == 500
+
+
+class TestCompatibilityLayer:
+    """Ensure compatibility shim behaviors are exercised."""
+
+    def test_getattr_returns_provider_class(self, monkeypatch: pytest.MonkeyPatch):
+        """__getattr__ should lazily import the provider."""
+        sentinel = object()
+        monkeypatch.setattr(
+            "example_service.features.health.providers.accent_auth.AccentAuthHealthProvider",
+            sentinel,
+        )
+
+        provider_cls = compat_module.AccentAuthHealthProvider
+
+        assert provider_cls is sentinel
+        # Subsequent access should hit cached global, no import
+        assert compat_module.AccentAuthHealthProvider is sentinel
+
+    def test_getattr_unknown_attribute_raises(self):
+        with pytest.raises(AttributeError):
+            _ = compat_module.unknown_attribute
+
+
+@pytest.mark.asyncio
+class TestPerformHeadRequest:
+    """Test `_perform_head_request` helper."""
+
+    async def test_uses_inner_client_when_available(self):
+        """If client provides `_client.head`, that path is used."""
+        inner = AsyncMock()
+        response = object()
+        inner.head.return_value = response
+        client = SimpleNamespace(_client=inner)
+
+        result = await _perform_head_request(client, "/ping", headers={"x": "1"})
+
+        assert result is response
+        inner.head.assert_awaited_once_with("/ping", headers={"x": "1"})
+
+    async def test_falls_back_to_outer_head(self):
+        """Outer head should be used when `_client` missing."""
+        outer_head = AsyncMock()
+        client = SimpleNamespace(head=outer_head)
+
+        await _perform_head_request(client, "/ping", headers={})
+
+        outer_head.assert_awaited_once_with("/ping", headers={})
+
+    async def test_raises_when_no_head_available(self):
+        """Missing head handlers should raise RuntimeError."""
+        client = SimpleNamespace()
+        with pytest.raises(RuntimeError):
+            await _perform_head_request(client, "/ping", headers={})
+
+
+class TestCompatHelpers:
+    """Validate compatibility aware helper functions."""
+
+    def test_get_auth_settings_prefers_compat(self, monkeypatch: pytest.MonkeyPatch):
+        sentinel_settings = object()
+        monkeypatch.setattr(
+            "example_service.features.health.providers.accent_auth._get_compat_module",
+            lambda: SimpleNamespace(get_auth_settings=lambda: sentinel_settings),
+        )
+
+        assert _get_auth_settings() is sentinel_settings
+
+    def test_get_auth_client_prefers_compat(self, monkeypatch: pytest.MonkeyPatch):
+        sentinel_client = object()
+        monkeypatch.setattr(
+            "example_service.features.health.providers.accent_auth._get_compat_module",
+            lambda: SimpleNamespace(get_accent_auth_client=lambda: sentinel_client),
+        )
+
+        assert _get_accent_auth_client() is sentinel_client

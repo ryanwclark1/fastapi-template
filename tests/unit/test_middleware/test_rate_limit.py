@@ -14,15 +14,15 @@ from example_service.core.exceptions import RateLimitException
 
 class DummyLimiter:
     def __init__(
-        self, allowed: bool = True, metadata: dict | None = None, exc: Exception | None = None
+        self, allowed: bool = True, metadata: dict | None = None, exc: Exception | None = None,
     ):
         self.allowed = allowed
         self.metadata = metadata or {"limit": 5, "remaining": 4, "reset": 1, "retry_after": 1}
         self.exc = exc
-        self.called_with: list[dict] = []
+        self.calls: list[dict] = []
 
     async def check_limit(self, **kwargs):
-        self.called_with.append(kwargs)
+        self.calls.append(kwargs)
         if self.exc:
             raise self.exc
         return self.allowed, self.metadata
@@ -55,8 +55,8 @@ async def test_rate_limit_injects_headers_on_success():
     start = next(msg for msg in send_messages if msg["type"] == "http.response.start")
     header_keys = {k for k, _ in start["headers"]}
     assert b"x-ratelimit-limit" in header_keys
-    assert limiter.called_with
-    assert limiter.called_with[0]["endpoint"] == "/api"
+    assert limiter.calls
+    assert limiter.calls[0]["endpoint"] == "/api"
 
 
 @pytest.mark.asyncio

@@ -18,6 +18,9 @@ from example_service.features.graphql.types.reminders import (
     ReminderEventType,
     ReminderType,
 )
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(AsyncGenerator)
 
 if TYPE_CHECKING:
     from strawberry.types import Info
@@ -89,7 +92,7 @@ async def _subscribe_to_channel(
                 continue
 
     except Exception as e:
-        logger.error(f"Subscription error: {e}")
+        logger.exception(f"Subscription error: {e}")
         raise
 
     finally:
@@ -148,7 +151,7 @@ class Subscription:
     @strawberry.subscription(description="Subscribe to reminder events")
     async def reminder_events(
         self,
-        info: Info[GraphQLContext, None],  # noqa: ARG002 - required by Strawberry
+        info: Info[GraphQLContext, None],
         event_types: EventTypesArg = None,
     ) -> AsyncGenerator[ReminderEvent]:
         """Subscribe to reminder events.

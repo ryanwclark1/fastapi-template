@@ -38,9 +38,12 @@ Usage:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends, HTTPException, status
+
+from example_service.utils.runtime_dependencies import require_runtime_dependency
 
 if TYPE_CHECKING:
     from example_service.infra.ai.pipelines import Pipeline
@@ -53,6 +56,8 @@ from example_service.infra.ai.observability import (
     AITracer,
     BudgetService,
 )
+
+require_runtime_dependency(Callable)
 
 
 def get_orchestrator() -> InstrumentedOrchestrator | None:
@@ -113,7 +118,7 @@ def get_ai_logger_dep() -> AIObservabilityLogger:
     return get_ai_logger()
 
 
-def get_pipeline_dep(name: str):
+def get_pipeline_dep(name: str) -> Callable[[], Pipeline]:
     """Factory for creating pipeline dependencies.
 
     Args:
@@ -199,7 +204,7 @@ Example:
 """
 
 OptionalOrchestrator = Annotated[
-    InstrumentedOrchestrator | None, Depends(optional_orchestrator)
+    InstrumentedOrchestrator | None, Depends(optional_orchestrator),
 ]
 """AI orchestrator dependency that is optional.
 

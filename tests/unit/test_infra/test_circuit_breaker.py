@@ -155,7 +155,7 @@ class TestCircuitBreakerStateTransitions:
     """Test circuit breaker state transitions."""
 
     async def test_closed_to_open_on_failures(
-        self, breaker: CircuitBreaker, fast_failing_func: Callable[[], None]
+        self, breaker: CircuitBreaker, fast_failing_func: Callable[[], None],
     ) -> None:
         """Test circuit opens after exceeding failure threshold."""
         assert breaker.state == CircuitState.CLOSED
@@ -178,7 +178,7 @@ class TestCircuitBreakerStateTransitions:
         # Force circuit to open
         breaker._state = CircuitState.OPEN
         breaker._last_failure_time = datetime.now(UTC) - timedelta(
-            seconds=breaker.recovery_timeout + 1
+            seconds=breaker.recovery_timeout + 1,
         )
 
         # Check state should trigger transition
@@ -188,7 +188,7 @@ class TestCircuitBreakerStateTransitions:
         assert breaker.state == CircuitState.HALF_OPEN
 
     async def test_half_open_to_closed_on_successes(
-        self, breaker: CircuitBreaker, successful_func: Callable[[], str]
+        self, breaker: CircuitBreaker, successful_func: Callable[[], str],
     ) -> None:
         """Test circuit closes after success threshold in half-open state."""
         # Set circuit to half-open
@@ -203,7 +203,7 @@ class TestCircuitBreakerStateTransitions:
         assert breaker.total_successes == breaker.success_threshold
 
     async def test_half_open_to_open_on_failure(
-        self, breaker: CircuitBreaker, fast_failing_func: Callable[[], None]
+        self, breaker: CircuitBreaker, fast_failing_func: Callable[[], None],
     ) -> None:
         """Test circuit reopens on any failure in half-open state."""
         # Set circuit to half-open
@@ -221,7 +221,7 @@ class TestCircuitBreakerCallProtection:
     """Test circuit breaker call() method."""
 
     async def test_call_succeeds_when_closed(
-        self, breaker: CircuitBreaker, successful_func: Callable[[], str]
+        self, breaker: CircuitBreaker, successful_func: Callable[[], str],
     ) -> None:
         """Test successful call passes through when circuit is closed."""
         result = await breaker.call(successful_func)
@@ -231,7 +231,7 @@ class TestCircuitBreakerCallProtection:
         assert breaker.total_failures == 0
 
     async def test_call_raises_circuit_open_error_when_open(
-        self, breaker: CircuitBreaker, successful_func: Callable[[], str]
+        self, breaker: CircuitBreaker, successful_func: Callable[[], str],
     ) -> None:
         """Test call raises CircuitOpenError when circuit is open."""
         # Force circuit to open
@@ -244,7 +244,7 @@ class TestCircuitBreakerCallProtection:
         assert breaker.total_rejections == 1
 
     async def test_call_records_failures(
-        self, breaker: CircuitBreaker, fast_failing_func: Callable[[], None]
+        self, breaker: CircuitBreaker, fast_failing_func: Callable[[], None],
     ) -> None:
         """Test call records failures and updates metrics."""
         with pytest.raises(ServiceError):
@@ -455,7 +455,7 @@ class TestCircuitBreakerReset:
         assert breaker.total_rejections == 0
 
     async def test_reset_allows_immediate_calls(
-        self, breaker: CircuitBreaker, successful_func: Callable[[], str]
+        self, breaker: CircuitBreaker, successful_func: Callable[[], str],
     ) -> None:
         """Test reset allows calls immediately after resetting open circuit."""
         # Open the circuit
@@ -473,7 +473,7 @@ class TestCircuitBreakerConcurrency:
     """Test circuit breaker behavior under concurrent access."""
 
     async def test_concurrent_calls_thread_safe(
-        self, breaker: CircuitBreaker, successful_func: Callable[[], str]
+        self, breaker: CircuitBreaker, successful_func: Callable[[], str],
     ) -> None:
         """Test concurrent calls are handled safely with lock."""
         # Execute multiple concurrent calls
@@ -485,7 +485,7 @@ class TestCircuitBreakerConcurrency:
         assert breaker.total_successes == 10
 
     async def test_concurrent_failures_counted_correctly(
-        self, breaker: CircuitBreaker, fast_failing_func: Callable[[], None]
+        self, breaker: CircuitBreaker, fast_failing_func: Callable[[], None],
     ) -> None:
         """Test concurrent failures are counted correctly."""
         # Execute failures sequentially to avoid circuit opening during test
@@ -519,7 +519,7 @@ class TestCircuitBreakerHalfOpenState:
                 pass
 
     async def test_half_open_success_progression(
-        self, breaker: CircuitBreaker, successful_func: Callable[[], str]
+        self, breaker: CircuitBreaker, successful_func: Callable[[], str],
     ) -> None:
         """Test half-open state progresses to closed on successes."""
         breaker._state = CircuitState.HALF_OPEN
@@ -592,7 +592,7 @@ class TestCircuitBreakerIntegration:
 
         # 3. Wait for recovery timeout
         breaker._last_failure_time = datetime.now(UTC) - timedelta(
-            seconds=breaker.recovery_timeout + 1
+            seconds=breaker.recovery_timeout + 1,
         )
 
         # 4. Check state to trigger HALF_OPEN transition

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 import uuid
 
@@ -10,6 +11,9 @@ from httpx import AsyncClient
 import pytest
 
 from example_service.app.middleware.request_id import RequestIDMiddleware
+
+if TYPE_CHECKING:
+    from starlette.types import Receive, Scope, Send
 
 
 class TestRequestIDMiddleware:
@@ -91,7 +95,7 @@ class TestRequestIDMiddleware:
 
     @patch("example_service.app.middleware.request_id.clear_log_context")
     async def test_clears_logging_context_after_request(
-        self, mock_clear_context: MagicMock, client: AsyncClient
+        self, mock_clear_context: MagicMock, client: AsyncClient,
     ):
         """Test that middleware clears logging context after request completes."""
         await client.get("/test")
@@ -143,8 +147,6 @@ class TestRequestIDMiddleware:
 
     async def test_handles_non_http_scope(self):
         """Test that middleware passes through non-HTTP scopes (websocket, lifespan)."""
-        from starlette.types import Receive, Scope, Send
-
         # Create a simple ASGI app
         async def simple_app(scope: Scope, receive: Receive, send: Send):
             await send({"type": "websocket.accept"})
@@ -164,8 +166,6 @@ class TestRequestIDMiddleware:
 
     async def test_handles_missing_headers(self):
         """Test that middleware handles requests with no headers gracefully."""
-        from starlette.types import Receive, Scope, Send
-
         # Mock ASGI app
         async def mock_app(scope: Scope, receive: Receive, send: Send):
             await send(
@@ -173,13 +173,13 @@ class TestRequestIDMiddleware:
                     "type": "http.response.start",
                     "status": 200,
                     "headers": [[b"content-type", b"application/json"]],
-                }
+                },
             )
             await send(
                 {
                     "type": "http.response.body",
                     "body": b'{"status":"ok"}',
-                }
+                },
             )
 
         middleware = RequestIDMiddleware(mock_app)

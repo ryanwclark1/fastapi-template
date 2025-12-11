@@ -284,7 +284,7 @@ class CircuitBreaker:
         return self._state == CircuitState.HALF_OPEN
 
     async def call(
-        self, func: Callable[P, Awaitable[T]], *args: P.args, **kwargs: P.kwargs
+        self, func: Callable[P, Awaitable[T]], *args: P.args, **kwargs: P.kwargs,
     ) -> T:
         """Execute function with circuit breaker protection.
 

@@ -440,6 +440,168 @@ class InternalServerException(AppException):
             extra=extra,
         )
 
+# ============================================================================
+# Authentication Exceptions (General - Used by All Services)
+# ============================================================================
+# These exceptions are used by any service that validates tokens from accent-auth.
+# They should be copied to consumer services or extracted to a shared library.
+
+
+class MissingAuthenticationError(UnauthorizedException):
+    """Exception raised when authentication credentials are missing.
+
+    Example:
+        raise MissingAuthenticationError()
+    """
+
+    def __init__(
+        self,
+        detail: str = "Authentication credentials required",
+        instance: str | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
+        """Initialize missing authentication exception."""
+        super().__init__(
+            detail=detail,
+            type="missing-authentication",
+            instance=instance,
+            extra=extra,
+        )
+
+
+class TokenExpiredError(UnauthorizedException):
+    """Exception raised when an authentication token has expired.
+
+    Example:
+        raise TokenExpiredError("token-uuid-123")
+    """
+
+    def __init__(
+        self,
+        token_uuid: str | None = None,
+        detail: str = "Token has expired",
+        instance: str | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
+        """Initialize token expired exception."""
+        final_extra = {"token_uuid": token_uuid} if token_uuid else {}
+        if extra:
+            final_extra.update(extra)
+        super().__init__(
+            detail=detail,
+            type="token-expired",
+            instance=instance,
+            extra=final_extra or None,
+        )
+
+
+class TokenInvalidError(UnauthorizedException):
+    """Exception raised when an authentication token is invalid.
+
+    Example:
+        raise TokenInvalidError("token-uuid-123")
+    """
+
+    def __init__(
+        self,
+        token_uuid: str | None = None,
+        detail: str = "Invalid token",
+        instance: str | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
+        """Initialize token invalid exception."""
+        final_extra = {"token_uuid": token_uuid} if token_uuid else {}
+        if extra:
+            final_extra.update(extra)
+        super().__init__(
+            detail=detail,
+            type="token-invalid",
+            instance=instance,
+            extra=final_extra or None,
+        )
+
+
+class InsufficientPermissionsError(ForbiddenException):
+    """Exception raised when user lacks required permissions.
+
+    Example:
+        raise InsufficientPermissionsError("admin.write", ["user.read"])
+    """
+
+    def __init__(
+        self,
+        required_permission: str | None = None,
+        user_permissions: list[str] | None = None,
+        detail: str | None = None,
+        instance: str | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
+        """Initialize insufficient permissions exception."""
+        if detail is None:
+            detail = "Insufficient permissions"
+            if required_permission:
+                detail = f"Missing required permission: {required_permission}"
+        final_extra: dict[str, Any] = {}
+        if required_permission:
+            final_extra["required_permission"] = required_permission
+        if user_permissions:
+            final_extra["user_permissions"] = user_permissions
+        if extra:
+            final_extra.update(extra)
+        super().__init__(
+            detail=detail,
+            type="insufficient-permissions",
+            instance=instance,
+            extra=final_extra or None,
+        )
+
+
+# ============================================================================
+# Auth Provider Specific Exceptions
+# ============================================================================
+# These exceptions are specific to accent-auth (the authentication provider).
+# Consumer services do NOT need these - they only validate tokens, not credentials.
+
+
+class InvalidCredentialsError(UnauthorizedException):
+    """Exception raised when authentication credentials are invalid.
+
+    This is ONLY used by accent-auth when verifying username/password.
+    Consumer services never see passwords - they only validate tokens.
+
+    Example:
+        raise InvalidCredentialsError("user@example.com")
+    """
+
+    def __init__(
+        self,
+        login: str | None = None,
+        detail: str | None = None,
+        instance: str | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
+        """Initialize invalid credentials exception.
+
+        Args:
+            login: The login identifier that failed authentication.
+            detail: Human-readable error message.
+            instance: URI reference identifying this specific occurrence.
+            extra: Additional context about the error.
+        """
+        if detail is None:
+            detail = "Invalid credentials"
+            if login:
+                detail = f"Invalid credentials for {login}"
+        final_extra = {"login": login} if login else {}
+        if extra:
+            final_extra.update(extra)
+        super().__init__(
+            detail=detail,
+            type="invalid-credentials",
+            instance=instance,
+            extra=final_extra or None,
+        )
+
 
 # Aliases for convenience/backward compatibility
 AuthenticationError = UnauthorizedException

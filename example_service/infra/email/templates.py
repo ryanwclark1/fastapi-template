@@ -126,9 +126,12 @@ class EmailTemplateRenderer:
 
         # Raise error if neither template found
         if html_content is None and text_content is None:
-            raise TemplateNotFoundError(
+            msg = (
                 f"No template found for: {template_name} "
                 f"(looked for {template_name}.html and {template_name}.txt)"
+            )
+            raise TemplateNotFoundError(
+                msg,
             )
 
         return html_content, text_content
@@ -244,9 +247,8 @@ class EmailTemplateRenderer:
         # Normalize whitespace
         text = re.sub(r" +", " ", text)  # Multiple spaces to single
         text = re.sub(r"\n\s*\n", "\n\n", text)  # Multiple newlines to double
-        text = text.strip()
+        return text.strip()
 
-        return text
 
 
 class TemplateNotFoundError(Exception):

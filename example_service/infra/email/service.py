@@ -202,7 +202,7 @@ class EmailService:
         try:
             html_content, text_content = self.renderer.render(template, **full_context)
         except TemplateNotFoundError:
-            logger.error(f"Email template not found: {template}")
+            logger.exception(f"Email template not found: {template}")
             raise
 
         # Extract subject from context if not provided

@@ -99,9 +99,12 @@ class EventRegistry:
             if event_version in self._events[event_type]:
                 existing = self._events[event_type][event_version]
                 if existing is not cls:
-                    raise ValueError(
+                    msg = (
                         f"Event type '{event_type}' version {event_version} "
                         f"already registered with {existing.__name__}"
+                    )
+                    raise ValueError(
+                        msg,
                     )
                 # Already registered (idempotent)
                 return cls
@@ -178,7 +181,8 @@ class EventRegistry:
         event_class = self.get(event_type, version)
         if event_class is None:
             version_str = f" version {version}" if version else ""
-            raise KeyError(f"Unknown event type: '{event_type}'{version_str}")
+            msg = f"Unknown event type: '{event_type}'{version_str}"
+            raise KeyError(msg)
         return event_class
 
     def deserialize(

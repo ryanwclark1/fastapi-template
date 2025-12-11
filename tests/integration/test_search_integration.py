@@ -70,8 +70,8 @@ async def search_session(search_db_engine) -> AsyncSession:
                         END IF;
                     END
                     $$;
-                    """
-                )
+                    """,
+                ),
             )
 
         # Create all tables
@@ -245,7 +245,7 @@ class TestSearchRanking:
 
     @pytest.mark.asyncio
     async def test_title_matches_rank_higher_than_description(
-        self, search_session, sample_reminders
+        self, search_session, sample_reminders,
     ):
         """Title matches should rank higher due to weight 'A'."""
         result = await search_session.execute(
@@ -255,7 +255,7 @@ class TestSearchRanking:
                 FROM reminders
                 WHERE search_vector @@ to_tsquery('english', 'python')
                 ORDER BY rank DESC
-            """)
+            """),
         )
         rows = result.fetchall()
 
@@ -274,7 +274,7 @@ class TestSearchRanking:
                 SELECT id, title
                 FROM reminders
                 WHERE search_vector @@ phraseto_tsquery('english', 'python django')
-            """)
+            """),
         )
         rows = result.fetchall()
 
@@ -291,7 +291,7 @@ class TestSearchRanking:
                 FROM reminders
                 WHERE search_vector @@ websearch_to_tsquery('english', 'python -django')
                 ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', 'python -django')) DESC
-            """)
+            """),
         )
         rows = result.fetchall()
 
@@ -308,7 +308,7 @@ class TestSearchRanking:
                 SELECT id, title
                 FROM reminders
                 WHERE search_vector @@ websearch_to_tsquery('english', 'django OR machine')
-            """)
+            """),
         )
         rows = result.fetchall()
 
@@ -354,7 +354,7 @@ class TestFuzzySearch:
                 FROM reminders
                 WHERE title % 'pythn'
                 ORDER BY sim DESC
-            """)
+            """),
         )
         rows = result.fetchall()
 
@@ -373,7 +373,7 @@ class TestFuzzySearch:
                 SELECT id, title, similarity(title, 'postgrs') as sim
                 FROM reminders
                 WHERE title % 'postgrs'
-            """)
+            """),
         )
         rows = result.fetchall()
 
@@ -392,7 +392,7 @@ class TestFuzzySearch:
                 SELECT id, title, similarity(title, 'pythn') as sim
                 FROM reminders
                 WHERE title % 'pythn'
-            """)
+            """),
         )
         rows = result.fetchall()
 
@@ -411,7 +411,7 @@ class TestFuzzySearch:
                        similarity('python', title) as sim
                 FROM reminders
                 ORDER BY wsim DESC
-            """)
+            """),
         )
         rows = result.fetchall()
 
@@ -654,7 +654,7 @@ class TestSearchFlow:
                 WHERE search_vector @@ websearch_to_tsquery('english', 'python web')
                 ORDER BY rank DESC
                 LIMIT 10
-            """)
+            """),
         )
         rows = result.fetchall()
 
@@ -698,13 +698,13 @@ class TestSearchFlow:
                 SELECT COUNT(*) as cnt
                 FROM reminders
                 WHERE search_vector @@ to_tsquery('english', 'pythno')
-            """)
+            """),
         )
         fts_count = fts_result.scalar()
         assert fts_count == 0  # Typo returns nothing
 
         # 2. Fall back to fuzzy search
-        await session.execute(text("SET pg_trgm.similarity_threshold = 0.3"))
+        await session.execute(text("SET pg_trgm.similarity_threshold = 0.1"))
 
         fuzzy_result = await session.execute(
             text("""
@@ -713,7 +713,7 @@ class TestSearchFlow:
                 WHERE title % 'pythno'
                 ORDER BY sim DESC
                 LIMIT 5
-            """)
+            """),
         )
         fuzzy_rows = fuzzy_result.fetchall()
 

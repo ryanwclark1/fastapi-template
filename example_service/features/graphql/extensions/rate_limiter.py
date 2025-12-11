@@ -20,11 +20,9 @@ from typing import Any, ClassVar
 from graphql import GraphQLError
 from strawberry.extensions import SchemaExtension
 
-# from example_service.core.cache import get_cache_instance
-
 
 # Stub for missing cache module
-def get_cache_instance():  # type: ignore[misc]
+def get_cache_instance() -> None:  # type: ignore[misc]
     """Stub for missing cache module."""
     return
 
@@ -79,7 +77,7 @@ class GraphQLRateLimiter(SchemaExtension):
         self,
         limits: dict[str, int] | None = None,
         window_seconds: int | None = None,
-    ):
+    ) -> None:
         """Initialize rate limiter.
 
         Args:
@@ -211,9 +209,12 @@ class GraphQLRateLimiter(SchemaExtension):
             count = int(count_value) + 1  # type: ignore[arg-type]
 
             if count > limit:
-                raise RateLimitExceeded(
+                msg = (
                     f"Rate limit exceeded for {operation_type} operations. "
                     f"Limit: {limit} per {self.window} seconds"
+                )
+                raise RateLimitExceeded(
+                    msg,
                 )
 
             # Set new count with expiry
@@ -223,7 +224,7 @@ class GraphQLRateLimiter(SchemaExtension):
             raise
         except Exception as e:
             # Don't fail the operation if rate limiting has issues
-            logger.error(
+            logger.exception(
                 "Rate limiting check failed",
                 extra={"error": str(e), "user_id": user_id, "operation_type": operation_type},
             )
@@ -250,8 +251,9 @@ class GraphQLRateLimiter(SchemaExtension):
 
         # Check limit
         if count >= limit:
+            msg = f"Rate limit exceeded. Limit: {limit} per {self.window} seconds"
             raise RateLimitExceeded(
-                f"Rate limit exceeded. Limit: {limit} per {self.window} seconds"
+                msg,
             )
 
         # Increment

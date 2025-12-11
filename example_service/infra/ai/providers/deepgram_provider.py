@@ -42,7 +42,7 @@ class DeepgramProvider(BaseProvider):
         model_name: str = "nova-2",
         timeout: int = 120,
         max_retries: int = 3,
-        **kwargs: Any,  # noqa: ARG002
+        **kwargs: Any,
     ) -> None:
         """Initialize Deepgram provider.
 
@@ -71,7 +71,7 @@ class DeepgramProvider(BaseProvider):
                 "Install with: pip install deepgram-sdk"
             )
             raise ImportError(
-                msg
+                msg,
             ) from e
 
     def get_provider_name(self) -> str:
@@ -116,12 +116,12 @@ class DeepgramProvider(BaseProvider):
             if isinstance(audio, str):
                 # URL source
                 response = await self.client.listen.asyncrest.v("1").transcribe_url(
-                    {"url": audio}, options
+                    {"url": audio}, options,
                 )
             else:
                 # Bytes source
                 response = await self.client.listen.asyncrest.v("1").transcribe_file(
-                    {"buffer": audio}, options
+                    {"buffer": audio}, options,
                 )
 
             # Parse response
@@ -148,7 +148,7 @@ class DeepgramProvider(BaseProvider):
                             end=utt["end"],
                             speaker=speaker_id,
                             confidence=utt.get("confidence"),
-                        )
+                        ),
                     )
             # Fallback to words if no utterances
             elif "words" in alternatives:
@@ -169,7 +169,7 @@ class DeepgramProvider(BaseProvider):
                                 start=current_start,
                                 end=word["end"],
                                 confidence=alternatives.get("confidence"),
-                            )
+                            ),
                         )
                         current_segment = []
                         current_start = None
@@ -183,7 +183,7 @@ class DeepgramProvider(BaseProvider):
                             start=current_start or 0.0,
                             end=last_word["end"],
                             confidence=alternatives.get("confidence"),
-                        )
+                        ),
                     )
             else:
                 # No words available, create single segment
@@ -193,7 +193,7 @@ class DeepgramProvider(BaseProvider):
                         start=0.0,
                         end=results.get("duration", 0.0),
                         confidence=alternatives.get("confidence"),
-                    )
+                    ),
                 )
 
             # Get duration
@@ -223,8 +223,9 @@ class DeepgramProvider(BaseProvider):
                     original_error=e,
                 ) from e
 
+            msg = f"Deepgram transcription failed: {error_msg}"
             raise ProviderError(
-                f"Deepgram transcription failed: {error_msg}",
+                msg,
                 provider="deepgram",
                 operation="transcription",
                 original_error=e,
@@ -257,36 +258,34 @@ class DeepgramProvider(BaseProvider):
         # Transcribe both channels with speaker diarization disabled
         # (we'll use channel as speaker)
         result1 = await self.transcribe(
-            channel1, language=language, speaker_diarization=False, **kwargs
+            channel1, language=language, speaker_diarization=False, **kwargs,
         )
         result2 = await self.transcribe(
-            channel2, language=language, speaker_diarization=False, **kwargs
+            channel2, language=language, speaker_diarization=False, **kwargs,
         )
 
         # Merge segments with channel attribution
-        all_segments = []
-
-        for seg in result1.segments:
-            all_segments.append(
-                TranscriptionSegment(
-                    text=seg.text,
-                    start=seg.start,
-                    end=seg.end,
-                    speaker="Agent",  # Channel 1 is typically agent
-                    confidence=seg.confidence,
-                )
+        all_segments = [
+            TranscriptionSegment(
+                text=seg.text,
+                start=seg.start,
+                end=seg.end,
+                speaker="Agent",  # Channel 1 is typically agent
+                confidence=seg.confidence,
             )
+            for seg in result1.segments
+        ]
 
-        for seg in result2.segments:
-            all_segments.append(
-                TranscriptionSegment(
-                    text=seg.text,
-                    start=seg.start,
-                    end=seg.end,
-                    speaker="Customer",  # Channel 2 is typically customer
-                    confidence=seg.confidence,
-                )
+        all_segments.extend(
+            TranscriptionSegment(
+                text=seg.text,
+                start=seg.start,
+                end=seg.end,
+                speaker="Customer",  # Channel 2 is typically customer
+                confidence=seg.confidence,
             )
+            for seg in result2.segments
+        )
 
         # Sort by start time
         all_segments.sort(key=lambda s: s.start)

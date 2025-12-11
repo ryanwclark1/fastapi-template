@@ -71,4 +71,5 @@ class Tag(TimestampedBase):
     )
 
     def __repr__(self) -> str:
+        """Return tag summary for debugging."""
         return f"<Tag(id={self.id}, name={self.name!r})>"

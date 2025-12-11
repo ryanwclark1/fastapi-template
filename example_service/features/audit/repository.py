@@ -127,7 +127,7 @@ class AuditRepository(BaseRepository[AuditLog]):
         logs = result.scalars().all()
 
         _lazy.debug(
-            lambda: f"get_entity_history: {entity_type}/{entity_id} -> {len(logs)} entries"
+            lambda: f"get_entity_history: {entity_type}/{entity_id} -> {len(logs)} entries",
         )
         return logs
 
@@ -214,7 +214,7 @@ class AuditRepository(BaseRepository[AuditLog]):
             )
         else:
             _lazy.debug(
-                lambda: f"list_dangerous_actions: tenant_id={tenant_id} -> no dangerous actions"
+                lambda: f"list_dangerous_actions: tenant_id={tenant_id} -> no dangerous actions",
             )
 
         return logs
@@ -308,7 +308,7 @@ class AuditRepository(BaseRepository[AuditLog]):
         action_result = await session.execute(
             select(subquery.c.action, func.count())
             .select_from(subquery)
-            .group_by(subquery.c.action)
+            .group_by(subquery.c.action),
         )
         # Convert enum keys to their string values for dictionary
         actions_count: dict[str, int] = {str(k): v for k, v in action_result.all()}
@@ -317,33 +317,33 @@ class AuditRepository(BaseRepository[AuditLog]):
         entity_result = await session.execute(
             select(subquery.c.entity_type, func.count())
             .select_from(subquery)
-            .group_by(subquery.c.entity_type)
+            .group_by(subquery.c.entity_type),
         )
         entity_types_count: dict[str, int] = dict(entity_result.all())  # type: ignore[arg-type]
 
         # Success count
         success_result = await session.execute(
-            select(func.count()).select_from(subquery).where(subquery.c.success == True)  # noqa: E712
+            select(func.count()).select_from(subquery).where(subquery.c.success),
         )
         success_count = success_result.scalar() or 0
 
         # Unique users
         users_result = await session.execute(
-            select(func.count(func.distinct(subquery.c.user_id))).select_from(subquery)
+            select(func.count(func.distinct(subquery.c.user_id))).select_from(subquery),
         )
         unique_users = users_result.scalar() or 0
 
         # Time range
         time_result = await session.execute(
             select(
-                func.min(subquery.c.timestamp), func.max(subquery.c.timestamp)
-            ).select_from(subquery)
+                func.min(subquery.c.timestamp), func.max(subquery.c.timestamp),
+            ).select_from(subquery),
         )
         time_row = time_result.one_or_none()
         time_range = (time_row[0], time_row[1]) if time_row else (None, None)
 
         _lazy.debug(
-            lambda: f"get_summary_stats: {total_entries} entries, {unique_users} users"
+            lambda: f"get_summary_stats: {total_entries} entries, {unique_users} users",
         )
 
         return {

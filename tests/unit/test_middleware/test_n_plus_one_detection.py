@@ -259,7 +259,7 @@ class TestNPlusOneDetectionMiddleware:
     def test_initialization_custom_exclude_patterns(self, app: FastAPI) -> None:
         """Test middleware initialization with custom exclude patterns."""
         middleware = NPlusOneDetectionMiddleware(
-            app, exclude_patterns=[r"pg_catalog", r"information_schema"]
+            app, exclude_patterns=[r"pg_catalog", r"information_schema"],
         )
 
         assert len(middleware.exclude_patterns) == 2
@@ -267,7 +267,7 @@ class TestNPlusOneDetectionMiddleware:
 
     @pytest.mark.asyncio
     async def test_dispatch_normal_request(
-        self, app: FastAPI, middleware: NPlusOneDetectionMiddleware
+        self, app: FastAPI, middleware: NPlusOneDetectionMiddleware,
     ) -> None:
         """Test middleware dispatch with normal request."""
         app.add_middleware(
@@ -296,7 +296,7 @@ class TestNPlusOneDetectionMiddleware:
 
     @pytest.mark.asyncio
     async def test_record_query_pattern_tracking(
-        self, middleware: NPlusOneDetectionMiddleware
+        self, middleware: NPlusOneDetectionMiddleware,
     ) -> None:
         """Test query pattern tracking with multiple similar queries."""
         mock_request = Mock(spec=Request)
@@ -331,7 +331,7 @@ class TestNPlusOneDetectionMiddleware:
 
     @pytest.mark.asyncio
     async def test_record_query_slow_query_logging(
-        self, middleware: NPlusOneDetectionMiddleware, caplog: Any
+        self, middleware: NPlusOneDetectionMiddleware, caplog: Any,
     ) -> None:
         """Test slow query logging."""
         mock_request = Mock(spec=Request)
@@ -359,7 +359,7 @@ class TestNPlusOneDetectionMiddleware:
 
     @pytest.mark.asyncio
     async def test_analyze_query_patterns_with_n_plus_one(
-        self, middleware: NPlusOneDetectionMiddleware, caplog: Any
+        self, middleware: NPlusOneDetectionMiddleware, caplog: Any,
     ) -> None:
         """Test query pattern analysis detects N+1 issues."""
         mock_request = Mock(spec=Request)
@@ -385,7 +385,7 @@ class TestNPlusOneDetectionMiddleware:
 
     @pytest.mark.asyncio
     async def test_analyze_query_patterns_with_exception(
-        self, middleware: NPlusOneDetectionMiddleware, caplog: Any
+        self, middleware: NPlusOneDetectionMiddleware, caplog: Any,
     ) -> None:
         """Test query pattern analysis with exception."""
         mock_request = Mock(spec=Request)
@@ -397,14 +397,14 @@ class TestNPlusOneDetectionMiddleware:
 
         with caplog.at_level("WARNING"):
             await middleware._analyze_query_patterns(
-                mock_request, None, exception=ValueError("Test error")
+                mock_request, None, exception=ValueError("Test error"),
             )
 
         assert "Request completed with exception" in caplog.text
 
     @pytest.mark.asyncio
     async def test_log_n_plus_one_patterns(
-        self, middleware: NPlusOneDetectionMiddleware, caplog: Any
+        self, middleware: NPlusOneDetectionMiddleware, caplog: Any,
     ) -> None:
         """Test N+1 pattern logging with recommendations."""
         mock_request = Mock(spec=Request)
@@ -425,7 +425,7 @@ class TestNPlusOneDetectionMiddleware:
 
     @pytest.mark.asyncio
     async def test_log_request_summary_with_n_plus_one(
-        self, middleware: NPlusOneDetectionMiddleware, caplog: Any
+        self, middleware: NPlusOneDetectionMiddleware, caplog: Any,
     ) -> None:
         """Test request summary logging with N+1 detection."""
         mock_request = Mock(spec=Request)
@@ -440,7 +440,7 @@ class TestNPlusOneDetectionMiddleware:
 
     @pytest.mark.asyncio
     async def test_log_request_summary_without_n_plus_one(
-        self, middleware: NPlusOneDetectionMiddleware, caplog: Any
+        self, middleware: NPlusOneDetectionMiddleware, caplog: Any,
     ) -> None:
         """Test request summary logging without N+1 detection."""
         mock_request = Mock(spec=Request)

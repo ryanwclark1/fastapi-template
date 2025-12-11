@@ -190,7 +190,8 @@ class TestFunctionNode:
         """Test function execution failure."""
 
         async def failing_process(data: dict[str, Any]) -> dict[str, Any]:
-            raise ValueError("Test error")
+            msg = "Test error"
+            raise ValueError(msg)
 
         node = FunctionNode("process", failing_process)
         state = WorkflowState(data={})
@@ -210,7 +211,8 @@ class TestFunctionNode:
             nonlocal call_count
             call_count += 1
             if call_count < 3:
-                raise RuntimeError("Temporary failure")
+                msg = "Temporary failure"
+                raise RuntimeError(msg)
             return {"success": True}
 
         node = FunctionNode("process", flaky_process, retry_count=3)
@@ -434,7 +436,8 @@ class TestWorkflow:
         """Test workflow failure handling."""
 
         async def failing_step(data: dict[str, Any]) -> dict[str, Any]:
-            raise RuntimeError("Step failed")
+            msg = "Step failed"
+            raise RuntimeError(msg)
 
         workflow = (
             WorkflowBuilder("failing")

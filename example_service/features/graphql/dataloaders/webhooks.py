@@ -36,7 +36,7 @@ class WebhookDataLoader:
         """
         self._session = session
         self._loader: DataLoader[UUID, Webhook | None] = DataLoader(
-            load_fn=self._batch_load_webhooks
+            load_fn=self._batch_load_webhooks,
         )
 
     async def _batch_load_webhooks(
@@ -101,7 +101,7 @@ class WebhookDeliveryDataLoader:
         """
         self._session = session
         self._loader: DataLoader[UUID, WebhookDelivery | None] = DataLoader(
-            load_fn=self._batch_load_deliveries
+            load_fn=self._batch_load_deliveries,
         )
 
     async def _batch_load_deliveries(
@@ -169,7 +169,7 @@ class WebhookDeliveriesByWebhookDataLoader:
         self._session = session
         self._limit = limit
         self._loader: DataLoader[UUID, list[WebhookDelivery]] = DataLoader(
-            load_fn=self._batch_load_deliveries_by_webhook
+            load_fn=self._batch_load_deliveries_by_webhook,
         )
 
     async def _batch_load_deliveries_by_webhook(

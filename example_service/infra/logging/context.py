@@ -212,7 +212,7 @@ class ContextBoundLogger(logging.LoggerAdapter):
         return ContextBoundLogger(self.logger, **merged)
 
     def process(
-        self, msg: object, kwargs: MutableMapping[str, Any]
+        self, msg: object, kwargs: MutableMapping[str, Any],
     ) -> tuple[object, MutableMapping[str, Any]]:
         """Process log message and kwargs to include bound context.
 

@@ -49,8 +49,13 @@ try:
         get_progress_middleware,
     )
 except Exception:  # pragma: no cover - best effort
-    get_dlq_middleware = lambda: None  # noqa: E731
-    get_progress_middleware = lambda: None  # noqa: E731
+    def get_dlq_middleware() -> None:
+        """Fallback no-op DLQ middleware accessor."""
+        logging.getLogger(__name__).debug("DLQ middleware unavailable; returning None")
+
+    def get_progress_middleware() -> None:
+        """Fallback no-op progress middleware accessor."""
+        logging.getLogger(__name__).debug("Progress middleware unavailable; returning None")
 
 
 # ──────────────────────────────────────────────────────────────
@@ -75,7 +80,7 @@ class TrackerNotAvailableError(TaskServiceError):
 
 if TYPE_CHECKING:
     from apscheduler.schedulers.asyncio import (
-        AsyncIOScheduler,  # type: ignore[import-untyped]
+        AsyncIOScheduler,
     )
 
     from example_service.infra.tasks.tracking.base import BaseTaskTracker
@@ -429,7 +434,7 @@ class TaskManagementService:
         if broker is None:
             msg = "Task broker not configured. Ensure RabbitMQ and Redis are available."
             raise BrokerNotConfiguredError(
-                msg
+                msg,
             )
 
         params = params or {}
@@ -460,7 +465,8 @@ class TaskManagementService:
                 "Failed to trigger task",
                 extra={"task_name": task_name.value, "error": str(e)},
             )
-            raise TaskServiceError(f"Failed to trigger task: {e}") from e
+            msg = f"Failed to trigger task: {e}"
+            raise TaskServiceError(msg) from e
 
     async def _dispatch_task(
         self,
@@ -820,7 +826,8 @@ class TaskManagementService:
                 "Failed to retry DLQ task",
                 extra={"task_id": task_id, "error": str(e)},
             )
-            raise TaskServiceError(f"Failed to retry task: {e}") from e
+            msg = f"Failed to retry task: {e}"
+            raise TaskServiceError(msg) from e
 
     async def discard_dlq_task(
         self,
@@ -913,7 +920,7 @@ class TaskManagementService:
                     success=result.cancelled,
                     message=result.message,
                     previous_status=result.previous_status,
-                )
+                ),
             )
             if result.cancelled:
                 successful += 1
@@ -951,7 +958,7 @@ class TaskManagementService:
                         task_id=task_id,
                         success=True,
                         message=retry_result.message,
-                    )
+                    ),
                 )
                 successful += 1
             except Exception as e:
@@ -960,7 +967,7 @@ class TaskManagementService:
                         task_id=task_id,
                         success=False,
                         message=str(e),
-                    )
+                    ),
                 )
                 failed += 1
 

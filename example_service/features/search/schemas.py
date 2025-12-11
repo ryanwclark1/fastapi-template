@@ -8,6 +8,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(datetime)
+
 
 class SearchSyntax(StrEnum):
     """Search query syntax modes."""
@@ -30,30 +34,30 @@ class SearchRequest(BaseModel):
 
     query: str = Field(min_length=1, max_length=500, description="Search query")
     entity_types: list[str] | None = Field(
-        default=None, description="Entity types to search (all if not specified)"
+        default=None, description="Entity types to search (all if not specified)",
     )
     syntax: SearchSyntax = Field(
-        default=SearchSyntax.WEB, description="Query syntax mode"
+        default=SearchSyntax.WEB, description="Query syntax mode",
     )
     highlight: bool = Field(
-        default=True, description="Include highlighted snippets"
+        default=True, description="Include highlighted snippets",
     )
     highlight_tag: str = Field(
-        default="<mark>", description="HTML tag for highlights"
+        default="<mark>", description="HTML tag for highlights",
     )
     limit: int = Field(default=20, ge=1, le=100, description="Results per entity type")
     offset: int = Field(default=0, ge=0, description="Offset for pagination")
     min_rank: float = Field(
-        default=0.0, ge=0.0, le=1.0, description="Minimum rank threshold"
+        default=0.0, ge=0.0, le=1.0, description="Minimum rank threshold",
     )
     include_facets: bool = Field(
-        default=False, description="Include faceted search results"
+        default=False, description="Include faceted search results",
     )
     filters: list[SearchFilter] | None = Field(
-        default=None, description="Filters for drill-down within results"
+        default=None, description="Filters for drill-down within results",
     )
     expand_synonyms: bool = Field(
-        default=True, description="Expand query with synonyms"
+        default=True, description="Expand query with synonyms",
     )
 
     model_config = {
@@ -64,8 +68,8 @@ class SearchRequest(BaseModel):
                 "highlight": True,
                 "include_facets": True,
                 "filters": [{"field": "is_completed", "value": "false"}],
-            }
-        }
+            },
+        },
     }
 
 
@@ -103,7 +107,7 @@ class EntitySearchResult(BaseModel):
     total: int = Field(description="Total matching results")
     hits: list[SearchHit] = Field(description="Search results")
     facets: list[FacetResult] | None = Field(
-        default=None, description="Facet counts for this entity type"
+        default=None, description="Facet counts for this entity type",
     )
 
 
@@ -126,13 +130,13 @@ class SearchResponse(BaseModel):
     total_hits: int = Field(description="Total results across all entity types")
     results: list[EntitySearchResult] = Field(description="Results by entity type")
     suggestions: list[str] = Field(
-        default_factory=list, description="Query suggestions for no/few results"
+        default_factory=list, description="Query suggestions for no/few results",
     )
     did_you_mean: DidYouMeanSuggestion | None = Field(
-        default=None, description="Spelling correction suggestion"
+        default=None, description="Spelling correction suggestion",
     )
     facets: list[FacetResult] | None = Field(
-        default=None, description="Aggregated facet counts across all entity types"
+        default=None, description="Aggregated facet counts across all entity types",
     )
     took_ms: int = Field(description="Search time in milliseconds")
 
@@ -169,10 +173,10 @@ class SearchableEntity(BaseModel):
     title_field: str | None = Field(default=None, description="Field used for result title")
     snippet_field: str | None = Field(default=None, description="Field used for snippets")
     supports_fuzzy: bool = Field(
-        default=False, description="Whether fuzzy matching is available"
+        default=False, description="Whether fuzzy matching is available",
     )
     facet_fields: list[str] = Field(
-        default_factory=list, description="Fields available for faceted search"
+        default_factory=list, description="Fields available for faceted search",
     )
 
 
@@ -184,7 +188,7 @@ class SearchCapabilitiesResponse(BaseModel):
     max_query_length: int
     max_results_per_entity: int
     features: list[str] = Field(
-        default_factory=list, description="List of available search features"
+        default_factory=list, description="List of available search features",
     )
 
 
@@ -261,7 +265,7 @@ class ZeroResultsResponse(BaseModel):
     queries: list[ZeroResultQuery] = Field(description="Zero-result queries by frequency")
     recommendations: list[str] = Field(
         default_factory=list,
-        description="Suggestions for addressing content gaps"
+        description="Suggestions for addressing content gaps",
     )
 
 

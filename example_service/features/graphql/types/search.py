@@ -16,6 +16,10 @@ from enum import Enum
 import strawberry
 from strawberry.scalars import JSON
 
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(datetime, JSON)
+
 # --- Enums ---
 
 
@@ -69,7 +73,7 @@ class EntitySearchResultType:
     total: int = strawberry.field(description="Total matching results")
     hits: list[SearchHitType] = strawberry.field(description="Search results")
     facets: list[FacetResultType] | None = strawberry.field(
-        description="Facet counts for this entity type"
+        description="Facet counts for this entity type",
     )
 
 
@@ -91,10 +95,10 @@ class SearchResponseType:
     results: list[EntitySearchResultType] = strawberry.field(description="Results by entity type")
     suggestions: list[str] = strawberry.field(description="Query suggestions for no/few results")
     did_you_mean: DidYouMeanSuggestionType | None = strawberry.field(
-        description="Spelling correction suggestion"
+        description="Spelling correction suggestion",
     )
     facets: list[FacetResultType] | None = strawberry.field(
-        description="Aggregated facet counts across all entity types"
+        description="Aggregated facet counts across all entity types",
     )
     took_ms: int = strawberry.field(description="Search time in milliseconds")
 
@@ -216,7 +220,7 @@ class SearchFilterInput:
     field: str = strawberry.field(description="Field name to filter on")
     value: str = strawberry.field(description="Value to filter by")
     operator: str = strawberry.field(
-        default="eq", description="Filter operator: eq, ne, in, range"
+        default="eq", description="Filter operator: eq, ne, in, range",
     )
 
 
@@ -226,34 +230,34 @@ class SearchInput:
 
     query: str = strawberry.field(description="Search query (1-500 characters)")
     entity_types: list[str] | None = strawberry.field(
-        default=None, description="Entity types to search (all if not specified)"
+        default=None, description="Entity types to search (all if not specified)",
     )
     syntax: SearchSyntaxEnum = strawberry.field(
-        default=SearchSyntaxEnum.WEB, description="Query syntax mode"
+        default=SearchSyntaxEnum.WEB, description="Query syntax mode",
     )
     highlight: bool = strawberry.field(
-        default=True, description="Include highlighted snippets"
+        default=True, description="Include highlighted snippets",
     )
     highlight_tag: str = strawberry.field(
-        default="<mark>", description="HTML tag for highlights"
+        default="<mark>", description="HTML tag for highlights",
     )
     limit: int = strawberry.field(
-        default=20, description="Results per entity type (1-100)"
+        default=20, description="Results per entity type (1-100)",
     )
     offset: int = strawberry.field(
-        default=0, description="Offset for pagination"
+        default=0, description="Offset for pagination",
     )
     min_rank: float = strawberry.field(
-        default=0.0, description="Minimum rank threshold (0-1)"
+        default=0.0, description="Minimum rank threshold (0-1)",
     )
     include_facets: bool = strawberry.field(
-        default=False, description="Include faceted search results"
+        default=False, description="Include faceted search results",
     )
     filters: list[SearchFilterInput] | None = strawberry.field(
-        default=None, description="Filters for drill-down within results"
+        default=None, description="Filters for drill-down within results",
     )
     expand_synonyms: bool = strawberry.field(
-        default=True, description="Expand query with synonyms"
+        default=True, description="Expand query with synonyms",
     )
 
 
@@ -263,10 +267,10 @@ class SearchSuggestionInput:
 
     prefix: str = strawberry.field(description="Query prefix (2-100 characters)")
     entity_type: str | None = strawberry.field(
-        default=None, description="Limit to entity type"
+        default=None, description="Limit to entity type",
     )
     limit: int = strawberry.field(
-        default=10, description="Max suggestions (1-50)"
+        default=10, description="Max suggestions (1-50)",
     )
 
 

@@ -407,7 +407,7 @@ class ConnectionManager:
         count = 0
         for conn_info in list(self._connections.values()):
             if conn_info.user_id == user_id and await self.send_to_connection(
-                conn_info.connection_id, message
+                conn_info.connection_id, message,
             ):
                 count += 1
         return count
@@ -490,7 +490,7 @@ class ConnectionManager:
                     await self._send_to_channel(channel, data, set())
 
                 except Exception as e:
-                    logger.error(
+                    logger.exception(
                         "Error processing PubSub message",
                         extra={"error": str(e)},
                     )
@@ -498,7 +498,7 @@ class ConnectionManager:
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            logger.error("PubSub listener error", extra={"error": str(e)})
+            logger.exception("PubSub listener error", extra={"error": str(e)})
 
     async def _heartbeat_loop(self) -> None:
         """Send periodic pings to all connections."""
@@ -560,7 +560,7 @@ def get_connection_manager() -> ConnectionManager:
     if _manager is None:
         msg = "Connection manager not initialized. Call start_connection_manager() first."
         raise RuntimeError(
-            msg
+            msg,
         )
     return _manager
 

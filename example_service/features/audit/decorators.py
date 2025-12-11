@@ -8,12 +8,13 @@ from __future__ import annotations
 from functools import wraps
 import logging
 import time
-from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
+from typing import TYPE_CHECKING, Any, ParamSpec, Self, TypeVar
 
 from .models import AuditAction
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
+    from types import TracebackType
 
     from fastapi import Request
 
@@ -108,7 +109,7 @@ def audited(
                     user = getattr(request.state, "user", None)
                     if user:
                         user_id = getattr(user, "user_id", None) or getattr(
-                            user, "id", None
+                            user, "id", None,
                         )
                         # Extract roles from user object
                         user_roles = getattr(user, "roles", None)
@@ -157,7 +158,6 @@ def audited(
 
             try:
                 result = await func(*args, **kwargs)
-                return result
             except Exception as e:
                 success = False
                 error_message = str(e)
@@ -219,6 +219,7 @@ def audited(
                         audit_error,
                         extra={"entity_type": entity_type, "action": detected_action},
                     )
+            return result
 
         return wrapper
 
@@ -313,8 +314,7 @@ def audit_action(
             error_message: str | None = None
 
             try:
-                result = await func(*args, **kwargs)
-                return result
+                return await func(*args, **kwargs)
             except Exception as e:
                 success = False
                 error_message = str(e)
@@ -437,12 +437,17 @@ class AuditContext:
         self.success = False
         self.error_message = error
 
-    async def __aenter__(self) -> AuditContext:
+    async def __aenter__(self) -> Self:
         """Enter the audit context."""
         self._start_time = time.monotonic()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         """Exit the audit context and log the entry."""
         from example_service.infra.database.session import get_async_session
 

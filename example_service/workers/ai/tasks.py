@@ -35,7 +35,7 @@ if broker is not None:
         input_data: dict[str, Any],
         tenant_id: str,
         execution_id: str,
-        options: dict[str, Any] | None = None,  # noqa: ARG001
+        options: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Execute an AI pipeline in background.
 
@@ -87,7 +87,8 @@ if broker is not None:
             # Get pipeline definition
             pipeline = get_pipeline(pipeline_name)
             if pipeline is None:
-                raise AITaskError(f"Pipeline '{pipeline_name}' not found")
+                msg = f"Pipeline '{pipeline_name}' not found"
+                raise AITaskError(msg)
 
             # Get orchestrator
             orchestrator = get_instrumented_orchestrator()
@@ -141,7 +142,8 @@ if broker is not None:
                 },
                 exc_info=True,
             )
-            raise AITaskError(f"Pipeline execution failed: {e}") from e
+            msg = f"Pipeline execution failed: {e}"
+            raise AITaskError(msg) from e
 
     @broker.task()
     async def execute_pipeline_step(
@@ -181,12 +183,14 @@ if broker is not None:
             # Get pipeline definition
             pipeline = get_pipeline(pipeline_name)
             if pipeline is None:
-                raise AITaskError(f"Pipeline '{pipeline_name}' not found")
+                msg = f"Pipeline '{pipeline_name}' not found"
+                raise AITaskError(msg)
 
             # Find the step
             step = pipeline.get_step(step_name)
             if step is None:
-                raise AITaskError(f"Step '{step_name}' not found in pipeline '{pipeline_name}'")
+                msg = f"Step '{step_name}' not found in pipeline '{pipeline_name}'"
+                raise AITaskError(msg)
 
             # Create executor and run step
             from example_service.infra.ai.pipelines.types import PipelineContext
@@ -241,7 +245,8 @@ if broker is not None:
                 },
                 exc_info=True,
             )
-            raise AITaskError(f"Pipeline step failed: {e}") from e
+            msg = f"Pipeline step failed: {e}"
+            raise AITaskError(msg) from e
 
     # =========================================================================
     # Maintenance Tasks
@@ -284,13 +289,13 @@ if broker is not None:
                     delete(AIJob).where(
                         AIJob.completed_at < cutoff,
                         AIJob.status.in_([AIJobStatus.COMPLETED, AIJobStatus.FAILED]),
-                    )
+                    ),
                 )
                 jobs_deleted = getattr(job_result, "rowcount", 0) or 0
 
                 # Delete old usage logs (orphaned or just old)
                 usage_result = await session.execute(
-                    delete(AIUsageLog).where(AIUsageLog.created_at < cutoff)
+                    delete(AIUsageLog).where(AIUsageLog.created_at < cutoff),
                 )
                 logs_deleted = getattr(usage_result, "rowcount", 0) or 0
 
@@ -317,4 +322,5 @@ if broker is not None:
                 extra={"error": str(e)},
                 exc_info=True,
             )
-            raise AITaskError(f"Job cleanup failed: {e}") from e
+            msg = f"Job cleanup failed: {e}"
+            raise AITaskError(msg) from e

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
 from hashlib import sha256
 from io import BytesIO
 import os
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -17,6 +17,11 @@ from example_service.features.files.models import File, FileStatus, FileThumbnai
 from example_service.features.files.repository import FileRepository
 from example_service.features.files.service import FileService
 from example_service.infra.storage.client import InvalidFileError, StorageClientError
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+else:  # pragma: no cover - runtime placeholder for typing-only import
+    AsyncGenerator = Any
 
 pytestmark = pytest.mark.asyncio
 
@@ -137,7 +142,7 @@ def postgres_dsn():
     original_url = container.get_connection_url()
     # Replace any psycopg2 reference with psycopg (psycopg3)
     url = original_url.replace("postgresql+psycopg2://", "postgresql+psycopg://").replace(
-        "postgresql://", "postgresql+psycopg://"
+        "postgresql://", "postgresql+psycopg://",
     )
     yield url
     container.stop()
@@ -157,15 +162,15 @@ async def session(postgres_dsn) -> AsyncGenerator[AsyncSession]:
                 SELECT EXISTS (
                     SELECT 1 FROM pg_type WHERE typname = 'filestatus'
                 )
-                """
-            )
+                """,
+            ),
         )
         exists = result.scalar()
 
         if not exists:
             # Create the filestatus enum type
             sa_enum = sa.Enum(
-                "pending", "processing", "ready", "failed", "deleted", name="filestatus"
+                "pending", "processing", "ready", "failed", "deleted", name="filestatus",
             )
             await conn.run_sync(lambda sync_conn, e=sa_enum: e.create(sync_conn, checkfirst=False))
 
@@ -174,7 +179,7 @@ async def session(postgres_dsn) -> AsyncGenerator[AsyncSession]:
             lambda sync_conn: File.metadata.create_all(
                 sync_conn,
                 tables=[File.__table__, FileThumbnail.__table__],
-            )
+            ),
         )
 
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)

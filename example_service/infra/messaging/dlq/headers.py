@@ -102,7 +102,7 @@ class RetryState:
         return cls(
             count=_safe_int(headers.get(RETRY_COUNT_HEADER), default=0),
             first_attempt_ms=_safe_int(
-                headers.get(RETRY_FIRST_ATTEMPT_HEADER), default=0
+                headers.get(RETRY_FIRST_ATTEMPT_HEADER), default=0,
             ),
             total_delay_ms=_safe_int(headers.get(RETRY_TOTAL_DELAY_HEADER), default=0),
             last_error=str(headers.get(RETRY_LAST_ERROR_HEADER, ""))[:MAX_ERROR_LENGTH],

@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Callable
 import functools
 import logging
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Self, TypeVar
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -203,7 +203,7 @@ class CatchContext:
         self.message = message
         self.logger = logger or logging.getLogger()
 
-    def __enter__(self) -> CatchContext:
+    def __enter__(self) -> Self:
         """Enter context manager."""
         return self
 

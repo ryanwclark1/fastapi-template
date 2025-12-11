@@ -6,13 +6,16 @@ import html
 from importlib import resources
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from example_service.core.settings import get_app_settings
+
+if TYPE_CHECKING:
+    from example_service.core.settings.app import AppSettings
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +25,13 @@ _ASYNCAPI_PATCHED = False
 
 def ensure_asyncapi_template_patched() -> None:
     """Guarantee the AsyncAPI template uses local, CSP-safe assets."""
-    _patch_asyncapi_template()
+    global _ASYNCAPI_PATCHED
+    if not _ASYNCAPI_PATCHED:
+        _patch_asyncapi_template()
+        _ASYNCAPI_PATCHED = True
 
 
-def configure_documentation(app: FastAPI) -> None:
+def configure_documentation(app: FastAPI, settings: AppSettings | None = None) -> None:
     """Configure documentation routes with local assets.
 
     Always mount the static docs assets so AsyncAPI pages can render even when
@@ -40,7 +46,7 @@ def configure_documentation(app: FastAPI) -> None:
 
     ensure_asyncapi_template_patched()
 
-    settings = get_app_settings()
+    settings = settings or get_app_settings()
     if settings.disable_docs:
         logger.info("API documentation disabled via configuration")
         return
@@ -50,17 +56,19 @@ def configure_documentation(app: FastAPI) -> None:
     oauth_redirect_url = settings.get_swagger_ui_oauth2_redirect_url()
 
     if docs_url:
-        _register_swagger_ui(app, docs_url, oauth_redirect_url)
+        _register_swagger_ui(app, docs_url, oauth_redirect_url, settings)
     if redoc_url:
-        _register_redoc(app, redoc_url)
+        _register_redoc(app, redoc_url, settings)
     if oauth_redirect_url:
         _register_oauth_redirect(app, oauth_redirect_url)
 
 
 def _register_swagger_ui(
-    app: FastAPI, docs_url: str, oauth_redirect: str | None
+    app: FastAPI,
+    docs_url: str,
+    oauth_redirect: str | None,
+    settings: AppSettings,
 ) -> None:
-    settings = get_app_settings()
     path = _normalize_path(docs_url)
     config_url = _path_join(path, "swagger-config.json")
 
@@ -95,8 +103,7 @@ def _register_swagger_ui(
         return JSONResponse(payload)
 
 
-def _register_redoc(app: FastAPI, redoc_url: str) -> None:
-    settings = get_app_settings()
+def _register_redoc(app: FastAPI, redoc_url: str, settings: AppSettings) -> None:
     path = _normalize_path(redoc_url)
 
     @app.get(path, include_in_schema=False)
@@ -198,10 +205,6 @@ def _render_oauth_redirect_html() -> str:
 
 
 def _patch_asyncapi_template() -> None:
-    global _ASYNCAPI_PATCHED
-    if _ASYNCAPI_PATCHED:
-        return
-
     from faststream.specification.asyncapi import site as asyncapi_site
 
     def custom_asyncapi_html(
@@ -214,8 +217,8 @@ def _patch_asyncapi_template() -> None:
         schemas: bool = True,
         errors: bool = True,
         expand_message_examples: bool = True,
-        asyncapi_js_url: str | None = None,  # noqa: ARG001 - ignored, use local assets
-        asyncapi_css_url: str | None = None,  # noqa: ARG001 - ignored, use local assets
+        asyncapi_js_url: str | None = None,
+        asyncapi_css_url: str | None = None,
     ) -> str:
         config = {
             "show": {
@@ -262,7 +265,6 @@ def _patch_asyncapi_template() -> None:
 """
 
     asyncapi_site.get_asyncapi_html = custom_asyncapi_html
-    _ASYNCAPI_PATCHED = True
 
     logger.debug("Patched FastStream AsyncAPI template for CSP-safe assets")
 

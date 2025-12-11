@@ -52,16 +52,6 @@ class JobSettings(BaseSettings):
     redis_job_key_prefix: str = "job:data:"
     """Redis key prefix for job data cache."""
 
-    # Webhooks
-    webhook_timeout_seconds: int = 30
-    """Timeout for webhook HTTP requests."""
-
-    webhook_max_retries: int = 3
-    """Maximum retry attempts for failed webhook delivery."""
-
-    webhook_retry_delay_seconds: float = 60.0
-    """Delay between webhook retry attempts."""
-
     # Progress tracking
     progress_update_debounce_ms: int = 500
     """Minimum interval between progress updates to avoid DB flooding."""
@@ -78,27 +68,12 @@ class JobSettings(BaseSettings):
     stats_cache_ttl_seconds: int = 5
     """How long to cache queue statistics."""
 
-    class Config:
-        """Pydantic configuration."""
-
-        env_prefix = "JOB_"
-        case_sensitive = False
-
-
-# Singleton instance
-_settings: JobSettings | None = None
+    model_config = {
+        "env_prefix": "JOB_",
+        "case_sensitive": False,
+        "frozen": True,
+        "extra": "ignore",
+    }
 
 
-def get_job_settings() -> JobSettings:
-    """Get the job settings singleton.
-
-    Returns:
-        JobSettings instance with values from environment variables.
-    """
-    global _settings
-    if _settings is None:
-        _settings = JobSettings()
-    return _settings
-
-
-__all__ = ["JobSettings", "get_job_settings"]
+__all__ = ["JobSettings"]

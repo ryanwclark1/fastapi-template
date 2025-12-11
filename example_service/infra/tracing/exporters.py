@@ -170,7 +170,7 @@ class ObservableSpanExporter(SpanExporter):
         """Record a successful export and update state."""
         otel_spans_exported_total.labels(exporter_type=self._exporter_type).inc(span_count)
         otel_last_successful_export_timestamp.labels(exporter_type=self._exporter_type).set(
-            time.time()
+            time.time(),
         )
 
         self._recent_results.append(True)
@@ -179,7 +179,7 @@ class ObservableSpanExporter(SpanExporter):
     def _record_failure(self, span_count: int, error_type: str) -> None:
         """Record a failed export and update state."""
         otel_spans_failed_total.labels(
-            exporter_type=self._exporter_type, error_type=error_type
+            exporter_type=self._exporter_type, error_type=error_type,
         ).inc(span_count)
 
         self._recent_results.append(False)

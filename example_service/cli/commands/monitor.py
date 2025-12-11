@@ -213,13 +213,13 @@ async def show_connections() -> None:
                 FROM pg_stat_activity
                 WHERE datname = current_database()
                 ORDER BY query_start DESC NULLS LAST
-            """)
+            """),
             )
             connections = result.fetchall()
 
             click.echo()
             click.echo(
-                f"  {'PID':<8} {'User':<15} {'State':<12} {'Client':<18} {'Query'}"
+                f"  {'PID':<8} {'User':<15} {'State':<12} {'Client':<18} {'Query'}",
             )
             click.echo("  " + "-" * 80)
 
@@ -237,7 +237,7 @@ async def show_connections() -> None:
                 query = (conn.query_preview or "")[:40]
 
                 click.echo(
-                    f"  {conn.pid:<8} {(conn.username or 'N/A'):<15} {state_str:<21} {client:<18} {query}"
+                    f"  {conn.pid:<8} {(conn.username or 'N/A'):<15} {state_str:<21} {client:<18} {query}",
                 )
 
             click.echo()
@@ -285,7 +285,7 @@ async def show_queues() -> None:
                     declaration = await queue.declare()
 
                     click.echo(
-                        f"  {queue_name:<40} {declaration.message_count:<12} {declaration.consumer_count:<12}"
+                        f"  {queue_name:<40} {declaration.message_count:<12} {declaration.consumer_count:<12}",
                     )
                 except Exception:
                     click.echo(f"  {queue_name:<40} {'N/A':<12} {'N/A':<12}")
@@ -336,10 +336,10 @@ async def redis_info() -> None:
         section("Statistics")
         click.echo(f"  Total Keys:     {db_size}")
         click.echo(
-            f"  Connected:      {info_clients.get('connected_clients', 0)} clients"
+            f"  Connected:      {info_clients.get('connected_clients', 0)} clients",
         )
         click.echo(
-            f"  Total Commands: {info_stats.get('total_commands_processed', 0):,}"
+            f"  Total Commands: {info_stats.get('total_commands_processed', 0):,}",
         )
         click.echo(f"  Keyspace Hits:  {info_stats.get('keyspace_hits', 0):,}")
         click.echo(f"  Keyspace Misses:{info_stats.get('keyspace_misses', 0):,}")
@@ -370,7 +370,7 @@ async def show_metrics() -> None:
             total_users = result.scalar_one()
 
             result = await session.execute(
-                select(func.count()).select_from(User).where(User.is_active == True)  # noqa: E712
+                select(func.count()).select_from(User).where(User.is_active),
             )
             active_users = result.scalar_one()
 
@@ -386,7 +386,7 @@ async def show_metrics() -> None:
             result = await session.execute(
                 select(func.count())
                 .select_from(Reminder)
-                .where(Reminder.is_completed == True)  # noqa: E712
+                .where(Reminder.is_completed),
             )
             completed_reminders = result.scalar_one()
 
@@ -394,9 +394,9 @@ async def show_metrics() -> None:
                 select(func.count())
                 .select_from(Reminder)
                 .where(
-                    Reminder.is_completed == False,  # noqa: E712
+                    not Reminder.is_completed,
                     Reminder.remind_at <= datetime.now(UTC),
-                )
+                ),
             )
             overdue_reminders = result.scalar_one()
 
@@ -410,7 +410,7 @@ async def show_metrics() -> None:
             result = await session.execute(
                 text("""
                 SELECT pg_size_pretty(pg_database_size(current_database()))
-            """)
+            """),
             )
             db_size = result.scalar_one()
 
@@ -510,11 +510,11 @@ def view_logs(lines: int, follow: bool, level: str | None) -> None:
             if grep_path is None:
                 msg = "grep command not found"
                 raise FileNotFoundError(msg)
-            tail_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)  # noqa: S603
+            tail_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
             if tail_proc.stdout is None:
                 error("Failed to create tail process")
                 sys.exit(1)
-            grep_proc = subprocess.Popen(  # noqa: S603
+            grep_proc = subprocess.Popen(
                 [grep_path, "--line-buffered", level],
                 stdin=tail_proc.stdout,
                 stdout=subprocess.PIPE,
@@ -532,7 +532,7 @@ def view_logs(lines: int, follow: bool, level: str | None) -> None:
                 grep_proc.terminate()
         else:
             # tail_path is resolved via shutil.which(), log_file is validated path
-            subprocess.run(cmd, check=False)  # noqa: S603
+            subprocess.run(cmd, check=False)
 
     except FileNotFoundError:
         error("tail command not found")

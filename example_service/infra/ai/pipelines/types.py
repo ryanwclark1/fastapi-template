@@ -411,7 +411,7 @@ class PipelineDefinition:
 
     # Progress tracking
     progress_checkpoints: list[str] = field(
-        default_factory=list
+        default_factory=list,
     )  # Step names that mark progress checkpoints
 
     # Metadata
@@ -427,7 +427,8 @@ class PipelineDefinition:
         step_names = set()
         for step in self.steps:
             if step.name in step_names:
-                raise ValueError(f"Duplicate step name: {step.name}")
+                msg = f"Duplicate step name: {step.name}"
+                raise ValueError(msg)
             step_names.add(step.name)
 
     def get_step(self, name: str) -> PipelineStep | None:

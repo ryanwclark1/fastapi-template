@@ -160,17 +160,19 @@ class EventPublisher:
         for event in events:
             effective_correlation = correlation_id or self._correlation_id
             if effective_correlation and not event.correlation_id:
-                event = event.with_correlation(effective_correlation)
+                correlated_event = event.with_correlation(effective_correlation)
+            else:
+                correlated_event = event
 
             entries.append(
                 EventOutbox(
-                    event_type=event.event_type,
-                    event_version=event.event_version,
-                    payload=json.dumps(event.model_dump(mode="json")),
-                    correlation_id=event.correlation_id,
-                    aggregate_type=event.metadata.get("aggregate_type"),
-                    aggregate_id=event.metadata.get("aggregate_id"),
-                )
+                    event_type=correlated_event.event_type,
+                    event_version=correlated_event.event_version,
+                    payload=json.dumps(correlated_event.model_dump(mode="json")),
+                    correlation_id=correlated_event.correlation_id,
+                    aggregate_type=correlated_event.metadata.get("aggregate_type"),
+                    aggregate_id=correlated_event.metadata.get("aggregate_id"),
+                ),
             )
 
         add_all = getattr(self._session, "add_all", None)

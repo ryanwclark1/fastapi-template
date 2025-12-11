@@ -22,6 +22,9 @@ from example_service.features.graphql.types.pydantic_bridge import (
     pydantic_type,
 )
 from example_service.features.tags.schemas import TagCreate, TagResponse, TagUpdate
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(PageInfoType)
 
 # ============================================================================
 # Tag Type (Output)

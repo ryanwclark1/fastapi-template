@@ -129,7 +129,7 @@ def traced_handler(handler_name: str | None = None) -> Callable[[F], F]:
             if event is not None:
                 attributes["message.id"] = str(getattr(event, "event_id", "unknown"))
                 attributes["message.type"] = str(
-                    getattr(event, "event_type", "unknown")
+                    getattr(event, "event_type", "unknown"),
                 )
                 # Include service name if available
                 if hasattr(event, "service"):

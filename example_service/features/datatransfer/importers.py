@@ -114,7 +114,7 @@ class BaseImporter[T](ABC):
         """Supported file extensions for this importer."""
         ...
 
-    def validate_record(self, row_number: int, record: dict[str, Any]) -> ParsedRecord:
+    def validate_record(self, record: dict[str, Any], *, row_number: int) -> ParsedRecord:
         """Validate a parsed record.
 
         Args:
@@ -128,30 +128,43 @@ class BaseImporter[T](ABC):
         validated_data = {}
 
         # Check required fields
-        for field in self.required_fields:
-            if field not in record or record[field] is None or record[field] == "":
-                errors.append((field, f"Required field '{field}' is missing or empty"))
+        errors.extend(
+            (field, f"Required field '{field}' is missing or empty")
+            for field in self.required_fields
+            if field not in record or record[field] in (None, "")
+        )
 
         # Type conversion and validation
         for field, value in record.items():
+            field_value = value
             try:
                 # Type conversion
-                if field in self.field_types and value is not None and value != "":
+                if (
+                    field in self.field_types
+                    and field_value is not None
+                    and field_value != ""
+                ):
                     expected_type = self.field_types[field]
                     try:
                         if expected_type is bool:
-                            if isinstance(value, str):
-                                value = value.lower() in ("true", "1", "yes", "on")
+                            if isinstance(field_value, str):
+                                converted = field_value.lower() in (
+                                    "true",
+                                    "1",
+                                    "yes",
+                                    "on",
+                                )
                             else:
-                                value = bool(value)
+                                converted = bool(field_value)
+                            field_value = converted
                         elif expected_type is int:
-                            value = int(value)
+                            field_value = int(field_value)
                         elif expected_type is float:
-                            value = float(value)
+                            field_value = float(field_value)
                         elif expected_type is datetime:
-                            if isinstance(value, datetime):
+                            if isinstance(field_value, datetime):
                                 pass  # Already a datetime
-                            elif isinstance(value, str):
+                            elif isinstance(field_value, str):
                                 # Try ISO format first, then common formats
                                 for fmt in (
                                     None,  # ISO format via fromisoformat
@@ -162,30 +175,49 @@ class BaseImporter[T](ABC):
                                 ):
                                     try:
                                         if fmt is None:
-                                            value = datetime.fromisoformat(
-                                                value.replace("Z", "+00:00")
+                                            field_value = datetime.fromisoformat(
+                                                field_value,
                                             )
                                         else:
-                                            value = datetime.strptime(value, fmt)
+                                            field_value = datetime.strptime(
+                                                field_value,
+                                                fmt,
+                                            )
                                         break
                                     except ValueError:
                                         continue
                                 else:
-                                    raise ValueError(f"Unrecognized datetime format: {value}")
+                                    msg = (
+                                        "Unrecognized datetime format:"
+                                        f" {field_value}"
+                                    )
+                                    raise ValueError(msg)
                             else:
-                                raise TypeError(f"Cannot convert {type(value).__name__} to datetime")
+                                msg = (
+                                    "Cannot convert"
+                                    f" {type(field_value).__name__} to datetime"
+                                )
+                                raise TypeError(msg)
                         elif expected_type is UUID:
-                            if isinstance(value, UUID):
+                            if isinstance(field_value, UUID):
                                 pass  # Already a UUID
-                            elif isinstance(value, str):
-                                value = UUID(value)
+                            elif isinstance(field_value, str):
+                                field_value = UUID(field_value)
                             else:
-                                raise TypeError(f"Cannot convert {type(value).__name__} to UUID")
+                                msg = (
+                                    "Cannot convert"
+                                    f" {type(field_value).__name__} to UUID"
+                                )
+                                raise TypeError(msg)
                         else:
-                            value = expected_type(value)
+                            field_value = expected_type(field_value)
                     except (ValueError, TypeError) as e:
                         errors.append(
-                            (field, f"Cannot convert '{value}' to {expected_type.__name__}: {e}")
+                            (
+                                field,
+                                f"Cannot convert '{field_value}' to"
+                                f" {expected_type.__name__}: {e}",
+                            ),
                         )
                         continue
 
@@ -193,13 +225,13 @@ class BaseImporter[T](ABC):
                 if field in self.field_validators:
                     validator = self.field_validators[field]
                     try:
-                        validation_result = validator(value)
+                        validation_result = validator(field_value)
                         if validation_result is not True and validation_result is not None:
                             errors.append((field, str(validation_result)))
                     except Exception as e:
                         errors.append((field, f"Validation failed: {e}"))
 
-                validated_data[field] = value
+                validated_data[field] = field_value
 
             except Exception as e:
                 errors.append((field, f"Processing error: {e}"))
@@ -233,6 +265,7 @@ class CSVImporter(BaseImporter[T]):
 
     @property
     def supported_extensions(self) -> list[str]:
+        """Return supported file extensions for CSV imports."""
         return [".csv"]
 
     def parse_file(self, file_path: Path) -> list[ParsedRecord]:
@@ -253,7 +286,7 @@ class CSVImporter(BaseImporter[T]):
         for row_num, row in enumerate(reader, start=2):  # Row 1 is header
             # Clean up None values from empty strings
             cleaned = {k: (v if v != "" else None) for k, v in row.items() if k}
-            parsed = self.validate_record(row_num, cleaned)
+            parsed = self.validate_record(cleaned, row_number=row_num)
             records.append(parsed)
 
         return records
@@ -282,6 +315,7 @@ class JSONImporter(BaseImporter[T]):
 
     @property
     def supported_extensions(self) -> list[str]:
+        """Return supported file extensions for JSON imports."""
         return [".json"]
 
     def parse_file(self, file_path: Path) -> list[ParsedRecord]:
@@ -303,7 +337,8 @@ class JSONImporter(BaseImporter[T]):
         elif isinstance(data, dict):
             records_list = data.get(self.records_key, [])
             if not isinstance(records_list, list):
-                raise DataImportError(f"Expected '{self.records_key}' to be an array")
+                msg = f"Expected '{self.records_key}' to be an array"
+                raise DataImportError(msg)
         else:
             msg = "JSON must be an array or object with records"
             raise DataImportError(msg)
@@ -316,11 +351,11 @@ class JSONImporter(BaseImporter[T]):
                         row_number=row_num,
                         data={},
                         errors=[("_record", f"Row {row_num} is not an object")],
-                    )
+                    ),
                 )
                 continue
 
-            parsed = self.validate_record(row_num, row)
+            parsed = self.validate_record(row, row_number=row_num)
             records.append(parsed)
 
         return records
@@ -352,6 +387,7 @@ class ExcelImporter(BaseImporter[T]):
 
     @property
     def supported_extensions(self) -> list[str]:
+        """Return supported file extensions for Excel imports."""
         return [".xlsx", ".xls"]
 
     def parse_file(self, file_path: Path) -> list[ParsedRecord]:
@@ -397,7 +433,7 @@ class ExcelImporter(BaseImporter[T]):
                 if i < len(headers):
                     row_dict[headers[i]] = value
 
-            parsed = self.validate_record(row_num, row_dict)
+            parsed = self.validate_record(row_dict, row_number=row_num)
             records.append(parsed)
 
         return records
@@ -442,7 +478,8 @@ def get_importer(
             field_types=field_types,
             field_validators=field_validators,
         )
-    raise ValueError(f"Unsupported import format: {format}")
+    msg = f"Unsupported import format: {format}"
+    raise ValueError(msg)
 
 
 __all__ = [

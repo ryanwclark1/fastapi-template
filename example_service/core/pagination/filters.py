@@ -121,9 +121,8 @@ class CursorFilter(StatementFilter):
             statement = self._apply_seek_condition(statement)
 
         # Apply LIMIT (fetch one extra to detect has_more)
-        statement = statement.limit(self.limit + 1)
+        return statement.limit(self.limit + 1)
 
-        return statement
 
     def _apply_ordering(self, statement: Select[Any]) -> Select[Any]:
         """Apply ORDER BY clause based on sort specification."""
@@ -222,7 +221,7 @@ class CursorFilter(StatementFilter):
         if type_name in ("DateTime", "TIMESTAMP"):
             if isinstance(value, str):
                 # Parse ISO format datetime
-                return datetime.fromisoformat(value.replace("Z", "+00:00"))
+                return datetime.fromisoformat(value)
             return value
 
         if type_name in ("Uuid", "UUID"):

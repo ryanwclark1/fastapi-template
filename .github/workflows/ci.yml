@@ -98,15 +98,6 @@ jobs:
           OTEL_ENABLED: "false"
           AUTH_ENABLED: "false"
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          files: ./coverage.xml
-          flags: unit
-          fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
       - name: Upload test results
         uses: actions/upload-artifact@v5
         if: always()
@@ -207,15 +198,6 @@ jobs:
           RABBIT_PASSWORD: admin123
           OTEL_ENABLED: "false"
           AUTH_ENABLED: "false"
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          files: ./coverage.xml
-          flags: integration
-          fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Upload test results
         uses: actions/upload-artifact@v5

@@ -160,7 +160,7 @@ class BaseRepository[T]:
             instance = await session.get(self.model, id)
 
         self._lazy.debug(
-            lambda: f"db.get: {self.model.__name__}({id}) -> {'found' if instance else 'not found'}"
+            lambda: f"db.get: {self.model.__name__}({id}) -> {'found' if instance else 'not found'}",
         )
         return instance
 
@@ -226,7 +226,7 @@ class BaseRepository[T]:
         instance = result.scalar_one_or_none()
 
         self._lazy.debug(
-            lambda: f"db.get_by: {self.model.__name__}.{attr.key}={value!r} -> {'found' if instance else 'not found'}"
+            lambda: f"db.get_by: {self.model.__name__}.{attr.key}={value!r} -> {'found' if instance else 'not found'}",
         )
         return instance
 
@@ -256,7 +256,7 @@ class BaseRepository[T]:
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.list: {self.model.__name__}(limit={limit}, offset={offset}) -> {len(items)} items"
+            lambda: f"db.list: {self.model.__name__}(limit={limit}, offset={offset}) -> {len(items)} items",
         )
         return items
 
@@ -304,10 +304,10 @@ class BaseRepository[T]:
         items = result.scalars().all()
 
         search_result = SearchResult(
-            items=items, total=total, limit=limit, offset=offset
+            items=items, total=total, limit=limit, offset=offset,
         )
         self._lazy.debug(
-            lambda: f"db.search: {self.model.__name__}(limit={limit}, offset={offset}) -> {len(items)}/{total} items, page {search_result.page}/{search_result.pages}"
+            lambda: f"db.search: {self.model.__name__}(limit={limit}, offset={offset}) -> {len(items)}/{total} items, page {search_result.page}/{search_result.pages}",
         )
         return search_result
 
@@ -333,7 +333,7 @@ class BaseRepository[T]:
         return instance
 
     async def create_many(
-        self, session: AsyncSession, instances: Iterable[T]
+        self, session: AsyncSession, instances: Iterable[T],
     ) -> Sequence[T]:
         """Persist multiple entities.
 
@@ -351,7 +351,7 @@ class BaseRepository[T]:
             await session.refresh(instance)
 
         self._lazy.debug(
-            lambda: f"db.create_many: {self.model.__name__} -> {len(instances_list)} created"
+            lambda: f"db.create_many: {self.model.__name__} -> {len(instances_list)} created",
         )
         return instances_list
 
@@ -405,7 +405,7 @@ class BaseRepository[T]:
             await session.refresh(instance)
 
         self._lazy.debug(
-            lambda: f"db.update_many: {self.model.__name__} -> {len(instances_list)} updated"
+            lambda: f"db.update_many: {self.model.__name__} -> {len(instances_list)} updated",
         )
         return instances_list
 
@@ -453,7 +453,7 @@ class BaseRepository[T]:
             )
         else:
             self._lazy.debug(
-                lambda: f"db.delete_many: {self.model.__name__} -> {deleted_count} deleted"
+                lambda: f"db.delete_many: {self.model.__name__} -> {deleted_count} deleted",
             )
         return deleted_count
 
@@ -484,12 +484,12 @@ class BaseRepository[T]:
             ValueError: If conflict_columns or update_columns is empty
 
         Example:
-                users = [User(email=\"a@b.com\", name=\"Alice\"), User(email=\"c@d.com\", name=\"Carol\")]
+                users = [User(email="a@b.com", name="Alice"), User(email="c@d.com", name="Carol")]
             upserted = await repo.upsert_many(
                 session,
                 users,
-                conflict_columns=[\"email\"],
-                update_columns=[\"name\", \"updated_at\"],
+                conflict_columns=["email"],
+                update_columns=["name", "updated_at"],
             )
 
         Note:
@@ -535,7 +535,7 @@ class BaseRepository[T]:
         # Scalars returns model instances when using RETURNING
         upserted = list(result.scalars().all())
         self._lazy.debug(
-            lambda: f"db.upsert_many: {self.model.__name__}(conflict={conflict_columns}) -> {len(upserted)} upserted"
+            lambda: f"db.upsert_many: {self.model.__name__}(conflict={conflict_columns}) -> {len(upserted)} upserted",
         )
         return upserted
 
@@ -566,9 +566,9 @@ class BaseRepository[T]:
             Total number of rows inserted
 
         Example:
-                users = [User(email=f\"user{i}@example.com\") for i in range(10000)]
+                users = [User(email=f"user{i}@example.com") for i in range(10000)]
             count = await repo.bulk_create(session, users, batch_size=2000)
-            print(f\"Inserted {count} users\")
+            print(f"Inserted {count} users")
         """
         from sqlalchemy import inspect as sa_inspect
 
@@ -576,10 +576,23 @@ class BaseRepository[T]:
             mapper = sa_inspect(type(inst))
             if mapper is None:
                 return {}
-            column_attrs = getattr(mapper, "column_attrs", None)
-            if column_attrs is None:
-                return {}
-            return {c.key: getattr(inst, c.key) for c in column_attrs}
+            column_attrs = getattr(mapper, "column_attrs", None) or []
+            data: dict[str, Any] = {}
+            for column_prop in column_attrs:
+                key = column_prop.key
+                if not column_prop.columns:
+                    continue
+                column = column_prop.columns[0]
+                value = getattr(inst, key)
+                if value is None:
+                    autoinc = getattr(column, "autoincrement", False)
+                    has_default = column.server_default is not None or column.default is not None
+                    if column.primary_key and autoinc:
+                        continue
+                    if has_default:
+                        continue
+                data[key] = value
+            return data
 
         instances_list = list(instances)
         if not instances_list:
@@ -742,7 +755,7 @@ class BaseRepository[T]:
         connection: Connection[Any] = Connection(edges=edges, page_info=page_info)
 
         self._lazy.debug(
-            lambda: f"db.paginate_cursor: {self.model.__name__}(limit={limit}) -> {len(edges)} items, has_next={has_next}"
+            lambda: f"db.paginate_cursor: {self.model.__name__}(limit={limit}) -> {len(edges)} items, has_next={has_next}",
         )
 
         return connection
@@ -764,7 +777,7 @@ class BaseRepository[T]:
             if pk_cols and len(pk_cols) > 0:
                 # Return the first primary key column's attribute
                 return cast(
-                    "InstrumentedAttribute[Any]", getattr(self.model, pk_cols[0].name)
+                    "InstrumentedAttribute[Any]", getattr(self.model, pk_cols[0].name),
                 )
         except Exception as e:
             self._logger.debug("Failed to get primary key column", exc_info=e)
@@ -774,7 +787,8 @@ class BaseRepository[T]:
         # Using getattr with cast to satisfy type checker
         attr = getattr(self.model, "id", None)
         if attr is None:
-            raise AttributeError(f"{self.model.__name__} has no 'id' attribute")
+            msg = f"{self.model.__name__} has no 'id' attribute"
+            raise AttributeError(msg)
         return cast("InstrumentedAttribute[Any]", attr)
 
 
@@ -858,7 +872,7 @@ class TenantAwareRepository[T](BaseRepository[T]):
         instance = result.scalar_one_or_none()
 
         self._lazy.debug(
-            lambda: f"db.get_for_tenant: {self.model.__name__}({id}, tenant={tenant_id}) -> {'found' if instance else 'not found'}"
+            lambda: f"db.get_for_tenant: {self.model.__name__}({id}, tenant={tenant_id}) -> {'found' if instance else 'not found'}",
         )
         return instance
 
@@ -930,7 +944,7 @@ class TenantAwareRepository[T](BaseRepository[T]):
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.list_for_tenant: {self.model.__name__}(tenant={tenant_id}, limit={limit}, offset={offset}) -> {len(items)} items"
+            lambda: f"db.list_for_tenant: {self.model.__name__}(tenant={tenant_id}, limit={limit}, offset={offset}) -> {len(items)} items",
         )
         return items
 
@@ -980,7 +994,7 @@ class TenantAwareRepository[T](BaseRepository[T]):
         instance = await self.get_for_tenant(session, id, tenant_id)
         if instance is None:
             self._lazy.debug(
-                lambda: f"db.delete_for_tenant({id}, tenant={tenant_id}) -> not found"
+                lambda: f"db.delete_for_tenant({id}, tenant={tenant_id}) -> not found",
             )
             return False
 

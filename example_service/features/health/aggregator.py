@@ -250,12 +250,14 @@ class HealthAggregator:
             ValueError: If provider with same name already registered
         """
         if not isinstance(provider, HealthProvider):
+            msg = f"Provider must implement HealthProvider protocol, got {type(provider).__name__}"
             raise TypeError(
-                f"Provider must implement HealthProvider protocol, got {type(provider).__name__}"
+                msg,
             )
 
         if provider.name in self._providers:
-            raise ValueError(f"Provider '{provider.name}' already registered")
+            msg = f"Provider '{provider.name}' already registered"
+            raise ValueError(msg)
 
         self._providers[provider.name] = provider
         logger.info("Registered health provider", extra={"provider": provider.name})
@@ -339,7 +341,7 @@ class HealthAggregator:
             return {}
 
         async def check_provider(
-            name: str, provider: HealthProvider
+            name: str, provider: HealthProvider,
         ) -> tuple[str, HealthCheckResult]:
             """Run a single provider check with error handling and metrics tracking."""
             from example_service.features.health.providers import (
@@ -402,7 +404,7 @@ class HealthAggregator:
             async with asyncio.timeout(self._check_timeout):
                 results = await asyncio.gather(*tasks, return_exceptions=True)
         except TimeoutError:
-            logger.error(
+            logger.exception(
                 "Health check timed out",
                 extra={"timeout": self._check_timeout, "providers": list(self._providers.keys())},
             )

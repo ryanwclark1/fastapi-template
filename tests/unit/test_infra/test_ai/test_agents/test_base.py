@@ -180,7 +180,7 @@ class TestLLMResponse:
                         "name": "search",
                         "arguments": '{"query": "test"}',
                     },
-                }
+                },
             ],
         )
 
@@ -363,7 +363,7 @@ class TestAgentToolExecution:
                     "name": "get_weather",
                     "arguments": '{"city": "Paris"}',
                 },
-            }
+            },
         ]
 
         results = await agent.execute_tools(tool_calls)
@@ -380,7 +380,8 @@ class TestAgentToolExecution:
 
         @tool(description="Failing tool")
         async def failing_tool() -> None:
-            raise ValueError("Intentional error")
+            msg = "Intentional error"
+            raise ValueError(msg)
 
         class FailingAgent(BaseAgent[str, str]):
             agent_type = "failing_agent"
@@ -400,7 +401,7 @@ class TestAgentToolExecution:
                     "name": "failing_tool",
                     "arguments": "{}",
                 },
-            }
+            },
         ]
 
         results = await agent.execute_tools(tool_calls)

@@ -91,7 +91,7 @@ class ReservedWord:
 
 @lru_cache(maxsize=2048)
 def _substitute_reserved_words(
-    expression: str, auth_id: str, session_id: str, tenant_id: str
+    expression: str, auth_id: str, session_id: str, tenant_id: str,
 ) -> str:
     """Substitute reserved words in ACL pattern with actual values.
 
@@ -127,7 +127,7 @@ def _substitute_reserved_words(
 
 @lru_cache(maxsize=2048)
 def _compile_acl_pattern(
-    access: str, auth_id: str, session_id: str, tenant_id: str
+    access: str, auth_id: str, session_id: str, tenant_id: str,
 ) -> re.Pattern[str]:
     """Compile ACL pattern to regex with caching.
 
@@ -166,7 +166,7 @@ def _compile_acl_pattern(
 
 @lru_cache(maxsize=512)
 def _get_cached_access_check(
-    auth_id: str, session_id: str, acl_tuple: tuple[str, ...], tenant_id: str
+    auth_id: str, session_id: str, acl_tuple: tuple[str, ...], tenant_id: str,
 ) -> AccessCheck:
     """Create and cache AccessCheck instances.
 

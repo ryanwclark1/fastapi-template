@@ -74,7 +74,7 @@ class Reminder(TimestampedBase, TenantMixin):
     # Self-referential relationship
     parent: Mapped[Reminder | None] = relationship(
         "Reminder",
-        remote_side=[id],
+        remote_side="Reminder.id",
         back_populates="occurrences",
         foreign_keys=[parent_id],
     )

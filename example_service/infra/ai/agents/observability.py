@@ -143,14 +143,17 @@ if PROMETHEUS_AVAILABLE:
 else:
     # No-op metrics when Prometheus is not available
     class NoOpMetric:
+        """Fallback metric type when Prometheus is unavailable."""
+
         def labels(self, *args: Any, **kwargs: Any) -> NoOpMetric:
+            """Return self to preserve chained usage."""
             return self
 
         def inc(self, *args: Any, **kwargs: Any) -> None:
-            pass
+            """Ignore increment operations when metrics are disabled."""
 
         def observe(self, *args: Any, **kwargs: Any) -> None:
-            pass
+            """Ignore observe operations when metrics are disabled."""
 
     AGENT_EXECUTIONS = NoOpMetric()  # type: ignore[assignment]
     AGENT_DURATION = NoOpMetric()  # type: ignore[assignment]
@@ -423,20 +426,20 @@ class AgentSpan:
         self._span.set_attribute(f"{self._prefix}.steps", result.steps)
         self._span.set_attribute(f"{self._prefix}.tool_calls", result.tool_calls)
         self._span.set_attribute(
-            f"{self._prefix}.cost_usd", float(result.total_cost_usd)
+            f"{self._prefix}.cost_usd", float(result.total_cost_usd),
         )
         self._span.set_attribute(
-            f"{self._prefix}.input_tokens", result.total_input_tokens
+            f"{self._prefix}.input_tokens", result.total_input_tokens,
         )
         self._span.set_attribute(
-            f"{self._prefix}.output_tokens", result.total_output_tokens
+            f"{self._prefix}.output_tokens", result.total_output_tokens,
         )
         self._span.set_attribute(f"{self._prefix}.duration_seconds", duration)
 
         if result.error:
             self._span.set_attribute(f"{self._prefix}.error", result.error)
             self._span.set_attribute(
-                f"{self._prefix}.error_code", result.error_code or ""
+                f"{self._prefix}.error_code", result.error_code or "",
             )
             self._span.set_status(Status(StatusCode.ERROR, result.error))
 
@@ -513,10 +516,10 @@ class IterationSpan:
         """Record iteration state."""
         self._span.set_attribute(f"{self._prefix}.step_count", state.step_count)
         self._span.set_attribute(
-            f"{self._prefix}.tool_call_count", state.tool_call_count
+            f"{self._prefix}.tool_call_count", state.tool_call_count,
         )
         self._span.set_attribute(
-            f"{self._prefix}.cost_usd", float(state.total_cost_usd)
+            f"{self._prefix}.cost_usd", float(state.total_cost_usd),
         )
         self._span.set_attribute(f"{self._prefix}.is_complete", state.is_complete)
 
@@ -548,20 +551,20 @@ class LLMSpan:
     def record_response(self, response: LLMResponse) -> None:
         """Record LLM response."""
         self._span.set_attribute(
-            f"{self._prefix}.llm.input_tokens", response.input_tokens
+            f"{self._prefix}.llm.input_tokens", response.input_tokens,
         )
         self._span.set_attribute(
-            f"{self._prefix}.llm.output_tokens", response.output_tokens
+            f"{self._prefix}.llm.output_tokens", response.output_tokens,
         )
         self._span.set_attribute(
-            f"{self._prefix}.llm.cost_usd", float(response.cost_usd)
+            f"{self._prefix}.llm.cost_usd", float(response.cost_usd),
         )
         self._span.set_attribute(
-            f"{self._prefix}.llm.tool_calls", len(response.tool_calls)
+            f"{self._prefix}.llm.tool_calls", len(response.tool_calls),
         )
         if response.latency_ms:
             self._span.set_attribute(
-                f"{self._prefix}.llm.latency_ms", response.latency_ms
+                f"{self._prefix}.llm.latency_ms", response.latency_ms,
             )
         self._span.set_status(Status(StatusCode.OK))
 
@@ -611,7 +614,7 @@ class ToolSpan:
         self._span.set_attribute(f"{self._prefix}.tool.status", result.status.value)
         if result.duration_ms:
             self._span.set_attribute(
-                f"{self._prefix}.tool.duration_ms", result.duration_ms
+                f"{self._prefix}.tool.duration_ms", result.duration_ms,
             )
         if result.error:
             self._span.set_attribute(f"{self._prefix}.tool.error", result.error)
@@ -649,52 +652,52 @@ class NoOpAgentSpan:
     """No-op agent span when tracing is disabled."""
 
     def set_attribute(self, key: str, value: Any) -> None:
-        pass
+        """Ignore attribute calls when tracing is disabled."""
 
     def record_result(self, result: Any) -> None:
-        pass
+        """Ignore result recording when tracing is disabled."""
 
     def record_error(self, exception: Exception) -> None:
-        pass
+        """Ignore error recording when tracing is disabled."""
 
 
 class NoOpIterationSpan:
     """No-op iteration span when tracing is disabled."""
 
     def set_attribute(self, key: str, value: Any) -> None:
-        pass
+        """Ignore attribute calls when tracing is disabled."""
 
     def record_state(self, state: Any) -> None:
-        pass
+        """Ignore state recording when tracing is disabled."""
 
     def record_error(self, exception: Exception) -> None:
-        pass
+        """Ignore error recording when tracing is disabled."""
 
 
 class NoOpLLMSpan:
     """No-op LLM span when tracing is disabled."""
 
     def set_attribute(self, key: str, value: Any) -> None:
-        pass
+        """Ignore attribute calls when tracing is disabled."""
 
     def record_response(self, response: Any) -> None:
-        pass
+        """Ignore response recording when tracing is disabled."""
 
     def record_error(self, exception: Exception) -> None:
-        pass
+        """Ignore error recording when tracing is disabled."""
 
 
 class NoOpToolSpan:
     """No-op tool span when tracing is disabled."""
 
     def set_attribute(self, key: str, value: Any) -> None:
-        pass
+        """Ignore attribute calls when tracing is disabled."""
 
     def record_result(self, result: Any) -> None:
-        pass
+        """Ignore result recording when tracing is disabled."""
 
     def record_error(self, exception: Exception) -> None:
-        pass
+        """Ignore error recording when tracing is disabled."""
 
 
 # =============================================================================

@@ -14,10 +14,10 @@ database operations work correctly without mocking.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 import pytest
 from sqlalchemy import String, select
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
 from example_service.core.database.base import (
@@ -28,6 +28,9 @@ from example_service.core.database.base import (
     TimestampMixin,
 )
 from example_service.core.database.repository import BaseRepository
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 # ============================================================================
 # Test Models
@@ -47,9 +50,10 @@ class SoftDeletablePost(Base, IntegerPKMixin, TimestampMixin, SoftDeleteMixin):
     """Test model with soft delete support (no audit columns)."""
 
     __tablename__ = "soft_deletable_posts"
+    __table_args__ = {"extend_existing": True}
 
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    body: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    content: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
 
 class FullAuditPost(Base, IntegerPKMixin, TimestampMixin, AuditColumnsMixin, SoftDeleteMixin):
@@ -131,7 +135,7 @@ async def test_update_sets_updated_by(db_session: AsyncSession, current_user: st
 
 @pytest.mark.asyncio
 async def test_complete_audit_trail_through_lifecycle(
-    db_session: AsyncSession, current_user: str, admin_user: str
+    db_session: AsyncSession, current_user: str, admin_user: str,
 ) -> None:
     """Test complete audit trail: create -> update -> verify all fields."""
     repo = BaseRepository(AuditedDocument)
@@ -572,7 +576,7 @@ async def test_upsert_with_audit_tracking(db_session: AsyncSession, current_user
 
 @pytest.mark.asyncio
 async def test_complete_lifecycle_create_update_soft_delete_recover(
-    db_session: AsyncSession, current_user: str, admin_user: str
+    db_session: AsyncSession, current_user: str, admin_user: str,
 ) -> None:
     """Test complete lifecycle: create -> update -> soft delete -> recover."""
     repo = BaseRepository(FullAuditPost)
@@ -672,7 +676,7 @@ async def test_querying_mixed_deleted_non_deleted_records(db_session: AsyncSessi
 
 @pytest.mark.asyncio
 async def test_audit_trail_complete_at_each_step(
-    db_session: AsyncSession, current_user: str, admin_user: str
+    db_session: AsyncSession, current_user: str, admin_user: str,
 ) -> None:
     """Verify audit trail is complete and accurate at every lifecycle step."""
     repo = BaseRepository(FullAuditPost)
@@ -728,7 +732,7 @@ async def test_audit_trail_complete_at_each_step(
 
 @pytest.mark.asyncio
 async def test_bulk_operations_preserve_audit_integrity(
-    db_session: AsyncSession, current_user: str
+    db_session: AsyncSession, current_user: str,
 ) -> None:
     """Test that bulk operations maintain audit trail integrity.
 

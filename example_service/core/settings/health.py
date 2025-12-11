@@ -17,7 +17,9 @@ Example:
 
 from __future__ import annotations
 
-from pydantic import Field
+from typing import Any
+
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -54,6 +56,20 @@ class ProviderConfig(BaseSettings):
         default=False,
         description="Whether this provider is critical for readiness probe",
     )
+
+    @classmethod
+    @model_validator(mode="before")
+    def _parse_string_config(cls, data: Any) -> Any:
+        """Allow space-delimited key=value strings for provider configs."""
+        if isinstance(data, str):
+            parsed: dict[str, str] = {}
+            for segment in data.split():
+                if "=" not in segment:
+                    continue
+                key, value = segment.split("=", 1)
+                parsed[key.strip()] = value.strip()
+            return parsed
+        return data
 
     model_config = SettingsConfigDict(
         frozen=True,
@@ -301,6 +317,46 @@ class HealthCheckSettings(BaseSettings):
             for name, config in providers.items()
             if config.enabled and config.critical_for_readiness
         ]
+
+    @classmethod
+    @model_validator(mode="before")
+    def _filter_empty_complex_fields(cls, data: Any) -> Any:
+        """Filter out empty or invalid values for complex nested fields.
+
+        Pydantic-settings tries to parse complex fields (like ProviderConfig)
+        as JSON when they're provided as environment variables. If the value
+        is empty or invalid JSON, this causes a parsing error. This validator
+        removes empty string values for nested ProviderConfig fields so they
+        fall back to their defaults.
+
+        This handles cases where environment variables like HEALTH_DATABASE=
+        (empty) or HEALTH_DATABASE=invalid are set, which would otherwise
+        cause JSON parsing errors.
+        """
+        if isinstance(data, dict):
+            # List of ProviderConfig field names
+            provider_fields = {
+                "database",
+                "cache",
+                "rabbitmq",
+                "accent_auth",
+                "s3",
+                "consul",
+            }
+            # Remove empty string values for provider config fields
+            filtered = {}
+            for key, value in data.items():
+                # Skip empty or invalid string values for provider config fields
+                # Let them use defaults instead of causing JSON parsing errors
+                # Only filter strings - if it's already a dict, let pydantic handle it
+                if key in provider_fields and isinstance(value, str):
+                    stripped = value.strip()
+                    # Skip empty strings or strings that don't look like JSON objects
+                    if stripped == "" or (stripped and not stripped.startswith("{")):
+                        continue
+                filtered[key] = value
+            return filtered
+        return data
 
     model_config = SettingsConfigDict(
         env_prefix="HEALTH_",

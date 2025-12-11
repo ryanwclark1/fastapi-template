@@ -72,7 +72,7 @@ class FileRepository(TenantAwareRepository[File]):
         file = result.scalar_one_or_none()
 
         self._lazy.debug(
-            lambda: f"db.get_by_storage_key({storage_key}, tenant={tenant_id}) -> {'found' if file else 'not found'}"
+            lambda: f"db.get_by_storage_key({storage_key}, tenant={tenant_id}) -> {'found' if file else 'not found'}",
         )
         return file
 
@@ -111,7 +111,7 @@ class FileRepository(TenantAwareRepository[File]):
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.list_by_owner: owner_id={owner_id}, tenant={tenant_id}, limit={limit}, offset={offset} -> {len(items)} items"
+            lambda: f"db.list_by_owner: owner_id={owner_id}, tenant={tenant_id}, limit={limit}, offset={offset} -> {len(items)} items",
         )
         return items
 
@@ -149,7 +149,7 @@ class FileRepository(TenantAwareRepository[File]):
         items = result.scalars().all()
 
         self._lazy.debug(
-            lambda: f"db.list_by_status: status={status.value}, tenant={tenant_id}, limit={limit}, offset={offset} -> {len(items)} items"
+            lambda: f"db.list_by_status: status={status.value}, tenant={tenant_id}, limit={limit}, offset={offset} -> {len(items)} items",
         )
         return items
 
@@ -272,7 +272,7 @@ class FileRepository(TenantAwareRepository[File]):
 
         self._lazy.debug(
             lambda: f"db.search_files: query={query!r}, owner_id={owner_id}, tenant={tenant_id}, content_type={content_type} "
-            f"-> {len(search_result.items)}/{search_result.total}"
+            f"-> {len(search_result.items)}/{search_result.total}",
         )
         return search_result
 

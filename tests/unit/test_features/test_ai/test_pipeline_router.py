@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
+import contextlib
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi import FastAPI, status
@@ -27,6 +28,11 @@ from example_service.infra.ai.pipelines.types import (
     PipelineResult,
     PipelineStep,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+else:  # pragma: no cover - runtime placeholder for typing-only import
+    AsyncGenerator = Any
 
 
 @pytest.fixture
@@ -53,7 +59,7 @@ def mock_budget_service() -> MagicMock:
             percent_used=0.0,
             period=BudgetPeriod.DAILY,
             message="Budget OK",
-        )
+        ),
     )
     budget_service.set_budget = AsyncMock()
     budget_service.get_budget_status = AsyncMock()
@@ -74,7 +80,7 @@ def mock_pipeline() -> PipelineDefinition:
                 name="step1",
                 capability=Capability.TRANSCRIPTION,
                 description="Transcribe",
-            )
+            ),
         ],
         estimated_duration_seconds=10,
         estimated_cost_usd=Decimal("0.10"),
@@ -101,7 +107,7 @@ def mock_pipeline_result() -> PipelineResult:
 
 @pytest.fixture
 async def ai_client(
-    mock_orchestrator: MagicMock, mock_budget_service: MagicMock
+    mock_orchestrator: MagicMock, mock_budget_service: MagicMock,
 ) -> AsyncGenerator[AsyncClient]:
     """Create HTTP client with AI router and mocked dependencies."""
     app = FastAPI()
@@ -123,12 +129,12 @@ async def ai_client(
         return AsyncMock()
 
     with patch(
-        "example_service.features.ai.pipeline.router.get_instrumented_orchestrator"
+        "example_service.features.ai.pipeline.router.get_instrumented_orchestrator",
     ) as mock_get_orch:
         mock_get_orch.return_value = mock_orchestrator
 
         with patch(
-            "example_service.features.ai.pipeline.router.get_budget_service"
+            "example_service.features.ai.pipeline.router.get_budget_service",
         ) as mock_get_budget:
             mock_get_budget.return_value = mock_budget_service
 
@@ -143,12 +149,10 @@ async def ai_client(
             app.dependency_overrides[get_session] = override_get_session
             app.dependency_overrides[get_orchestrator] = override_get_orchestrator
             app.dependency_overrides[get_current_tenant] = override_get_current_tenant
-            # Don't override validate_tenant_budget - let it use the real dependency
-            # so budget checks work properly in tests
-            # app.dependency_overrides[validate_tenant_budget] = override_validate_tenant_budget
+            # Don't override validate_tenant_budget—keep the real dependency so budget checks run.
 
             async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
+                transport=ASGITransport(app=app), base_url="http://test",
             ) as client:
                 yield client
 
@@ -171,7 +175,7 @@ class TestListPipelines:
                     steps=[],
                     estimated_duration_seconds=10,
                     estimated_cost_usd=Decimal("0.10"),
-                )
+                ),
             ]
 
             response = await ai_client.get("/ai/pipelines")
@@ -187,7 +191,7 @@ class TestGetPipeline:
 
     @pytest.mark.asyncio
     async def test_get_pipeline_success(
-        self, ai_client: AsyncClient, mock_pipeline: PipelineDefinition
+        self, ai_client: AsyncClient, mock_pipeline: PipelineDefinition,
     ) -> None:
         """Test successfully getting a pipeline."""
         with patch("example_service.features.ai.pipeline.router.get_pipeline") as mock_get:
@@ -246,13 +250,8 @@ class TestExecutePipeline:
             if response.status_code != status.HTTP_200_OK:
                 import json
 
-                try:
-                    error_detail = response.json()
-                    print(f"Response status: {response.status_code}")
-                    print(f"Response body: {json.dumps(error_detail, indent=2)}")
-                except Exception:
-                    print(f"Response status: {response.status_code}")
-                    print(f"Response text: {response.text}")
+                with contextlib.suppress(Exception):
+                    response.json()
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
             assert data["execution_id"] == "exec-123"
@@ -307,7 +306,7 @@ class TestExecutePipeline:
                         steps=[],
                         estimated_duration_seconds=10,
                         estimated_cost_usd=Decimal("0.10"),
-                    )
+                    ),
                 ]
 
                 response = await ai_client.post(
@@ -323,7 +322,7 @@ class TestExecutePipeline:
 
     @pytest.mark.asyncio
     async def test_execute_pipeline_budget_exceeded(
-        self, ai_client: AsyncClient, mock_budget_service: MagicMock
+        self, ai_client: AsyncClient, mock_budget_service: MagicMock,
     ) -> None:
         """Test executing pipeline when budget is exceeded."""
         # Override the check_budget mock to return blocked result
@@ -336,7 +335,7 @@ class TestExecutePipeline:
                 percent_used=100.0,
                 period=BudgetPeriod.DAILY,
                 message="Budget exceeded",
-            )
+            ),
         )
 
         with patch("example_service.features.ai.pipeline.router.get_pipeline") as mock_get:
@@ -386,7 +385,7 @@ class TestGetExecution:
 
     @pytest.mark.asyncio
     async def test_get_execution_not_found(
-        self, ai_client: AsyncClient, mock_orchestrator: MagicMock
+        self, ai_client: AsyncClient, mock_orchestrator: MagicMock,
     ) -> None:
         """Test getting non-existent execution."""
         mock_orchestrator.get_execution.return_value = None
@@ -401,7 +400,7 @@ class TestGetProgress:
 
     @pytest.mark.asyncio
     async def test_get_progress_success(
-        self, ai_client: AsyncClient, mock_orchestrator: MagicMock
+        self, ai_client: AsyncClient, mock_orchestrator: MagicMock,
     ) -> None:
         """Test successfully getting execution progress."""
         mock_orchestrator.get_progress.return_value = {
@@ -421,7 +420,7 @@ class TestGetProgress:
 
     @pytest.mark.asyncio
     async def test_get_progress_not_found(
-        self, ai_client: AsyncClient, mock_orchestrator: MagicMock
+        self, ai_client: AsyncClient, mock_orchestrator: MagicMock,
     ) -> None:
         """Test getting progress for non-existent execution."""
         mock_orchestrator.get_progress.return_value = None
@@ -436,7 +435,7 @@ class TestBudgetEndpoints:
 
     @pytest.mark.asyncio
     async def test_set_budget_success(
-        self, ai_client: AsyncClient, mock_budget_service: MagicMock
+        self, ai_client: AsyncClient, mock_budget_service: MagicMock,
     ) -> None:
         """Test successfully setting budget."""
         response = await ai_client.post(
@@ -452,7 +451,7 @@ class TestBudgetEndpoints:
 
     @pytest.mark.asyncio
     async def test_get_budget_status_success(
-        self, ai_client: AsyncClient, mock_budget_service: MagicMock
+        self, ai_client: AsyncClient, mock_budget_service: MagicMock,
     ) -> None:
         """Test successfully getting budget status."""
         mock_budget_service.get_budget_status.return_value = {
@@ -471,7 +470,7 @@ class TestBudgetEndpoints:
 
     @pytest.mark.asyncio
     async def test_get_spend_summary_success(
-        self, ai_client: AsyncClient, mock_budget_service: MagicMock
+        self, ai_client: AsyncClient, mock_budget_service: MagicMock,
     ) -> None:
         """Test successfully getting spend summary."""
         mock_budget_service.get_spend_summary.return_value = {
@@ -494,7 +493,7 @@ class TestListCapabilities:
     async def test_list_capabilities_success(self, ai_client: AsyncClient) -> None:
         """Test successfully listing capabilities."""
         with patch(
-            "example_service.features.ai.pipeline.router.get_capability_registry"
+            "example_service.features.ai.pipeline.router.get_capability_registry",
         ) as mock_registry:
             mock_registry.return_value.list_capabilities.return_value = [
                 Capability.TRANSCRIPTION,
@@ -515,7 +514,7 @@ class TestListProviders:
     async def test_list_providers_success(self, ai_client: AsyncClient) -> None:
         """Test successfully listing providers."""
         with patch(
-            "example_service.features.ai.pipeline.router.get_capability_registry"
+            "example_service.features.ai.pipeline.router.get_capability_registry",
         ) as mock_registry:
             mock_provider = MagicMock()
             mock_provider.name = "test_provider"

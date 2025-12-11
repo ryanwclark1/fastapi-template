@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path  # noqa: TC003
+from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import quote, urlparse
 
@@ -11,6 +11,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ._sanitizers import sanitize_inline_numeric
 from .yaml_sources import create_redis_yaml_source
+
+_SETTINGS_DIR = Path(__file__).resolve().parent
 
 
 class RedisSettings(BaseSettings):

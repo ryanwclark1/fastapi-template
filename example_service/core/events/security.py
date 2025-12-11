@@ -86,12 +86,12 @@ _NON_PRINTABLE_PATTERN: Final[re.Pattern[str]] = re.compile(r"[\x00-\x1f\x7f-\x9
 
 # Pattern for valid format string field names
 _FORMAT_FIELD_PATTERN: Final[re.Pattern[str]] = re.compile(
-    r"\{([^{}!:]+)(?:[!:][^{}]*)?\}"
+    r"\{([^{}!:]+)(?:[!:][^{}]*)?\}",
 )
 
 # Pattern for safe identifiers (alphanumeric + underscore)
 _SAFE_IDENTIFIER_PATTERN: Final[re.Pattern[str]] = re.compile(
-    r"^[a-zA-Z_][a-zA-Z0-9_]*$"
+    r"^[a-zA-Z_][a-zA-Z0-9_]*$",
 )
 
 
@@ -131,9 +131,12 @@ def validate_routing_key_input(value: str) -> None:
         raise ValueError(msg)
 
     if len(value) > MAX_ROUTING_KEY_LENGTH:
-        raise ValueError(
+        msg = (
             f"Routing key exceeds maximum length of {MAX_ROUTING_KEY_LENGTH} "
             f"(got {len(value)})"
+        )
+        raise ValueError(
+            msg,
         )
 
     # Prevent double-escaping
@@ -331,13 +334,15 @@ def safe_format_routing_key(
     # Validate all fields are safe
     for field in required_fields:
         if not validate_format_field(field):
-            raise RoutingKeySecurityError(f"Forbidden format field: {field}")
+            msg = f"Forbidden format field: {field}"
+            raise RoutingKeySecurityError(msg)
 
     # Build safe values dict with only required fields
     safe_values: dict[str, str] = {}
     for field in required_fields:
         if field not in values:
-            raise ValueError(f"Missing required field for routing key: {field}")
+            msg = f"Missing required field for routing key: {field}"
+            raise ValueError(msg)
 
         value = str(values[field])
 
@@ -352,8 +357,9 @@ def safe_format_routing_key(
 
     # Validate output
     if len(result) > MAX_ROUTING_KEY_LENGTH:
+        msg = f"Formatted routing key exceeds {MAX_ROUTING_KEY_LENGTH} chars"
         raise RoutingKeySecurityError(
-            f"Formatted routing key exceeds {MAX_ROUTING_KEY_LENGTH} chars"
+            msg,
         )
 
     if _NON_PRINTABLE_PATTERN.search(result):

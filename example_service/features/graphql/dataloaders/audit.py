@@ -37,7 +37,7 @@ class AuditLogDataLoader:
         """
         self._session = session
         self._loader: DataLoader[UUID, AuditLog | None] = DataLoader(
-            load_fn=self._batch_load_audit_logs
+            load_fn=self._batch_load_audit_logs,
         )
 
     async def _batch_load_audit_logs(
@@ -105,7 +105,7 @@ class AuditLogsByEntityDataLoader:
         self._session = session
         self._limit = limit
         self._loader: DataLoader[tuple[str, str], list[AuditLog]] = DataLoader(
-            load_fn=self._batch_load_logs_by_entity
+            load_fn=self._batch_load_logs_by_entity,
         )
 
     async def _batch_load_logs_by_entity(

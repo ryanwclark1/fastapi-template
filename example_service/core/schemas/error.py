@@ -82,7 +82,7 @@ class ProblemDetail(BaseModel):
                     "limit": 100,
                     "window": "minute",
                 },
-            ]
+            ],
         },
     }
 
@@ -190,7 +190,7 @@ class ValidationProblemDetail(ProblemDetail):
                             "value": 15,
                         },
                     ],
-                }
-            ]
-        }
+                },
+            ],
+        },
     }

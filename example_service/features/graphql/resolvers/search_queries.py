@@ -81,18 +81,15 @@ async def search_query(
     # Would be replaced with actual PostgreSQL FTS or vector search
 
     entity_types = input.entity_types or ["reminders", "tags", "users", "posts"]
-    results = []
-
-    for entity_type in entity_types:
-        # Mock results for demonstration
-        results.append(
-            EntitySearchResultType(
-                entity_type=entity_type,
-                total=0,
-                hits=[],
-                facets=None,
-            )
+    results = [
+        EntitySearchResultType(
+            entity_type=entity_type,
+            total=0,
+            hits=[],
+            facets=None,
         )
+        for entity_type in entity_types
+    ]
 
     took_ms = int((time.monotonic() - start_time) * 1000)
 

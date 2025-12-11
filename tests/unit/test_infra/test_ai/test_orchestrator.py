@@ -102,7 +102,7 @@ def mock_budget_service():
             percent_used=10.0,
             period=BudgetPeriod.MONTHLY,
             message="Budget OK",
-        )
+        ),
     )
     service.track_spend = AsyncMock()
     return service
@@ -151,14 +151,14 @@ def mock_saga_coordinator():
                     ),
                     provider_used="mock_provider",
                     retries=0,
-                )
+                ),
             },
             total_duration_ms=1000.0,
             total_cost_usd=Decimal("0.05"),
             compensation_performed=False,
             compensated_steps=[],
             error=None,
-        )
+        ),
     )
     return saga
 
@@ -209,7 +209,7 @@ class TestBasicExecution:
 
     @pytest.mark.asyncio
     async def test_execute_calls_saga_coordinator(
-        self, orchestrator, simple_pipeline, mock_saga_coordinator
+        self, orchestrator, simple_pipeline, mock_saga_coordinator,
     ):
         """Execute should delegate to saga coordinator."""
         await orchestrator.execute(
@@ -241,7 +241,7 @@ class TestBudgetIntegration:
 
     @pytest.mark.asyncio
     async def test_execute_checks_budget(
-        self, orchestrator, simple_pipeline, mock_budget_service
+        self, orchestrator, simple_pipeline, mock_budget_service,
     ):
         """Execute should check budget before execution."""
         await orchestrator.execute(
@@ -254,7 +254,7 @@ class TestBudgetIntegration:
 
     @pytest.mark.asyncio
     async def test_execute_skips_budget_when_no_tenant(
-        self, orchestrator, simple_pipeline, mock_budget_service
+        self, orchestrator, simple_pipeline, mock_budget_service,
     ):
         """Execute should skip budget check without tenant."""
         await orchestrator.execute(
@@ -266,7 +266,7 @@ class TestBudgetIntegration:
 
     @pytest.mark.asyncio
     async def test_execute_skips_budget_when_requested(
-        self, orchestrator, simple_pipeline, mock_budget_service
+        self, orchestrator, simple_pipeline, mock_budget_service,
     ):
         """Execute should skip budget check when skip_budget_check=True."""
         await orchestrator.execute(
@@ -280,7 +280,7 @@ class TestBudgetIntegration:
 
     @pytest.mark.asyncio
     async def test_execute_raises_on_budget_exceeded(
-        self, orchestrator, simple_pipeline, mock_budget_service
+        self, orchestrator, simple_pipeline, mock_budget_service,
     ):
         """Execute should raise BudgetExceededException when budget exceeded."""
         mock_budget_service.check_budget.return_value = BudgetCheckResult(
@@ -304,7 +304,7 @@ class TestBudgetIntegration:
 
     @pytest.mark.asyncio
     async def test_execute_tracks_spend_after_success(
-        self, orchestrator, simple_pipeline, mock_budget_service
+        self, orchestrator, simple_pipeline, mock_budget_service,
     ):
         """Execute should track spend after successful execution."""
         await orchestrator.execute(
@@ -329,7 +329,7 @@ class TestMetricsIntegration:
 
     @pytest.mark.asyncio
     async def test_execute_records_pipeline_started(
-        self, orchestrator, simple_pipeline, mock_metrics
+        self, orchestrator, simple_pipeline, mock_metrics,
     ):
         """Execute should record pipeline started metric."""
         await orchestrator.execute(
@@ -339,12 +339,12 @@ class TestMetricsIntegration:
         )
 
         mock_metrics.record_pipeline_started.assert_called_once_with(
-            "test_pipeline", "tenant-123"
+            "test_pipeline", "tenant-123",
         )
 
     @pytest.mark.asyncio
     async def test_execute_records_pipeline_completed(
-        self, orchestrator, simple_pipeline, mock_metrics
+        self, orchestrator, simple_pipeline, mock_metrics,
     ):
         """Execute should record pipeline completed metric."""
         await orchestrator.execute(
@@ -354,12 +354,12 @@ class TestMetricsIntegration:
         )
 
         mock_metrics.record_pipeline_completed.assert_called_once_with(
-            "test_pipeline", "tenant-123"
+            "test_pipeline", "tenant-123",
         )
 
     @pytest.mark.asyncio
     async def test_execute_records_pipeline_execution_metrics(
-        self, orchestrator, simple_pipeline, mock_metrics
+        self, orchestrator, simple_pipeline, mock_metrics,
     ):
         """Execute should record detailed execution metrics."""
         await orchestrator.execute(
@@ -376,7 +376,7 @@ class TestMetricsIntegration:
 
     @pytest.mark.asyncio
     async def test_execute_records_budget_exceeded_metric(
-        self, orchestrator, simple_pipeline, mock_budget_service, mock_metrics
+        self, orchestrator, simple_pipeline, mock_budget_service, mock_metrics,
     ):
         """Execute should record budget exceeded metric."""
         mock_budget_service.check_budget.return_value = BudgetCheckResult(
@@ -397,7 +397,7 @@ class TestMetricsIntegration:
             )
 
         mock_metrics.record_budget_exceeded.assert_called_once_with(
-            "tenant-123", "blocked"
+            "tenant-123", "blocked",
         )
 
 
@@ -411,7 +411,7 @@ class TestTracingIntegration:
 
     @pytest.mark.asyncio
     async def test_execute_creates_pipeline_span(
-        self, orchestrator, simple_pipeline, mock_tracer
+        self, orchestrator, simple_pipeline, mock_tracer,
     ):
         """Execute should create pipeline tracing span."""
         await orchestrator.execute(
@@ -424,7 +424,7 @@ class TestTracingIntegration:
 
     @pytest.mark.asyncio
     async def test_execute_records_success_on_span(
-        self, orchestrator, simple_pipeline, mock_tracer
+        self, orchestrator, simple_pipeline, mock_tracer,
     ):
         """Execute should record success on tracing span."""
         await orchestrator.execute(
@@ -438,7 +438,7 @@ class TestTracingIntegration:
 
     @pytest.mark.asyncio
     async def test_execute_records_failure_on_span(
-        self, orchestrator, simple_pipeline, mock_tracer, mock_saga_coordinator
+        self, orchestrator, simple_pipeline, mock_tracer, mock_saga_coordinator,
     ):
         """Execute should record failure on tracing span."""
         mock_saga_coordinator.execute.return_value = PipelineResult(
@@ -470,7 +470,7 @@ class TestTracingIntegration:
 
     @pytest.mark.asyncio
     async def test_execute_works_without_tracer(
-        self, mock_registry, mock_event_store, mock_budget_service, mock_saga_coordinator, simple_pipeline
+        self, mock_registry, mock_event_store, mock_budget_service, mock_saga_coordinator, simple_pipeline,
     ):
         """Execute should work when tracing is disabled."""
         orch = InstrumentedOrchestrator(
@@ -503,7 +503,7 @@ class TestErrorHandling:
 
     @pytest.mark.asyncio
     async def test_failed_execution_returns_result(
-        self, orchestrator, simple_pipeline, mock_saga_coordinator
+        self, orchestrator, simple_pipeline, mock_saga_coordinator,
     ):
         """Failed execution should return result with error details."""
         mock_saga_coordinator.execute.return_value = PipelineResult(
@@ -530,7 +530,7 @@ class TestErrorHandling:
                     provider_used="mock_provider",
                     retries=3,
                     error="Provider error",
-                )
+                ),
             },
             total_duration_ms=500.0,
             total_cost_usd=Decimal(0),
@@ -551,7 +551,7 @@ class TestErrorHandling:
 
     @pytest.mark.asyncio
     async def test_metrics_recorded_on_failure(
-        self, orchestrator, simple_pipeline, mock_metrics, mock_saga_coordinator
+        self, orchestrator, simple_pipeline, mock_metrics, mock_saga_coordinator,
     ):
         """Metrics should be recorded even on failure."""
         mock_saga_coordinator.execute.return_value = PipelineResult(
@@ -582,7 +582,7 @@ class TestErrorHandling:
 
     @pytest.mark.asyncio
     async def test_pipeline_completed_always_recorded(
-        self, orchestrator, simple_pipeline, mock_metrics, mock_saga_coordinator
+        self, orchestrator, simple_pipeline, mock_metrics, mock_saga_coordinator,
     ):
         """Pipeline completed metric should always be recorded (for gauge)."""
         mock_saga_coordinator.execute.side_effect = RuntimeError("Unexpected error")
@@ -658,7 +658,7 @@ class TestEventStreaming:
 
     @pytest.mark.asyncio
     async def test_stream_events_returns_async_iterator(
-        self, orchestrator, mock_event_store
+        self, orchestrator, mock_event_store,
     ):
         """stream_events should return async iterator."""
         events = []
@@ -672,7 +672,7 @@ class TestEventStreaming:
 
     @pytest.mark.asyncio
     async def test_stream_events_filters_by_type(
-        self, orchestrator, mock_event_store
+        self, orchestrator, mock_event_store,
     ):
         """stream_events should support event type filtering."""
         from example_service.infra.ai.events import EventType

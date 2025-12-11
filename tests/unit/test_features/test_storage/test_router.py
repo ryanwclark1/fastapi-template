@@ -9,7 +9,7 @@ from fastapi import FastAPI, status
 from httpx import ASGITransport, AsyncClient
 import pytest
 
-from example_service.core.dependencies.accent_auth import get_current_user
+from example_service.core.dependencies.accent_auth import get_auth_user
 from example_service.core.dependencies.tenant import get_tenant_context
 from example_service.core.schemas.auth import AuthUser
 from example_service.features.storage.dependencies import get_storage_service
@@ -53,7 +53,7 @@ def mock_tenant_context():
 
 @pytest.fixture
 async def storage_client(
-    mock_storage_service, mock_admin_user, mock_tenant_context
+    mock_storage_service, mock_admin_user, mock_tenant_context,
 ) -> AsyncGenerator[AsyncClient]:
     """Create HTTP client with storage router and mocked dependencies."""
     from example_service.features.storage.router import router
@@ -73,7 +73,7 @@ async def storage_client(
 
     # Override get_current_user - since mock_admin_user has "#" permission,
     # the ACL check in require_acl("storage.#") will pass
-    app.dependency_overrides[get_current_user] = override_get_current_user
+    app.dependency_overrides[get_auth_user] = override_get_current_user
     app.dependency_overrides[get_storage_service] = override_get_storage_service
     app.dependency_overrides[get_tenant_context] = override_get_tenant_context
 
@@ -119,12 +119,12 @@ class TestBucketEndpoints:
         assert data["success"] is True
         assert "deleted successfully" in data["message"]
         mock_storage_service.delete_bucket.assert_awaited_once_with(
-            bucket="test-bucket", force=False
+            bucket="test-bucket", force=False,
         )
 
     @pytest.mark.asyncio
     async def test_delete_bucket_with_force(
-        self, storage_client: AsyncClient, mock_storage_service
+        self, storage_client: AsyncClient, mock_storage_service,
     ):
         """Test bucket deletion with force flag."""
         mock_storage_service.delete_bucket.return_value = True
@@ -133,7 +133,7 @@ class TestBucketEndpoints:
 
         assert response.status_code == status.HTTP_200_OK
         mock_storage_service.delete_bucket.assert_awaited_once_with(
-            bucket="test-bucket", force=True
+            bucket="test-bucket", force=True,
         )
 
     @pytest.mark.asyncio
@@ -173,7 +173,7 @@ class TestBucketEndpoints:
                 "region": "us-west-2",
                 "creation_date": datetime.now(UTC),
                 "versioning_enabled": False,
-            }
+            },
         ]
 
         response = await storage_client.get("/api/v1/storage/buckets/test-bucket")
@@ -185,7 +185,7 @@ class TestBucketEndpoints:
 
     @pytest.mark.asyncio
     async def test_get_bucket_info_not_found(
-        self, storage_client: AsyncClient, mock_storage_service
+        self, storage_client: AsyncClient, mock_storage_service,
     ):
         """Test getting info for non-existent bucket."""
         mock_storage_service.bucket_exists.return_value = False
@@ -240,7 +240,7 @@ class TestObjectEndpoints:
 
     @pytest.mark.asyncio
     async def test_list_objects_with_pagination(
-        self, storage_client: AsyncClient, mock_storage_service
+        self, storage_client: AsyncClient, mock_storage_service,
     ):
         """Test object listing with pagination."""
         from example_service.infra.storage.backends import ObjectMetadata
@@ -256,7 +256,7 @@ class TestObjectEndpoints:
                     etag="abc123",
                     storage_class="STANDARD",
                     custom_metadata={},
-                )
+                ),
             ],
             "next-token-123",  # Has more results
         )
@@ -303,7 +303,7 @@ class TestObjectEndpoints:
 
         files = {"file": ("test.txt", BytesIO(b"test content"), "text/plain")}
         response = await storage_client.post(
-            "/api/v1/storage/objects/test.txt?acl=public-read", files=files
+            "/api/v1/storage/objects/test.txt?acl=public-read", files=files,
         )
 
         assert response.status_code == status.HTTP_201_CREATED
@@ -329,11 +329,11 @@ class TestObjectEndpoints:
 
     @pytest.mark.asyncio
     async def test_download_object_not_found(
-        self, storage_client: AsyncClient, mock_storage_service
+        self, storage_client: AsyncClient, mock_storage_service,
     ):
         """Test downloading non-existent object."""
         mock_storage_service.download_file.side_effect = StorageFileNotFoundError(
-            "Object not found"
+            "Object not found",
         )
 
         response = await storage_client.get("/api/v1/storage/objects/nonexistent.txt")
@@ -385,9 +385,9 @@ class TestACLEndpoints:
                     {
                         "Grantee": {"Type": "CanonicalUser", "ID": "user-id"},
                         "Permission": "FULL_CONTROL",
-                    }
+                    },
                 ],
-            }
+            },
         )
 
         response = await storage_client.get("/api/v1/storage/objects/test.txt/acl")
@@ -405,7 +405,7 @@ class TestSchemaValidation:
 
     @pytest.mark.asyncio
     async def test_bucket_create_validation(
-        self, storage_client: AsyncClient, mock_storage_service
+        self, storage_client: AsyncClient, mock_storage_service,
     ):
         """Test bucket creation schema validation."""
         # Too short bucket name
@@ -418,7 +418,7 @@ class TestSchemaValidation:
 
     @pytest.mark.asyncio
     async def test_object_list_query_validation(
-        self, storage_client: AsyncClient, mock_storage_service
+        self, storage_client: AsyncClient, mock_storage_service,
     ):
         """Test object list query parameter validation."""
         # max_keys too large

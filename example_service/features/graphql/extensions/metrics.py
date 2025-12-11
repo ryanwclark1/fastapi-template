@@ -41,7 +41,7 @@ class GraphQLMetrics:
     - Resolver metrics (field execution times)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize all GraphQL metrics."""
         # ====================================================================
         # Request Metrics
@@ -223,7 +223,7 @@ class GraphQLMetricsExtension(SchemaExtension):
         )
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize metrics extension."""
         self.metrics = GRAPHQL_METRICS
         self._start_time: float | None = None

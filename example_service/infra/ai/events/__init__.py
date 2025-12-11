@@ -32,6 +32,7 @@ Quick Start:
 
 # Event types
 # Event store
+from example_service.infra.ai.events.saga import SagaCoordinator
 from example_service.infra.ai.events.store import (
     EventPublisher,
     EventStore,
@@ -65,9 +66,6 @@ from example_service.infra.ai.events.types import (
 
 # Alias for consistency with other modules
 configure_event_store = set_event_store
-
-# Saga coordinator
-from example_service.infra.ai.events.saga import SagaCoordinator  # noqa: E402
 
 __all__ = [
     # Event types

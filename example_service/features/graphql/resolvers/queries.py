@@ -32,19 +32,19 @@ logger = logging.getLogger(__name__)
 
 # Type aliases for annotated arguments with descriptions
 FirstArg = Annotated[
-    int, strawberry.argument(description="Number of items to return (forward pagination)")
+    int, strawberry.argument(description="Number of items to return (forward pagination)"),
 ]
 AfterArg = Annotated[
-    str | None, strawberry.argument(description="Cursor to start after (forward pagination)")
+    str | None, strawberry.argument(description="Cursor to start after (forward pagination)"),
 ]
 LastArg = Annotated[
-    int | None, strawberry.argument(description="Number of items to return (backward pagination)")
+    int | None, strawberry.argument(description="Number of items to return (backward pagination)"),
 ]
 BeforeArg = Annotated[
-    str | None, strawberry.argument(description="Cursor to start before (backward pagination)")
+    str | None, strawberry.argument(description="Cursor to start before (backward pagination)"),
 ]
 IncludeCompletedArg = Annotated[
-    bool, strawberry.argument(description="Include completed reminders")
+    bool, strawberry.argument(description="Include completed reminders"),
 ]
 
 
@@ -112,7 +112,7 @@ class Query:
         # Build base statement
         stmt = select(Reminder)
         if not include_completed:
-            stmt = stmt.where(Reminder.is_completed == False)  # noqa: E712
+            stmt = stmt.where(not Reminder.is_completed)
 
         # Use existing cursor pagination
         connection = await repo.paginate_cursor(

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
 from fastapi import FastAPI, status
@@ -23,6 +23,11 @@ from example_service.features.email.models import (
 )
 from example_service.features.email.router import router
 from example_service.features.email.service import EmailConfigService
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+else:  # pragma: no cover - runtime placeholder for typing-only import
+    AsyncGenerator = Any
 
 
 @pytest.fixture
@@ -215,7 +220,7 @@ class TestGetConfig:
 
     @pytest.mark.asyncio
     async def test_get_config_success(
-        self, email_client: AsyncClient, mock_config_repository: MagicMock
+        self, email_client: AsyncClient, mock_config_repository: MagicMock,
     ) -> None:
         """Test successfully retrieving email configuration."""
         config = EmailConfig(
@@ -244,7 +249,7 @@ class TestGetConfig:
 
     @pytest.mark.asyncio
     async def test_get_config_not_found(
-        self, email_client: AsyncClient, mock_config_repository: MagicMock
+        self, email_client: AsyncClient, mock_config_repository: MagicMock,
     ) -> None:
         """Test retrieving non-existent configuration."""
         mock_config_repository.get_by_tenant_id.return_value = None
@@ -292,7 +297,7 @@ class TestUpdateConfig:
 
     @pytest.mark.asyncio
     async def test_update_config_not_found(
-        self, email_client: AsyncClient, mock_config_repository: MagicMock
+        self, email_client: AsyncClient, mock_config_repository: MagicMock,
     ) -> None:
         """Test updating non-existent configuration."""
         mock_config_repository.get_by_tenant_id.return_value = None
@@ -336,7 +341,7 @@ class TestDeleteConfig:
 
     @pytest.mark.asyncio
     async def test_delete_config_not_found(
-        self, email_client: AsyncClient, mock_config_repository: MagicMock
+        self, email_client: AsyncClient, mock_config_repository: MagicMock,
     ) -> None:
         """Test deleting non-existent configuration."""
         mock_config_repository.get_by_tenant_id.return_value = None
@@ -351,7 +356,7 @@ class TestTestConfig:
 
     @pytest.mark.asyncio
     async def test_send_test_email_success(
-        self, email_client: AsyncClient, mock_email_service: AsyncMock
+        self, email_client: AsyncClient, mock_email_service: AsyncMock,
     ) -> None:
         """Test successfully sending test email."""
         mock_email_service.send.return_value = MagicMock(
@@ -377,7 +382,7 @@ class TestTestConfig:
 
     @pytest.mark.asyncio
     async def test_send_test_email_failure(
-        self, email_client: AsyncClient, mock_email_service: AsyncMock
+        self, email_client: AsyncClient, mock_email_service: AsyncMock,
     ) -> None:
         """Test test email failure handling."""
         mock_email_service.send.return_value = MagicMock(
@@ -401,7 +406,7 @@ class TestTestConfig:
 
     @pytest.mark.asyncio
     async def test_send_test_email_exception(
-        self, email_client: AsyncClient, mock_email_service: AsyncMock
+        self, email_client: AsyncClient, mock_email_service: AsyncMock,
     ) -> None:
         """Test test email exception handling."""
         mock_email_service.send.side_effect = Exception("Unexpected error")
@@ -423,7 +428,7 @@ class TestCheckHealth:
 
     @pytest.mark.asyncio
     async def test_health_check_success(
-        self, email_client: AsyncClient, mock_email_service: AsyncMock
+        self, email_client: AsyncClient, mock_email_service: AsyncMock,
     ) -> None:
         """Test successful health check."""
         mock_email_service.health_check.return_value = True
@@ -440,7 +445,7 @@ class TestCheckHealth:
 
     @pytest.mark.asyncio
     async def test_health_check_failure(
-        self, email_client: AsyncClient, mock_email_service: AsyncMock
+        self, email_client: AsyncClient, mock_email_service: AsyncMock,
     ) -> None:
         """Test health check failure."""
         mock_email_service.health_check.return_value = False
@@ -454,7 +459,7 @@ class TestCheckHealth:
 
     @pytest.mark.asyncio
     async def test_health_check_exception(
-        self, email_client: AsyncClient, mock_email_service: AsyncMock
+        self, email_client: AsyncClient, mock_email_service: AsyncMock,
     ) -> None:
         """Test health check exception handling."""
         mock_email_service.health_check.side_effect = Exception("Health check failed")
@@ -473,7 +478,7 @@ class TestListProviders:
 
     @pytest.mark.asyncio
     async def test_list_providers(
-        self, email_client: AsyncClient, mock_email_service: AsyncMock
+        self, email_client: AsyncClient, mock_email_service: AsyncMock,
     ) -> None:
         """Test listing available email providers."""
         response = await email_client.get("/email/providers")
@@ -507,7 +512,7 @@ class TestGetUsageStats:
 
     @pytest.mark.asyncio
     async def test_get_usage_stats(
-        self, email_client: AsyncClient, mock_usage_repository: MagicMock
+        self, email_client: AsyncClient, mock_usage_repository: MagicMock,
     ) -> None:
         """Test getting usage statistics."""
         mock_usage_repository.get_usage_stats.return_value = {
@@ -519,7 +524,7 @@ class TestGetUsageStats:
             "total_cost_usd": 0.003,
         }
         mock_usage_repository.get_usage_by_provider.return_value = {
-            "smtp": {"count": 5, "cost": 0.003}
+            "smtp": {"count": 5, "cost": 0.003},
         }
 
         response = await email_client.get("/email/configs/tenant-123/usage")
@@ -537,7 +542,7 @@ class TestGetUsageStats:
 
     @pytest.mark.asyncio
     async def test_get_usage_stats_with_date_range(
-        self, email_client: AsyncClient, mock_usage_repository: MagicMock
+        self, email_client: AsyncClient, mock_usage_repository: MagicMock,
     ) -> None:
         """Test getting usage statistics with custom date range."""
         mock_usage_repository.get_usage_stats.return_value = {
@@ -555,7 +560,7 @@ class TestGetUsageStats:
         end_date = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S")
 
         response = await email_client.get(
-            f"/email/configs/tenant-123/usage?start_date={start_date}&end_date={end_date}"
+            f"/email/configs/tenant-123/usage?start_date={start_date}&end_date={end_date}",
         )
 
         assert response.status_code == status.HTTP_200_OK
@@ -566,7 +571,7 @@ class TestGetAuditLogs:
 
     @pytest.mark.asyncio
     async def test_get_audit_logs(
-        self, email_client: AsyncClient, mock_audit_repository: MagicMock
+        self, email_client: AsyncClient, mock_audit_repository: MagicMock,
     ) -> None:
         """Test getting audit logs."""
         # Mock audit logs
@@ -603,7 +608,7 @@ class TestGetAuditLogs:
 
     @pytest.mark.asyncio
     async def test_get_audit_logs_pagination(
-        self, email_client: AsyncClient, mock_audit_repository: MagicMock
+        self, email_client: AsyncClient, mock_audit_repository: MagicMock,
     ) -> None:
         """Test getting audit logs with pagination."""
         logs = [

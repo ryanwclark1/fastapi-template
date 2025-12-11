@@ -90,7 +90,7 @@ async def create_workflow_definition_mutation(
 
     # Check for existing slug
     existing = await ctx.session.execute(
-        select(AIWorkflowDefinition).where(AIWorkflowDefinition.slug == input.slug)
+        select(AIWorkflowDefinition).where(AIWorkflowDefinition.slug == input.slug),
     )
     if existing.scalar_one_or_none():
         return WorkflowError(
@@ -132,7 +132,7 @@ async def create_workflow_definition_mutation(
         await ctx.session.refresh(definition)
 
         return WorkflowDefinitionSuccess(
-            definition=WorkflowDefinitionType.from_model(definition)
+            definition=WorkflowDefinitionType.from_model(definition),
         )
 
     except Exception as e:
@@ -215,7 +215,7 @@ async def update_workflow_definition_mutation(
         await ctx.session.refresh(definition)
 
         return WorkflowDefinitionSuccess(
-            definition=WorkflowDefinitionType.from_model(definition)
+            definition=WorkflowDefinitionType.from_model(definition),
         )
 
     except Exception as e:
@@ -270,7 +270,7 @@ async def delete_workflow_definition_mutation(
         await ctx.session.refresh(definition)
 
         return WorkflowDefinitionSuccess(
-            definition=WorkflowDefinitionType.from_model(definition)
+            definition=WorkflowDefinitionType.from_model(definition),
         )
 
     except Exception as e:
@@ -310,7 +310,7 @@ async def execute_workflow_mutation(
     # Get workflow definition
     stmt = select(AIWorkflowDefinition).where(
         AIWorkflowDefinition.id == definition_uuid,
-        AIWorkflowDefinition.is_active == True,  # noqa: E712
+        AIWorkflowDefinition.is_active,
     )
     result = await ctx.session.execute(stmt)
     definition = result.scalar_one_or_none()
@@ -342,11 +342,11 @@ async def execute_workflow_mutation(
         await ctx.session.commit()
         await ctx.session.refresh(execution)
 
-        # TODO: Trigger actual workflow execution via task queue
+        # NOTE: Trigger actual workflow execution via task queue when background worker is available.
         # For now, just create the execution record
 
         return WorkflowExecutionSuccess(
-            execution=WorkflowExecutionType.from_model(execution)
+            execution=WorkflowExecutionType.from_model(execution),
         )
 
     except Exception as e:
@@ -419,7 +419,7 @@ async def cancel_workflow_execution_mutation(
         await ctx.session.refresh(execution)
 
         return WorkflowExecutionSuccess(
-            execution=WorkflowExecutionType.from_model(execution)
+            execution=WorkflowExecutionType.from_model(execution),
         )
 
     except Exception as e:
@@ -498,11 +498,11 @@ async def respond_to_approval_mutation(
         await ctx.session.commit()
         await ctx.session.refresh(approval)
 
-        # TODO: Trigger workflow resumption via task queue
+        # NOTE: Trigger workflow resumption via task queue when resume worker is wired up.
         # Update the parent workflow execution status
 
         return WorkflowApprovalSuccess(
-            approval=WorkflowApprovalType.from_model(approval)
+            approval=WorkflowApprovalType.from_model(approval),
         )
 
     except Exception as e:

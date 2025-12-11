@@ -8,6 +8,9 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from example_service.features.files.models import FileStatus
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(datetime, UUID, FileStatus)
 
 
 class FileCreate(BaseModel):
@@ -155,7 +158,7 @@ class BatchDownloadRequest(BaseModel):
     """Request for batch file download."""
 
     file_ids: list[UUID] = Field(
-        ..., min_length=1, max_length=100, description="List of file IDs to download (max 100)"
+        ..., min_length=1, max_length=100, description="List of file IDs to download (max 100)",
     )
 
 
@@ -185,7 +188,7 @@ class BatchDeleteRequest(BaseModel):
     """Request for batch file deletion."""
 
     file_ids: list[UUID] = Field(
-        ..., min_length=1, max_length=100, description="List of file IDs to delete (max 100)"
+        ..., min_length=1, max_length=100, description="List of file IDs to delete (max 100)",
     )
     dry_run: bool = Field(False, description="If true, preview deletion without executing")
     hard_delete: bool = Field(False, description="If true, permanently delete from storage")
@@ -197,7 +200,7 @@ class BatchDeleteItem(BaseModel):
     file_id: UUID
     filename: str | None = Field(None, description="Original filename")
     would_delete: bool | None = Field(
-        None, description="Whether file would be deleted (dry run only)"
+        None, description="Whether file would be deleted (dry run only)",
     )
     deleted: bool | None = Field(None, description="Whether file was deleted (actual run)")
     success: bool = Field(..., description="Whether operation succeeded")

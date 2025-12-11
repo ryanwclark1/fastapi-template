@@ -224,7 +224,7 @@ class SendGridProvider(BaseEmailProvider):
             if response.status_code == 202:
                 # Get message ID from header
                 message_id = response.headers.get(
-                    "X-Message-Id", f"sg-{response.headers.get('X-Request-Id', 'unknown')}"
+                    "X-Message-Id", f"sg-{response.headers.get('X-Request-Id', 'unknown')}",
                 )
 
                 return EmailDeliveryResult.success_result(
@@ -244,9 +244,11 @@ class SendGridProvider(BaseEmailProvider):
                     error_body = "; ".join(
                         e.get("message", str(e)) for e in error_json["errors"]
                     )
-            except Exception:  # noqa: S110
-                # Ignore JSON parsing errors, use default error_body
-                pass
+            except Exception as exc:  # pragma: no cover - best-effort logging
+                logger.debug(
+                    "Failed to parse SendGrid error response as JSON",
+                    exc_info=exc,
+                )
 
             error_code = self._classify_http_error(response.status_code)
 

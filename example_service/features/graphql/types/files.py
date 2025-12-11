@@ -12,8 +12,10 @@ Auto-generated from Pydantic schemas:
 from __future__ import annotations
 
 from enum import Enum
+from typing import Any
 
 import strawberry
+from strawberry.types import Info
 
 from example_service.features.files.models import FileStatus as ModelFileStatus
 from example_service.features.files.schemas import (
@@ -27,6 +29,9 @@ from example_service.features.graphql.types.pydantic_bridge import (
     pydantic_input,
     pydantic_type,
 )
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(PageInfoType, Info)
 
 # ============================================================================
 # Enums
@@ -57,7 +62,7 @@ class FileThumbnailType:
 
     # Computed fields
     @strawberry.field(description="Presigned download URL for the thumbnail")
-    async def download_url(self, info) -> str:  # noqa: ARG002
+    async def download_url(self, info: Info[Any, Any]) -> str:
         """Generate presigned download URL for thumbnail.
 
         Uses the storage service to generate a time-limited URL.
@@ -112,7 +117,7 @@ class FileType:
 
     # Computed fields
     @strawberry.field(description="Presigned download URL for the file")
-    async def download_url(self, info) -> str:  # noqa: ARG002
+    async def download_url(self, info: Info[Any, Any]) -> str:
         """Generate presigned download URL for file.
 
         Uses the storage service to generate a time-limited URL.
@@ -203,7 +208,7 @@ class PresignedUploadResponse:
 
     upload_url: str = strawberry.field(description="URL to POST the file to")
     upload_fields: strawberry.scalars.JSON = strawberry.field(
-        description="Form fields to include in POST"
+        description="Form fields to include in POST",
     )
     file_id: strawberry.ID = strawberry.field(description="File ID to use after upload completes")
     storage_key: str = strawberry.field(description="Storage key where file will be stored")

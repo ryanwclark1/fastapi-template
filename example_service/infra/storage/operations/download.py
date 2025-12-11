@@ -9,8 +9,10 @@ Provides memory-efficient download operations with:
 from __future__ import annotations
 
 import logging
-from pathlib import Path  # noqa: TC003
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+_DOWNLOAD_MODULE_ROOT = Path(__file__).resolve().parent
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable

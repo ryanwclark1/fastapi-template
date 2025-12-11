@@ -151,7 +151,8 @@ def hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
     """
     match = HEX_COLOR_PATTERN.match(hex_color)
     if not match:
-        raise ValueError(f"Invalid hex color: {hex_color}")
+        msg = f"Invalid hex color: {hex_color}"
+        raise ValueError(msg)
 
     hex_digits = match.group(1)
 
@@ -173,7 +174,7 @@ def hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
 
 
 def rgb_to_ansi_16(rgb: tuple[int, int, int]) -> str:
-    """Convert RGB color to 16-color ANSI escape code.
+    r"""Convert RGB color to 16-color ANSI escape code.
 
     Finds the nearest color in the standard 16-color palette.
 
@@ -200,7 +201,7 @@ def rgb_to_ansi_16(rgb: tuple[int, int, int]) -> str:
 
 
 def rgb_to_ansi_256(rgb: tuple[int, int, int]) -> str:
-    """Convert RGB color to 256-color ANSI escape code.
+    r"""Convert RGB color to 256-color ANSI escape code.
 
     Finds the nearest color in the 256-color palette.
 
@@ -219,7 +220,7 @@ def rgb_to_ansi_256(rgb: tuple[int, int, int]) -> str:
 
 
 def rgb_to_ansi_truecolor(rgb: tuple[int, int, int]) -> str:
-    """Convert RGB color to 24-bit truecolor ANSI escape code.
+    r"""Convert RGB color to 24-bit truecolor ANSI escape code.
 
     Args:
         rgb: RGB tuple (r, g, b) with values 0-255.
@@ -245,7 +246,7 @@ def rgb_to_ansi(
     mode: ColorMode | None = None,
     stream: TextIO | None = None,
 ) -> str:
-    """Convert RGB color to ANSI escape code based on terminal capability.
+    r"""Convert RGB color to ANSI escape code based on terminal capability.
 
     Automatically detects terminal capabilities and uses the best available
     color mode. Falls back to simpler modes if needed.
@@ -281,7 +282,7 @@ def hex_to_ansi(
     mode: ColorMode | None = None,
     stream: TextIO | None = None,
 ) -> str:
-    """Convert hex color to ANSI escape code based on terminal capability.
+    r"""Convert hex color to ANSI escape code based on terminal capability.
 
     Automatically detects terminal capabilities and uses the best available
     color mode. Falls back to simpler modes if needed.
@@ -313,7 +314,7 @@ def hex_to_ansi(
 
 
 def rgb_to_ansi_bg_16(rgb: tuple[int, int, int]) -> str:
-    """Convert RGB color to 16-color ANSI background escape code.
+    r"""Convert RGB color to 16-color ANSI background escape code.
 
     Args:
         rgb: RGB tuple (r, g, b) with values 0-255.
@@ -329,7 +330,7 @@ def rgb_to_ansi_bg_16(rgb: tuple[int, int, int]) -> str:
 
 
 def rgb_to_ansi_bg_256(rgb: tuple[int, int, int]) -> str:
-    """Convert RGB color to 256-color ANSI background escape code.
+    r"""Convert RGB color to 256-color ANSI background escape code.
 
     Args:
         rgb: RGB tuple (r, g, b) with values 0-255.
@@ -342,7 +343,7 @@ def rgb_to_ansi_bg_256(rgb: tuple[int, int, int]) -> str:
 
 
 def rgb_to_ansi_bg_truecolor(rgb: tuple[int, int, int]) -> str:
-    """Convert RGB color to 24-bit truecolor ANSI background escape code.
+    r"""Convert RGB color to 24-bit truecolor ANSI background escape code.
 
     Args:
         rgb: RGB tuple (r, g, b) with values 0-255.

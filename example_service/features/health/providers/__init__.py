@@ -36,9 +36,9 @@ Example:
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 import time
+from typing import TYPE_CHECKING
 
 from example_service.core.schemas.common import HealthStatus
 from example_service.core.settings.health import ProviderConfig
@@ -65,6 +65,9 @@ from .redis import RedisHealthProvider
 from .s3 import S3StorageHealthProvider
 from .storage import StorageHealthProvider
 from .task_tracker import TaskTrackerHealthProvider
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 _STATUS_GAUGE_VALUES = {
     HealthStatus.HEALTHY: 1.0,
@@ -104,22 +107,22 @@ def record_health_check_result(
 __all__ = [
     # Protocol and base types
     "DEGRADED_LATENCY_THRESHOLD_MS",
-    "HealthCheckResult",
-    "HealthProvider",
-    "record_health_check_result",
-    "track_health_check",
-    "ProviderConfig",
-    # Core infrastructure providers
-    "DatabaseHealthProvider",
-    "RedisHealthProvider",
-    "RabbitMQHealthProvider",
-    "ExternalServiceHealthProvider",
-    "S3StorageHealthProvider",
-    "ConsulHealthProvider",
-    "DatabasePoolHealthProvider",
     # Application-specific providers
     "AccentAuthHealthProvider",
+    "ConsulHealthProvider",
+    # Core infrastructure providers
+    "DatabaseHealthProvider",
+    "DatabasePoolHealthProvider",
+    "ExternalServiceHealthProvider",
+    "HealthCheckResult",
+    "HealthProvider",
+    "ProviderConfig",
+    "RabbitMQHealthProvider",
     "RateLimiterHealthProvider",
+    "RedisHealthProvider",
+    "S3StorageHealthProvider",
     "StorageHealthProvider",
     "TaskTrackerHealthProvider",
+    "record_health_check_result",
+    "track_health_check",
 ]

@@ -186,6 +186,22 @@ class ConsulSettings(BaseSettings):
     # Validators
     # ──────────────────────────────────────────────────────────────
 
+    @field_validator("health_check_mode", mode="before")
+    @classmethod
+    def _normalize_health_check_mode(cls, value: Any) -> HealthCheckMode | Any:
+        """Allow enum names like 'HealthCheckMode.TTL' or raw strings."""
+        if isinstance(value, HealthCheckMode):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip()
+            if normalized.upper().startswith("HEALTHCHECKMODE."):
+                normalized = normalized.split(".", 1)[1]
+            try:
+                return HealthCheckMode(normalized.lower())
+            except ValueError:
+                return value
+        return value
+
     @model_validator(mode="after")
     def _validate_ttl_settings(self) -> ConsulSettings:
         """Ensure TTL heartbeat interval is less than TTL duration."""
@@ -193,9 +209,12 @@ class ConsulSettings(BaseSettings):
             self.health_check_mode == HealthCheckMode.TTL
             and self.ttl_heartbeat_interval >= self.ttl_seconds
         ):
-            raise ValueError(
+            msg = (
                 f"ttl_heartbeat_interval ({self.ttl_heartbeat_interval}s) must be "
                 f"less than ttl_seconds ({self.ttl_seconds}s) to avoid flapping"
+            )
+            raise ValueError(
+                msg,
             )
         return self
 
@@ -203,7 +222,7 @@ class ConsulSettings(BaseSettings):
     def _validate_http_settings(self) -> ConsulSettings:
         """Ensure HTTP check path starts with /."""
         if self.health_check_mode == HealthCheckMode.HTTP and not self.http_check_path.startswith(
-            "/"
+            "/",
         ):
             msg = "http_check_path must start with '/'"
             raise ValueError(msg)

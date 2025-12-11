@@ -151,7 +151,7 @@ class DLQMiddleware:
 
         # Check 1: Non-retryable exception (permanent failure)
         if is_non_retryable_exception(exc) or not self.config.should_retry_exception(
-            exc
+            exc,
         ):
             logger.warning(
                 "Non-retryable exception %s, routing to DLQ: %s",

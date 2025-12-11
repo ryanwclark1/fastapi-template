@@ -80,7 +80,7 @@ class OpenAIAdapter(ProviderAdapter):
         transcription_model: str = "whisper-1",
         timeout: int = 120,
         max_retries: int = 3,
-        **kwargs: Any,  # noqa: ARG002
+        **kwargs: Any,
     ) -> None:
         """Initialize OpenAI adapter.
 
@@ -90,6 +90,7 @@ class OpenAIAdapter(ProviderAdapter):
             transcription_model: Transcription model (whisper-1)
             timeout: Request timeout in seconds
             max_retries: Maximum retry attempts
+            **kwargs: Additional adapter-specific options.
         """
         self.api_key = api_key
         self.model_name = model_name

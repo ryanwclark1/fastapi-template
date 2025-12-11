@@ -305,7 +305,7 @@ class TestCreateOrUpdateConfig:
             smtp_port=465,
         )
 
-        result = await service.create_or_update_config("tenant-123", config_data)
+        await service.create_or_update_config("tenant-123", config_data)
 
         mock_config_repository.update_config.assert_awaited_once()
         mock_session.commit.assert_awaited_once()
@@ -556,7 +556,7 @@ class TestGetUsageStats:
             "total_cost_usd": 0.50,
         }
         mock_usage_repository.get_usage_by_provider.return_value = {
-            "smtp": {"count": 100, "cost": 0.50}
+            "smtp": {"count": 100, "cost": 0.50},
         }
 
         result = await service.get_usage_stats("tenant-123")
@@ -594,6 +594,34 @@ class TestGetUsageStats:
 
         assert result.tenant_id == "tenant-123"
         mock_usage_repository.get_usage_stats.assert_awaited_once()
+
+    def test_get_rate_limit_hits_happy_path(
+        self,
+        service: EmailConfigService,
+    ) -> None:
+        """Rate limit metrics aggregated per tenant."""
+        sample_for_tenant = MagicMock(labels={"tenant_id": "tenant-123"}, value=2)
+        sample_other = MagicMock(labels={"tenant_id": "tenant-456"}, value=4)
+        collection = MagicMock(samples=[sample_for_tenant, sample_other])
+
+        with patch(
+            "example_service.features.email.service.email_rate_limit_hits_total.collect",
+            return_value=[collection],
+        ):
+            result = service._get_rate_limit_hits("tenant-123")
+
+        assert result == 2
+
+    def test_get_rate_limit_hits_handles_errors(
+        self,
+        service: EmailConfigService,
+    ) -> None:
+        """Errors from Prometheus collection should be swallowed."""
+        with patch(
+            "example_service.features.email.service.email_rate_limit_hits_total.collect",
+            side_effect=RuntimeError("boom"),
+        ):
+            assert service._get_rate_limit_hits("tenant-123") == 0
 
 
 class TestGetAuditLogs:

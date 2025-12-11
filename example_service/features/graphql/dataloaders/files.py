@@ -103,7 +103,7 @@ class FileThumbnailDataLoader:
         """
         self._session = session
         self._loader: DataLoader[UUID, FileThumbnail | None] = DataLoader(
-            load_fn=self._batch_load_thumbnails
+            load_fn=self._batch_load_thumbnails,
         )
 
     async def _batch_load_thumbnails(
@@ -169,7 +169,7 @@ class FileThumbnailsByFileDataLoader:
         """
         self._session = session
         self._loader: DataLoader[UUID, list[FileThumbnail]] = DataLoader(
-            load_fn=self._batch_load_thumbnails_by_file
+            load_fn=self._batch_load_thumbnails_by_file,
         )
 
     async def _batch_load_thumbnails_by_file(

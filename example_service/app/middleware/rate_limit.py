@@ -250,7 +250,7 @@ class RateLimitMiddleware:
                     tracker.record_failure(str(e))
             except (ImportError, AttributeError, RuntimeError) as tracker_error:
                 logger.debug(
-                    "Failed to record rate limit failure", exc_info=tracker_error
+                    "Failed to record rate limit failure", exc_info=tracker_error,
                 )
 
             logger.exception(
@@ -300,6 +300,8 @@ class RateLimitMiddleware:
 
         Args:
             exc: RateLimitException instance.
+            scope: ASGI scope of the original request.
+            receive: ASGI receive callable.
             send: ASGI send callable.
         """
         metadata = exc.extra or {}

@@ -43,13 +43,12 @@ Authentication Dependencies (ACL-based using Accent-Auth):
 
     from example_service.core.dependencies.auth import (
         # Type aliases
-        CurrentActiveUser,
-        CurrentUser,
-        OptionalUser,
-        SuperUser,
+        AuthUserDep,          # Required authentication
+        OptionalAuthUser,     # Optional authentication
+        SuperuserDep,         # Superuser access only
         # Functions
-        get_current_user,
-        get_current_user_optional,
+        get_auth_user,
+        get_auth_user_optional,
         require_acl,
         require_any_acl,
         require_all_acls,
@@ -59,7 +58,7 @@ Authentication Dependencies (ACL-based using Accent-Auth):
 
     # Or import directly from accent_auth:
     from example_service.core.dependencies.accent_auth import (
-        get_current_user,
+        get_auth_user,
         require_acl,
         require_any_acl,
         require_all_acls,

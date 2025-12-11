@@ -11,6 +11,7 @@ Provides:
 
 from __future__ import annotations
 
+import contextlib
 from datetime import UTC, datetime, timedelta
 import logging
 from typing import TYPE_CHECKING, Annotated
@@ -52,10 +53,10 @@ logger = logging.getLogger(__name__)
 
 # Type aliases for annotated arguments
 FirstArg = Annotated[
-    int, strawberry.argument(description="Number of items to return (forward pagination)")
+    int, strawberry.argument(description="Number of items to return (forward pagination)"),
 ]
 AfterArg = Annotated[
-    str | None, strawberry.argument(description="Cursor to start after")
+    str | None, strawberry.argument(description="Cursor to start after"),
 ]
 
 
@@ -154,7 +155,7 @@ async def workflow_definitions_query(
                 or_(
                     AIWorkflowDefinition.name.ilike(search_pattern),
                     AIWorkflowDefinition.description.ilike(search_pattern),
-                )
+                ),
             )
 
     # Order by created_at desc
@@ -163,10 +164,8 @@ async def workflow_definitions_query(
     # Simple offset-based pagination using cursor
     offset = 0
     if after:
-        try:
+        with contextlib.suppress(ValueError):
             offset = int(after)
-        except ValueError:
-            pass
 
     stmt = stmt.offset(offset).limit(first + 1)
 
@@ -272,10 +271,8 @@ async def workflow_executions_query(
     # Simple offset-based pagination
     offset = 0
     if after:
-        try:
+        with contextlib.suppress(ValueError):
             offset = int(after)
-        except ValueError:
-            pass
 
     stmt = stmt.offset(offset).limit(first + 1)
 
@@ -375,10 +372,8 @@ async def workflow_approvals_query(
     # Simple offset-based pagination
     offset = 0
     if after:
-        try:
+        with contextlib.suppress(ValueError):
             offset = int(after)
-        except ValueError:
-            pass
 
     stmt = stmt.offset(offset).limit(first + 1)
 
@@ -429,12 +424,12 @@ async def pending_approvals_query(
     # Build query for pending, non-expired approvals
     stmt = (
         select(AIWorkflowApproval)
-        .where(AIWorkflowApproval.is_pending == True)  # noqa: E712
+        .where(AIWorkflowApproval.is_pending)
         .where(
             or_(
                 AIWorkflowApproval.expires_at.is_(None),
                 AIWorkflowApproval.expires_at > now,
-            )
+            ),
         )
     )
 
@@ -444,10 +439,8 @@ async def pending_approvals_query(
     # Simple offset-based pagination
     offset = 0
     if after:
-        try:
+        with contextlib.suppress(ValueError):
             offset = int(after)
-        except ValueError:
-            pass
 
     stmt = stmt.offset(offset).limit(first + 1)
 
@@ -496,8 +489,8 @@ async def workflow_stats_query(
     # Get definition count
     def_count_result = await ctx.session.execute(
         select(func.count(AIWorkflowDefinition.id)).where(
-            AIWorkflowDefinition.is_active == True  # noqa: E712
-        )
+            AIWorkflowDefinition.is_active,
+        ),
     )
     total_definitions = def_count_result.scalar() or 0
 
@@ -508,15 +501,15 @@ async def workflow_stats_query(
             func.count(AIWorkflowExecution.id).label("count"),
         )
         .where(AIWorkflowExecution.created_at >= since)
-        .group_by(AIWorkflowExecution.status)
+        .group_by(AIWorkflowExecution.status),
     )
     exec_counts = {row.status: row.count for row in exec_stats}
 
     # Get pending approvals count
     pending_result = await ctx.session.execute(
         select(func.count(AIWorkflowApproval.id)).where(
-            AIWorkflowApproval.is_pending == True  # noqa: E712
-        )
+            AIWorkflowApproval.is_pending,
+        ),
     )
     pending_approvals = pending_result.scalar() or 0
 
@@ -529,11 +522,11 @@ async def workflow_stats_query(
                 func.extract(
                     "epoch",
                     AIWorkflowExecution.completed_at - AIWorkflowExecution.started_at,
-                )
+                ),
             ).label("avg_duration"),
         )
         .where(AIWorkflowExecution.created_at >= since)
-        .where(AIWorkflowExecution.status == "completed")
+        .where(AIWorkflowExecution.status == "completed"),
     )
     usage = usage_stats.first()
 
@@ -548,7 +541,7 @@ async def workflow_stats_query(
             AIWorkflowExecution.definition_id == AIWorkflowDefinition.id,
         )
         .where(AIWorkflowExecution.created_at >= since)
-        .group_by(AIWorkflowDefinition.name)
+        .group_by(AIWorkflowDefinition.name),
     )
     executions_by_workflow = {row.name: row.count for row in workflow_stats}
 

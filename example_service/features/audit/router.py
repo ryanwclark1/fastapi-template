@@ -5,16 +5,16 @@ Provides endpoints for querying and retrieving audit logs.
 
 from __future__ import annotations
 
-from datetime import datetime  # noqa: TC003
+import datetime as dt
 from typing import TYPE_CHECKING, Annotated
-from uuid import UUID  # noqa: TC003
+import uuid
 
 from fastapi import APIRouter, Depends, Query
 
-from example_service.core.dependencies.accent_auth import get_current_user
+from example_service.core.dependencies.auth import AuthUserDep
 from example_service.core.dependencies.database import get_db_session
 from example_service.core.exceptions import NotFoundException
-from example_service.core.schemas.auth import AuthUser
+from example_service.utils.runtime_dependencies import require_runtime_dependency
 
 from .models import AuditAction
 from .schemas import (
@@ -30,7 +30,10 @@ from .service import AuditService
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+
 router = APIRouter(prefix="/audit", tags=["audit"])
+
+require_runtime_dependency(dt.datetime, uuid.UUID, AuthUserDep)
 
 
 @router.get(
@@ -41,7 +44,7 @@ router = APIRouter(prefix="/audit", tags=["audit"])
 )
 async def query_audit_logs(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
     entity_type: Annotated[str | None, Query(description="Filter by entity type")] = None,
     entity_id: Annotated[str | None, Query(description="Filter by entity ID")] = None,
     user_id: Annotated[str | None, Query(description="Filter by user who performed action")] = None,
@@ -49,8 +52,8 @@ async def query_audit_logs(
     action: Annotated[AuditAction | None, Query(description="Filter by action type")] = None,
     success: Annotated[bool | None, Query(description="Filter by success status")] = None,
     request_id: Annotated[str | None, Query(description="Filter by request ID")] = None,
-    start_time: Annotated[datetime | None, Query(description="Filter logs after this time")] = None,
-    end_time: Annotated[datetime | None, Query(description="Filter logs before this time")] = None,
+    start_time: Annotated[dt.datetime | None, Query(description="Filter logs after this time")] = None,
+    end_time: Annotated[dt.datetime | None, Query(description="Filter logs before this time")] = None,
     order_by: Annotated[str, Query(description="Field to order by")] = "timestamp",
     order_desc: Annotated[bool, Query(description="Order descending")] = True,
     limit: Annotated[int, Query(ge=1, le=1000, description="Maximum results")] = 50,
@@ -87,14 +90,15 @@ async def query_audit_logs(
     description="Retrieve a specific audit log entry by its ID.",
 )
 async def get_audit_log(
-    audit_id: UUID,
+    audit_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
 ) -> AuditLogResponse:
     """Get a specific audit log entry.
 
     Args:
         audit_id: The audit log ID.
+        session: Async database session.
 
     Returns:
         The audit log entry.
@@ -106,7 +110,8 @@ async def get_audit_log(
     audit_log = await service.get_by_id(audit_id)
 
     if audit_log is None:
-        raise NotFoundException(f"Audit log {audit_id} not found")
+        msg = f"Audit log {audit_id} not found"
+        raise NotFoundException(msg)
 
     return AuditLogResponse.model_validate(audit_log)
 
@@ -121,7 +126,7 @@ async def get_entity_history(
     entity_type: str,
     entity_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
     limit: Annotated[int, Query(ge=1, le=1000, description="Maximum entries")] = 100,
 ) -> EntityAuditHistory:
     """Get the complete audit trail for an entity.
@@ -132,6 +137,7 @@ async def get_entity_history(
     Args:
         entity_type: Type of entity (e.g., "reminder", "file").
         entity_id: ID of the entity.
+        session: Async database session.
         limit: Maximum number of entries to return.
 
     Returns:
@@ -149,10 +155,10 @@ async def get_entity_history(
 )
 async def get_audit_summary(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
     tenant_id: Annotated[str | None, Query(description="Filter by tenant")] = None,
-    start_time: Annotated[datetime | None, Query(description="Start of time range")] = None,
-    end_time: Annotated[datetime | None, Query(description="End of time range")] = None,
+    start_time: Annotated[dt.datetime | None, Query(description="Start of time range")] = None,
+    end_time: Annotated[dt.datetime | None, Query(description="End of time range")] = None,
 ) -> AuditSummary:
     """Get audit log summary statistics.
 
@@ -165,6 +171,7 @@ async def get_audit_summary(
     - Time range of logs
 
     Args:
+        session: Async database session.
         tenant_id: Optional tenant filter.
         start_time: Optional start time filter.
         end_time: Optional end time filter.
@@ -183,7 +190,7 @@ async def get_audit_summary(
     description="Get list of all available audit action types.",
 )
 async def list_audit_actions(
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
 ) -> list[str]:
     """Get list of all audit action types.
 
@@ -202,9 +209,9 @@ async def list_audit_actions(
 async def get_user_activity(
     user_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
-    start_time: Annotated[datetime | None, Query(description="Start of time range")] = None,
-    end_time: Annotated[datetime | None, Query(description="End of time range")] = None,
+    _user: AuthUserDep,
+    start_time: Annotated[dt.datetime | None, Query(description="Start of time range")] = None,
+    end_time: Annotated[dt.datetime | None, Query(description="End of time range")] = None,
     limit: Annotated[int, Query(ge=1, le=1000, description="Maximum results")] = 50,
     offset: Annotated[int, Query(ge=0, description="Number of results to skip")] = 0,
 ) -> AuditLogListResponse:
@@ -214,6 +221,7 @@ async def get_user_activity(
 
     Args:
         user_id: ID of the user.
+        session: Async database session.
         start_time: Optional start time filter.
         end_time: Optional end time filter.
         limit: Maximum number of results.
@@ -242,10 +250,10 @@ async def get_user_activity(
 )
 async def list_dangerous_actions(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
     tenant_id: Annotated[str | None, Query(description="Filter by tenant")] = None,
-    start_time: Annotated[datetime | None, Query(description="Start of time range")] = None,
-    end_time: Annotated[datetime | None, Query(description="End of time range")] = None,
+    start_time: Annotated[dt.datetime | None, Query(description="Start of time range")] = None,
+    end_time: Annotated[dt.datetime | None, Query(description="End of time range")] = None,
     limit: Annotated[int, Query(ge=1, le=1000, description="Maximum results")] = 50,
     offset: Annotated[int, Query(ge=0, description="Number of results to skip")] = 0,
 ) -> DangerousActionsResponse:
@@ -260,6 +268,7 @@ async def list_dangerous_actions(
     Use this endpoint for security audits and compliance reviews.
 
     Args:
+        session: Async database session.
         tenant_id: Optional tenant filter.
         start_time: Optional start time filter.
         end_time: Optional end time filter.

@@ -35,7 +35,7 @@ class TrackerStub:
                 "task_name": "demo",
                 "started_at": "2024-01-01T00:00:00Z",
                 "running_for_ms": 10,
-            }
+            },
         ]
 
     async def get_stats(self, hours: int = 24):
@@ -175,7 +175,7 @@ async def test_get_dlq_entries_returns_entries(monkeypatch: pytest.MonkeyPatch) 
             "retry_count": "3",
             "failed_at": "2024-01-01T00:00:00Z",
             "status": "pending",
-        }
+        },
     ])
     monkeypatch.setattr(task_service, "get_dlq_middleware", lambda: dlq_stub)
     service = task_service.TaskManagementService(tracker=TrackerStub())
@@ -203,7 +203,7 @@ async def test_get_dlq_entry_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_discard_dlq_task_success(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test discarding a DLQ task."""
     dlq_stub = DLQMiddlewareStub(entries=[
-        {"task_id": "dlq-1", "task_name": "test", "status": "pending"}
+        {"task_id": "dlq-1", "task_name": "test", "status": "pending"},
     ])
     monkeypatch.setattr(task_service, "get_dlq_middleware", lambda: dlq_stub)
     service = task_service.TaskManagementService(tracker=TrackerStub())

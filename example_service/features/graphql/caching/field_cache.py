@@ -22,7 +22,7 @@ import hashlib
 import logging
 from typing import TYPE_CHECKING, Any
 
-from example_service.core.cache import get_cache_instance
+from example_service.infra.cache import get_cache_instance
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -160,7 +160,7 @@ def cached_field(
 
             except Exception as e:
                 # Don't fail the field resolution if caching has issues
-                logger.error(
+                logger.exception(
                     "Field cache error",
                     extra={
                         "error": str(e),
@@ -191,7 +191,7 @@ def invalidate_field_cache(cache_key: str) -> None:
             cache.delete(cache_key)
             logger.debug("Field cache invalidated", extra={"cache_key": cache_key})
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Field cache invalidation failed",
                 extra={"error": str(e), "cache_key": cache_key},
             )

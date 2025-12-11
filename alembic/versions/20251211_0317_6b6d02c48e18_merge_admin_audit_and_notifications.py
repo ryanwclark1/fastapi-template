@@ -1,8 +1,8 @@
-"""all tables
+"""merge admin audit and notifications
 
-Revision ID: 10527cfd05ed
-Revises: 43c3ce68c327
-Create Date: 2025-12-10 17:49:05.286356+00:00
+Revision ID: 6b6d02c48e18
+Revises: add_admin_audit_table, ba51709f4161
+Create Date: 2025-12-11 03:17:05.021405+00:00
 
 """
 from __future__ import annotations
@@ -14,8 +14,8 @@ from alembic import op
 
 
 # revision identifiers, used by Alembic.
-revision: str = '10527cfd05ed'
-down_revision: str | None = '43c3ce68c327'
+revision: str = '6b6d02c48e18'
+down_revision: str | None = ('add_admin_audit_table', 'ba51709f4161')
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

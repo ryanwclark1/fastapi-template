@@ -213,7 +213,8 @@ class ExperimentManager:
         """
         # Ensure at least 2 variants
         if len(variants) < 2:
-            raise ValueError("Experiment must have at least 2 variants")
+            msg = "Experiment must have at least 2 variants"
+            raise ValueError(msg)
 
         # Ensure "control" variant exists
         if "control" not in variants:
@@ -506,7 +507,7 @@ class ExperimentManager:
         if traffic_percentage >= 100.0:
             return True
 
-        hash_value = int(hashlib.md5(user_id.encode()).hexdigest()[:8], 16)  # noqa: S324
+        hash_value = int(hashlib.sha256(user_id.encode()).hexdigest()[:8], 16)
         bucket = (hash_value % 100) + 1
         return bucket <= traffic_percentage
 
@@ -519,7 +520,7 @@ class ExperimentManager:
         """Deterministically assign user to a variant."""
         # Use hash for consistent assignment
         key = f"{experiment_name}:{user_id}"
-        hash_value = int(hashlib.md5(key.encode()).hexdigest()[:8], 16)  # noqa: S324
+        hash_value = int(hashlib.sha256(key.encode()).hexdigest()[:8], 16)
         index = hash_value % len(variants)
         return variants[index]
 
@@ -552,9 +553,8 @@ class ExperimentManager:
 
         # Approximate p-value using normal distribution
         # Using simplified approximation
-        p_value = 2 * (1 - self._normal_cdf(z))
+        return 2 * (1 - self._normal_cdf(z))
 
-        return p_value
 
     def _normal_cdf(self, x: float) -> float:
         """Approximate normal CDF."""

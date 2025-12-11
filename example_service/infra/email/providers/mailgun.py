@@ -89,7 +89,7 @@ class MailgunProvider(BaseEmailProvider):
                 '{"domain": "mail.example.com"}'
             )
             raise ValueError(
-                msg
+                msg,
             )
 
         self._api_key = config.api_key
@@ -217,7 +217,7 @@ class MailgunProvider(BaseEmailProvider):
                                         content,
                                         attachment.content_type or "application/octet-stream",
                                     ),
-                                )
+                                ),
                             )
 
                 response = await client.post(
@@ -247,9 +247,11 @@ class MailgunProvider(BaseEmailProvider):
             try:
                 error_json = response.json()
                 error_body = error_json.get("message", error_body)
-            except Exception:  # noqa: S110
-                # Ignore JSON parsing errors, use default error_body
-                pass
+            except Exception as exc:  # pragma: no cover - best-effort logging
+                logger.debug(
+                    "Failed to parse Mailgun error response as JSON",
+                    exc_info=exc,
+                )
 
             error_code = self._classify_http_error(response.status_code)
 

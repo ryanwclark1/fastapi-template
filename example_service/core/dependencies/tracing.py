@@ -23,10 +23,15 @@ Usage:
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import Annotated
 
 from fastapi import Depends
 from opentelemetry.trace import Tracer
+
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(Awaitable, Callable)
 
 
 def get_tracer_dep(name: str = "example_service") -> Tracer:
@@ -56,7 +61,7 @@ def get_default_tracer() -> Tracer:
     return get_tracer_dep()
 
 
-def tracer_factory(name: str):
+def tracer_factory(name: str) -> Callable[[], Tracer]:
     """Factory for creating named tracer dependencies.
 
     Use this to create module-specific tracers with custom names.
@@ -96,7 +101,9 @@ Example:
 """
 
 
-def add_span_attributes_dep(**attributes: str | float | bool):
+def add_span_attributes_dep(
+    **attributes: str | float | bool,
+) -> Callable[[], Awaitable[None]]:
     """Factory for adding attributes to the current span.
 
     This creates a dependency that adds the specified attributes
@@ -125,7 +132,10 @@ def add_span_attributes_dep(**attributes: str | float | bool):
     return add_attributes
 
 
-def add_span_event_dep(name: str, **attributes: str | float | bool):
+def add_span_event_dep(
+    name: str,
+    **attributes: str | float | bool,
+) -> Callable[[], Awaitable[None]]:
     """Factory for adding an event to the current span.
 
     This creates a dependency that adds a named event with optional

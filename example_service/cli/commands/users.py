@@ -88,10 +88,10 @@ async def list_users(active_only: bool, superusers: bool, limit: int, output_for
             stmt = select(User).limit(limit)
 
             if active_only:
-                stmt = stmt.where(User.is_active == True)  # noqa: E712
+                stmt = stmt.where(User.is_active)
 
             if superusers:
-                stmt = stmt.where(User.is_superuser == True)  # noqa: E712
+                stmt = stmt.where(User.is_superuser)
 
             result = await session.execute(stmt)
             users_list = result.scalars().all()
@@ -132,7 +132,7 @@ async def list_users(active_only: bool, superusers: bool, limit: int, output_for
                 superuser = click.style("Yes", fg="cyan") if user.is_superuser else "No"
 
                 click.echo(
-                    f"{user.id:<6} {user.username:<20} {user.email:<35} {active:<17} {superuser:<8}"
+                    f"{user.id:<6} {user.username:<20} {user.email:<35} {active:<17} {superuser:<8}",
                 )
 
             click.echo()
@@ -171,7 +171,7 @@ async def create_user(email: str, username: str, full_name: str | None, password
         async with get_async_session() as session:
             # Check if user exists
             existing = await session.execute(
-                select(User).where((User.email == email) | (User.username == username))
+                select(User).where((User.email == email) | (User.username == username)),
             )
             if existing.scalar_one_or_none():
                 error("A user with this email or username already exists")
@@ -226,7 +226,7 @@ async def create_superuser(email: str, username: str, full_name: str | None, pas
         async with get_async_session() as session:
             # Check if user exists
             existing = await session.execute(
-                select(User).where((User.email == email) | (User.username == username))
+                select(User).where((User.email == email) | (User.username == username)),
             )
             if existing.scalar_one_or_none():
                 error("A user with this email or username already exists")
@@ -284,7 +284,7 @@ async def deactivate_user(identifier: str) -> None:
                 stmt = select(User).where(User.id == user_id)
             except ValueError:
                 stmt = select(User).where(
-                    (User.email == identifier) | (User.username == identifier)
+                    (User.email == identifier) | (User.username == identifier),
                 )
 
             result = await session.execute(stmt)
@@ -332,7 +332,7 @@ async def activate_user(identifier: str) -> None:
                 stmt = select(User).where(User.id == user_id)
             except ValueError:
                 stmt = select(User).where(
-                    (User.email == identifier) | (User.username == identifier)
+                    (User.email == identifier) | (User.username == identifier),
                 )
 
             result = await session.execute(stmt)
@@ -387,7 +387,7 @@ async def reset_password(identifier: str, password: str) -> None:
                 stmt = select(User).where(User.id == user_id)
             except ValueError:
                 stmt = select(User).where(
-                    (User.email == identifier) | (User.username == identifier)
+                    (User.email == identifier) | (User.username == identifier),
                 )
 
             result = await session.execute(stmt)
@@ -435,7 +435,7 @@ async def promote_to_superuser(identifier: str) -> None:
                 stmt = select(User).where(User.id == user_id)
             except ValueError:
                 stmt = select(User).where(
-                    (User.email == identifier) | (User.username == identifier)
+                    (User.email == identifier) | (User.username == identifier),
                 )
 
             result = await session.execute(stmt)
@@ -487,7 +487,7 @@ async def demote_from_superuser(identifier: str) -> None:
                 stmt = select(User).where(User.id == user_id)
             except ValueError:
                 stmt = select(User).where(
-                    (User.email == identifier) | (User.username == identifier)
+                    (User.email == identifier) | (User.username == identifier),
                 )
 
             result = await session.execute(stmt)
@@ -533,7 +533,7 @@ async def show_user(identifier: str) -> None:
                 stmt = select(User).where(User.id == user_id)
             except ValueError:
                 stmt = select(User).where(
-                    (User.email == identifier) | (User.username == identifier)
+                    (User.email == identifier) | (User.username == identifier),
                 )
 
             result = await session.execute(stmt)

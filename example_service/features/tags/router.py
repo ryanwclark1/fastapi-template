@@ -216,7 +216,7 @@ async def get_tag_reminders(
     stmt = select(Reminder).join(reminder_tags).where(reminder_tags.c.tag_id == tag_id)
 
     if not include_completed:
-        stmt = stmt.where(Reminder.is_completed == False)  # noqa: E712
+        stmt = stmt.where(not Reminder.is_completed)
 
     stmt = stmt.order_by(Reminder.created_at.desc())
 
@@ -247,7 +247,7 @@ async def get_reminder_tags(
 ) -> list[TagResponse]:
     """Get all tags for a specific reminder."""
     result = await session.execute(
-        select(Reminder).options(selectinload(Reminder.tags)).where(Reminder.id == reminder_id)
+        select(Reminder).options(selectinload(Reminder.tags)).where(Reminder.id == reminder_id),
     )
     reminder = result.scalar_one_or_none()
 
@@ -272,7 +272,7 @@ async def set_reminder_tags(
 ) -> list[TagResponse]:
     """Set (replace) all tags for a reminder."""
     result = await session.execute(
-        select(Reminder).options(selectinload(Reminder.tags)).where(Reminder.id == reminder_id)
+        select(Reminder).options(selectinload(Reminder.tags)).where(Reminder.id == reminder_id),
     )
     reminder = result.scalar_one_or_none()
 
@@ -317,7 +317,7 @@ async def add_reminder_tags(
 ) -> list[TagResponse]:
     """Add tags to a reminder."""
     result = await session.execute(
-        select(Reminder).options(selectinload(Reminder.tags)).where(Reminder.id == reminder_id)
+        select(Reminder).options(selectinload(Reminder.tags)).where(Reminder.id == reminder_id),
     )
     reminder = result.scalar_one_or_none()
 
@@ -355,7 +355,7 @@ async def remove_reminder_tags(
 ) -> list[TagResponse]:
     """Remove tags from a reminder."""
     result = await session.execute(
-        select(Reminder).options(selectinload(Reminder.tags)).where(Reminder.id == reminder_id)
+        select(Reminder).options(selectinload(Reminder.tags)).where(Reminder.id == reminder_id),
     )
     reminder = result.scalar_one_or_none()
 

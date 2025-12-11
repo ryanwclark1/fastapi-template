@@ -140,7 +140,7 @@ def validate() -> None:
         click.echo("\n🗄️  Database Configuration:")
         try:
             info(
-                f"  Database URL: {settings.db.host}:{settings.db.port}/{settings.db.name}"
+                f"  Database URL: {settings.db.host}:{settings.db.port}/{settings.db.name}",
             )
             success("  ✓ Database settings valid")
         except Exception as e:
@@ -230,7 +230,6 @@ def _extract_defaults_from_settings() -> dict[str, tuple[str, str]]:
     from example_service.core.settings.i18n import I18nSettings
     from example_service.core.settings.jobs import JobSettings
     from example_service.core.settings.logs import LoggingSettings
-    from example_service.core.settings.mock import MockModeSettings
     from example_service.core.settings.otel import OtelSettings
     from example_service.core.settings.pagination import PaginationSettings
     from example_service.core.settings.postgres import PostgresSettings
@@ -256,7 +255,6 @@ def _extract_defaults_from_settings() -> dict[str, tuple[str, str]]:
         StorageSettings,
         TaskSettings,
         PaginationSettings,
-        MockModeSettings,
         AISettings,
         EmailSettings,
         GraphQLSettings,
@@ -275,10 +273,10 @@ def _extract_defaults_from_settings() -> dict[str, tuple[str, str]]:
             continue
 
         # Get env_prefix from model_config
-        prefix = model_config.get("env_prefix", "")  # type: ignore[union-attr]
+        prefix = model_config.get("env_prefix", "")
         if not prefix:
             warning(
-                f"No env_prefix found in {settings_cls.__name__}.model_config, skipping"
+                f"No env_prefix found in {settings_cls.__name__}.model_config, skipping",
             )
             continue
 
@@ -304,7 +302,7 @@ def _extract_defaults_from_settings() -> dict[str, tuple[str, str]]:
                     try:
                         # Type narrowing: default_factory is Callable[[], Any] when not None
                         factory = cast(
-                            "Callable[[], object]", field_info.default_factory
+                            "Callable[[], object]", field_info.default_factory,
                         )
                         default_val = factory()
                     except Exception as e:
@@ -371,7 +369,7 @@ def generate_env(output: str, overwrite: bool) -> None:
 
         # Helper to add a section
         def add_section(
-            title: str, prefix: str, header_comments: list[str] | None = None
+            title: str, prefix: str, header_comments: list[str] | None = None,
         ) -> None:
             lines.append("# " + "=" * 76)
             lines.append(f"# {title}")
@@ -379,8 +377,7 @@ def generate_env(output: str, overwrite: bool) -> None:
 
             # Add header comments if provided
             if header_comments:
-                for comment in header_comments:
-                    lines.append(f"# {comment}")
+                lines.extend(f"# {comment}" for comment in header_comments)
                 lines.append("")
 
             # Get all env vars with this prefix
@@ -481,7 +478,7 @@ def generate_env_with_defaults(output: str, overwrite: bool) -> None:
 
         # Helper to add a section
         def add_section(
-            title: str, prefix: str, header_comments: list[str] | None = None
+            title: str, prefix: str, header_comments: list[str] | None = None,
         ) -> None:
             lines.append("# " + "=" * 76)
             lines.append(f"# {title}")
@@ -489,8 +486,7 @@ def generate_env_with_defaults(output: str, overwrite: bool) -> None:
 
             # Add header comments if provided
             if header_comments:
-                for comment in header_comments:
-                    lines.append(f"# {comment}")
+                lines.extend(f"# {comment}" for comment in header_comments)
                 lines.append("")
 
             # Get all env vars with this prefix
@@ -572,7 +568,7 @@ def get(key: str) -> None:
         # Handle SecretStr
         if hasattr(value, "get_secret_value"):
             warning(
-                "This is a secret value. Use 'config show --show-secrets' to view it."
+                "This is a secret value. Use 'config show --show-secrets' to view it.",
             )
             click.echo("***")
         else:
@@ -677,12 +673,14 @@ def show_env(show_all: bool, filter_prefix: str | None) -> None:
         # Show expected variables by category
         for category, variables in expected_vars.items():
             if filter_prefix:
-                variables = [v for v in variables if v.startswith(filter_prefix)]
-                if not variables:
+                filtered_vars = [v for v in variables if v.startswith(filter_prefix)]
+                if not filtered_vars:
                     continue
+            else:
+                filtered_vars = variables[:]
 
             section(category)
-            for var in variables:
+            for var in filtered_vars:
                 value = os.environ.get(var) or ""
                 if value:
                     set_count += 1
@@ -694,7 +692,7 @@ def show_env(show_all: bool, filter_prefix: str | None) -> None:
                     else:
                         display_value = value[:40] + ("..." if len(value) > 40 else "")
                     click.echo(
-                        f"  {click.style('OK', fg='green')} {var}={display_value}"
+                        f"  {click.style('OK', fg='green')} {var}={display_value}",
                     )
                 else:
                     unset_count += 1
@@ -759,7 +757,7 @@ def check_env() -> None:
         section("Database Configuration")
         click.echo(f"  {click.style('OK', fg='green')} DATABASE_URL (using URL format)")
         click.echo(
-            f"  {click.style('INFO', fg='blue')} Individual DB_* variables are optional when DATABASE_URL is set"
+            f"  {click.style('INFO', fg='blue')} Individual DB_* variables are optional when DATABASE_URL is set",
         )
 
     section("Required Variables")
@@ -778,11 +776,11 @@ def check_env() -> None:
             value = os.environ.get(var)
             if value:
                 click.echo(
-                    f"  {click.style('SET', fg='yellow')} {var} (ignored, DATABASE_URL is used)"
+                    f"  {click.style('SET', fg='yellow')} {var} (ignored, DATABASE_URL is used)",
                 )
             else:
                 click.echo(
-                    f"  {click.style('--', fg='white', dim=True)} {var} (not needed)"
+                    f"  {click.style('--', fg='white', dim=True)} {var} (not needed)",
                 )
 
     section("Recommended Variables")
@@ -792,7 +790,7 @@ def check_env() -> None:
             click.echo(f"  {click.style('OK', fg='green')} {var}")
         else:
             click.echo(
-                f"  {click.style('DEFAULT', fg='yellow')} {var} - not set (using default)"
+                f"  {click.style('DEFAULT', fg='yellow')} {var} - not set (using default)",
             )
             warnings_list.append(var)
 
@@ -803,12 +801,12 @@ def check_env() -> None:
     secret_key = os.environ.get("AUTH_SECRET_KEY", "")
     if secret_key and len(secret_key) < 32:
         click.echo(
-            f"  {click.style('WARN', fg='yellow')} AUTH_SECRET_KEY is short ({len(secret_key)} chars, recommend 32+)"
+            f"  {click.style('WARN', fg='yellow')} AUTH_SECRET_KEY is short ({len(secret_key)} chars, recommend 32+)",
         )
         warnings_list.append("AUTH_SECRET_KEY_LENGTH")
     elif secret_key:
         click.echo(
-            f"  {click.style('OK', fg='green')} AUTH_SECRET_KEY length OK ({len(secret_key)} chars)"
+            f"  {click.style('OK', fg='green')} AUTH_SECRET_KEY length OK ({len(secret_key)} chars)",
         )
 
     # Check environment value
@@ -817,12 +815,12 @@ def check_env() -> None:
         debug = os.environ.get("APP_DEBUG", "false").lower()
         if debug == "true":
             click.echo(
-                f"  {click.style('WARN', fg='yellow')} APP_DEBUG=true in production environment"
+                f"  {click.style('WARN', fg='yellow')} APP_DEBUG=true in production environment",
             )
             warnings_list.append("DEBUG_IN_PROD")
         else:
             click.echo(
-                f"  {click.style('OK', fg='green')} Debug disabled in production"
+                f"  {click.style('OK', fg='green')} Debug disabled in production",
             )
 
     # Summary
@@ -867,7 +865,7 @@ def show_sources() -> None:
     # Show current environment
     section("Active Environment")
     click.echo(
-        f"  APP_ENVIRONMENT: {os.environ.get('APP_ENVIRONMENT', 'development (default)')}"
+        f"  APP_ENVIRONMENT: {os.environ.get('APP_ENVIRONMENT', 'development (default)')}",
     )
 
     # Show configuration loading order
@@ -886,8 +884,8 @@ def show_sources() -> None:
             try:
                 with open(env_file) as f:
                     lines = f.readlines()[:5]  # First 5 lines
-                    for line in lines:
-                        line = line.strip()
+                    for raw_line in lines:
+                        line = raw_line.strip()
                         if line and not line.startswith("#") and "=" in line:
                             key = line.split("=")[0]
                             if any(
@@ -897,7 +895,7 @@ def show_sources() -> None:
                                 click.echo(f"    {key}=***")
                             else:
                                 click.echo(
-                                    f"    {line[:60]}{'...' if len(line) > 60 else ''}"
+                                    f"    {line[:60]}{'...' if len(line) > 60 else ''}",
                                 )
             except Exception as e:
                 click.echo(f"    (Error reading file: {e})")
@@ -958,7 +956,7 @@ def show_diff(output_format: str) -> None:
                     "same": same,
                 },
                 indent=2,
-            )
+            ),
         )
         return
 

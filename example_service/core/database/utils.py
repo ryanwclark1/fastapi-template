@@ -149,7 +149,8 @@ def parse_uuid(value: str | uuid.UUID | bytes) -> uuid.UUID:
     if isinstance(value, bytes):
         if len(value) == 16:
             return uuid.UUID(bytes=value)
-        raise ValueError(f"Invalid UUID bytes length: {len(value)}")
+        msg = f"Invalid UUID bytes length: {len(value)}"
+        raise ValueError(msg)
 
     # String handling
     value = value.strip()
@@ -174,7 +175,8 @@ def parse_uuid(value: str | uuid.UUID | bytes) -> uuid.UUID:
             # Log expected parsing errors at debug level, will raise ValueError below
             logger.debug("Failed to parse UUID from base64 format: %s", e, exc_info=True)
 
-    raise ValueError(f"Cannot parse UUID from: {value!r}")
+    msg = f"Cannot parse UUID from: {value!r}"
+    raise ValueError(msg)
 
 
 def uuid_to_timestamp(uid: uuid.UUID) -> datetime | None:

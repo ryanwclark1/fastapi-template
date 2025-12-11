@@ -10,7 +10,7 @@ Provides integration with the accent-redaction microservice for:
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Self
 
 import httpx
 
@@ -45,7 +45,7 @@ class AccentRedactionProvider:
         confidence_threshold: float = 0.7,
         redaction_method: str = "mask",
         timeout: int = 60,
-        **kwargs: Any,  # noqa: ARG002
+        **kwargs: Any,
     ) -> None:
         """Initialize accent-redaction client.
 
@@ -87,7 +87,7 @@ class AccentRedactionProvider:
         text: str,
         entity_types: list[str] | None = None,
         confidence_threshold: float | None = None,
-        **kwargs: Any,  # noqa: ARG002
+        **kwargs: Any,
     ) -> list[PIIEntity]:
         """Detect PII entities in text.
 
@@ -122,30 +122,29 @@ class AccentRedactionProvider:
             data = response.json()
 
             # Parse entities
-            entities = []
-            for entity_data in data.get("pii_entities", []):
-                entities.append(
-                    PIIEntity(
-                        type=entity_data["type"],
-                        text=entity_data["text"],
-                        start=entity_data["start"],
-                        end=entity_data["end"],
-                        score=entity_data["score"],
-                    )
+            return [
+                PIIEntity(
+                    type=entity_data["type"],
+                    text=entity_data["text"],
+                    start=entity_data["start"],
+                    end=entity_data["end"],
+                    score=entity_data["score"],
                 )
-
-            return entities
+                for entity_data in data.get("pii_entities", [])
+            ]
 
         except httpx.HTTPStatusError as e:
+            msg = f"PII detection failed with status {e.response.status_code}: {e.response.text}"
             raise ProviderError(
-                f"PII detection failed with status {e.response.status_code}: {e.response.text}",
+                msg,
                 provider="accent_redaction",
                 operation="pii_detection",
                 original_error=e,
             ) from e
         except Exception as e:
+            msg = f"PII detection failed: {e}"
             raise ProviderError(
-                f"PII detection failed: {e}",
+                msg,
                 provider="accent_redaction",
                 operation="pii_detection",
                 original_error=e,
@@ -156,7 +155,7 @@ class AccentRedactionProvider:
         text: str,
         entity_types: list[str] | None = None,
         redaction_method: str | None = None,
-        **kwargs: Any,  # noqa: ARG002
+        **kwargs: Any,
     ) -> PIIRedactionResult:
         """Detect and redact PII in text.
 
@@ -192,18 +191,17 @@ class AccentRedactionProvider:
             data = response.json()
 
             # Parse entities
-            entities = []
-            for entity_data in data.get("pii_entities", []):
-                entities.append(
-                    PIIEntity(
-                        type=entity_data["type"],
-                        text=entity_data["text"],
-                        start=entity_data["start"],
-                        end=entity_data["end"],
-                        score=entity_data["score"],
-                        anonymized_text=entity_data.get("anonymized_text"),
-                    )
+            entities = [
+                PIIEntity(
+                    type=entity_data["type"],
+                    text=entity_data["text"],
+                    start=entity_data["start"],
+                    end=entity_data["end"],
+                    score=entity_data["score"],
+                    anonymized_text=entity_data.get("anonymized_text"),
                 )
+                for entity_data in data.get("pii_entities", [])
+            ]
 
             # Build redaction map
             redaction_map = {}
@@ -223,15 +221,17 @@ class AccentRedactionProvider:
             )
 
         except httpx.HTTPStatusError as e:
+            msg = f"PII redaction failed with status {e.response.status_code}: {e.response.text}"
             raise ProviderError(
-                f"PII redaction failed with status {e.response.status_code}: {e.response.text}",
+                msg,
                 provider="accent_redaction",
                 operation="pii_redaction",
                 original_error=e,
             ) from e
         except Exception as e:
+            msg = f"PII redaction failed: {e}"
             raise ProviderError(
-                f"PII redaction failed: {e}",
+                msg,
                 provider="accent_redaction",
                 operation="pii_redaction",
                 original_error=e,
@@ -241,7 +241,7 @@ class AccentRedactionProvider:
         self,
         segments: list[dict[str, Any]],
         entity_types: list[str] | None = None,
-        **kwargs: Any,  # noqa: ARG002
+        **kwargs: Any,
     ) -> PIIRedactionResult:
         """Redact PII in transcript segments.
 
@@ -276,18 +276,17 @@ class AccentRedactionProvider:
             data = response.json()
 
             # Parse entities
-            entities = []
-            for entity_data in data.get("pii_entities", []):
-                entities.append(
-                    PIIEntity(
-                        type=entity_data["type"],
-                        text=entity_data["text"],
-                        start=entity_data["start"],
-                        end=entity_data["end"],
-                        score=entity_data["score"],
-                        anonymized_text=entity_data.get("anonymized_text"),
-                    )
+            entities = [
+                PIIEntity(
+                    type=entity_data["type"],
+                    text=entity_data["text"],
+                    start=entity_data["start"],
+                    end=entity_data["end"],
+                    score=entity_data["score"],
+                    anonymized_text=entity_data.get("anonymized_text"),
                 )
+                for entity_data in data.get("pii_entities", [])
+            ]
 
             # Get redacted text (combined from segments)
             redacted_text = data.get("anonymized_text", "")
@@ -308,15 +307,17 @@ class AccentRedactionProvider:
             )
 
         except httpx.HTTPStatusError as e:
+            msg = f"Transcript redaction failed with status {e.response.status_code}: {e.response.text}"
             raise ProviderError(
-                f"Transcript redaction failed with status {e.response.status_code}: {e.response.text}",
+                msg,
                 provider="accent_redaction",
                 operation="transcript_redaction",
                 original_error=e,
             ) from e
         except Exception as e:
+            msg = f"Transcript redaction failed: {e}"
             raise ProviderError(
-                f"Transcript redaction failed: {e}",
+                msg,
                 provider="accent_redaction",
                 operation="transcript_redaction",
                 original_error=e,
@@ -351,7 +352,7 @@ class AccentRedactionProvider:
         """Close HTTP client."""
         await self.client.aclose()
 
-    async def __aenter__(self) -> AccentRedactionProvider:
+    async def __aenter__(self) -> Self:
         """Async context manager entry."""
         return self
 

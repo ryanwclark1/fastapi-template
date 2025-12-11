@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 # Context variable for storing tenant information
 _tenant_context: ContextVar[TenantContext | None] = ContextVar(
-    "tenant_context", default=None
+    "tenant_context", default=None,
 )
 
 

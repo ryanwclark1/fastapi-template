@@ -148,7 +148,7 @@ class DebugMiddleware(BaseHTTPMiddleware):
             )
 
     async def dispatch(
-        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         """Process request with debug context and logging.
 
@@ -306,7 +306,7 @@ class DebugMiddleware(BaseHTTPMiddleware):
         return uuid.uuid4().hex[:8]
 
     def _build_request_context(
-        self, request: Request, trace_id: str, span_id: str
+        self, request: Request, trace_id: str, span_id: str,
     ) -> dict[str, Any]:
         """Build structured context for logging.
 

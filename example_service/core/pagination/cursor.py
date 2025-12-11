@@ -105,7 +105,8 @@ class CursorCodec:
                 direction=payload.get("d", "forward"),
             )
         except Exception as e:
-            raise ValueError(f"Invalid cursor: {e}") from e
+            msg = f"Invalid cursor: {e}"
+            raise ValueError(msg) from e
 
     @staticmethod
     def _serialize_values(values: dict[str, Any]) -> dict[str, Any]:

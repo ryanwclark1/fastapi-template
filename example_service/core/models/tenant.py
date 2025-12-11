@@ -6,6 +6,7 @@ as needed for your specific use case.
 
 from __future__ import annotations
 
+from contextlib import suppress
 from typing import TYPE_CHECKING
 
 from sqlalchemy import String
@@ -88,12 +89,10 @@ class Tenant(Base, TimestampMixin):
     )
 
     def __repr__(self) -> str:
+        """Return a concise representation for debugging."""
         return f"<Tenant(id={self.id}, name={self.name})>"
 
 
 # Ensure workflow models are imported so relationship strings resolve at runtime
-try:
+with suppress(ImportError):
     import example_service.infra.ai.agents.workflow_models  # noqa: F401
-except ImportError:
-    # Workflow models are optional depending on feature flags; ignore if unavailable
-    pass

@@ -8,7 +8,6 @@ without requiring the full email stack to be installed.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
@@ -68,7 +67,8 @@ def __getattr__(name: str) -> Any:
     """Lazily import feature components when accessed."""
     module_path = _ATTR_TO_MODULE.get(name)
     if module_path is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+        msg = f"module {__name__!r} has no attribute {name!r}"
+        raise AttributeError(msg)
 
     module = import_module(module_path)
     value = getattr(module, name)

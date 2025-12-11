@@ -586,5 +586,5 @@ async def track_dependency_check(dependency_name: str) -> AsyncIterator[None]:
     finally:
         duration = time.time() - start_time
         business.dependency_check_duration_seconds.labels(dependency_name=dependency_name).observe(
-            duration
+            duration,
         )

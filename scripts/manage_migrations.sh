@@ -11,31 +11,60 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# Database config - align with application's DB_* variables
-# Primary: Use DB_* variables (matches application settings)
-# Fallback: ACCENT_DB_* for backward compatibility
-export DB_HOST="${DB_HOST:-${ACCENT_DB_HOST:-localhost}}"
-export DB_PORT="${DB_PORT:-${ACCENT_DB_PORT:-15432}}"
-export DB_USER="${DB_USER:-${ACCENT_DB_USER:-asterisk}}"
-export DB_PASSWORD="${DB_PASSWORD:-${ACCENT_DB_PASSWORD:-secret123}}"
-export DB_NAME="${DB_NAME:-${ACCENT_DB_NAME:-accent}}"
+# Load .env file if it exists
+# Only load simple DB_*, POSTGRES_*, and DOCKER_* variables (skip complex JSON values)
+load_env_file() {
+    local env_file="$1"
+    echo -e "${BLUE}Loading environment from ${env_file}...${NC}"
 
-# For backward compatibility, also set ACCENT_DB_* if not already set
-export ACCENT_DB_HOST="${ACCENT_DB_HOST:-${DB_HOST}}"
-export ACCENT_DB_PORT="${ACCENT_DB_PORT:-${DB_PORT}}"
-export ACCENT_DB_USER="${ACCENT_DB_USER:-${DB_USER}}"
-export ACCENT_DB_PASSWORD="${ACCENT_DB_PASSWORD:-${DB_PASSWORD}}"
-export ACCENT_DB_NAME="${ACCENT_DB_NAME:-${DB_NAME}}"
+    # Extract only DB_*, POSTGRES_*, and DOCKER_* variables with simple values
+    # Skip: comments (#), empty lines, JSON arrays ([), JSON objects ({)
+    while IFS='=' read -r key value; do
+        # Skip if empty or comment
+        [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
+
+        # Only process DB_*, POSTGRES_*, and DOCKER_* variables
+        if [[ "$key" =~ ^(DB_|POSTGRES_|DOCKER_|AUTO_START_DOCKER|USE_DOCKER_COMPOSE) ]]; then
+            # Remove quotes if present
+            value="${value%\"}"
+            value="${value#\"}"
+            value="${value%\'}"
+            value="${value#\'}"
+            export "$key=$value"
+        fi
+    done < <(grep -E '^(DB_|POSTGRES_|DOCKER_|AUTO_START_DOCKER|USE_DOCKER_COMPOSE)' "$env_file" 2>/dev/null || true)
+
+    echo -e "${GREEN}${env_file} loaded successfully${NC}"
+}
+
+if [ -f .env ]; then
+    load_env_file .env
+elif [ -f .env.local ]; then
+    load_env_file .env.local
+else
+    echo -e "${YELLOW}No .env file found, using environment variables or defaults${NC}"
+fi
+
+# Database config - matches application's DB_* variables
+export DB_HOST="${DB_HOST:-localhost}"
+export DB_PORT="${DB_PORT:-5432}"
+export DB_USER="${DB_USER:-postgres}"
+export DB_PASSWORD="${DB_PASSWORD:-change-this-secret-key}"
+export DB_NAME="${DB_NAME:-example_service}"
+
+# Ensure POSTGRES_* variables match DB_* for Docker Compose
+export POSTGRES_USER="${POSTGRES_USER:-${DB_USER}}"
+export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-${DB_PASSWORD}}"
+export POSTGRES_DB="${POSTGRES_DB:-${DB_NAME}}"
 
 # Docker config
-# Path from service/accent-auth/ to root docker-compose.dev.yml
-DOCKER_COMPOSE_FILE="${DOCKER_COMPOSE_FILE:-../../docker-compose.dev.yml}"
+DOCKER_COMPOSE_FILE="${DOCKER_COMPOSE_FILE:-./deployment/docker/docker-compose.yml}"
 DOCKER_SERVICE="${DOCKER_SERVICE:-db}"
 AUTO_START_DOCKER="${AUTO_START_DOCKER:-true}"
 USE_DOCKER_COMPOSE="${USE_DOCKER_COMPOSE:-auto}"  # auto, true, false
-DOCKER_CONTAINER_NAME="${DOCKER_CONTAINER_NAME:-accent-dev-postgres}"
+DOCKER_CONTAINER_NAME="${DOCKER_CONTAINER_NAME:-docker-db-1}"
 DOCKER_IMAGE="${DOCKER_IMAGE:-postgres:18-alpine}"
-DOCKER_VOLUME="${DOCKER_VOLUME:-accent-postgres-data}"
+DOCKER_VOLUME="${DOCKER_VOLUME:-docker_postgres-data}"
 
 check_db() {
     DB_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
@@ -140,7 +169,13 @@ start_docker_db_compose() {
 
     echo -e "${BLUE}Starting/updating Docker database via docker-compose...${NC}"
 
-    if $DOCKER_CMD -f "$DOCKER_COMPOSE_FILE" up -d "$DOCKER_SERVICE" 2>&1; then
+    # Use --env-file to load .env if it exists
+    ENV_FILE_ARG=""
+    if [ -f .env ]; then
+        ENV_FILE_ARG="--env-file .env"
+    fi
+
+    if $DOCKER_CMD -f "$DOCKER_COMPOSE_FILE" $ENV_FILE_ARG up -d "$DOCKER_SERVICE" 2>&1; then
         echo -e "${GREEN}Waiting for database to be ready...${NC}"
         MAX_WAIT=60
         ELAPSED=0
@@ -203,7 +238,23 @@ case "${1:-}" in
         ;;
     create)
         [ -z "$2" ] && { echo "Usage: $0 create 'message'"; exit 1; }
+        if ! check_db; then
+            echo -e "${YELLOW}Database not available. Attempting to start Docker database...${NC}"
+            start_docker_db || { echo -e "${RED}Could not start database${NC}"; exit 1; }
+        fi
+
+        # Generate migration
         uv run alembic revision --autogenerate -m "$2"
+
+        # Find the most recently created migration file
+        LATEST_MIGRATION=$(ls -t alembic/versions/*.py 2>/dev/null | head -1)
+
+        if [ -n "$LATEST_MIGRATION" ] && [ -f "$LATEST_MIGRATION" ]; then
+            echo -e "${BLUE}Post-processing migration with FTS/trigram/ltree injection...${NC}"
+            uv run python alembic/inject_fts.py "$LATEST_MIGRATION" || {
+                echo -e "${YELLOW}Warning: FTS injection failed, but migration was created${NC}"
+            }
+        fi
         ;;
     upgrade)
         if ! check_db; then
@@ -288,26 +339,27 @@ case "${1:-}" in
         echo "  docker-stop        Stop Docker database"
         echo "  docker-restart     Restart Docker database"
         echo ""
+        echo "Configuration:"
+        echo "  The script automatically loads environment variables from .env or .env.local"
+        echo "  if either file exists in the project root."
+        echo ""
         echo "Environment variables:"
-        echo "  Database (primary - matches application):"
+        echo "  Database:"
         echo "    DB_HOST               Database host (default: localhost)"
-        echo "    DB_PORT               Database port (default: 15432)"
-        echo "    DB_USER               Database user (default: asterisk)"
-        echo "    DB_PASSWORD           Database password (default: secret123)"
-        echo "    DB_NAME               Database name (default: accent)"
-        echo "  Database (backward compatibility):"
-        echo "    ACCENT_DB_HOST        Legacy variable (falls back to DB_HOST)"
-        echo "    ACCENT_DB_PORT        Legacy variable (falls back to DB_PORT)"
-        echo "    ACCENT_DB_USER        Legacy variable (falls back to DB_USER)"
-        echo "    ACCENT_DB_PASSWORD    Legacy variable (falls back to DB_PASSWORD)"
-        echo "    ACCENT_DB_NAME        Legacy variable (falls back to DB_NAME)"
+        echo "    DB_PORT               Database port (default: 5432)"
+        echo "    DB_USER               Database user (default: postgres)"
+        echo "    DB_PASSWORD           Database password (default: change-this-secret-key)"
+        echo "    DB_NAME               Database name (default: example_service)"
+        echo "    POSTGRES_USER         PostgreSQL user for Docker (default: \${DB_USER})"
+        echo "    POSTGRES_PASSWORD     PostgreSQL password for Docker (default: \${DB_PASSWORD})"
+        echo "    POSTGRES_DB           PostgreSQL database for Docker (default: \${DB_NAME})"
         echo "  Docker configuration:"
-        echo "    DOCKER_COMPOSE_FILE     Path to docker-compose file (default: ../../docker-compose.dev.yml)"
+        echo "    DOCKER_COMPOSE_FILE     Path to docker-compose file (default: ./deployment/docker/docker-compose.yml)"
         echo "    DOCKER_SERVICE          Docker service name for compose (default: db)"
         echo "    USE_DOCKER_COMPOSE      Use docker-compose? auto/true/false (default: auto)"
-        echo "    DOCKER_CONTAINER_NAME   Container name for plain docker (default: accent-dev-postgres)"
+        echo "    DOCKER_CONTAINER_NAME   Container name for plain docker (default: docker-db-1)"
         echo "    DOCKER_IMAGE            PostgreSQL image (default: postgres:18-alpine)"
-        echo "    DOCKER_VOLUME           Volume name for data (default: accent-postgres-data)"
+        echo "    DOCKER_VOLUME           Volume name for data (default: docker_postgres-data)"
         echo "    AUTO_START_DOCKER       Auto-start Docker if DB unavailable (default: true)"
         exit 1
         ;;

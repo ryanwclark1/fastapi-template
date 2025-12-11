@@ -111,7 +111,7 @@ class AnthropicAdapter(ProviderAdapter):
         timeout: int = 120,
         max_retries: int = 3,
         max_tokens: int = 4096,
-        **kwargs: Any,  # noqa: ARG002
+        **kwargs: Any,
     ) -> None:
         """Initialize Anthropic adapter.
 
@@ -121,6 +121,7 @@ class AnthropicAdapter(ProviderAdapter):
             timeout: Request timeout in seconds
             max_retries: Maximum retry attempts
             max_tokens: Default max tokens for responses
+            **kwargs: Additional adapter-specific options.
         """
         self.api_key = api_key
         # Resolve alias if provided
@@ -404,7 +405,7 @@ class AnthropicAdapter(ProviderAdapter):
             try:
                 messages = input_data.get("messages", [])
                 response_model: type[BaseModel] | None = input_data.get(
-                    "response_model"
+                    "response_model",
                 )
                 system_message = input_data.get("system")
 

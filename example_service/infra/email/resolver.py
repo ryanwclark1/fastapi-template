@@ -383,7 +383,7 @@ def get_email_config_resolver() -> EmailConfigResolver:
             "Call initialize_email_config_resolver() during app startup."
         )
         raise RuntimeError(
-            msg
+            msg,
         )
     return _resolver
 

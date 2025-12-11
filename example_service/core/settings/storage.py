@@ -302,6 +302,22 @@ class StorageSettings(BaseSettings):
     # Validators
     # ──────────────────────────────────────────────────────────────
 
+    @field_validator("backend", mode="before")
+    @classmethod
+    def _normalize_backend(cls, value: Any) -> StorageBackendType | Any:
+        """Allow enum names like 'StorageBackendType.S3' in config sources."""
+        if isinstance(value, StorageBackendType):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip()
+            if normalized.upper().startswith("STORAGEBACKENDTYPE."):
+                normalized = normalized.split(".", 1)[1]
+            try:
+                return StorageBackendType(normalized.lower())
+            except ValueError:
+                return value
+        return value
+
     @field_validator("allowed_content_types", mode="before")
     @classmethod
     def _parse_content_types(cls, value: Any) -> list[str]:
@@ -339,13 +355,14 @@ class StorageSettings(BaseSettings):
         """Validate retry_mode is one of the allowed values."""
         allowed_modes = {"standard", "adaptive", "legacy"}
         if value not in allowed_modes:
-            raise ValueError(f"retry_mode must be one of {allowed_modes}, got {value}")
+            msg = f"retry_mode must be one of {allowed_modes}, got {value}"
+            raise ValueError(msg)
         return value
 
     @field_validator("access_key", "secret_key", mode="after")
     @classmethod
     def _validate_credentials(
-        cls, value: SecretStr | None, _info: ValidationInfo
+        cls, value: SecretStr | None, _info: ValidationInfo,
     ) -> SecretStr | None:
         """Validate that both access_key and secret_key are provided together or neither.
 
@@ -379,7 +396,7 @@ class StorageSettings(BaseSettings):
                 "static credentials. Provide both or neither (for IAM role authentication)."
             )
             raise ValueError(
-                msg
+                msg,
             )
 
         return self
@@ -474,9 +491,8 @@ class StorageSettings(BaseSettings):
         Returns:
             Dictionary suitable for creating S3 client with lifecycle-aware settings.
         """
-        config = self.get_boto3_config()
+        return self.get_boto3_config()
         # Add any additional lifecycle-specific config
-        return config
 
     # ──────────────────────────────────────────────────────────────
     # Model Configuration

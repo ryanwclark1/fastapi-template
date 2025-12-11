@@ -88,7 +88,7 @@ class GraphQLSettings(BaseSettings):
         description="Keepalive ping interval for subscriptions in seconds",
     )
 
-    # Introspection (security)
+    # Introspection controls (security)
     introspection_enabled: bool = Field(
         default=True,
         description="Enable GraphQL schema introspection (disable in production for security)",

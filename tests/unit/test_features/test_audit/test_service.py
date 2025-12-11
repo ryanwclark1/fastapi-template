@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from example_service.features.audit.models import AuditAction, AuditLog
 from example_service.features.audit.schemas import (
@@ -17,6 +17,9 @@ from example_service.features.audit.service import (
     AuditService,
     get_audit_service_with_session,
 )
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.fixture

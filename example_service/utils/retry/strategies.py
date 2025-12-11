@@ -1,3 +1,5 @@
+"""Retry strategy primitives used by the retry decorator."""
+
 from __future__ import annotations
 
 import random
@@ -8,6 +10,8 @@ if TYPE_CHECKING:
 
 
 class RetryStrategy:
+    """Configuration object that controls retry decisions."""
+
     def __init__(
         self,
         max_attempts: int = 3,
@@ -20,6 +24,7 @@ class RetryStrategy:
         retry_if: Callable[[Exception], bool] | None = None,
         stop_after_delay: float | None = None,
     ) -> None:
+        """Initialize the strategy with timing parameters."""
         self.max_attempts = max_attempts
         self.initial_delay = initial_delay
         self.max_delay = max_delay
@@ -31,11 +36,13 @@ class RetryStrategy:
         self.stop_after_delay = stop_after_delay
 
     def should_retry(self, exception: Exception) -> bool:
+        """Return True when the exception qualifies for a retry."""
         if self.retry_if is not None:
             return self.retry_if(exception)
         return isinstance(exception, self.exceptions)
 
     def calculate_delay(self, attempt: int) -> float:
+        """Compute the delay before the next attempt."""
         delay = self.initial_delay * (self.exponential_base**attempt)
         delay = min(delay, self.max_delay)
         if self.jitter:

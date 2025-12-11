@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Any
 
 from strawberry.permission import BasePermission
 
-from example_service.infra.auth.accent_auth import AccentAuthACL
+from example_service.features.graphql.utils import create_acl_checker
 
 if TYPE_CHECKING:
     from strawberry.types import Info
@@ -68,7 +68,7 @@ class IsAuthenticated(BasePermission):
     message = "You must be authenticated to access this resource"
 
     def has_permission(
-        self, _source: Any, info: Info[GraphQLContext, None], **_kwargs: Any
+        self, _source: Any, info: Info[GraphQLContext, None], **_kwargs: Any,
     ) -> bool:
         """Check if user is authenticated.
 
@@ -116,7 +116,7 @@ class IsSuperuser(BasePermission):
     message = "Superuser access required"
 
     def has_permission(
-        self, _source: Any, info: Info[GraphQLContext, None], **_kwargs: Any
+        self, _source: Any, info: Info[GraphQLContext, None], **_kwargs: Any,
     ) -> bool:
         """Check if user has superuser ACL (#).
 
@@ -132,17 +132,8 @@ class IsSuperuser(BasePermission):
         if not user:
             return False
 
-        # Get context IDs from metadata
-        session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
-        tenant_id = user.metadata.get("tenant_uuid")
-
         # Create ACL checker with full user context
-        acl = AccentAuthACL(
-            user.permissions,
-            auth_id=user.user_id,
-            session_id=session_id,
-            tenant_id=tenant_id,
-        )
+        acl = create_acl_checker(user)
 
         is_superuser = acl.is_superuser()
 
@@ -175,7 +166,7 @@ class HasACL(BasePermission):
             ...
     """
 
-    def __init__(self, acl_pattern: str):
+    def __init__(self, acl_pattern: str) -> None:
         """Initialize with required ACL pattern.
 
         Args:
@@ -185,7 +176,7 @@ class HasACL(BasePermission):
         self.message = f"ACL '{acl_pattern}' required"
 
     def has_permission(
-        self, _source: Any, info: Info[GraphQLContext, None], **_kwargs: Any
+        self, _source: Any, info: Info[GraphQLContext, None], **_kwargs: Any,
     ) -> bool:
         """Check if user has the required ACL.
 
@@ -201,17 +192,8 @@ class HasACL(BasePermission):
         if not user:
             return False
 
-        # Get context IDs from metadata
-        session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
-        tenant_id = user.metadata.get("tenant_uuid")
-
         # Create ACL checker with full user context for reserved word substitution
-        acl = AccentAuthACL(
-            user.permissions,
-            auth_id=user.user_id,
-            session_id=session_id,
-            tenant_id=tenant_id,
-        )
+        acl = create_acl_checker(user)
 
         has_acl = acl.has_permission(self.acl_pattern)
 
@@ -241,7 +223,7 @@ class HasAnyACL(BasePermission):
             ...
     """
 
-    def __init__(self, *acl_patterns: str):
+    def __init__(self, *acl_patterns: str) -> None:
         """Initialize with required ACL patterns.
 
         Args:
@@ -251,7 +233,7 @@ class HasAnyACL(BasePermission):
         self.message = f"One of these ACLs required: {', '.join(acl_patterns)}"
 
     def has_permission(
-        self, _source: Any, info: Info[GraphQLContext, None], **_kwargs: Any
+        self, _source: Any, info: Info[GraphQLContext, None], **_kwargs: Any,
     ) -> bool:
         """Check if user has any of the required ACLs.
 
@@ -267,15 +249,7 @@ class HasAnyACL(BasePermission):
         if not user:
             return False
 
-        session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
-        tenant_id = user.metadata.get("tenant_uuid")
-
-        acl = AccentAuthACL(
-            user.permissions,
-            auth_id=user.user_id,
-            session_id=session_id,
-            tenant_id=tenant_id,
-        )
+        acl = create_acl_checker(user)
 
         has_any = acl.has_any_permission(*self.acl_patterns)
 
@@ -304,7 +278,7 @@ class HasAllACLs(BasePermission):
             ...
     """
 
-    def __init__(self, *acl_patterns: str):
+    def __init__(self, *acl_patterns: str) -> None:
         """Initialize with required ACL patterns.
 
         Args:
@@ -314,7 +288,7 @@ class HasAllACLs(BasePermission):
         self.message = f"All of these ACLs required: {', '.join(acl_patterns)}"
 
     def has_permission(
-        self, _source: Any, info: Info[GraphQLContext, None], **_kwargs: Any
+        self, _source: Any, info: Info[GraphQLContext, None], **_kwargs: Any,
     ) -> bool:
         """Check if user has all of the required ACLs.
 
@@ -330,15 +304,7 @@ class HasAllACLs(BasePermission):
         if not user:
             return False
 
-        session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
-        tenant_id = user.metadata.get("tenant_uuid")
-
-        acl = AccentAuthACL(
-            user.permissions,
-            auth_id=user.user_id,
-            session_id=session_id,
-            tenant_id=tenant_id,
-        )
+        acl = create_acl_checker(user)
 
         has_all = acl.has_all_permissions(*self.acl_patterns)
 
@@ -372,7 +338,7 @@ class CanAccessResource(BasePermission):
             ...
     """
 
-    def __init__(self, resource_type: str, action: str):
+    def __init__(self, resource_type: str, action: str) -> None:
         """Initialize with resource type and action.
 
         Args:
@@ -402,15 +368,7 @@ class CanAccessResource(BasePermission):
         # Extract resource_id from kwargs if available
         resource_id = _kwargs.get("id") or _kwargs.get("resource_id")
 
-        session_id = user.metadata.get("session_uuid") or user.metadata.get("token")
-        tenant_id = user.metadata.get("tenant_uuid")
-
-        acl = AccentAuthACL(
-            user.permissions,
-            auth_id=user.user_id,
-            session_id=session_id,
-            tenant_id=tenant_id,
-        )
+        acl = create_acl_checker(user)
 
         can_access = acl.has_permission(self.acl_pattern)
 

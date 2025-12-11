@@ -15,10 +15,13 @@ from datetime import datetime
 from sqlalchemy import DateTime, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from example_service.core.database.base import Base, TimestampMixin, UUIDv7PKMixin
+from example_service.core.database.base import UUIDv7TimestampedBase
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(datetime)
 
 
-class EventOutbox(Base, UUIDv7PKMixin, TimestampMixin):
+class EventOutbox(UUIDv7TimestampedBase):
     """Outbox table for reliable event publishing.
 
     Events are staged here before being published to the message broker.

@@ -30,7 +30,7 @@ def _generate_uuid7() -> str:
     making it ideal for event IDs where chronological order matters.
     """
     try:
-        from uuid_utils import uuid7  # type: ignore[import-not-found]
+        from uuid_utils import uuid7
 
         return str(uuid7())
     except ImportError:
@@ -135,7 +135,8 @@ class DomainEvent(BaseModel):
             return
         # Ensure event_type is defined for concrete event classes
         if not hasattr(cls, "event_type") or cls.event_type == "domain.event":
-            raise TypeError(f"{cls.__name__} must define 'event_type' class variable")
+            msg = f"{cls.__name__} must define 'event_type' class variable"
+            raise TypeError(msg)
 
     @classmethod
     def get_event_type(cls) -> str:

@@ -10,13 +10,14 @@ This module provides administrative endpoints for:
 from __future__ import annotations
 
 import logging
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Query
 
-from example_service.features.admin.email.dependencies import (
-    EmailAdminServiceDep,
-)
+if TYPE_CHECKING:
+    from example_service.features.admin.email.dependencies import (
+        EmailAdminServiceDep,
+    )
 
 logger = logging.getLogger(__name__)
 

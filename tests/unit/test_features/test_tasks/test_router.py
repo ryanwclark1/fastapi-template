@@ -89,7 +89,7 @@ async def test_search_tasks_with_filters(client_and_service):
                 "started_at": "2024-01-01T00:00:00Z",
                 "finished_at": "2024-01-01T00:05:00Z",
                 "duration_ms": 300000,
-            }
+            },
         ],
         12,
     )
@@ -144,7 +144,7 @@ async def test_get_running_tasks(client_and_service):
             "started_at": "2024-01-01T00:00:00Z",
             "running_for_ms": 120000,
             "worker_id": "worker-1",
-        }
+        },
     ]
 
     response = await client.get("/tasks/running")
@@ -328,7 +328,7 @@ async def test_list_scheduled_jobs(client_and_service):
             "is_paused": False,
             "misfire_grace_time": 5,
             "max_instances": 1,
-        }
+        },
     ]
 
     response = await client.get("/tasks/scheduled")

@@ -50,7 +50,7 @@ class TenantMixin:
     """
 
     @declared_attr
-    def tenant_id(cls) -> Column:
+    def tenant_id(self) -> Column:
         """Tenant identifier column.
 
         Returns:
@@ -64,17 +64,17 @@ class TenantMixin:
         )
 
     @declared_attr  # type: ignore[arg-type]
-    def __table_args__(cls) -> tuple[Any, ...]:
+    def __table_args__(self) -> tuple[Any, ...]:
         """Add composite index on tenant_id and primary key.
 
         Returns:
             Table arguments tuple
         """
         # Get existing table args
-        existing_args = getattr(cls, "__table_args__", None)
+        existing_args = getattr(self, "__table_args__", None)
 
         # Build new index
-        tablename = getattr(cls, "__tablename__", None)
+        tablename = getattr(self, "__tablename__", None)
         if tablename is None:
             return existing_args or ()
         index_name = f"ix_{tablename}_tenant_id_id"
@@ -126,12 +126,14 @@ class TenantAwareSession(AsyncSession):
         """Execute statement with automatic tenant filtering.
 
         Args:
-            statement: SQL statement to execute
-            *args: Additional arguments
-            **kwargs: Additional keyword arguments
+            statement: SQL statement to execute.
+            params: Parameter mapping forwarded to SQLAlchemy.
+            execution_options: Execution options for SQLAlchemy's execute call.
+            bind_arguments: Additional connection arguments for SQLAlchemy.
+            **kwargs: Additional keyword arguments forwarded to SQLAlchemy.
 
         Returns:
-            Query result
+            Query result.
         """
         # Add tenant filter if applicable
         statement = self._add_tenant_filter(statement)
@@ -180,7 +182,7 @@ class TenantAwareSession(AsyncSession):
         return statement
 
 
-def set_tenant_on_insert(mapper: Any, connection: Any, target: Any) -> None:  # noqa: ARG001
+def set_tenant_on_insert(mapper: Any, connection: Any, target: Any) -> None:
     """SQLAlchemy event listener to set tenant_id on insert.
 
     This event listener automatically sets the tenant_id column
@@ -208,11 +210,11 @@ def set_tenant_on_insert(mapper: Any, connection: Any, target: Any) -> None:  # 
                 "Either set tenant_id manually or ensure tenant middleware is active."
             )
             raise ValueError(
-                msg
+                msg,
             )
 
 
-def validate_tenant_on_update(mapper: Any, connection: Any, target: Any) -> None:  # noqa: ARG001
+def validate_tenant_on_update(mapper: Any, connection: Any, target: Any) -> None:
     """SQLAlchemy event listener to prevent tenant_id changes.
 
     This event listener prevents accidental tenant_id modifications
@@ -237,7 +239,7 @@ def validate_tenant_on_update(mapper: Any, connection: Any, target: Any) -> None
                     "Tenant changes are not allowed for data integrity."
                 )
                 raise ValueError(
-                    msg
+                    msg,
                 )
 
 
@@ -295,7 +297,7 @@ async def create_tenant_schema(tenant_id: str, session: AsyncSession) -> None:
     # Check if schema exists
     result = await session.execute(
         text(
-            "SELECT 1 FROM information_schema.schemata WHERE schema_name = :schema_name"
+            "SELECT 1 FROM information_schema.schemata WHERE schema_name = :schema_name",
         ),
         {"schema_name": schema_name},
     )

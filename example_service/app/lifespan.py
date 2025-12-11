@@ -36,7 +36,6 @@ from example_service.core.settings import (
     get_db_settings,
     get_health_settings,
     get_logging_settings,
-    get_mock_settings,
     get_otel_settings,
     get_rabbit_settings,
     get_redis_settings,
@@ -159,14 +158,6 @@ async def _startup_database() -> None:
     from example_service.infra.database.session import init_database
 
     db = get_db_settings()
-    mock = get_mock_settings()
-
-    if mock.enabled:
-        logger.info(
-            "Database initialization skipped in mock mode",
-            extra={"mock_mode": True, "persona": mock.persona},
-        )
-        return
 
     if not db.is_configured:
         return
@@ -266,14 +257,6 @@ async def _startup_cache() -> None:
 
     redis = get_redis_settings()
     auth = get_auth_settings()
-    mock = get_mock_settings()
-
-    if mock.enabled:
-        logger.info(
-            "Redis cache initialization skipped in mock mode",
-            extra={"mock_mode": True, "persona": mock.persona},
-        )
-        return
 
     if not redis.is_configured:
         return
@@ -378,16 +361,8 @@ async def _startup_task_tracking() -> None:
     task = get_task_settings()
     redis = get_redis_settings()
     db = get_db_settings()
-    mock = get_mock_settings()
 
     _tracker_started = False
-
-    if mock.enabled:
-        logger.info(
-            "Task execution tracker initialization skipped in mock mode",
-            extra={"mock_mode": True, "persona": mock.persona},
-        )
-        return
 
     if not task.tracking_enabled:
         return
@@ -461,15 +436,6 @@ async def _startup_outbox() -> None:
 async def _startup_tasks() -> None:
     """Initialize Taskiq broker and APScheduler."""
     global _taskiq_module, _scheduler_module
-
-    mock = get_mock_settings()
-
-    if mock.enabled:
-        logger.info(
-            "Taskiq/APScheduler initialization skipped in mock mode",
-            extra={"mock_mode": True, "persona": mock.persona},
-        )
-        return
 
     result = await _initialize_taskiq_and_scheduler()
     if result:
@@ -614,7 +580,7 @@ async def _startup_health_monitor() -> None:
                     from example_service.infra.messaging.broker import broker
 
                     if broker is not None:
-                        return broker._connection is not None  # noqa: SLF001
+                        return broker._connection is not None
                 except Exception:
                     pass
                 return False
@@ -756,12 +722,8 @@ async def _shutdown_tasks() -> None:
     """Stop Taskiq broker and APScheduler."""
     global _taskiq_module, _scheduler_module
 
-    mock = get_mock_settings()
     rabbit = get_rabbit_settings()
     redis = get_redis_settings()
-
-    if mock.enabled:
-        return
 
     # Stop APScheduler first
     if _scheduler_module is not None:
@@ -794,9 +756,7 @@ async def _shutdown_task_tracking() -> None:
 
     from example_service.infra.tasks.tracking import stop_tracker
 
-    mock = get_mock_settings()
-
-    if mock.enabled or not _tracker_started:
+    if not _tracker_started:
         return
 
     await stop_tracker()
@@ -842,9 +802,8 @@ async def _shutdown_cache() -> None:
     from example_service.infra.cache.redis import stop_cache
 
     redis = get_redis_settings()
-    mock = get_mock_settings()
 
-    if mock.enabled or not redis.is_configured:
+    if not redis.is_configured:
         return
 
     await stop_cache()
@@ -856,9 +815,8 @@ async def _shutdown_database() -> None:
     from example_service.infra.database.session import close_database
 
     db = get_db_settings()
-    mock = get_mock_settings()
 
-    if mock.enabled or not db.is_configured:
+    if not db.is_configured:
         return
 
     await close_database()

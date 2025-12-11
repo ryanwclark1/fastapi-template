@@ -385,9 +385,12 @@ class BaseProvider(ABC):
             ValueError: If API key is missing
         """
         if not self.api_key:
-            raise ValueError(
+            msg = (
                 f"{self.get_provider_name()} requires an API key. "
                 "Configure via settings or tenant config."
+            )
+            raise ValueError(
+                msg,
             )
 
 

@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+else:  # pragma: no cover - runtime placeholder for typing-only import
+    Callable = Any
 
 
 @pytest.fixture

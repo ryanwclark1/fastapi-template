@@ -22,8 +22,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
 if TYPE_CHECKING:
     from example_service.core.database.base import Base
+
+require_runtime_dependency(datetime)
 
 
 # ============================================================================
@@ -245,7 +249,8 @@ def assert_soft_deleted(
         assert_soft_deleted(post, deleted_by="admin@example.com")
     """
     if not hasattr(model, "deleted_at"):
-        raise AttributeError(f"{model.__class__.__name__} does not have soft delete support")
+        msg = f"{model.__class__.__name__} does not have soft delete support"
+        raise AttributeError(msg)
 
     if is_deleted:
         assert model.deleted_at is not None, "deleted_at should be set for soft-deleted record"
@@ -289,7 +294,8 @@ def assert_timestamps_updated(
         assert_timestamps_updated(user, original)
     """
     if not hasattr(model, "updated_at"):
-        raise AttributeError(f"{model.__class__.__name__} does not have updated_at field")
+        msg = f"{model.__class__.__name__} does not have updated_at field"
+        raise AttributeError(msg)
 
     assert model.updated_at > original_updated_at, (
         f"updated_at should have changed. Original: {original_updated_at}, Current: {model.updated_at}"

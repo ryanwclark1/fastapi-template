@@ -48,7 +48,10 @@ def create_storage_backend(settings: StorageSettings) -> StorageBackend:
             return S3Backend(settings)
 
         case _:
-            raise StorageNotConfiguredError(
+            msg = (
                 f"Unsupported storage backend: {backend_type}. "
                 f"Supported backends: {', '.join([t.value for t in StorageBackendType])}"
+            )
+            raise StorageNotConfiguredError(
+                msg,
             )

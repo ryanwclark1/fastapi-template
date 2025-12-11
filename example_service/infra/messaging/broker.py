@@ -98,7 +98,7 @@ def _ensure_router_initialized() -> RabbitRouterType | None:
         except ImportError:
             logger.warning(
                 "faststream.rabbit.opentelemetry not available - "
-                "install faststream[rabbit] >= 0.5.0 for telemetry support"
+                "install faststream[rabbit] >= 0.5.0 for telemetry support",
             )
 
     router = RabbitRouter(
@@ -195,7 +195,7 @@ async def start_broker() -> None:
         logger.info("RabbitMQ broker started successfully")
     except TimeoutError:
         error_msg = f"RabbitMQ connection timeout after {rabbit_settings.connection_timeout}s"
-        logger.error(
+        logger.exception(
             error_msg,
             extra={
                 "url": rabbit_settings.get_url(),
@@ -291,7 +291,7 @@ async def broker_context() -> AsyncIterator[RabbitBroker | None]:
         yield broker
     except TimeoutError:
         error_msg = f"RabbitMQ connection timeout after {rabbit_settings.connection_timeout}s"
-        logger.error(
+        logger.exception(
             error_msg,
             extra={"connection_timeout": rabbit_settings.connection_timeout},
         )

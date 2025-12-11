@@ -112,7 +112,7 @@ def setup_tracing() -> None:
         )
 
     except Exception as e:
-        logger.error(
+        logger.exception(
             "Failed to setup OpenTelemetry tracing: %s",
             e,
             extra={"exception": str(e)},

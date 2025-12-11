@@ -293,7 +293,7 @@ class HierarchicalMixin:
 
         if include_self:
             stmt = select(func.count()).select_from(self.__class__).where(
-                path_col.descendant_of(str(path_value))
+                path_col.descendant_of(str(path_value)),
             )
         else:
             stmt = select(func.count()).select_from(self.__class__).where(

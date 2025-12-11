@@ -91,18 +91,15 @@ def _calculate_base_delay(
             return 0.0
 
         case RetryPolicy.LINEAR:
-            # delay = initial * (attempt + 1)
-            # attempt 0 -> 1x, attempt 1 -> 2x, attempt 2 -> 3x
+            # Linear strategy multiplies the initial delay by (attempt + 1).
             return float(initial_delay_ms * (attempt + 1))
 
         case RetryPolicy.EXPONENTIAL:
-            # delay = initial * multiplier^attempt
-            # attempt 0 -> 1x, attempt 1 -> 2x, attempt 2 -> 4x
+            # Exponential strategy uses initial * multiplier**attempt.
             return initial_delay_ms * (multiplier**attempt)
 
         case RetryPolicy.FIBONACCI:
-            # delay = initial * fib(attempt + 1)
-            # attempt 0 -> 1x, attempt 1 -> 1x, attempt 2 -> 2x, attempt 3 -> 3x
+            # Fibonacci strategy scales by fib(attempt + 1).
             fib_num = _fibonacci_binet(attempt + 1)
             return float(initial_delay_ms * fib_num)
 

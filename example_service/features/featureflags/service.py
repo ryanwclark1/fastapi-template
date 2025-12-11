@@ -195,9 +195,12 @@ class FeatureFlagService:
             ]
 
         for field, value in update_data.items():
-            if field == "status" and value:
-                value = value.value if hasattr(value, "value") else value
-            setattr(flag, field, value)
+            field_value = value
+            if field == "status" and field_value:
+                field_value = (
+                    field_value.value if hasattr(field_value, "value") else field_value
+                )
+            setattr(flag, field, field_value)
 
         await self.session.commit()
         await self.session.refresh(flag)
@@ -220,7 +223,7 @@ class FeatureFlagService:
 
         # Delete associated overrides
         await self.session.execute(
-            delete(FlagOverride).where(FlagOverride.flag_key == key)
+            delete(FlagOverride).where(FlagOverride.flag_key == key),
         )
 
         await self.session.delete(flag)
@@ -360,12 +363,12 @@ class FeatureFlagService:
             if context.user_id:
                 conditions.append(
                     (FlagOverride.entity_type == "user")
-                    & (FlagOverride.entity_id == context.user_id)
+                    & (FlagOverride.entity_id == context.user_id),
                 )
             if context.tenant_id:
                 conditions.append(
                     (FlagOverride.entity_type == "tenant")
-                    & (FlagOverride.entity_id == context.tenant_id)
+                    & (FlagOverride.entity_id == context.tenant_id),
                 )
 
             if conditions:
@@ -387,7 +390,7 @@ class FeatureFlagService:
 
             if include_details:
                 details.append(
-                    FlagEvaluationResult(key=flag.key, enabled=enabled, reason=reason)
+                    FlagEvaluationResult(key=flag.key, enabled=enabled, reason=reason),
                 )
 
         return FlagEvaluationResponse(
@@ -492,10 +495,8 @@ class FeatureFlagService:
         Returns:
             Bucket number 0-99.
         """
-        hash_input = f"{flag_key}:{identity}".encode()
-        # MD5 used for non-cryptographic consistent hashing (bucketing)
-        hash_value = hashlib.md5(hash_input).hexdigest()  # noqa: S324
-        return int(hash_value[:8], 16) % 100
+        consistent_hash = hashlib.sha256(f"{flag_key}:{identity}".encode()).hexdigest()
+        return int(consistent_hash[:8], 16) % 100
 
     def _matches_rule(
         self,

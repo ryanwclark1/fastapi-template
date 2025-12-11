@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from example_service.features.health.schemas import (
     CacheInfoResponse,
@@ -33,16 +33,17 @@ from example_service.features.health.schemas import (
     StartupResponse,
     StatusResponse,
 )
-
-# Import dependencies at runtime so FastAPI treats them as Depends()
-# NOTE: These MUST be outside TYPE_CHECKING for FastAPI to resolve the Annotated[..., Depends(...)] metadata
-from example_service.features.health.service import (  # noqa: TC001
-    HealthAggregatorDep,
-    HealthServiceDep,
+from example_service.features.health.service import (
+    HealthAggregator,
+    HealthService,
+    get_health_aggregator,
+    get_health_service,
 )
 
 router = APIRouter(prefix="/health", tags=["health"])
 
+HealthServiceDep = Annotated[HealthService, Depends(get_health_service)]
+HealthAggregatorDep = Annotated[HealthAggregator, Depends(get_health_aggregator)]
 
 # =============================================================================
 # Core Health Endpoints
@@ -85,6 +86,7 @@ async def health_check_detailed(
     and status messages for each health provider.
 
     Args:
+        service: Health service dependency.
         force_refresh: If True, bypass cache and run fresh checks
 
     Returns:
@@ -332,6 +334,7 @@ async def health_history(
     trend analysis and debugging intermittent issues.
 
     Args:
+        aggregator: Health aggregator dependency.
         limit: Maximum number of entries to return (most recent first)
         provider: Optional filter to show only specific provider
 

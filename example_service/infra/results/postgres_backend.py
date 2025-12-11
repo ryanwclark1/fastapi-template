@@ -188,8 +188,8 @@ class PostgresAsyncResultBackend(AsyncResultBackend[_ReturnType]):
             error_message = str(result.error)
             error_tb = "".join(
                 traceback.format_exception(
-                    type(result.error), result.error, result.error.__traceback__
-                )
+                    type(result.error), result.error, result.error.__traceback__,
+                ),
             )
 
         async with self._get_session() as session, session.begin():
@@ -278,7 +278,7 @@ class PostgresAsyncResultBackend(AsyncResultBackend[_ReturnType]):
             execution = (await session.execute(stmt)).scalar_one_or_none()
 
             if execution is None or execution.serialized_result is None:
-                raise ResultIsMissingError()
+                raise ResultIsMissingError
 
             # Deserialize the stored result
             taskiq_result = model_validate(
@@ -431,7 +431,7 @@ class PostgresAsyncResultBackend(AsyncResultBackend[_ReturnType]):
             values["error_type"] = type(error).__name__
             values["error_message"] = str(error)
             values["error_traceback"] = "".join(
-                traceback.format_exception(type(error), error, error.__traceback__)
+                traceback.format_exception(type(error), error, error.__traceback__),
             )
 
         async with self._get_session() as session, session.begin():

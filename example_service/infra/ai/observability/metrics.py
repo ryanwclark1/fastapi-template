@@ -116,7 +116,7 @@ class AIMetrics:
 
         if not PROMETHEUS_AVAILABLE and enabled:
             logger.warning(
-                "Prometheus client not available. Install with: pip install prometheus-client"
+                "Prometheus client not available. Install with: pip install prometheus-client",
             )
 
         if self.enabled:
@@ -193,7 +193,7 @@ class AIMetrics:
         # Saga metrics
         self.compensations_total = get_metric(f"{self.prefix}_compensations_total")
         self.compensation_duration_seconds = get_metric(
-            f"{self.prefix}_compensation_duration_seconds"
+            f"{self.prefix}_compensation_duration_seconds",
         )
 
         # Event metrics

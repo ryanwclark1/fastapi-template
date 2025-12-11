@@ -34,7 +34,7 @@ async def test_create_reminder_success(
                 "title": "New Test Reminder",
                 "description": "A test description",
                 "remindAt": remind_at,
-            }
+            },
         },
         context_value=graphql_context,
     )
@@ -60,7 +60,7 @@ async def test_create_reminder_validation_error_empty_title(
             "input": {
                 "title": "",
                 "description": "A test description",
-            }
+            },
         },
         context_value=graphql_context,
     )
@@ -85,7 +85,7 @@ async def test_create_reminder_validation_error_long_title(
             "input": {
                 "title": "x" * 201,
                 "description": "A test description",
-            }
+            },
         },
         context_value=graphql_context,
     )

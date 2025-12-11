@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from example_service.features.featureflags.models import (
     FeatureFlag,
@@ -16,6 +17,9 @@ from example_service.features.featureflags.repository import (
     get_feature_flag_repository,
     get_flag_override_repository,
 )
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.fixture
@@ -59,7 +63,7 @@ async def test_get_flag_override_repository_returns_singleton() -> None:
 
 @pytest.mark.asyncio
 async def test_get_by_key_found(
-    db_session: AsyncSession, flag_repository: FeatureFlagRepository
+    db_session: AsyncSession, flag_repository: FeatureFlagRepository,
 ) -> None:
     """Test getting flag by key when it exists."""
     flag = FeatureFlag(
@@ -80,7 +84,7 @@ async def test_get_by_key_found(
 
 @pytest.mark.asyncio
 async def test_get_by_key_not_found(
-    db_session: AsyncSession, flag_repository: FeatureFlagRepository
+    db_session: AsyncSession, flag_repository: FeatureFlagRepository,
 ) -> None:
     """Test getting flag by key when it doesn't exist."""
     result = await flag_repository.get_by_key(db_session, "nonexistent")
@@ -90,7 +94,7 @@ async def test_get_by_key_not_found(
 
 @pytest.mark.asyncio
 async def test_list_with_filters_by_status(
-    db_session: AsyncSession, flag_repository: FeatureFlagRepository
+    db_session: AsyncSession, flag_repository: FeatureFlagRepository,
 ) -> None:
     """Test listing flags filtered by status."""
     flag1 = FeatureFlag(
@@ -110,7 +114,7 @@ async def test_list_with_filters_by_status(
     await db_session.commit()
 
     result = await flag_repository.list_with_filters(
-        db_session, status=FlagStatus.ENABLED, limit=100
+        db_session, status=FlagStatus.ENABLED, limit=100,
     )
 
     assert result.total == 1
@@ -120,7 +124,7 @@ async def test_list_with_filters_by_status(
 
 @pytest.mark.asyncio
 async def test_list_with_filters_by_enabled(
-    db_session: AsyncSession, flag_repository: FeatureFlagRepository
+    db_session: AsyncSession, flag_repository: FeatureFlagRepository,
 ) -> None:
     """Test listing flags filtered by enabled state."""
     flag1 = FeatureFlag(
@@ -148,7 +152,7 @@ async def test_list_with_filters_by_enabled(
 
 @pytest.mark.asyncio
 async def test_list_with_filters_pagination(
-    db_session: AsyncSession, flag_repository: FeatureFlagRepository
+    db_session: AsyncSession, flag_repository: FeatureFlagRepository,
 ) -> None:
     """Test pagination in list_with_filters."""
     for i in range(10):
@@ -175,7 +179,7 @@ async def test_list_with_filters_pagination(
 
 @pytest.mark.asyncio
 async def test_get_by_keys(
-    db_session: AsyncSession, flag_repository: FeatureFlagRepository
+    db_session: AsyncSession, flag_repository: FeatureFlagRepository,
 ) -> None:
     """Test getting multiple flags by keys."""
     flag1 = FeatureFlag(
@@ -210,7 +214,7 @@ async def test_get_by_keys(
 
 @pytest.mark.asyncio
 async def test_get_by_keys_empty_list(
-    db_session: AsyncSession, flag_repository: FeatureFlagRepository
+    db_session: AsyncSession, flag_repository: FeatureFlagRepository,
 ) -> None:
     """Test getting flags with empty key list."""
     result = await flag_repository.get_by_keys(db_session, [])
@@ -238,7 +242,7 @@ async def test_get_all(db_session: AsyncSession, flag_repository: FeatureFlagRep
 
 @pytest.mark.asyncio
 async def test_delete_by_key_found(
-    db_session: AsyncSession, flag_repository: FeatureFlagRepository
+    db_session: AsyncSession, flag_repository: FeatureFlagRepository,
 ) -> None:
     """Test deleting flag by key when it exists."""
     flag = FeatureFlag(
@@ -259,7 +263,7 @@ async def test_delete_by_key_found(
 
 @pytest.mark.asyncio
 async def test_delete_by_key_not_found(
-    db_session: AsyncSession, flag_repository: FeatureFlagRepository
+    db_session: AsyncSession, flag_repository: FeatureFlagRepository,
 ) -> None:
     """Test deleting flag by key when it doesn't exist."""
     deleted = await flag_repository.delete_by_key(db_session, "nonexistent")
@@ -278,7 +282,7 @@ async def test_override_repository_initialization(
 
 @pytest.mark.asyncio
 async def test_get_by_entity_found(
-    db_session: AsyncSession, override_repository: FlagOverrideRepository
+    db_session: AsyncSession, override_repository: FlagOverrideRepository,
 ) -> None:
     """Test getting override by entity when it exists."""
     override = FlagOverride(
@@ -301,7 +305,7 @@ async def test_get_by_entity_found(
 
 @pytest.mark.asyncio
 async def test_get_by_entity_not_found(
-    db_session: AsyncSession, override_repository: FlagOverrideRepository
+    db_session: AsyncSession, override_repository: FlagOverrideRepository,
 ) -> None:
     """Test getting override by entity when it doesn't exist."""
     result = await override_repository.get_by_entity(db_session, "test_flag", "user", "user-123")
@@ -311,7 +315,7 @@ async def test_get_by_entity_not_found(
 
 @pytest.mark.asyncio
 async def test_upsert_creates_new(
-    db_session: AsyncSession, override_repository: FlagOverrideRepository
+    db_session: AsyncSession, override_repository: FlagOverrideRepository,
 ) -> None:
     """Test upsert creates new override when it doesn't exist."""
     override = FlagOverride(
@@ -333,7 +337,7 @@ async def test_upsert_creates_new(
 
 @pytest.mark.asyncio
 async def test_upsert_updates_existing(
-    db_session: AsyncSession, override_repository: FlagOverrideRepository
+    db_session: AsyncSession, override_repository: FlagOverrideRepository,
 ) -> None:
     """Test upsert updates existing override."""
     override1 = FlagOverride(
@@ -364,7 +368,7 @@ async def test_upsert_updates_existing(
 
 @pytest.mark.asyncio
 async def test_list_with_filters_by_flag_key(
-    db_session: AsyncSession, override_repository: FlagOverrideRepository
+    db_session: AsyncSession, override_repository: FlagOverrideRepository,
 ) -> None:
     """Test listing overrides filtered by flag key."""
     override1 = FlagOverride(
@@ -391,7 +395,7 @@ async def test_list_with_filters_by_flag_key(
 
 @pytest.mark.asyncio
 async def test_list_with_filters_by_entity_type(
-    db_session: AsyncSession, override_repository: FlagOverrideRepository
+    db_session: AsyncSession, override_repository: FlagOverrideRepository,
 ) -> None:
     """Test listing overrides filtered by entity type."""
     override1 = FlagOverride(
@@ -418,7 +422,7 @@ async def test_list_with_filters_by_entity_type(
 
 @pytest.mark.asyncio
 async def test_list_with_filters_by_entity_id(
-    db_session: AsyncSession, override_repository: FlagOverrideRepository
+    db_session: AsyncSession, override_repository: FlagOverrideRepository,
 ) -> None:
     """Test listing overrides filtered by entity ID."""
     override1 = FlagOverride(
@@ -445,7 +449,7 @@ async def test_list_with_filters_by_entity_id(
 
 @pytest.mark.asyncio
 async def test_get_by_context_user_only(
-    db_session: AsyncSession, override_repository: FlagOverrideRepository
+    db_session: AsyncSession, override_repository: FlagOverrideRepository,
 ) -> None:
     """Test getting overrides by context with user only."""
     override = FlagOverride(
@@ -464,7 +468,7 @@ async def test_get_by_context_user_only(
 
 @pytest.mark.asyncio
 async def test_get_by_context_tenant_only(
-    db_session: AsyncSession, override_repository: FlagOverrideRepository
+    db_session: AsyncSession, override_repository: FlagOverrideRepository,
 ) -> None:
     """Test getting overrides by context with tenant only."""
     override = FlagOverride(
@@ -483,7 +487,7 @@ async def test_get_by_context_tenant_only(
 
 @pytest.mark.asyncio
 async def test_get_by_context_user_precedence(
-    db_session: AsyncSession, override_repository: FlagOverrideRepository
+    db_session: AsyncSession, override_repository: FlagOverrideRepository,
 ) -> None:
     """Test that user overrides take precedence over tenant overrides."""
     user_override = FlagOverride(
@@ -503,7 +507,7 @@ async def test_get_by_context_user_precedence(
     await db_session.commit()
 
     result = await override_repository.get_by_context(
-        db_session, user_id="user-123", tenant_id="tenant-123"
+        db_session, user_id="user-123", tenant_id="tenant-123",
     )
 
     assert result == {"test_flag": True}  # User override takes precedence
@@ -511,7 +515,7 @@ async def test_get_by_context_user_precedence(
 
 @pytest.mark.asyncio
 async def test_get_by_context_no_context(
-    db_session: AsyncSession, override_repository: FlagOverrideRepository
+    db_session: AsyncSession, override_repository: FlagOverrideRepository,
 ) -> None:
     """Test getting overrides with no context."""
     result = await override_repository.get_by_context(db_session)
@@ -521,7 +525,7 @@ async def test_get_by_context_no_context(
 
 @pytest.mark.asyncio
 async def test_get_by_context_multiple_flags(
-    db_session: AsyncSession, override_repository: FlagOverrideRepository
+    db_session: AsyncSession, override_repository: FlagOverrideRepository,
 ) -> None:
     """Test getting multiple flag overrides by context."""
     override1 = FlagOverride(
@@ -547,7 +551,7 @@ async def test_get_by_context_multiple_flags(
 
 @pytest.mark.asyncio
 async def test_delete_by_entity_found(
-    db_session: AsyncSession, override_repository: FlagOverrideRepository
+    db_session: AsyncSession, override_repository: FlagOverrideRepository,
 ) -> None:
     """Test deleting override by entity when it exists."""
     override = FlagOverride(
@@ -560,7 +564,7 @@ async def test_delete_by_entity_found(
     await db_session.commit()
 
     deleted = await override_repository.delete_by_entity(
-        db_session, "test_flag", "user", "user-123"
+        db_session, "test_flag", "user", "user-123",
     )
     await db_session.commit()
 
@@ -572,11 +576,11 @@ async def test_delete_by_entity_found(
 
 @pytest.mark.asyncio
 async def test_delete_by_entity_not_found(
-    db_session: AsyncSession, override_repository: FlagOverrideRepository
+    db_session: AsyncSession, override_repository: FlagOverrideRepository,
 ) -> None:
     """Test deleting override by entity when it doesn't exist."""
     deleted = await override_repository.delete_by_entity(
-        db_session, "test_flag", "user", "user-123"
+        db_session, "test_flag", "user", "user-123",
     )
 
     assert deleted is False
@@ -584,7 +588,7 @@ async def test_delete_by_entity_not_found(
 
 @pytest.mark.asyncio
 async def test_delete_by_flag(
-    db_session: AsyncSession, override_repository: FlagOverrideRepository
+    db_session: AsyncSession, override_repository: FlagOverrideRepository,
 ) -> None:
     """Test deleting all overrides for a flag."""
     override1 = FlagOverride(
@@ -629,7 +633,7 @@ async def test_delete_by_flag(
 
 @pytest.mark.asyncio
 async def test_delete_by_flag_no_matches(
-    db_session: AsyncSession, override_repository: FlagOverrideRepository
+    db_session: AsyncSession, override_repository: FlagOverrideRepository,
 ) -> None:
     """Test deleting overrides for a flag that has none."""
     deleted_count = await override_repository.delete_by_flag(db_session, "nonexistent")

@@ -134,7 +134,7 @@ class SMTPProvider(BaseEmailProvider):
         exceptions=(OSError, ConnectionError, TimeoutError),
     )
     async def _do_send(  # type: ignore[override]  # @retry changes return type
-        self, message: EmailMessage
+        self, message: EmailMessage,
     ) -> EmailDeliveryResult:
         """Send email via SMTP.
 

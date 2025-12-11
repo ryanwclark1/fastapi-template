@@ -40,10 +40,10 @@ logger = logging.getLogger(__name__)
 
 # Type aliases for annotated arguments
 FirstArg = Annotated[
-    int, strawberry.argument(description="Number of items to return")
+    int, strawberry.argument(description="Number of items to return"),
 ]
 AfterArg = Annotated[
-    str | None, strawberry.argument(description="Cursor to start after")
+    str | None, strawberry.argument(description="Cursor to start after"),
 ]
 
 
@@ -52,7 +52,7 @@ def _parse_datetime(dt_str: str | None) -> datetime | None:
     if not dt_str:
         return None
     try:
-        return datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+        return datetime.fromisoformat(dt_str)
     except ValueError:
         return None
 

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 import enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -33,14 +33,20 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from example_service.core.database.base import Base
+from example_service.core.database.base import (
+    Base,
+    UserAuditMixin,
+    UUIDv7TimestampedBase,
+)
 from example_service.core.database.enums import (
     AIWorkflowNodeStatus,
     AIWorkflowNodeType,
     AIWorkflowStatus,
 )
-from example_service.core.models.tenant import Tenant
-from example_service.core.models.user import User
+
+if TYPE_CHECKING:
+    from example_service.core.models.tenant import Tenant
+    from example_service.core.models.user import User
 
 
 class WorkflowStatus(str, enum.Enum):
@@ -79,7 +85,7 @@ class WorkflowNodeType(str, enum.Enum):
     SUBWORKFLOW = "subworkflow"
 
 
-class AIWorkflowDefinition(Base):
+class AIWorkflowDefinition(UUIDv7TimestampedBase, UserAuditMixin):
     """Reusable workflow definition template.
 
     Stores the complete workflow graph definition including:
@@ -90,12 +96,6 @@ class AIWorkflowDefinition(Base):
     """
 
     __tablename__ = "ai_workflow_definitions"
-
-    # Primary key
-    id: Mapped[UUID] = mapped_column(
-        primary_key=True,
-        default=uuid4,
-    )
 
     # Multi-tenancy
     tenant_id: Mapped[UUID] = mapped_column(
@@ -126,20 +126,7 @@ class AIWorkflowDefinition(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    # Audit fields
-    created_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(UTC),
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
-    )
-    created_by_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True,
-    )
-
-    # Relationships
+    # Relationships (id, timestamps, audit FKs provided by base classes)
     tenant: Mapped[Tenant] = relationship(
         "Tenant",
         back_populates="workflow_definitions",
@@ -147,7 +134,12 @@ class AIWorkflowDefinition(Base):
     )
     created_by: Mapped[User | None] = relationship(
         "User",
-        foreign_keys=[created_by_id],
+        foreign_keys="AIWorkflowDefinition.created_by_id",
+        lazy="selectin",
+    )
+    updated_by: Mapped[User | None] = relationship(
+        "User",
+        foreign_keys="AIWorkflowDefinition.updated_by_id",
         lazy="selectin",
     )
     executions: Mapped[list[AIWorkflowExecution]] = relationship(
@@ -164,10 +156,11 @@ class AIWorkflowDefinition(Base):
     )
 
     def __repr__(self) -> str:
+        """Return workflow definition summary for debugging."""
         return f"<AIWorkflowDefinition {self.name} ({self.id})>"
 
 
-class AIWorkflowExecution(Base):
+class AIWorkflowExecution(UUIDv7TimestampedBase, UserAuditMixin):
     """Workflow execution instance.
 
     Tracks a single execution of a workflow definition including:
@@ -178,12 +171,6 @@ class AIWorkflowExecution(Base):
     """
 
     __tablename__ = "ai_workflow_executions"
-
-    # Primary key
-    id: Mapped[UUID] = mapped_column(
-        primary_key=True,
-        default=uuid4,
-    )
 
     # Workflow definition reference
     definition_id: Mapped[UUID] = mapped_column(
@@ -243,23 +230,10 @@ class AIWorkflowExecution(Base):
     correlation_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
     extra_metadata: Mapped[dict[str, Any]] = mapped_column(
-        "metadata", JSON, default=dict
+        "metadata", JSON, default=dict,
     )
 
-    # Audit fields
-    created_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(UTC),
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
-    )
-    created_by_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True,
-    )
-
-    # Relationships
+    # Relationships (id, timestamps, audit FKs provided by base classes)
     definition: Mapped[AIWorkflowDefinition] = relationship(
         "AIWorkflowDefinition",
         back_populates="executions",
@@ -272,7 +246,12 @@ class AIWorkflowExecution(Base):
     )
     created_by: Mapped[User | None] = relationship(
         "User",
-        foreign_keys=[created_by_id],
+        foreign_keys="AIWorkflowExecution.created_by_id",
+        lazy="selectin",
+    )
+    updated_by: Mapped[User | None] = relationship(
+        "User",
+        foreign_keys="AIWorkflowExecution.updated_by_id",
         lazy="selectin",
     )
     node_executions: Mapped[list[AIWorkflowNodeExecution]] = relationship(
@@ -290,7 +269,7 @@ class AIWorkflowExecution(Base):
     )
     parent_execution: Mapped[AIWorkflowExecution | None] = relationship(
         "AIWorkflowExecution",
-        remote_side=[id],
+        remote_side="AIWorkflowExecution.id",
         lazy="selectin",
     )
 
@@ -309,6 +288,7 @@ class AIWorkflowExecution(Base):
         return None
 
     def __repr__(self) -> str:
+        """Return workflow execution summary for debugging."""
         return f"<AIWorkflowExecution {self.id} ({self.status})>"
 
 
@@ -370,7 +350,7 @@ class AIWorkflowNodeExecution(Base):
 
     # Metadata
     extra_metadata: Mapped[dict[str, Any]] = mapped_column(
-        "metadata", JSON, default=dict
+        "metadata", JSON, default=dict,
     )
 
     # Relationships
@@ -397,6 +377,7 @@ class AIWorkflowNodeExecution(Base):
         return None
 
     def __repr__(self) -> str:
+        """Return node execution summary for debugging."""
         return f"<AIWorkflowNodeExecution {self.node_name} ({self.status})>"
 
 
@@ -430,7 +411,7 @@ class AIWorkflowApproval(Base):
     # Approval request details
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     options: Mapped[list[str]] = mapped_column(
-        JSON, default=lambda: ["approve", "reject"]
+        JSON, default=lambda: ["approve", "reject"],
     )
     context: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
@@ -458,7 +439,7 @@ class AIWorkflowApproval(Base):
 
     # Metadata
     extra_metadata: Mapped[dict[str, Any]] = mapped_column(
-        "metadata", JSON, default=dict
+        "metadata", JSON, default=dict,
     )
 
     # Relationships
@@ -487,5 +468,6 @@ class AIWorkflowApproval(Base):
         return datetime.now(UTC) > self.expires_at
 
     def __repr__(self) -> str:
+        """Return approval summary for debugging."""
         status = "pending" if self.is_pending else f"responded:{self.response}"
         return f"<AIWorkflowApproval {self.node_name} ({status})>"

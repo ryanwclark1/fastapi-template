@@ -22,10 +22,10 @@ async def e2e_stack(monkeypatch):
     clear_all_caches()
 
     broker_module = importlib.reload(
-        importlib.import_module("example_service.infra.messaging.broker")
+        importlib.import_module("example_service.infra.messaging.broker"),
     )
     handlers_module = importlib.reload(
-        importlib.import_module("example_service.infra.messaging.handlers")
+        importlib.import_module("example_service.infra.messaging.handlers"),
     )
     importlib.reload(importlib.import_module("example_service.app.router"))
     main_module = importlib.reload(importlib.import_module("example_service.app.main"))

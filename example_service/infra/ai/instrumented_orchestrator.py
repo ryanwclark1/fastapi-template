@@ -620,7 +620,7 @@ class InstrumentedOrchestrator:
             "total_steps": total_steps,
             "estimated_remaining_seconds": state.get("estimated_remaining_seconds"),
             "current_cost_usd": state.get(
-                "total_cost_usd", "0"
+                "total_cost_usd", "0",
             ),  # Keep as string for JSON serialization
         }
 

@@ -430,7 +430,8 @@ class StepBuilder:
             ValueError: If required fields are missing
         """
         if not self._capability:
-            raise ValueError(f"Step '{self._name}' requires a capability")
+            msg = f"Step '{self._name}' requires a capability"
+            raise ValueError(msg)
 
         # If we have a condition function, wrap it in a special condition
         actual_condition = self._condition
@@ -705,7 +706,8 @@ class PipelineBuilder:
             ValueError: If pipeline is invalid
         """
         if not self._steps:
-            raise ValueError(f"Pipeline '{self._name}' has no steps")
+            msg = f"Pipeline '{self._name}' has no steps"
+            raise ValueError(msg)
 
         return PipelineDefinition(
             name=self._name,

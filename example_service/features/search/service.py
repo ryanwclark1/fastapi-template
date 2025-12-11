@@ -251,7 +251,7 @@ class SearchService:
                         snippet_field=config.snippet_field,
                         supports_fuzzy=bool(config.fuzzy_fields),
                         facet_fields=config.facet_fields,
-                    )
+                    ),
                 )
 
         return SearchCapabilitiesResponse(
@@ -445,7 +445,7 @@ class SearchService:
         did_you_mean = None
         if total_hits < LOW_RESULT_THRESHOLD and self.enable_fuzzy_fallback:
             did_you_mean = await self._generate_did_you_mean(
-                request.query, entity_types
+                request.query, entity_types,
             )
 
         # Generate suggestions if few results
@@ -537,7 +537,7 @@ class SearchService:
                         snippet=hit.snippet,
                         data=hit.data,
                         created_at=hit.created_at,
-                    )
+                    ),
                 )
 
             # Re-sort by adjusted rank
@@ -549,7 +549,7 @@ class SearchService:
                     total=entity_result.total,
                     hits=boosted_hits,
                     facets=entity_result.facets,
-                )
+                ),
             )
 
         return boosted_results
@@ -619,7 +619,7 @@ class SearchService:
 
         # Main query
         stmt = (
-            select(  # type: ignore
+            select(
                 model_class,
                 rank_expr.label("rank"),
             )
@@ -641,7 +641,7 @@ class SearchService:
         # Get total count
         count_stmt = (
             select(func.count())
-            .select_from(model_class)  # type: ignore
+            .select_from(model_class)
             .where(search_vector.op("@@")(ts_query))
             .where(rank_expr >= request.min_rank)
         )
@@ -704,7 +704,7 @@ class SearchService:
                     snippet=snippet,
                     data=data,
                     created_at=created_at,
-                )
+                ),
             )
 
         # Get facets if requested
@@ -829,7 +829,7 @@ class SearchService:
                             field=field_name,
                             display_name=field_name.replace("_", " ").title(),
                             values=values,
-                        )
+                        ),
                     )
             except Exception as e:
                 logger.warning("Facet query failed for %s: %s", field_name, e)
@@ -958,15 +958,15 @@ class SearchService:
 
             try:
                 result = await self.session.execute(stmt)
-                for row in result.all():
-                    if row[0]:
-                        suggestions.append(
-                            SearchSuggestion(
-                                text=str(row[0]),
-                                entity_type=entity_type,
-                                count=row[1],
-                            )
-                        )
+                suggestions.extend(
+                    SearchSuggestion(
+                        text=str(row[0]),
+                        entity_type=entity_type,
+                        count=row[1],
+                    )
+                    for row in result.all()
+                    if row[0]
+                )
             except Exception as e:
                 logger.warning("Suggestion query failed for %s: %s", entity_type, e)
                 continue
@@ -1038,7 +1038,7 @@ class SearchService:
                     literal(str(text_value)),
                     func.websearch_to_tsquery(config, query),
                     options,
-                )
+                ),
             )
             result = await self.session.execute(stmt)
             snippet = result.scalar()
@@ -1062,9 +1062,7 @@ class SearchService:
         words = query.split()
         if len(words) > 1:
             # Suggest individual words
-            for word in words:
-                if len(word) > 2:
-                    suggestions.append(word)
+            suggestions.extend(word for word in words if len(word) > 2)
 
         return suggestions[:5]
 
@@ -1196,14 +1194,14 @@ class SearchService:
         recommendations = []
         if queries:
             recommendations.append(
-                "Consider adding content that addresses these frequently searched topics."
+                "Consider adding content that addresses these frequently searched topics.",
             )
             recommendations.append(
-                "Review if synonyms could help match these queries to existing content."
+                "Review if synonyms could help match these queries to existing content.",
             )
             if any(len(q.query.split()) == 1 for q in queries):
                 recommendations.append(
-                    "Some single-word queries may benefit from fuzzy matching improvements."
+                    "Some single-word queries may benefit from fuzzy matching improvements.",
                 )
 
         return ZeroResultsResponse(

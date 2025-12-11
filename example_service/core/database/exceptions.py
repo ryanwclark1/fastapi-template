@@ -19,7 +19,7 @@ class DatabaseError(Exception):
     indicates a problem with the database operation itself.
     """
 
-    def __init__(self, message: str, details: dict[str, Any] | None = None):
+    def __init__(self, message: str, details: dict[str, Any] | None = None) -> None:
         """Initialize database error.
 
         Args:
@@ -51,7 +51,7 @@ class NotFoundError(DatabaseError):
         identifier: The key/value that was searched for
     """
 
-    def __init__(self, model_name: str, identifier: dict[str, Any]):
+    def __init__(self, model_name: str, identifier: dict[str, Any]) -> None:
         """Initialize not found error.
 
         Args:

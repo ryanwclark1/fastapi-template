@@ -121,7 +121,7 @@ async def generate_upload_url(
     expires_in: int | None = None,
     bucket: str | None = None,
     max_size_bytes: int | None = None,
-    metadata: dict[str, str] | None = None,  # noqa: ARG001
+    metadata: dict[str, str] | None = None,
 ) -> PresignedUploadUrl:
     """Generate a presigned upload URL for browser uploads.
 

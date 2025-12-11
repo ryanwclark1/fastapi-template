@@ -35,7 +35,7 @@ from decimal import Decimal
 from enum import Enum
 import logging
 import statistics
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from sqlalchemy import and_, case, func, select
 
@@ -289,16 +289,16 @@ class AgentAnalytics:
         query = select(
             func.count(AIAgentRun.id).label("total_runs"),
             func.sum(
-                case((AIAgentRun.status == "completed", 1), else_=0)
+                case((AIAgentRun.status == "completed", 1), else_=0),
             ).label("successful"),
             func.sum(
-                case((AIAgentRun.status == "failed", 1), else_=0)
+                case((AIAgentRun.status == "failed", 1), else_=0),
             ).label("failed"),
             func.sum(
-                case((AIAgentRun.status == "cancelled", 1), else_=0)
+                case((AIAgentRun.status == "cancelled", 1), else_=0),
             ).label("cancelled"),
             func.sum(
-                case((AIAgentRun.status == "timeout", 1), else_=0)
+                case((AIAgentRun.status == "timeout", 1), else_=0),
             ).label("timed_out"),
             func.sum(AIAgentRun.total_input_tokens).label("input_tokens"),
             func.sum(AIAgentRun.total_output_tokens).label("output_tokens"),
@@ -306,8 +306,8 @@ class AgentAnalytics:
             func.avg(
                 func.extract(
                     "epoch",
-                    AIAgentRun.completed_at - AIAgentRun.started_at
-                )
+                    AIAgentRun.completed_at - AIAgentRun.started_at,
+                ),
             ).label("avg_duration"),
         ).where(and_(*conditions))
 
@@ -319,7 +319,7 @@ class AgentAnalytics:
         total_cost = Decimal(str(row.total_cost or 0))
         total_tokens = (row.input_tokens or 0) + (row.output_tokens or 0)
 
-        metrics = UsageMetrics(
+        return UsageMetrics(
             period_start=start_date,
             period_end=end_date,
             total_runs=total_runs,
@@ -337,7 +337,6 @@ class AgentAnalytics:
             error_rate=(row.failed or 0) / total_runs * 100 if total_runs > 0 else None,
         )
 
-        return metrics
 
     async def get_agent_metrics(
         self,
@@ -377,18 +376,18 @@ class AgentAnalytics:
             func.avg(
                 func.extract(
                     "epoch",
-                    AIAgentRun.completed_at - AIAgentRun.started_at
-                )
+                    AIAgentRun.completed_at - AIAgentRun.started_at,
+                ),
             ).label("avg_duration"),
             func.avg(AIAgentRun.current_step).label("avg_iterations"),
             func.sum(
-                case((AIAgentRun.status == "completed", 1), else_=0)
+                case((AIAgentRun.status == "completed", 1), else_=0),
             ).label("successful"),
             func.sum(
-                case((AIAgentRun.retry_count > 0, 1), else_=0)
+                case((AIAgentRun.retry_count > 0, 1), else_=0),
             ).label("retried"),
             func.sum(
-                case((AIAgentRun.status == "timeout", 1), else_=0)
+                case((AIAgentRun.status == "timeout", 1), else_=0),
             ).label("timed_out"),
         ).where(and_(*conditions))
 
@@ -425,7 +424,7 @@ class AgentAnalytics:
                 and_(
                     *conditions,
                     AIAgentRun.error_code.isnot(None),
-                )
+                ),
             )
             .group_by(AIAgentRun.error_code)
             .order_by(func.count(AIAgentRun.id).desc())
@@ -468,7 +467,7 @@ class AgentAnalytics:
             func.sum(AIAgentRun.total_cost_usd).label("total_cost"),
             func.count(AIAgentRun.id).label("total_runs"),
             func.sum(
-                AIAgentRun.total_input_tokens + AIAgentRun.total_output_tokens
+                AIAgentRun.total_input_tokens + AIAgentRun.total_output_tokens,
             ).label("total_tokens"),
         ).where(and_(*conditions))
 
@@ -526,7 +525,7 @@ class AgentAnalytics:
             and_(
                 *conditions,
                 AIAgentRun.status.in_(["failed", "timeout", "cancelled"]),
-            )
+            ),
         )
         failed_result = await self.db_session.execute(failed_query)
         wasted = Decimal(str(failed_result.scalar() or 0))
@@ -576,7 +575,7 @@ class AgentAnalytics:
                     AIAgentRun.tenant_id == tenant_id,
                     AIAgentRun.created_at >= start_date,
                     AIAgentRun.created_at <= end_date,
-                )
+                ),
             )
         )
         agent_types_result = await self.db_session.execute(agent_types_query)
@@ -585,7 +584,7 @@ class AgentAnalytics:
         metrics_by_agent = []
         for agent_type in agent_types:
             agent_metrics = await self.get_agent_metrics(
-                tenant_id, agent_type, start_date, end_date
+                tenant_id, agent_type, start_date, end_date,
             )
             metrics_by_agent.append(agent_metrics)
 
@@ -596,7 +595,7 @@ class AgentAnalytics:
         recommendations = []
         if include_recommendations:
             recommendations = self._generate_recommendations(
-                summary, metrics_by_agent, cost_analysis
+                summary, metrics_by_agent, cost_analysis,
             )
 
         return UsageReport(
@@ -621,14 +620,14 @@ class AgentAnalytics:
         if summary.error_rate and summary.error_rate > 10:
             recommendations.append(
                 f"High error rate detected ({summary.error_rate:.1f}%). "
-                "Review agent configurations and error logs."
+                "Review agent configurations and error logs.",
             )
 
         # Check cost efficiency
         if cost_analysis.wasted_cost > cost_analysis.total_cost_usd * Decimal("0.2"):
             recommendations.append(
                 f"${float(cost_analysis.wasted_cost):.2f} spent on failed runs. "
-                "Consider improving retry logic or input validation."
+                "Consider improving retry logic or input validation.",
             )
 
         # Check agent performance
@@ -636,13 +635,13 @@ class AgentAnalytics:
             if agent.timeout_rate and agent.timeout_rate > 5:
                 recommendations.append(
                     f"Agent '{agent.agent_type}' has {agent.timeout_rate:.1f}% timeout rate. "
-                    "Consider increasing timeout or optimizing prompts."
+                    "Consider increasing timeout or optimizing prompts.",
                 )
 
             if agent.retry_rate and agent.retry_rate > 20:
                 recommendations.append(
                     f"Agent '{agent.agent_type}' has {agent.retry_rate:.1f}% retry rate. "
-                    "Review error handling and input validation."
+                    "Review error handling and input validation.",
                 )
 
         return recommendations
@@ -677,7 +676,7 @@ class BenchmarkResult:
     individual_results: list[dict[str, Any]] = field(default_factory=list)
 
 
-class PerformanceBenchmark(Generic[T]):
+class PerformanceBenchmark[T]:
     """Performance benchmarking for agents.
 
     Run standardized tests to measure agent performance.

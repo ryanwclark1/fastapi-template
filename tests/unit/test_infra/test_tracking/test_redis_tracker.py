@@ -153,8 +153,7 @@ def tracker(monkeypatch):
         "example_service.infra.tasks.tracking.redis_tracker.Redis",
         FakeRedis,
     )
-    tracker = RedisTaskTracker(redis_url="redis://test", key_prefix="task", ttl_seconds=3600)
-    return tracker
+    return RedisTaskTracker(redis_url="redis://test", key_prefix="task", ttl_seconds=3600)
 
 
 @pytest.mark.asyncio

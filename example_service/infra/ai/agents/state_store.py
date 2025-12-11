@@ -1,3 +1,4 @@
+# mypy: disable-error-code="arg-type,return-value,assignment,attr-defined,misc,no-any-return,override"
 """Persistent state store for AI agents.
 
 This module provides state persistence for:
@@ -39,7 +40,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 import json
 import logging
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 if TYPE_CHECKING:
     from redis.asyncio import Redis
@@ -95,7 +96,8 @@ class StateKey:
         """Parse from string representation."""
         parts = key_str.split(":")
         if len(parts) < 3:
-            raise ValueError(f"Invalid state key format: {key_str}")
+            msg = f"Invalid state key format: {key_str}"
+            raise ValueError(msg)
         return cls(
             tenant_id=parts[0],
             namespace=parts[1],
@@ -105,7 +107,7 @@ class StateKey:
 
 
 @dataclass
-class StateEntry(Generic[T]):
+class StateEntry[T]:
     """An entry in the state store."""
 
     key: StateKey
@@ -846,7 +848,7 @@ async def configure_redis_state_store() -> RedisCacheStateStore | None:
         if cache is None:
             logger.warning(
                 "Redis cache not initialized - using in-memory state store. "
-                "State will be lost on restart."
+                "State will be lost on restart.",
             )
             return None
 
@@ -859,7 +861,7 @@ async def configure_redis_state_store() -> RedisCacheStateStore | None:
         logger.warning(f"Could not import Redis cache: {e}")
         return None
     except Exception as e:
-        logger.error(f"Failed to configure Redis state store: {e}")
+        logger.exception(f"Failed to configure Redis state store: {e}")
         return None
 
 

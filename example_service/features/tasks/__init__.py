@@ -75,45 +75,45 @@ from example_service.features.tasks.service import (
 __all__ = [
     # Exceptions
     "BrokerNotConfiguredError",
-    "TaskServiceError",
-    "TrackerNotAvailableError",
-    # Service
-    "TaskManagementService",
-    "get_task_service",
-    # Router
-    "router",
-    # Schemas - Enums
-    "DLQStatus",
-    "TaskName",
-    "TaskStatus",
-    # Schemas - Task Execution
-    "TaskExecutionResponse",
-    "TaskExecutionDetailResponse",
-    "RunningTaskResponse",
-    "TaskSearchParams",
-    "TaskSearchResponse",
-    "TaskStatsResponse",
+    # Schemas - Bulk Operations
+    "BulkCancelRequest",
+    "BulkCancelResponse",
+    "BulkOperationResult",
+    "BulkRetryRequest",
+    "BulkRetryResponse",
     # Schemas - Task Operations
     "CancelTaskRequest",
     "CancelTaskResponse",
-    "TriggerTaskRequest",
-    "TriggerTaskResponse",
-    # Schemas - Scheduled Jobs
-    "ScheduledJobListResponse",
-    "ScheduledJobResponse",
+    "DLQDiscardRequest",
+    "DLQDiscardResponse",
     # Schemas - DLQ
     "DLQEntryResponse",
     "DLQListResponse",
     "DLQRetryRequest",
     "DLQRetryResponse",
-    "DLQDiscardRequest",
-    "DLQDiscardResponse",
-    # Schemas - Bulk Operations
-    "BulkCancelRequest",
-    "BulkCancelResponse",
-    "BulkRetryRequest",
-    "BulkRetryResponse",
-    "BulkOperationResult",
+    # Schemas - Enums
+    "DLQStatus",
+    "RunningTaskResponse",
+    # Schemas - Scheduled Jobs
+    "ScheduledJobListResponse",
+    "ScheduledJobResponse",
+    "TaskExecutionDetailResponse",
+    # Schemas - Task Execution
+    "TaskExecutionResponse",
+    # Service
+    "TaskManagementService",
+    "TaskName",
     # Schemas - Progress
     "TaskProgressResponse",
+    "TaskSearchParams",
+    "TaskSearchResponse",
+    "TaskServiceError",
+    "TaskStatsResponse",
+    "TaskStatus",
+    "TrackerNotAvailableError",
+    "TriggerTaskRequest",
+    "TriggerTaskResponse",
+    "get_task_service",
+    # Router
+    "router",
 ]

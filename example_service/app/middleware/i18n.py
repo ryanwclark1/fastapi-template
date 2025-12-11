@@ -170,8 +170,8 @@ class I18nMiddleware(BaseHTTPMiddleware):
         # Parse language preferences with quality values
         preferences = []
 
-        for lang_part in accept_language.split(","):
-            lang_part = lang_part.strip()
+        for lang_part_raw in accept_language.split(","):
+            lang_part = lang_part_raw.strip()
             if not lang_part:
                 continue
 
@@ -211,7 +211,7 @@ class I18nMiddleware(BaseHTTPMiddleware):
         return None
 
     async def dispatch(
-        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         """Process request and set locale.
 

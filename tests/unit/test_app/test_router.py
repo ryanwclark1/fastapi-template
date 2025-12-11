@@ -73,7 +73,7 @@ def _prepare_base(monkeypatch: pytest.MonkeyPatch, settings: SimpleNamespace) ->
     """Patch module-level dependencies with simple sentinels."""
     monkeypatch.setattr(router_module, "get_app_settings", lambda: settings)
     monkeypatch.setattr(
-        router_module, "get_websocket_settings", lambda: SimpleNamespace(enabled=False)
+        router_module, "get_websocket_settings", lambda: SimpleNamespace(enabled=False),
     )
     monkeypatch.setattr(
         router_module,
@@ -91,10 +91,11 @@ def _prepare_base(monkeypatch: pytest.MonkeyPatch, settings: SimpleNamespace) ->
     monkeypatch.setattr(router_module, "email_router", object())
     monkeypatch.setattr(router_module, "admin_email_router", object())
     monkeypatch.setattr(router_module, "ai_pipeline_router", object())
+    monkeypatch.setattr(router_module, "agent_config_router", object())
 
 
 def test_setup_routers_without_rabbit(
-    monkeypatch: pytest.MonkeyPatch, settings: SimpleNamespace
+    monkeypatch: pytest.MonkeyPatch, settings: SimpleNamespace,
 ) -> None:
     """Core routers should be included even when messaging router is missing."""
     _prepare_base(monkeypatch, settings)
@@ -121,11 +122,16 @@ def test_setup_routers_without_rabbit(
         call(router_module.email_router, prefix="/api", tags=["email-configuration"]),
         call(router_module.admin_email_router, prefix="/api", tags=["admin-email"]),
         call(router_module.ai_pipeline_router, prefix="/api", tags=["AI Pipelines"]),
+        call(
+            router_module.agent_config_router,
+            prefix="/api",
+            tags=["AI Agent Configuration"],
+        ),
     ]
 
 
 def test_setup_routers_includes_rabbit_router(
-    monkeypatch: pytest.MonkeyPatch, settings: SimpleNamespace
+    monkeypatch: pytest.MonkeyPatch, settings: SimpleNamespace,
 ) -> None:
     """Messaging router should be included when available."""
     _prepare_base(monkeypatch, settings)

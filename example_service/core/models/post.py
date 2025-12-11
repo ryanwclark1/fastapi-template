@@ -16,7 +16,7 @@ from example_service.core.database import TimestampedBase
 from example_service.core.database.search import TSVECTOR
 
 if TYPE_CHECKING:
-    from .user import User  # noqa: TC004
+    from .user import User
 
 
 class Post(TimestampedBase):
@@ -60,7 +60,7 @@ class Post(TimestampedBase):
 
     # Foreign key to User
     author_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True,
     )
 
     # Full-text search vector (managed by database trigger)
@@ -71,7 +71,7 @@ class Post(TimestampedBase):
     )
 
     # Relationships
-    author: Mapped[User] = relationship("User", back_populates="posts")
+    author: Mapped["User"] = relationship("User", back_populates="posts")
 
     # Additional indexes
     __table_args__ = (

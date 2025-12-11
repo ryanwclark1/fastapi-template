@@ -16,9 +16,12 @@ from example_service.features.reminders.recurrence import (
     Weekday,
     describe_rrule,
 )
+from example_service.utils.runtime_dependencies import require_runtime_dependency
 
 if TYPE_CHECKING:
     from example_service.features.reminders.models import Reminder
+
+require_runtime_dependency(datetime, UUID)
 
 
 class ReminderBase(BaseModel):

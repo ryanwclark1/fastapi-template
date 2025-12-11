@@ -158,7 +158,7 @@ class SearchManager:
         for target, event_name, callback in self._listeners:
             with contextlib.suppress(Exception):
                 event.remove(
-                    target, event_name, callback
+                    target, event_name, callback,
                 )  # Listener may already be removed
         self._listeners.clear()
         self._processed_tables.clear()
@@ -224,7 +224,7 @@ class SearchManager:
             logger.info("Full-text search configured for %s", table_name)
 
         except Exception as e:
-            logger.error("Failed to setup FTS for %s: %s", table_name, e)
+            logger.exception("Failed to setup FTS for %s: %s", table_name, e)
 
     def _get_model_for_table(self, table: Table) -> Any:
         """Find the model class associated with a table.
@@ -285,7 +285,7 @@ class SearchManager:
             config = search_field_configs.get(field_name, search_config)
             weight = search_weights.get(field_name, "D")
             vector_parts.append(
-                f"setweight(to_tsvector('{config}', coalesce(NEW.{field_name}, '')), '{weight}')"
+                f"setweight(to_tsvector('{config}', coalesce(NEW.{field_name}, '')), '{weight}')",
             )
 
         vector_expr = (

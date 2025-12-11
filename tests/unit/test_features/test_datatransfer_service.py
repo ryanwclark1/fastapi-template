@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 import pytest
 
 from example_service.features.datatransfer import service as dt_service
 from example_service.features.datatransfer.schemas import ExportFormat, ExportRequest
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 
 def test_ensure_export_dir_uses_configured_path(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     custom_dir = tmp_path / "exports"
     monkeypatch.setattr(dt_service, "EXPORT_DIR", custom_dir)

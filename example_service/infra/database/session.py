@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator  # noqa: TC003
 from contextlib import asynccontextmanager
 import logging
 import time
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from opentelemetry import trace
 from sqlalchemy import event, text
@@ -27,6 +26,11 @@ from example_service.infra.metrics.prometheus import (
 )
 from example_service.infra.metrics.tracking import track_slow_query
 from example_service.utils.retry import retry
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+else:  # pragma: no cover - typing fallback
+    AsyncGenerator = Any
 
 logger = logging.getLogger(__name__)
 
@@ -80,8 +84,8 @@ async def _ensure_event_outbox_table() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(
             lambda sync_conn: cast("Any", EventOutbox.__table__).create(
-                bind=sync_conn, checkfirst=True
-            )
+                bind=sync_conn, checkfirst=True,
+            ),
         )
 
     _outbox_table_initialized = True
@@ -116,7 +120,7 @@ def _receive_close(dbapi_conn: Any, connection_record: Any) -> None:
 # Store checkout start time in connection_record.info for timing
 @event.listens_for(engine.sync_engine.pool, "checkout")
 def _receive_checkout(
-    dbapi_conn: Any, connection_record: Any, connection_proxy: Any
+    dbapi_conn: Any, connection_record: Any, connection_proxy: Any,
 ) -> None:
     """Track connection checkout from pool.
 
@@ -172,7 +176,7 @@ def _receive_checkin(dbapi_conn: Any, connection_record: Any) -> None:
 
 @event.listens_for(engine.sync_engine.pool, "invalidate")
 def _receive_invalidate(
-    dbapi_conn: Any, connection_record: Any, exception: Any
+    dbapi_conn: Any, connection_record: Any, exception: Any,
 ) -> None:
     """Track connection invalidation.
 
@@ -188,7 +192,7 @@ def _receive_invalidate(
 
 @event.listens_for(engine.sync_engine.pool, "soft_invalidate")
 def _receive_soft_invalidate(
-    dbapi_conn: Any, connection_record: Any, exception: Any
+    dbapi_conn: Any, connection_record: Any, exception: Any,
 ) -> None:
     """Track soft connection invalidation.
 
@@ -237,7 +241,7 @@ def track_checkout_timeout() -> None:
 # Track query execution duration with trace correlation
 @event.listens_for(engine.sync_engine, "before_cursor_execute")
 def _before_cursor_execute(
-    conn: Any, cursor: Any, statement: str, parameters: Any, context: Any, executemany: Any
+    conn: Any, cursor: Any, statement: str, parameters: Any, context: Any, executemany: Any,
 ) -> None:
     """Record query start time before execution."""
     _ = conn, cursor, statement, parameters, executemany
@@ -246,7 +250,7 @@ def _before_cursor_execute(
 
 @event.listens_for(engine.sync_engine, "after_cursor_execute")
 def _after_cursor_execute(
-    conn: Any, cursor: Any, statement: str, parameters: Any, context: Any, executemany: Any
+    conn: Any, cursor: Any, statement: str, parameters: Any, context: Any, executemany: Any,
 ) -> None:
     """Record query duration and link to current trace via exemplar."""
     _ = conn, cursor, parameters, executemany
@@ -282,7 +286,7 @@ def _after_cursor_execute(
     # Record metric with exemplar if trace is available
     if trace_id:
         database_query_duration_seconds.labels(operation=operation).observe(
-            duration, exemplar={"trace_id": trace_id}
+            duration, exemplar={"trace_id": trace_id},
         )
     else:
         database_query_duration_seconds.labels(operation=operation).observe(duration)
@@ -379,7 +383,7 @@ async def init_database() -> None:
             if db_settings.is_configured
             else "sqlite+aiosqlite:///./test.db"
         )
-        logger.error(
+        logger.exception(
             "Failed to connect to database",
             extra={"url": db_url, "error": str(e)},
         )

@@ -29,7 +29,7 @@ class BackupError(Exception):
 
 
 async def run_pg_dump(
-    database_url: str, output_path: Path, exclude_tables: list[str] | None = None
+    database_url: str, output_path: Path, exclude_tables: list[str] | None = None,
 ) -> None:
     """Execute pg_dump asynchronously.
 
@@ -98,7 +98,8 @@ async def run_pg_dump(
             "pg_dump failed",
             extra={"returncode": proc.returncode, "stderr": error_msg},
         )
-        raise BackupError(f"pg_dump failed with code {proc.returncode}: {error_msg}")
+        msg = f"pg_dump failed with code {proc.returncode}: {error_msg}"
+        raise BackupError(msg)
 
     logger.info(
         "pg_dump completed successfully",
@@ -276,7 +277,8 @@ if broker is not None:
             raise
         except Exception as e:
             logger.exception("Unexpected error during backup", extra={"error": str(e)})
-            raise BackupError(f"Backup failed: {e}") from e
+            msg = f"Backup failed: {e}"
+            raise BackupError(msg) from e
 
     @broker.task()
     async def list_backups() -> dict:
@@ -306,7 +308,7 @@ if broker is not None:
                         "size_bytes": stat.st_size,
                         "size_mb": round(stat.st_size / (1024 * 1024), 2),
                         "modified": datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat(),
-                    }
+                    },
                 )
 
         # List S3 backups
@@ -324,7 +326,7 @@ if broker is not None:
                             "size_bytes": obj["Size"],
                             "size_mb": round(obj["Size"] / (1024 * 1024), 2),
                             "modified": obj["LastModified"].isoformat(),
-                        }
+                        },
                     )
             except Exception as e:
                 logger.warning(f"Failed to list S3 backups: {e}")

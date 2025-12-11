@@ -11,7 +11,7 @@ Provides a base class for external service clients with:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 import httpx
 
@@ -93,7 +93,7 @@ class BaseHTTPClient:
         """Close the HTTP client and release connections."""
         await self.client.aclose()
 
-    async def __aenter__(self) -> BaseHTTPClient:
+    async def __aenter__(self) -> Self:
         """Enter async context manager."""
         return self
 

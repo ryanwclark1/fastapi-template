@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 from starlette.requests import Request
 from starlette.responses import Response
-from starlette.types import Scope
 
 from example_service.app.middleware.debug import DebugMiddleware
+
+if TYPE_CHECKING:
+    from starlette.types import Scope
 
 
 def _scope(headers: list[tuple[bytes, bytes]] | None = None) -> Scope:

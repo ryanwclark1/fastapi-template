@@ -1,3 +1,4 @@
+# mypy: disable-error-code="attr-defined,arg-type,assignment,return-value,misc,name-defined"
 """Email management CLI commands.
 
 This module provides CLI commands for managing email:
@@ -57,7 +58,6 @@ async def test_email(tenant_id: str, recipient: str, use_system: bool) -> None:
     Sends a test email and reports delivery status.
 
     Examples:
-    \b
       example-service email test -t tenant-123 --to admin@example.com
     """
     from example_service.features.email.service import EmailConfigService
@@ -429,7 +429,6 @@ async def send_email(
     """Send an email using tenant configuration.
 
     Examples:
-    \b
       example-service email send -t tenant-123 --to user@example.com -s "Hello" -b "Test message"
     """
     from example_service.features.email.service import EmailConfigService

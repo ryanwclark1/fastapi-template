@@ -45,7 +45,7 @@ def _build_request(path: str = "/test") -> Request:
     ],
 )
 async def test_app_exception_handler_handles_problem_details(
-    exception_cls: type[AppException], headers_expected: bool, monkeypatch: pytest.MonkeyPatch
+    exception_cls: type[AppException], headers_expected: bool, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """App exceptions should produce RFC 7807 responses and track metrics."""
     tracked: dict[str, Any] = {}
@@ -96,7 +96,7 @@ async def test_validation_exception_handler_formats_errors(monkeypatch: pytest.M
     exc = RequestValidationError(
         [
             {"loc": ("body", "name"), "msg": "field required", "type": "value_error"},
-        ]
+        ],
     )
 
     response = await validation_exception_handler(request, exc)

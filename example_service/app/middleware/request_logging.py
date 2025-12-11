@@ -39,7 +39,7 @@ SLOW_REQUEST_THRESHOLD = 5.0
 # Security event detection patterns
 SECURITY_PATTERNS = {
     "sql_injection": re.compile(
-        r"(\bunion\b.*\bselect\b|\bor\b.*=.*|\bdrop\b.*\btable\b)", re.IGNORECASE
+        r"(\bunion\b.*\bselect\b|\bor\b.*=.*|\bdrop\b.*\btable\b)", re.IGNORECASE,
     ),
     "xss": re.compile(r"(<script|javascript:|onerror=|onload=)", re.IGNORECASE),
     "path_traversal": re.compile(r"(\.\./|\.\.\\|%2e%2e)", re.IGNORECASE),
@@ -254,7 +254,7 @@ class PIIMasker:
 
         # Mask credit cards (before phone to avoid false positives)
         value = self.CREDIT_CARD_PATTERN.sub(
-            lambda m: self.mask_credit_card(m.group()), value
+            lambda m: self.mask_credit_card(m.group()), value,
         )
 
         # Mask phone numbers
@@ -270,7 +270,7 @@ class PIIMasker:
         return value
 
     def mask_dict(
-        self, data: dict[str, Any], depth: int = 0, max_depth: int = 10
+        self, data: dict[str, Any], depth: int = 0, max_depth: int = 10,
     ) -> dict[str, Any]:
         """Recursively mask PII in dictionary.
 
@@ -380,7 +380,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         # Add custom sensitive fields to masker
         if sensitive_fields:
             self.masker.sensitive_fields = self.masker.sensitive_fields | set(
-                sensitive_fields
+                sensitive_fields,
             )
 
         self.exempt_paths = exempt_paths or [
@@ -567,7 +567,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         return body_bytes, None
 
     async def dispatch(
-        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         """Log request and response with PII masking.
 
@@ -580,8 +580,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         """
         # Skip detailed logging for exempt paths
         if self._is_exempt(request.url.path):
-            response = await call_next(request)
-            return response
+            return await call_next(request)
 
         start_time = time.time()
         request_id = getattr(request.state, "request_id", None)
@@ -665,7 +664,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
         # Detect security events if enabled
         security_events = self._detect_security_event(
-            request, request.url.path, dict(request.query_params), parsed_body
+            request, request.url.path, dict(request.query_params), parsed_body,
         )
         if security_events:
             log_data["security_events"] = security_events
@@ -772,7 +771,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             )
 
         if duration >= SLOW_REQUEST_THRESHOLD and hasattr(
-            tracking, "track_slow_request"
+            tracking, "track_slow_request",
         ):
             tracking.track_slow_request(
                 path=request.url.path,

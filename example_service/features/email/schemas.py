@@ -15,6 +15,9 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from example_service.features.email.models import EmailProviderType
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(datetime, EmailProviderType)
 
 
 class EmailConfigBase(BaseModel):
@@ -342,7 +345,7 @@ class SendEmailRequest(BaseModel):
 
     @field_validator("body", "body_html")
     @classmethod
-    def validate_body_content(cls, v: str | None, info: Any) -> str | None:
+    def validate_body_content(cls, v: str | None) -> str | None:
         """Ensure at least one body type is provided."""
         return v
 

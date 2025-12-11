@@ -42,7 +42,7 @@ def serialize_value(value: Any) -> Any:
     if hasattr(value, "model_dump"):
         return value.model_dump()
     if hasattr(value, "__dict__") and not isinstance(
-        value, (str, int, float, bool, list, dict)
+        value, (str, int, float, bool, list, dict),
     ):
         return {
             k: serialize_value(v)
@@ -138,10 +138,12 @@ class CSVExporter(BaseExporter[T]):
 
     @property
     def content_type(self) -> str:
+        """Return MIME type for CSV exports."""
         return "text/csv"
 
     @property
     def file_extension(self) -> str:
+        """Return file extension for CSV exports."""
         return "csv"
 
     def export(self, records: list[T], output_path: Path) -> int:
@@ -199,10 +201,12 @@ class JSONExporter(BaseExporter[T]):
 
     @property
     def content_type(self) -> str:
+        """Return MIME type for JSON exports."""
         return "application/json"
 
     @property
     def file_extension(self) -> str:
+        """Return file extension for JSON exports."""
         return "json"
 
     def export(self, records: list[T], output_path: Path) -> int:
@@ -217,7 +221,7 @@ class JSONExporter(BaseExporter[T]):
 
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(
-                export_data, f, indent=self.indent, ensure_ascii=False, default=str
+                export_data, f, indent=self.indent, ensure_ascii=False, default=str,
             )
 
         return len(rows)
@@ -233,7 +237,7 @@ class JSONExporter(BaseExporter[T]):
         }
 
         return json.dumps(
-            export_data, indent=self.indent, ensure_ascii=False, default=str
+            export_data, indent=self.indent, ensure_ascii=False, default=str,
         ).encode("utf-8")
 
 
@@ -245,10 +249,12 @@ class ExcelExporter(BaseExporter[T]):
 
     @property
     def content_type(self) -> str:
+        """Return MIME type for Excel exports."""
         return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
     @property
     def file_extension(self) -> str:
+        """Return file extension for Excel exports."""
         return "xlsx"
 
     def _build_workbook(self, records: list[T]) -> tuple[Any, int]:
@@ -342,7 +348,8 @@ def get_exporter(
         return JSONExporter(fields=fields, include_headers=include_headers)
     if format_lower in ("xlsx", "excel"):
         return ExcelExporter(fields=fields, include_headers=include_headers)
-    raise ValueError(f"Unsupported export format: {format}")
+    msg = f"Unsupported export format: {format}"
+    raise ValueError(msg)
 
 
 __all__ = [

@@ -32,12 +32,15 @@ from example_service.features.webhooks.schemas import (
     WebhookRead,
     WebhookUpdate,
 )
+from example_service.utils.runtime_dependencies import require_runtime_dependency
 
 # Keep PydanticDeliveryStatus alias for backward compatibility with existing code
 PydanticDeliveryStatus = ModelDeliveryStatus
 
 if TYPE_CHECKING:
     from strawberry.types import Info
+
+require_runtime_dependency(PageInfoType)
 
 # ============================================================================
 # Enums
@@ -196,7 +199,7 @@ class CreateWebhookInput:
     # Override custom_headers with JSON type (dict not supported in GraphQL)
     custom_headers: strawberry.scalars.JSON | None = strawberry.field(
         default=None,
-        description="Custom HTTP headers as JSON object"
+        description="Custom HTTP headers as JSON object",
     )
 
 
@@ -223,7 +226,7 @@ class UpdateWebhookInput:
     # Override custom_headers with JSON type (dict not supported in GraphQL)
     custom_headers: strawberry.scalars.JSON | None = strawberry.field(
         default=None,
-        description="Custom HTTP headers as JSON object"
+        description="Custom HTTP headers as JSON object",
     )
 
 
@@ -370,7 +373,7 @@ class WebhookDeliveryEvent:
     """
 
     event_type: WebhookDeliveryEventType = strawberry.field(
-        description="Type of event that occurred"
+        description="Type of event that occurred",
     )
     delivery: WebhookDeliveryType = strawberry.field(description="Delivery attempt data")
     webhook_id: strawberry.ID = strawberry.field(description="Parent webhook ID")

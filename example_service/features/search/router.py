@@ -9,9 +9,9 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, Query
 
-from example_service.core.dependencies.accent_auth import get_current_user
+from example_service.core.dependencies.auth import AuthUserDep
 from example_service.core.dependencies.database import get_db_session
-from example_service.core.schemas.auth import AuthUser
+from example_service.utils.runtime_dependencies import require_runtime_dependency
 
 from .schemas import (
     RecordClickRequest,
@@ -31,7 +31,9 @@ from .service import SearchService
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+
 router = APIRouter(prefix="/search", tags=["search"])
+require_runtime_dependency(AuthUserDep)
 
 
 @router.get(
@@ -42,7 +44,7 @@ router = APIRouter(prefix="/search", tags=["search"])
 )
 async def get_search_capabilities(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
 ) -> SearchCapabilitiesResponse:
     """Get search capabilities.
 
@@ -64,7 +66,7 @@ async def get_search_capabilities(
 async def search(
     request: SearchRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
 ) -> SearchResponse:
     """Execute a full-text search.
 
@@ -78,6 +80,7 @@ async def search(
 
     Args:
         request: Search parameters including query and options.
+        session: Async database session.
 
     Returns:
         Search results with relevance ranking.
@@ -94,7 +97,7 @@ async def search(
 )
 async def search_get(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
     q: Annotated[str, Query(min_length=1, max_length=500, description="Search query")],
     entities: Annotated[list[str] | None, Query(description="Entity types")] = None,
     syntax: Annotated[SearchSyntax, Query(description="Query syntax")] = SearchSyntax.WEB,
@@ -107,6 +110,7 @@ async def search_get(
     Convenience endpoint for simple GET-based searches.
 
     Args:
+        session: Async database session.
         q: Search query.
         entities: Entity types to search (comma-separated).
         syntax: Query syntax mode.
@@ -139,7 +143,7 @@ async def search_get(
 )
 async def get_suggestions(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
     prefix: Annotated[str, Query(min_length=2, max_length=100, description="Search prefix")],
     entity_type: Annotated[str | None, Query(description="Limit to entity type")] = None,
     limit: Annotated[int, Query(ge=1, le=50, description="Max suggestions")] = 10,
@@ -149,6 +153,7 @@ async def get_suggestions(
     Returns suggestions based on matching content as the user types.
 
     Args:
+        session: Async database session.
         prefix: The text the user has typed.
         entity_type: Optional filter for specific entity type.
         limit: Maximum number of suggestions.
@@ -180,7 +185,7 @@ async def get_suggestions(
 )
 async def get_search_analytics(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
     days: Annotated[int, Query(ge=1, le=365, description="Number of days to analyze")] = 30,
 ) -> SearchAnalyticsResponse:
     """Get search analytics and statistics.
@@ -194,6 +199,7 @@ async def get_search_analytics(
     - Queries with no results (content gaps)
 
     Args:
+        session: Async database session.
         days: Number of days to analyze (default: 30).
 
     Returns:
@@ -201,7 +207,7 @@ async def get_search_analytics(
     """
     service = SearchService(session)
     return await service.get_analytics(
-        SearchAnalyticsRequest(days=days)
+        SearchAnalyticsRequest(days=days),
     )
 
 
@@ -213,7 +219,7 @@ async def get_search_analytics(
 )
 async def get_search_trends(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
     days: Annotated[int, Query(ge=1, le=365, description="Number of days")] = 30,
     interval: Annotated[str, Query(description="Grouping interval", regex="^(hour|day|week)$")] = "day",
 ) -> SearchTrendsResponse:
@@ -222,6 +228,7 @@ async def get_search_trends(
     Shows search activity patterns grouped by time interval.
 
     Args:
+        session: Async database session.
         days: Number of days to analyze.
         interval: Time grouping ("hour", "day", or "week").
 
@@ -240,7 +247,7 @@ async def get_search_trends(
 )
 async def get_zero_result_queries(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
     days: Annotated[int, Query(ge=1, le=365, description="Number of days")] = 7,
     limit: Annotated[int, Query(ge=1, le=100, description="Max results")] = 20,
 ) -> ZeroResultsResponse:
@@ -252,6 +259,7 @@ async def get_zero_result_queries(
     - Adding spelling corrections
 
     Args:
+        session: Async database session.
         days: Number of days to analyze.
         limit: Maximum number of queries to return.
 
@@ -270,7 +278,7 @@ async def get_zero_result_queries(
 async def record_click(
     request: RecordClickRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
 ) -> dict[str, bool]:
     """Record a click on a search result.
 
@@ -278,6 +286,7 @@ async def record_click(
 
     Args:
         request: Click information including search ID and position.
+        session: Async database session.
 
     Returns:
         Success indicator.
@@ -303,13 +312,14 @@ async def record_click(
 )
 async def get_slow_queries(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
     days: Annotated[int, Query(ge=1, le=365, description="Number of days")] = 7,
     limit: Annotated[int, Query(ge=1, le=100, description="Max results")] = 50,
 ) -> dict:
     """Get slow search queries for performance analysis.
 
     Args:
+        session: Async database session.
         days: Number of days to analyze.
         limit: Maximum number of queries to return.
 
@@ -328,7 +338,7 @@ async def get_slow_queries(
 )
 async def get_performance_stats(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
     days: Annotated[int, Query(ge=1, le=365, description="Number of days")] = 7,
 ) -> dict:
     """Get query performance statistics.
@@ -339,6 +349,7 @@ async def get_performance_stats(
     - Slow query rates
 
     Args:
+        session: Async database session.
         days: Number of days to analyze.
 
     Returns:
@@ -356,7 +367,7 @@ async def get_performance_stats(
 )
 async def search_health(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
 ) -> dict:
     """Get health status of search components.
 
@@ -378,7 +389,7 @@ async def search_health(
                         "total_requests": stats.total_requests,
                     }
                     for name, stats in circuit_stats.items()
-                }
+                },
             },
         },
     }

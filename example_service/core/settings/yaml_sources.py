@@ -53,7 +53,7 @@ class ConfDYamlConfigSettingsSource(YamlConfigSettingsSource):
         config_dir_env: str = "CONFIG_DIR",
         base_dir: str = "conf",
         yaml_file_encoding: str | None = "utf-8",
-    ):
+    ) -> None:
         """Initialize the conf.d YAML source.
 
         Args:
@@ -80,13 +80,10 @@ class ConfDYamlConfigSettingsSource(YamlConfigSettingsSource):
             confd_path = config_base / confd_dir
             if confd_path.exists() and confd_path.is_dir():
                 # YAML files
-                for f in sorted(confd_path.glob("*.yaml")):
-                    yaml_files.append(f)
-                for f in sorted(confd_path.glob("*.yml")):
-                    yaml_files.append(f)
+                yaml_files.extend(sorted(confd_path.glob("*.yaml")))
+                yaml_files.extend(sorted(confd_path.glob("*.yml")))
                 # JSON files (also valid YAML)
-                for f in sorted(confd_path.glob("*.json")):
-                    yaml_files.append(f)
+                yaml_files.extend(sorted(confd_path.glob("*.json")))
 
         # Store files list for __repr__
         self._yaml_files = yaml_files
@@ -100,6 +97,7 @@ class ConfDYamlConfigSettingsSource(YamlConfigSettingsSource):
         )
 
     def __repr__(self) -> str:
+        """Return human-readable summary of configured YAML files."""
         if self._yaml_files:
             files_str = ", ".join(str(f) for f in self._yaml_files)
             return f"{self.__class__.__name__}(yaml_files=[{files_str}])"
@@ -312,21 +310,4 @@ def create_ai_yaml_source(settings_cls: type[BaseSettings]) -> ConfDYamlConfigSe
         yaml_file="ai.yaml",
         confd_dir="ai.d",
         config_dir_env="AI_CONFIG_DIR",
-    )
-
-
-def create_mock_yaml_source(settings_cls: type[BaseSettings]) -> ConfDYamlConfigSettingsSource:
-    """Create YAML source for MockModeSettings.
-
-    Loads from:
-    - conf/mock.yaml (base)
-    - conf/mock.d/*.yaml (overrides)
-
-    Override directory with: MOCK_CONFIG_DIR=/custom/path
-    """
-    return ConfDYamlConfigSettingsSource(
-        settings_cls,
-        yaml_file="mock.yaml",
-        confd_dir="mock.d",
-        config_dir_env="MOCK_CONFIG_DIR",
     )

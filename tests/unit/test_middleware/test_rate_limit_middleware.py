@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 import pytest
 
 from example_service.app.middleware.rate_limit import RateLimitMiddleware
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 
 class StubLimiter:

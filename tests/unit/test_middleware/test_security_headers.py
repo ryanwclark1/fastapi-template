@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from httpx import AsyncClient
@@ -11,6 +13,9 @@ from example_service.app.middleware.security_headers import (
     SecurityHeadersMiddleware,
     get_security_headers,
 )
+
+if TYPE_CHECKING:
+    from starlette.types import Receive, Scope, Send
 
 
 class TestSecurityHeadersMiddleware:
@@ -321,8 +326,6 @@ class TestSecurityHeadersMiddleware:
     async def test_handles_non_http_scope(self):
         """Test that middleware passes through non-HTTP scopes."""
         from unittest.mock import AsyncMock
-
-        from starlette.types import Receive, Scope, Send
 
         async def simple_app(scope: Scope, receive: Receive, send: Send):
             await send({"type": "websocket.accept"})

@@ -65,38 +65,38 @@ from .openai_provider import (
 )
 
 __all__ = [
-    # Main factory class
-    "ProviderFactory",
-    # Utility functions
-    "get_factory",
-    "get_available_providers",
-    "get_default_providers",
-    "close_all_providers",
-    "reset_factories",
     # Base classes and protocols
     "BaseProvider",
-    "TranscriptionProvider",
-    "LLMProvider",
-    "PIIRedactionProvider",
     "EmbeddingProvider",
+    "EmbeddingResult",
+    "LLMMessage",
+    "LLMProvider",
+    "LLMResponse",
+    "OpenAIEmbeddingProvider",
+    "OpenAILLMProvider",
+    # OpenAI implementations
+    "OpenAITranscriptionProvider",
+    "PIIEntity",
+    "PIIRedactionProvider",
+    "PIIRedactionResult",
+    "ProviderAuthenticationError",
+    # Configuration
+    "ProviderConfig",
+    # Exceptions
+    "ProviderError",
+    # Main factory class
+    "ProviderFactory",
+    "ProviderInvalidInputError",
+    "ProviderRateLimitError",
+    "ProviderTimeoutError",
+    "TranscriptionProvider",
     # Result models
     "TranscriptionResult",
     "TranscriptionSegment",
-    "LLMMessage",
-    "LLMResponse",
-    "PIIEntity",
-    "PIIRedactionResult",
-    "EmbeddingResult",
-    # Exceptions
-    "ProviderError",
-    "ProviderAuthenticationError",
-    "ProviderRateLimitError",
-    "ProviderTimeoutError",
-    "ProviderInvalidInputError",
-    # Configuration
-    "ProviderConfig",
-    # OpenAI implementations
-    "OpenAITranscriptionProvider",
-    "OpenAILLMProvider",
-    "OpenAIEmbeddingProvider",
+    "close_all_providers",
+    "get_available_providers",
+    "get_default_providers",
+    # Utility functions
+    "get_factory",
+    "reset_factories",
 ]

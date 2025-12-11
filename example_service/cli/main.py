@@ -36,7 +36,6 @@ def cli(ctx: click.Context) -> None:
     database operations, cache management, server running, configuration validation,
     background tasks, scheduled jobs, user management, and various utility operations.
 
-    \b
     Command Groups:
       db         Database migrations and management
       cache      Redis cache operations
@@ -57,7 +56,6 @@ def cli(ctx: click.Context) -> None:
       email      Email configuration and testing
       flags      Feature flag management
 
-    \b
     Quick Start:
       example-service db init           # Test database connection
       example-service db upgrade        # Apply migrations

@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import datetime as dt
+from datetime import UTC
 import logging
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
+import uuid
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy import select
 
-# NOTE: These MUST be outside TYPE_CHECKING for FastAPI to resolve Annotated[..., Depends(...)] metadata
-from sqlalchemy.ext.asyncio import AsyncSession  # noqa: TC002
-
+from example_service.core.dependencies.accent_auth import get_current_user
 from example_service.core.dependencies.database import get_db_session
-from example_service.core.dependencies.events import EventPublisherDep  # noqa: TC001
+from example_service.core.dependencies.events import get_event_publisher
 from example_service.core.exceptions import BadRequestException
 from example_service.features.reminders.events import (
     ReminderCompletedEvent,
@@ -44,16 +44,27 @@ from example_service.infra.metrics.tracking import (
     track_feature_usage,
     track_user_action,
 )
+from example_service.utils.runtime_dependencies import require_runtime_dependency
 
 if TYPE_CHECKING:
-    from uuid import UUID
+    from sqlalchemy.ext.asyncio import AsyncSession
 
-router = APIRouter(prefix="/reminders", tags=["reminders"])
+    from example_service.core.events import EventPublisher
+else:  # pragma: no cover - typing fallback
+    AsyncSession = Any
+
+router = APIRouter(
+    prefix="/reminders",
+    tags=["reminders"],
+    dependencies=[Depends(get_current_user)],
+)
 
 # Standard logger for INFO/WARNING/ERROR
 logger = logging.getLogger(__name__)
 # Lazy logger for DEBUG (zero overhead when DEBUG disabled)
 lazy_logger = get_lazy_logger(__name__)
+
+require_runtime_dependency(uuid.UUID)
 
 
 @router.get(
@@ -128,7 +139,7 @@ async def list_reminders_paginated(
     stmt = select(Reminder)
 
     if not include_completed:
-        stmt = stmt.where(Reminder.is_completed == False)  # noqa: E712
+        stmt = stmt.where(not Reminder.is_completed)
 
     # Determine sort column
     sort_column = getattr(Reminder, sort_by, Reminder.created_at)
@@ -170,8 +181,8 @@ async def search_reminders(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     repo: Annotated[ReminderRepository, Depends(get_reminder_repository)],
     query: str | None = None,
-    before: datetime | None = None,
-    after: datetime | None = None,
+    before: dt.datetime | None = None,
+    after: dt.datetime | None = None,
     limit: int = 50,
     offset: int = 0,
     sort_by: str = "created_at",
@@ -313,7 +324,7 @@ async def get_overdue_reminders(
     responses={404: {"description": "Reminder not found"}},
 )
 async def get_reminder(
-    reminder_id: UUID,
+    reminder_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     repo: Annotated[ReminderRepository, Depends(get_reminder_repository)],
 ) -> ReminderResponse:
@@ -359,7 +370,7 @@ Supported frequencies: DAILY, WEEKLY, MONTHLY, YEARLY
 async def create_reminder(
     payload: ReminderCreate,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    publisher: EventPublisherDep,
+    publisher: Annotated[EventPublisher, Depends(get_event_publisher)],
 ) -> ReminderResponse:
     """Create a new reminder with optional recurrence."""
     # Track business metrics
@@ -390,7 +401,7 @@ async def create_reminder(
             title=reminder.title,
             description=reminder.description,
             remind_at=reminder.remind_at,
-        )
+        ),
     )
 
     await session.commit()
@@ -407,11 +418,11 @@ async def create_reminder(
     responses={404: {"description": "Reminder not found"}},
 )
 async def update_reminder(
-    reminder_id: UUID,
+    reminder_id: uuid.UUID,
     payload: ReminderUpdate,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     repo: Annotated[ReminderRepository, Depends(get_reminder_repository)],
-    publisher: EventPublisherDep,
+    publisher: Annotated[EventPublisher, Depends(get_event_publisher)],
 ) -> ReminderResponse:
     """Update an existing reminder."""
     reminder = await repo.get_or_raise(session, reminder_id)
@@ -462,7 +473,7 @@ async def update_reminder(
             ReminderUpdatedEvent(
                 reminder_id=str(reminder_id),
                 changes=changes,
-            )
+            ),
         )
 
     await session.commit()
@@ -479,10 +490,10 @@ async def update_reminder(
     responses={404: {"description": "Reminder not found"}},
 )
 async def complete_reminder(
-    reminder_id: UUID,
+    reminder_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     repo: Annotated[ReminderRepository, Depends(get_reminder_repository)],
-    publisher: EventPublisherDep,
+    publisher: Annotated[EventPublisher, Depends(get_event_publisher)],
 ) -> ReminderResponse:
     """Mark a reminder as completed."""
     reminder = await repo.get_or_raise(session, reminder_id)
@@ -497,7 +508,7 @@ async def complete_reminder(
         ReminderCompletedEvent(
             reminder_id=str(reminder_id),
             title=reminder.title,
-        )
+        ),
     )
 
     await session.commit()
@@ -514,10 +525,10 @@ async def complete_reminder(
     responses={404: {"description": "Reminder not found"}},
 )
 async def delete_reminder(
-    reminder_id: UUID,
+    reminder_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     repo: Annotated[ReminderRepository, Depends(get_reminder_repository)],
-    publisher: EventPublisherDep,
+    publisher: Annotated[EventPublisher, Depends(get_event_publisher)],
 ) -> None:
     """Delete a reminder permanently."""
     reminder = await repo.get_or_raise(session, reminder_id)
@@ -563,17 +574,18 @@ Use query parameters to control the date range and number of occurrences.
     },
 )
 async def get_occurrences(
-    reminder_id: UUID,
+    reminder_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     repo: Annotated[ReminderRepository, Depends(get_reminder_repository)],
-    after: datetime | None = None,
-    before: datetime | None = None,
+    after: dt.datetime | None = None,
+    before: dt.datetime | None = None,
     limit: int = 50,
 ) -> OccurrencesResponse:
     """Get upcoming occurrences for a recurring reminder.
 
     Args:
         reminder_id: ID of the recurring reminder
+        session: Async database session.
         repo: Reminder repository
         after: Only show occurrences after this date (default: now)
         before: Only show occurrences before this date
@@ -593,7 +605,7 @@ async def get_occurrences(
 
     # Default to now if no after date specified
     if after is None:
-        after = datetime.now(UTC)
+        after = dt.datetime.now(UTC)
 
     # Use recurrence end date if no before date specified
     if before is None and reminder.recurrence_end_at:
@@ -609,7 +621,7 @@ async def get_occurrences(
     limit = min(limit, 100)
 
     occurrences = []
-    for dt in generate_occurrences(
+    for occurrence_dt in generate_occurrences(
         reminder.recurrence_rule,
         start,
         after=after,
@@ -617,13 +629,13 @@ async def get_occurrences(
         count=limit,
     ):
         # Check if this occurrence was broken out
-        broken = broken_out.get(dt)
+        broken = broken_out.get(occurrence_dt)
         occurrences.append(
             OccurrenceResponse(
-                date=dt,
+                date=occurrence_dt,
                 is_modified=broken is not None,
                 reminder_id=broken.id if broken else None,
-            )
+            ),
         )
 
     return OccurrencesResponse(
@@ -661,18 +673,20 @@ Common use cases:
     },
 )
 async def break_out_occurrence(
-    reminder_id: UUID,
-    occurrence_date: datetime,
+    reminder_id: uuid.UUID,
+    occurrence_date: dt.datetime,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     repo: Annotated[ReminderRepository, Depends(get_reminder_repository)],
-    publisher: EventPublisherDep,
+    publisher: Annotated[EventPublisher, Depends(get_event_publisher)],
 ) -> ReminderResponse:
     """Break out a single occurrence from a recurring series.
 
     Args:
         reminder_id: ID of the recurring reminder
         occurrence_date: The specific occurrence date to break out
+        session: Async database session.
         repo: Reminder repository
+        publisher: Event publisher for reminder events.
 
     Returns:
         The new independent reminder
@@ -716,7 +730,7 @@ async def break_out_occurrence(
             title=broken_out.title,
             description=broken_out.description,
             remind_at=broken_out.remind_at,
-        )
+        ),
     )
 
     await session.commit()
@@ -746,15 +760,16 @@ async def break_out_occurrence(
     },
 )
 async def get_next_reminder_occurrence(
-    reminder_id: UUID,
+    reminder_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     repo: Annotated[ReminderRepository, Depends(get_reminder_repository)],
-    after: datetime | None = None,
+    after: dt.datetime | None = None,
 ) -> OccurrenceResponse | None:
     """Get the next occurrence for a recurring reminder.
 
     Args:
         reminder_id: ID of the recurring reminder
+        session: Async database session.
         repo: Reminder repository
         after: Find next occurrence after this date (default: now)
 
@@ -772,7 +787,7 @@ async def get_next_reminder_occurrence(
 
     # Default to now
     if after is None:
-        after = datetime.now(UTC)
+        after = dt.datetime.now(UTC)
 
     start = reminder.remind_at or reminder.created_at
     next_dt = get_next_occurrence(reminder.recurrence_rule, start, after)

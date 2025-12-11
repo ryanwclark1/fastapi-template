@@ -2,20 +2,27 @@
 
 Provides async background job execution with progress tracking
 for long-running export and import operations.
+
+This module integrates with the JobManager for persistent job storage
+while maintaining backward compatibility with the legacy JobTracker interface.
 """
 
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 import logging
 from typing import TYPE_CHECKING, Any
-import uuid
+from uuid import UUID
+
+from example_service.infra.tasks.jobs.enums import JobStatus as JobManagerStatus
+from example_service.infra.tasks.jobs.manager import JobManager, JobNotFoundError
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
+
+    from example_service.infra.tasks.jobs.models import Job
 
     from .schemas import ExportRequest, ImportFormat
 
@@ -23,7 +30,11 @@ logger = logging.getLogger(__name__)
 
 
 class JobStatus(StrEnum):
-    """Status of a background job."""
+    """Status of a background job.
+
+    Note: This enum is kept for backward compatibility.
+    Internally mapped to JobManager's JobStatus enum.
+    """
 
     PENDING = "pending"
     RUNNING = "running"
@@ -41,7 +52,11 @@ class JobType(StrEnum):
 
 @dataclass
 class JobProgress:
-    """Progress information for a background job."""
+    """Progress information for a background job.
+
+    Legacy model kept for backward compatibility.
+    Internally maps to JobManager's Job + JobProgress models.
+    """
 
     job_id: str
     job_type: JobType
@@ -102,21 +117,119 @@ class JobProgress:
 
 
 class JobTracker:
-    """Tracks background job progress.
+    """Tracks background job progress with persistent storage.
 
-    Thread-safe in-memory job tracker. For production, consider
-    using Redis or a database for persistence across restarts.
+    Replaces the in-memory job tracker with JobManager for database persistence.
+    Maintains backward compatibility with the legacy interface while providing
+    durability across service restarts.
     """
 
-    def __init__(self) -> None:
-        self._jobs: dict[str, JobProgress] = {}
-        self._lock = asyncio.Lock()
+    def __init__(self, session: AsyncSession) -> None:
+        """Initialize job tracker with database session.
+
+        Args:
+            session: SQLAlchemy async session for database operations.
+        """
+        self.session = session
+        self.job_manager = JobManager(session)
+
+    def _convert_status_to_manager(self, status: JobStatus) -> JobManagerStatus:
+        """Convert legacy JobStatus to JobManager status.
+
+        Args:
+            status: Legacy job status.
+
+        Returns:
+            JobManager status enum value.
+        """
+        mapping = {
+            JobStatus.PENDING: JobManagerStatus.PENDING,
+            JobStatus.RUNNING: JobManagerStatus.RUNNING,
+            JobStatus.COMPLETED: JobManagerStatus.COMPLETED,
+            JobStatus.FAILED: JobManagerStatus.FAILED,
+            JobStatus.CANCELLED: JobManagerStatus.CANCELLED,
+        }
+        return mapping.get(status, JobManagerStatus.PENDING)
+
+    def _convert_status_from_manager(self, status: JobManagerStatus | str) -> JobStatus:
+        """Convert JobManager status to legacy JobStatus.
+
+        Args:
+            status: JobManager status (enum or string).
+
+        Returns:
+            Legacy job status.
+        """
+        # Handle both enum and string values
+        status_str = status.value if isinstance(status, JobManagerStatus) else status
+
+        mapping = {
+            "pending": JobStatus.PENDING,
+            "queued": JobStatus.PENDING,  # Map QUEUED to PENDING for simplicity
+            "running": JobStatus.RUNNING,
+            "completed": JobStatus.COMPLETED,
+            "failed": JobStatus.FAILED,
+            "cancelled": JobStatus.CANCELLED,
+            "retrying": JobStatus.RUNNING,  # Map RETRYING to RUNNING
+            "paused": JobStatus.PENDING,  # Map PAUSED to PENDING
+        }
+        return mapping.get(status_str, JobStatus.PENDING)
+
+    def _job_to_progress(self, job: Job) -> JobProgress:
+        """Convert JobManager Job to legacy JobProgress.
+
+        Args:
+            job: JobManager job instance.
+
+        Returns:
+            Legacy JobProgress instance.
+        """
+        # Extract progress information
+        progress_record = job.progress[0] if job.progress else None
+
+        # Extract metadata from labels
+        labels_dict = {label.key: label.value for label in job.labels} if job.labels else {}
+        job_type_str = labels_dict.get("operation", "export")
+        entity_type = labels_dict.get("entity", "unknown")
+
+        # Extract counts from result_data or progress
+        total_records = 0
+        processed_records = 0
+        successful_records = 0
+        failed_records = 0
+
+        if progress_record:
+            total_records = progress_record.total_items or 0
+            processed_records = progress_record.current_item or 0
+
+        if job.result_data:
+            # Override with final counts if available
+            total_records = job.result_data.get("total_records", total_records)
+            successful_records = job.result_data.get("record_count", 0)
+            failed_records = job.result_data.get("failed_records", 0)
+
+        return JobProgress(
+            job_id=str(job.id),
+            job_type=JobType(job_type_str),
+            status=self._convert_status_from_manager(job.status),
+            entity_type=entity_type,
+            total_records=total_records,
+            processed_records=processed_records,
+            successful_records=successful_records,
+            failed_records=failed_records,
+            started_at=job.started_at or job.created_at,
+            completed_at=job.completed_at,
+            error_message=job.error_message,
+            result_data=job.result_data or {},
+        )
 
     async def create_job(
         self,
         job_type: JobType,
         entity_type: str,
         total_records: int = 0,
+        tenant_id: str | None = None,
+        user_id: str | None = None,
     ) -> JobProgress:
         """Create a new job and return its progress tracker.
 
@@ -124,31 +237,47 @@ class JobTracker:
             job_type: Type of job (export or import).
             entity_type: Entity type being processed.
             total_records: Total number of records (if known).
+            tenant_id: Optional tenant ID for multi-tenancy.
+            user_id: Optional user ID who initiated the job.
 
         Returns:
             JobProgress instance for tracking.
         """
-        job_id = str(uuid.uuid4())
-        job = JobProgress(
-            job_id=job_id,
-            job_type=job_type,
-            entity_type=entity_type,
-            total_records=total_records,
+        # Create via JobManager
+        job = await self.job_manager.submit(
+            tenant_id=tenant_id or "default",
+            task_name=f"datatransfer.{job_type.value}",
+            args={"entity_type": entity_type, "total_records": total_records},
+            labels={
+                "feature": "datatransfer",
+                "operation": job_type.value,
+                "entity": entity_type,
+            },
+            actor_id=user_id,
         )
 
-        async with self._lock:
-            self._jobs[job_id] = job
+        # Update progress with total if known
+        if total_records > 0:
+            await self.job_manager.update_progress(
+                job.id,
+                percentage=0,
+                total_items=total_records,
+                current_item=0,
+                message=f"Initializing {job_type.value}",
+            )
+
+        await self.session.commit()
 
         logger.info(
             "Created background job",
             extra={
-                "job_id": job_id,
+                "job_id": str(job.id),
                 "job_type": job_type,
                 "entity_type": entity_type,
             },
         )
 
-        return job
+        return self._job_to_progress(job)
 
     async def start_job(self, job_id: str) -> None:
         """Mark a job as started.
@@ -156,10 +285,11 @@ class JobTracker:
         Args:
             job_id: ID of the job to start.
         """
-        async with self._lock:
-            if job_id in self._jobs:
-                self._jobs[job_id].status = JobStatus.RUNNING
-                self._jobs[job_id].started_at = datetime.now(UTC)
+        try:
+            await self.job_manager.mark_running(UUID(job_id))
+            await self.session.commit()
+        except JobNotFoundError:
+            logger.warning("Attempted to start non-existent job", extra={"job_id": job_id})
 
     async def update_progress(
         self,
@@ -178,14 +308,30 @@ class JobTracker:
             failed: Number of failed records.
             total: Update total if now known.
         """
-        async with self._lock:
-            if job_id in self._jobs:
-                job = self._jobs[job_id]
-                job.processed_records = processed
-                job.successful_records = successful
-                job.failed_records = failed
-                if total is not None:
-                    job.total_records = total
+        total_items = total if total is not None else processed
+        percentage = int(processed / total_items * 100) if total_items > 0 else 0
+
+        await self.job_manager.update_progress(
+            UUID(job_id),
+            percentage=percentage,
+            current_item=processed,
+            total_items=total_items,
+            message=f"Processed {processed}/{total_items} ({successful} successful, {failed} failed)",
+        )
+
+        # Store detailed counts in job's result_data for later retrieval
+        job = await self.job_manager.get(UUID(job_id))
+        if job:
+            if job.result_data is None:
+                job.result_data = {}
+            job.result_data.update({
+                "processed_records": processed,
+                "successful_records": successful,
+                "failed_records": failed,
+                "total_records": total_items,
+            })
+
+        await self.session.commit()
 
     async def complete_job(
         self,
@@ -198,20 +344,15 @@ class JobTracker:
             job_id: ID of the job.
             result_data: Optional result data to store.
         """
-        async with self._lock:
-            if job_id in self._jobs:
-                job = self._jobs[job_id]
-                job.status = JobStatus.COMPLETED
-                job.completed_at = datetime.now(UTC)
-                if result_data:
-                    job.result_data = result_data
+        await self.job_manager.mark_completed(
+            UUID(job_id),
+            result_data=result_data or {},
+        )
+        await self.session.commit()
 
         logger.info(
             "Job completed",
-            extra={
-                "job_id": job_id,
-                "elapsed_seconds": self._jobs.get(job_id, JobProgress(job_id=job_id, job_type=JobType.EXPORT)).elapsed_seconds,
-            },
+            extra={"job_id": job_id},
         )
 
     async def fail_job(self, job_id: str, error_message: str) -> None:
@@ -221,12 +362,12 @@ class JobTracker:
             job_id: ID of the job.
             error_message: Error message describing the failure.
         """
-        async with self._lock:
-            if job_id in self._jobs:
-                job = self._jobs[job_id]
-                job.status = JobStatus.FAILED
-                job.completed_at = datetime.now(UTC)
-                job.error_message = error_message
+        await self.job_manager.mark_failed(
+            UUID(job_id),
+            error_message=error_message,
+            should_retry=False,  # Data transfer jobs typically don't auto-retry
+        )
+        await self.session.commit()
 
         logger.error(
             "Job failed",
@@ -242,16 +383,15 @@ class JobTracker:
         Returns:
             True if cancelled, False if not found or already completed.
         """
-        async with self._lock:
-            if job_id not in self._jobs:
-                return False
-
-            job = self._jobs[job_id]
-            if job.status in (JobStatus.PENDING, JobStatus.RUNNING):
-                job.status = JobStatus.CANCELLED
-                job.completed_at = datetime.now(UTC)
-                return True
-
+        try:
+            result = await self.job_manager.cancel(
+                UUID(job_id),
+                reason="User requested cancellation",
+            )
+            await self.session.commit()
+            return result
+        except JobNotFoundError:
+            logger.warning("Attempted to cancel non-existent job", extra={"job_id": job_id})
             return False
 
     async def get_job(self, job_id: str) -> JobProgress | None:
@@ -263,14 +403,20 @@ class JobTracker:
         Returns:
             JobProgress if found, None otherwise.
         """
-        async with self._lock:
-            return self._jobs.get(job_id)
+        try:
+            job = await self.job_manager.get(UUID(job_id), include_relations=True)
+            if job:
+                return self._job_to_progress(job)
+            return None
+        except (JobNotFoundError, ValueError):
+            return None
 
     async def list_jobs(
         self,
         job_type: JobType | None = None,
         status: JobStatus | None = None,
         limit: int = 100,
+        tenant_id: str | None = None,
     ) -> list[JobProgress]:
         """List jobs with optional filtering.
 
@@ -278,73 +424,73 @@ class JobTracker:
             job_type: Filter by job type.
             status: Filter by status.
             limit: Maximum number of jobs to return.
+            tenant_id: Filter by tenant ID.
 
         Returns:
             List of matching jobs.
         """
-        async with self._lock:
-            jobs = list(self._jobs.values())
-
+        # Build label filters
+        labels = {"feature": "datatransfer"}
         if job_type:
-            jobs = [j for j in jobs if j.job_type == job_type]
+            labels["operation"] = job_type.value
+
+        # Convert status if provided
+        manager_status = None
         if status:
-            jobs = [j for j in jobs if j.status == status]
+            manager_status = self._convert_status_to_manager(status)
 
-        # Sort by start time descending (newest first)
-        jobs.sort(key=lambda j: j.started_at or datetime.min.replace(tzinfo=UTC), reverse=True)
+        # Query jobs
+        jobs = await self.job_manager.get_by_labels(
+            tenant_id=tenant_id or "default",
+            labels=labels,
+            status=manager_status,
+            limit=limit,
+        )
 
-        return jobs[:limit]
+        return [self._job_to_progress(job) for job in jobs]
 
     async def cleanup_old_jobs(self, max_age_hours: int = 24) -> int:
         """Remove completed jobs older than max_age_hours.
+
+        Note: This is handled by JobManager's TTL cleanup.
+        Kept for backward compatibility but delegates to JobManager.
 
         Args:
             max_age_hours: Maximum age in hours for completed jobs.
 
         Returns:
-            Number of jobs removed.
+            Number of jobs removed (always 0 - handled by background cleanup).
         """
-        from datetime import timedelta
-
-        cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
-        removed = 0
-
-        async with self._lock:
-            to_remove = []
-            for job_id, job in self._jobs.items():
-                if job.completed_at and job.completed_at < cutoff:
-                    to_remove.append(job_id)
-
-            for job_id in to_remove:
-                del self._jobs[job_id]
-                removed += 1
-
-        if removed > 0:
-            logger.info("Cleaned up old jobs", extra={"removed_count": removed})
-
-        return removed
+        # JobManager handles cleanup via background tasks
+        # This method is kept for backward compatibility
+        logger.info(
+            "Cleanup requested - handled by JobManager background tasks",
+            extra={"max_age_hours": max_age_hours},
+        )
+        return 0
 
 
-# Global job tracker instance
-_job_tracker: JobTracker | None = None
+def get_job_tracker(session: AsyncSession) -> JobTracker:
+    """Get a job tracker instance.
 
-
-def get_job_tracker() -> JobTracker:
-    """Get the global job tracker instance.
+    Args:
+        session: Database session for job persistence.
 
     Returns:
-        JobTracker singleton instance.
+        JobTracker instance backed by JobManager.
+
+    Note:
+        This no longer uses a singleton pattern. Each call creates
+        a new tracker instance with the provided session.
     """
-    global _job_tracker
-    if _job_tracker is None:
-        _job_tracker = JobTracker()
-    return _job_tracker
+    return JobTracker(session)
 
 
 async def run_export_job(
     session: AsyncSession,
     request: ExportRequest,
     tenant_id: str | None = None,
+    user_id: str | None = None,
 ) -> JobProgress:
     """Run an export as a background job with progress tracking.
 
@@ -352,16 +498,19 @@ async def run_export_job(
         session: Database session.
         request: Export request.
         tenant_id: Optional tenant ID.
+        user_id: Optional user ID who initiated the export.
 
     Returns:
         JobProgress with results.
     """
     from .service import DataTransferService
 
-    tracker = get_job_tracker()
+    tracker = get_job_tracker(session)
     job = await tracker.create_job(
         job_type=JobType.EXPORT,
         entity_type=request.entity_type,
+        tenant_id=tenant_id,
+        user_id=user_id,
     )
 
     try:
@@ -404,6 +553,8 @@ async def run_import_job(
     skip_errors: bool = False,
     update_existing: bool = False,
     batch_size: int = 100,
+    tenant_id: str | None = None,
+    user_id: str | None = None,
 ) -> JobProgress:
     """Run an import as a background job with progress tracking.
 
@@ -416,16 +567,20 @@ async def run_import_job(
         skip_errors: Continue on errors.
         update_existing: Update existing records.
         batch_size: Batch size for processing.
+        tenant_id: Optional tenant ID.
+        user_id: Optional user ID who initiated the import.
 
     Returns:
         JobProgress with results.
     """
     from .service import DataTransferService
 
-    tracker = get_job_tracker()
+    tracker = get_job_tracker(session)
     job = await tracker.create_job(
         job_type=JobType.IMPORT,
         entity_type=entity_type,
+        tenant_id=tenant_id,
+        user_id=user_id,
     )
 
     try:

@@ -1,3 +1,5 @@
+"""High-level retry decorator with metrics instrumentation."""
+
 from __future__ import annotations
 
 import asyncio
@@ -36,6 +38,23 @@ def retry(
     stop_after_delay: float | None = None,
     on_retry: Callable[[Exception, int], None] | None = None,
 ) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
+    """Retry decorator for async callables.
+
+    Args:
+        max_attempts: Total attempts before raising.
+        initial_delay: Initial backoff delay in seconds.
+        max_delay: Maximum delay between attempts.
+        exponential_base: Exponential multiplier for delay growth.
+        jitter: Whether to randomize delays.
+        jitter_range: Range for jitter multiplier.
+        exceptions: Exception types considered retryable.
+        retry_if: Optional predicate to decide retryability dynamically.
+        stop_after_delay: Absolute timeout for retry loop.
+        on_retry: Optional callback invoked before each retry attempt.
+
+    Returns:
+        Decorator that wraps the provided coroutine with retry logic.
+    """
     strategy = RetryStrategy(
         max_attempts=max_attempts,
         initial_delay=initial_delay,
@@ -77,7 +96,7 @@ def retry(
                         statistics.end_time = time.monotonic()
                         # Track retry exhaustion
                         track_retry_exhausted(func.__name__)
-                        logger.error(
+                        logger.exception(
                             f"All retry attempts exhausted for {func.__name__}",
                             extra={
                                 "function": func.__name__,

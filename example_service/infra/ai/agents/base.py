@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
 import logging
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
@@ -69,6 +69,12 @@ class AgentConfig(BaseModel):
     - Execution limits
     - Checkpoint behavior
     """
+
+    # Agent configuration reference (optional - links to persisted Agent model)
+    agent_id: UUID | None = Field(
+        default=None,
+        description="UUID of the Agent configuration in database (if using persisted config)",
+    )
 
     # Model settings
     model: str = Field(
@@ -251,7 +257,7 @@ class AgentState:
 
 
 @dataclass
-class AgentResult(Generic[TOutput]):
+class AgentResult[TOutput]:
     """Result from agent execution.
 
     Contains the final output, execution metadata, and any errors.
@@ -363,7 +369,7 @@ class LLMResponse(BaseModel):
     latency_ms: float | None = None
 
 
-class BaseAgent(ABC, Generic[TInput, TOutput]):
+class BaseAgent[TInput, TOutput](ABC):
     """Abstract base class for AI agents.
 
     Provides the foundation for building autonomous agents with:
@@ -420,7 +426,8 @@ class BaseAgent(ABC, Generic[TInput, TOutput]):
             user_id: User ID for tracking
         """
         if not hasattr(self, "agent_type") or not self.agent_type:
-            raise ValueError("Agent must define agent_type")
+            msg = "Agent must define agent_type"
+            raise ValueError(msg)
 
         self.config = config or self.default_config or AgentConfig()
         self.tool_registry = tool_registry or get_tool_registry()
@@ -564,16 +571,19 @@ class BaseAgent(ABC, Generic[TInput, TOutput]):
         """Execute with iteration tracking and checkpoints."""
         while self._state.iteration < self.config.max_iterations:
             if self._cancelled:
-                raise asyncio.CancelledError()
+                raise asyncio.CancelledError
 
             self._state.iteration += 1
 
             # Check cost limits
-            if self.config.max_cost_usd:
-                if float(self._state.total_cost_usd) >= self.config.max_cost_usd:
-                    raise RuntimeError(
-                        f"Cost limit exceeded: ${self._state.total_cost_usd}"
-                    )
+            if (
+                self.config.max_cost_usd
+                and float(self._state.total_cost_usd) >= self.config.max_cost_usd
+            ):
+                msg = f"Cost limit exceeded: ${self._state.total_cost_usd}"
+                raise RuntimeError(
+                    msg,
+                )
 
             # Check token limits
             if self.config.max_tokens_total:
@@ -582,7 +592,8 @@ class BaseAgent(ABC, Generic[TInput, TOutput]):
                     self._state.total_output_tokens
                 )
                 if total_tokens >= self.config.max_tokens_total:
-                    raise RuntimeError(f"Token limit exceeded: {total_tokens}")
+                    msg = f"Token limit exceeded: {total_tokens}"
+                    raise RuntimeError(msg)
 
             # Create checkpoint if needed
             if (
@@ -597,8 +608,9 @@ class BaseAgent(ABC, Generic[TInput, TOutput]):
             if self._state.is_complete:
                 return output
 
+        msg = f"Agent exceeded maximum iterations: {self.config.max_iterations}"
         raise RuntimeError(
-            f"Agent exceeded maximum iterations: {self.config.max_iterations}"
+            msg,
         )
 
     async def llm_call(
@@ -670,13 +682,14 @@ class BaseAgent(ABC, Generic[TInput, TOutput]):
         # Build request based on provider
         if self.config.provider == "openai":
             return await self._call_openai(
-                orchestrator, messages, tools, temperature, max_tokens, **kwargs
+                orchestrator, messages, tools, temperature, max_tokens, **kwargs,
             )
         if self.config.provider == "anthropic":
             return await self._call_anthropic(
-                orchestrator, messages, tools, temperature, max_tokens, **kwargs
+                orchestrator, messages, tools, temperature, max_tokens, **kwargs,
             )
-        raise ValueError(f"Unsupported provider: {self.config.provider}")
+        msg = f"Unsupported provider: {self.config.provider}"
+        raise ValueError(msg)
 
     async def _call_openai(
         self,
@@ -711,7 +724,8 @@ class BaseAgent(ABC, Generic[TInput, TOutput]):
         )
 
         if not result.success:
-            raise RuntimeError(f"LLM call failed: {result.error}")
+            msg = f"LLM call failed: {result.error}"
+            raise RuntimeError(msg)
 
         data = result.data or {}
         usage = result.usage or {}
@@ -761,7 +775,8 @@ class BaseAgent(ABC, Generic[TInput, TOutput]):
         )
 
         if not result.success:
-            raise RuntimeError(f"LLM call failed: {result.error}")
+            msg = f"LLM call failed: {result.error}"
+            raise RuntimeError(msg)
 
         data = result.data or {}
         usage = result.usage or {}
@@ -838,7 +853,7 @@ class BaseAgent(ABC, Generic[TInput, TOutput]):
 
         except TimeoutError:
             return ToolResult.timeout(
-                error=f"Tool '{tool_name}' timed out after {tool.timeout_seconds}s"
+                error=f"Tool '{tool_name}' timed out after {tool.timeout_seconds}s",
             )
         except Exception as e:
             logger.exception(f"Tool {tool_name} execution failed")
@@ -892,8 +907,7 @@ class BaseAgent(ABC, Generic[TInput, TOutput]):
         Returns:
             Checkpoint ID if created, None otherwise
         """
-        checkpoint_id = await self._create_checkpoint("manual_pause")
-        return checkpoint_id
+        return await self._create_checkpoint("manual_pause")
 
     async def _create_checkpoint(self, name: str) -> UUID | None:
         """Create a checkpoint of current state."""
@@ -922,23 +936,26 @@ class BaseAgent(ABC, Generic[TInput, TOutput]):
     async def _restore_from_checkpoint(self, checkpoint_id: UUID) -> None:
         """Restore state from a checkpoint."""
         if not self.db_session:
-            raise RuntimeError("Database session required for checkpoint restore")
+            msg = "Database session required for checkpoint restore"
+            raise RuntimeError(msg)
 
         from sqlalchemy import select
 
         from example_service.infra.ai.agents.models import AIAgentCheckpoint
 
         result = await self.db_session.execute(
-            select(AIAgentCheckpoint).where(AIAgentCheckpoint.id == checkpoint_id)
+            select(AIAgentCheckpoint).where(AIAgentCheckpoint.id == checkpoint_id),
         )
         checkpoint = result.scalar_one_or_none()
 
         if not checkpoint:
-            raise ValueError(f"Checkpoint {checkpoint_id} not found")
+            msg = f"Checkpoint {checkpoint_id} not found"
+            raise ValueError(msg)
 
         if not checkpoint.is_valid:
+            msg = f"Checkpoint {checkpoint_id} is invalid: {checkpoint.invalidated_reason}"
             raise ValueError(
-                f"Checkpoint {checkpoint_id} is invalid: {checkpoint.invalidated_reason}"
+                msg,
             )
 
         self._state = AgentState.from_dict(checkpoint.state_snapshot)
@@ -968,6 +985,7 @@ class BaseAgent(ABC, Generic[TInput, TOutput]):
         self._db_run = AIAgentRun(
             id=self._run_id,
             tenant_id=self.tenant_id,
+            agent_id=self.config.agent_id,  # Link to Agent configuration if available
             agent_type=self.agent_type,
             agent_version=self.agent_version,
             run_name=run_name,
@@ -1029,4 +1047,5 @@ class BaseAgent(ABC, Generic[TInput, TOutput]):
         await self.db_session.flush()
 
     def __repr__(self) -> str:
+        """Return agent runtime summary for debugging."""
         return f"<{self.__class__.__name__}(type={self.agent_type})>"

@@ -6,7 +6,6 @@ with progress tracking, validation, and storage integration.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 import gzip
 import logging
@@ -35,6 +34,8 @@ from .schemas import (
 from .validators import get_validator_registry, validate_entity
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -209,9 +210,12 @@ class DataTransferService:
             ValueError: If entity type is not supported.
         """
         if entity_type not in ENTITY_REGISTRY:
-            raise ValueError(
+            msg = (
                 f"Unknown entity type: {entity_type}. "
                 f"Supported types: {list(ENTITY_REGISTRY.keys())}"
+            )
+            raise ValueError(
+                msg,
             )
         return ENTITY_REGISTRY[entity_type]
 
@@ -262,7 +266,7 @@ class DataTransferService:
         """
         if not hasattr(model_class, condition.field):
             logger.warning(
-                "Ignoring filter on unknown field: %s", condition.field
+                "Ignoring filter on unknown field: %s", condition.field,
             )
             return stmt
 
@@ -328,7 +332,8 @@ class DataTransferService:
         # Get entity configuration
         config = self._get_entity_config(entity_type)
         if not config.get("exportable", True):
-            raise ValueError(f"Entity '{entity_type}' is not exportable")
+            msg = f"Entity '{entity_type}' is not exportable"
+            raise ValueError(msg)
 
         # Import the model
         model_class = self._import_model(config["model_path"])
@@ -338,18 +343,21 @@ class DataTransferService:
 
         # Apply tenant filter if tenant isolation is enabled and tenant_id is provided
         settings = get_datatransfer_settings()
-        if settings.enable_tenant_isolation and tenant_id:
-            if hasattr(model_class, "tenant_id"):
-                stmt = stmt.where(model_class.tenant_id == tenant_id)
-                logger.debug(
-                    "Applied tenant filter for export",
-                    extra={"entity_type": entity_type, "tenant_id": tenant_id},
-                )
-            else:
-                logger.warning(
-                    "Tenant isolation enabled but model has no tenant_id field",
-                    extra={"entity_type": entity_type, "model": model_class.__name__},
-                )
+        if (
+            settings.enable_tenant_isolation
+            and tenant_id
+            and hasattr(model_class, "tenant_id")
+        ):
+            stmt = stmt.where(model_class.tenant_id == tenant_id)
+            logger.debug(
+                "Applied tenant filter for export",
+                extra={"entity_type": entity_type, "tenant_id": tenant_id},
+            )
+        elif settings.enable_tenant_isolation:
+            logger.warning(
+                "Tenant isolation enabled but model has no tenant_id field",
+                extra={"entity_type": entity_type, "model": model_class.__name__},
+            )
 
         # Apply legacy simple filters if provided (deprecated)
         if filters:
@@ -416,7 +424,7 @@ class DataTransferService:
             storage_uri = None
             if request.upload_to_storage:
                 storage_uri = await self._upload_to_storage(
-                    file_path, request.entity_type
+                    file_path, request.entity_type,
                 )
 
             return ExportResult(
@@ -526,9 +534,12 @@ class DataTransferService:
 
         # Apply tenant filter
         settings = get_datatransfer_settings()
-        if settings.enable_tenant_isolation and tenant_id:
-            if hasattr(model_class, "tenant_id"):
-                stmt = stmt.where(model_class.tenant_id == tenant_id)
+        if (
+            settings.enable_tenant_isolation
+            and tenant_id
+            and hasattr(model_class, "tenant_id")
+        ):
+            stmt = stmt.where(model_class.tenant_id == tenant_id)
 
         # Apply filters
         if filters:
@@ -564,7 +575,8 @@ class DataTransferService:
         """
         config = self._get_entity_config(entity_type=request.entity_type)
         if not config.get("exportable", True):
-            raise ValueError(f"Entity '{request.entity_type}' is not exportable")
+            msg = f"Entity '{request.entity_type}' is not exportable"
+            raise ValueError(msg)
 
         model_class = self._import_model(config["model_path"])
 
@@ -573,9 +585,12 @@ class DataTransferService:
 
         # Apply tenant filter
         settings = get_datatransfer_settings()
-        if settings.enable_tenant_isolation and tenant_id:
-            if hasattr(model_class, "tenant_id"):
-                stmt = stmt.where(model_class.tenant_id == tenant_id)
+        if (
+            settings.enable_tenant_isolation
+            and tenant_id
+            and hasattr(model_class, "tenant_id")
+        ):
+            stmt = stmt.where(model_class.tenant_id == tenant_id)
 
         # Apply filters
         if request.filters:
@@ -691,7 +706,8 @@ class DataTransferService:
             # Get entity configuration
             config = self._get_entity_config(entity_type)
             if not config.get("importable", True):
-                raise ValueError(f"Entity '{entity_type}' is not importable")
+                msg = f"Entity '{entity_type}' is not importable"
+                raise ValueError(msg)
 
             # Get importer
             importer = get_importer(
@@ -727,7 +743,7 @@ class DataTransferService:
                                     value=record.data.get(field)
                                     if field != "_record"
                                     else None,
-                                )
+                                ),
                             )
                     continue
 
@@ -743,7 +759,7 @@ class DataTransferService:
                                         field=err.field,
                                         error=err.message,
                                         value=err.value,
-                                    )
+                                    ),
                                 )
                         continue
 
@@ -807,7 +823,7 @@ class DataTransferService:
                         existing = None
                         if update_existing and "id" in record.data:
                             existing = await self.session.get(
-                                model_class, record.data["id"]
+                                model_class, record.data["id"],
                             )
 
                         if existing:
@@ -819,7 +835,7 @@ class DataTransferService:
                         elif "id" in record.data:
                             # Skip if exists and not updating
                             existing = await self.session.get(
-                                model_class, record.data["id"]
+                                model_class, record.data["id"],
                             )
                             if existing:
                                 skipped += 1
@@ -843,7 +859,7 @@ class DataTransferService:
                                     row=record.row_number,
                                     field=None,
                                     error=f"Database error: {e}",
-                                )
+                                ),
                             )
                         if not skip_errors:
                             await self.session.rollback()
@@ -936,7 +952,8 @@ class DataTransferService:
         # Get entity configuration
         config = self._get_entity_config(entity_type)
         if not config.get("importable", True):
-            raise ValueError(f"Entity '{entity_type}' is not importable")
+            msg = f"Entity '{entity_type}' is not importable"
+            raise ValueError(msg)
 
         fields = config.get("fields", [])
         required_fields = config.get("required_fields", [])

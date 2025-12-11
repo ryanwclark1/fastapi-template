@@ -20,6 +20,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(datetime, Decimal)
+
 # =============================================================================
 # Enums
 # =============================================================================
@@ -29,6 +33,7 @@ class PipelineStatus(str, Enum):
     """Pipeline execution status."""
 
     PENDING = "pending"
+    PROCESSING = "processing"
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -77,7 +82,7 @@ class PipelineExecutionRequest(BaseModel):
     """
 
     pipeline_name: str = Field(
-        description="Name of predefined pipeline (call_analysis, transcription, etc.)"
+        description="Name of predefined pipeline (call_analysis, transcription, etc.)",
     )
     input_data: dict[str, Any] = Field(
         default_factory=dict,
@@ -188,8 +193,8 @@ class PipelineExecutionResponse(BaseModel):
                 "estimated_duration_seconds": 120,
                 "estimated_cost_usd": "0.15",
                 "stream_url": "/ws/ai/executions/exec-123.../events",
-            }
-        }
+            },
+        },
     }
 
 
@@ -251,6 +256,10 @@ class PipelineResultResponse(BaseModel):
     # Metrics
     total_duration_ms: float = Field(description="Total execution duration")
     total_cost_usd: str = Field(description="Total cost in USD")
+    estimated_cost_usd: str | None = Field(
+        default=None,
+        description="Estimated cost based on pipeline definition",
+    )
 
     # Timing
     started_at: datetime | None = Field(default=None)
@@ -288,8 +297,8 @@ class PipelineResultResponse(BaseModel):
                 "total_cost_usd": "0.0847",
                 "started_at": "2025-01-15T10:30:00Z",
                 "completed_at": "2025-01-15T10:30:45Z",
-            }
-        }
+            },
+        },
     }
 
 

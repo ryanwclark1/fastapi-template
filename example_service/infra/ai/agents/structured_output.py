@@ -35,16 +35,18 @@ Example:
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import Enum
 import json
 import logging
 import re
-from typing import Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from pydantic import BaseModel, ValidationError, create_model
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +64,7 @@ class ExtractionStrategy(str, Enum):
 
 
 @dataclass
-class ExtractionResult(Generic[T]):
+class ExtractionResult[T: BaseModel]:
     """Result from structured extraction."""
 
     success: bool
@@ -88,7 +90,7 @@ class RetryConfig:
     self_correction_prompt: str | None = None
 
 
-class StructuredOutputParser(Generic[T]):
+class StructuredOutputParser[T: BaseModel]:
     """Parser for extracting structured output from LLM responses.
 
     Supports multiple extraction strategies and automatic retry
@@ -178,7 +180,7 @@ Important:
                     success=False,
                     raw_response=response,
                     error=f"Validation failed: {e}",
-                    validation_errors=[err for err in e.errors()],
+                    validation_errors=[dict(err) for err in e.errors()],
                     strategy_used=strategy,
                 )
 
@@ -201,16 +203,21 @@ Important:
             ExtractionResult with parsed data
         """
         try:
-            if isinstance(arguments, str):
-                data = json.loads(arguments)
-            else:
-                data = arguments
+            data = json.loads(arguments) if isinstance(arguments, str) else arguments
 
             validated = self.response_model.model_validate(data)
+            # Convert arguments to string for raw_response
+            raw_resp: str | None
+            if isinstance(data, dict):
+                raw_resp = json.dumps(data)
+            elif isinstance(arguments, str):
+                raw_resp = arguments
+            else:
+                raw_resp = json.dumps(arguments) if arguments else None
             return ExtractionResult(
                 success=True,
                 data=validated,
-                raw_response=json.dumps(data) if isinstance(data, dict) else arguments,
+                raw_response=raw_resp,
                 strategy_used=ExtractionStrategy.FUNCTION_CALLING,
             )
         except json.JSONDecodeError as e:
@@ -224,7 +231,7 @@ Important:
                 success=False,
                 raw_response=arguments if isinstance(arguments, str) else None,
                 error=f"Validation failed: {e}",
-                validation_errors=[err for err in e.errors()],
+                validation_errors=[dict(err) for err in e.errors()],
             )
 
     def _get_strategies(self) -> list[ExtractionStrategy]:
@@ -293,7 +300,7 @@ Important:
         return None
 
 
-class StructuredOutputExtractor(Generic[T]):
+class StructuredOutputExtractor[T: BaseModel]:
     """High-level extractor with retry and self-correction.
 
     Handles the full extraction workflow including:
@@ -360,11 +367,11 @@ class StructuredOutputExtractor(Generic[T]):
                 # Call LLM
                 if self.strategy == ExtractionStrategy.FUNCTION_CALLING:
                     response = await self._call_with_function(
-                        extraction_messages, **llm_kwargs
+                        extraction_messages, **llm_kwargs,
                     )
                 else:
                     response = await self._call_for_json(
-                        extraction_messages, **llm_kwargs
+                        extraction_messages, **llm_kwargs,
                     )
 
                 # Track usage
@@ -389,7 +396,7 @@ class StructuredOutputExtractor(Generic[T]):
                 # Prepare retry with error feedback
                 if attempt < self.retry_config.max_retries:
                     extraction_messages = self._prepare_retry_messages(
-                        extraction_messages, result
+                        extraction_messages, result,
                     )
 
             except Exception as e:
@@ -465,7 +472,7 @@ class StructuredOutputExtractor(Generic[T]):
 
         if self.retry_config.include_raw_response and failed_result.raw_response:
             error_info.append(
-                f"Your response was:\n```\n{failed_result.raw_response[:500]}\n```"
+                f"Your response was:\n```\n{failed_result.raw_response[:500]}\n```",
             )
 
         error_message = "\n\n".join(error_info)
@@ -500,7 +507,7 @@ class StructuredOutputExtractor(Generic[T]):
             {
                 "type": "function",
                 "function": function_schema,
-            }
+            },
         ]
         kwargs["tool_choice"] = {
             "type": "function",
@@ -534,7 +541,7 @@ class StructuredOutputExtractor(Generic[T]):
 
 
 # Convenience function for simple extraction
-async def extract_structured(
+async def extract_structured[T: BaseModel](
     response_model: type[T],
     messages: list[dict[str, Any]],
     llm_call: Callable[..., Awaitable[dict[str, Any]]],
@@ -578,7 +585,7 @@ async def extract_structured(
 
 
 # Output validation decorators
-def validate_output(response_model: type[T]) -> Callable[..., Any]:
+def validate_output[T: BaseModel](response_model: type[T]) -> Callable[..., Any]:
     """Decorator to validate agent output against a Pydantic model.
 
     Example:
@@ -603,10 +610,12 @@ def validate_output(response_model: type[T]) -> Callable[..., Any]:
                 extraction = parser.parse(result)
                 if extraction.success:
                     return extraction.data  # type: ignore
-                raise ValueError(f"Failed to parse output: {extraction.error}")
+                msg = f"Failed to parse output: {extraction.error}"
+                raise ValueError(msg)
 
+            msg = f"Expected {response_model.__name__}, got {type(result).__name__}"
             raise TypeError(
-                f"Expected {response_model.__name__}, got {type(result).__name__}"
+                msg,
             )
 
         return wrapper

@@ -39,15 +39,17 @@ Example:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 import inspect
 import logging
-from typing import Any, Generic, TypeVar, get_type_hints
+from typing import TYPE_CHECKING, Any, TypeVar, get_type_hints
 
 from pydantic import BaseModel, Field, create_model
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +67,7 @@ class ToolResultStatus(str, Enum):
 
 
 @dataclass
-class ToolResult(Generic[T]):
+class ToolResult[T]:
     """Result from tool execution.
 
     Provides a standardized way to return results from tools,
@@ -272,9 +274,11 @@ class BaseTool(ABC):
     def __init__(self) -> None:
         """Initialize the tool."""
         if not hasattr(self, "name") or not self.name:
-            raise ValueError("Tool must have a name")
+            msg = "Tool must have a name"
+            raise ValueError(msg)
         if not hasattr(self, "description") or not self.description:
-            raise ValueError("Tool must have a description")
+            msg = "Tool must have a description"
+            raise ValueError(msg)
 
     @abstractmethod
     async def execute(self, **kwargs: Any) -> ToolResult[Any]:
@@ -369,6 +373,7 @@ class BaseTool(ABC):
         return await self.execute(**validated)
 
     def __repr__(self) -> str:
+        """Return tool summary for debugging."""
         return f"<{self.__class__.__name__}(name={self.name})>"
 
 
@@ -522,7 +527,8 @@ class ToolRegistry:
             ValueError: If tool with same name already exists
         """
         if tool.name in self._tools:
-            raise ValueError(f"Tool '{tool.name}' is already registered")
+            msg = f"Tool '{tool.name}' is already registered"
+            raise ValueError(msg)
 
         self._tools[tool.name] = tool
 
@@ -553,7 +559,8 @@ class ToolRegistry:
         """Get a tool by name, raising if not found."""
         tool = self.get(name)
         if tool is None:
-            raise KeyError(f"Tool '{name}' not found")
+            msg = f"Tool '{name}' not found"
+            raise KeyError(msg)
         return tool
 
     def list_all(self) -> list[BaseTool]:
@@ -625,9 +632,11 @@ class ToolRegistry:
         self._tags_index.clear()
 
     def __len__(self) -> int:
+        """Return the number of registered tools."""
         return len(self._tools)
 
     def __contains__(self, name: str) -> bool:
+        """Return True if a tool with the given name exists."""
         return name in self._tools
 
 

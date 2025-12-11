@@ -90,8 +90,8 @@ async def init() -> None:
                     SELECT COUNT(*)
                     FROM information_schema.tables
                     WHERE table_schema = 'public'
-                """
-                )
+                """,
+                ),
             )
             table_count = result.scalar_one()
             info(f"Tables in public schema: {table_count}")
@@ -147,7 +147,7 @@ async def info_cmd(output_format: str) -> None:
             version = result.scalar_one()
 
             result = await session.execute(
-                text("SELECT pg_size_pretty(pg_database_size(current_database()))")
+                text("SELECT pg_size_pretty(pg_database_size(current_database()))"),
             )
             db_size = result.scalar_one()
 
@@ -719,7 +719,7 @@ async def shell() -> None:
 
         # Run psql interactively
         # psql_cmd is constructed from validated database settings, not user input
-        subprocess.run(psql_cmd, check=False, env=env)  # noqa: S603
+        subprocess.run(psql_cmd, check=False, env=env)
 
     except FileNotFoundError:
         error("psql command not found. Please install PostgreSQL client tools.")

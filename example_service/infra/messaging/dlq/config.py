@@ -207,9 +207,12 @@ class DLQConfig(BaseSettings):
     def _validate_delays(self) -> DLQConfig:
         """Ensure max_delay >= initial_delay."""
         if self.max_delay_ms < self.initial_delay_ms:
-            raise ValueError(
+            msg = (
                 f"max_delay_ms ({self.max_delay_ms}) must be >= "
                 f"initial_delay_ms ({self.initial_delay_ms})"
+            )
+            raise ValueError(
+                msg,
             )
         return self
 
@@ -221,8 +224,9 @@ class DLQConfig(BaseSettings):
             msg = "Jitter range values must be positive"
             raise ValueError(msg)
         if min_jitter >= max_jitter:
+            msg = f"Jitter range min ({min_jitter}) must be < max ({max_jitter})"
             raise ValueError(
-                f"Jitter range min ({min_jitter}) must be < max ({max_jitter})"
+                msg,
             )
         return self
 

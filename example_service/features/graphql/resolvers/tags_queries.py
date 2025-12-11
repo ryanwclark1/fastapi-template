@@ -29,16 +29,16 @@ logger = logging.getLogger(__name__)
 
 # Type aliases for annotated arguments
 FirstArg = Annotated[
-    int, strawberry.argument(description="Number of items to return (forward pagination)")
+    int, strawberry.argument(description="Number of items to return (forward pagination)"),
 ]
 AfterArg = Annotated[
-    str | None, strawberry.argument(description="Cursor to start after (forward pagination)")
+    str | None, strawberry.argument(description="Cursor to start after (forward pagination)"),
 ]
 LastArg = Annotated[
-    int | None, strawberry.argument(description="Number of items to return (backward pagination)")
+    int | None, strawberry.argument(description="Number of items to return (backward pagination)"),
 ]
 BeforeArg = Annotated[
-    str | None, strawberry.argument(description="Cursor to start before (backward pagination)")
+    str | None, strawberry.argument(description="Cursor to start before (backward pagination)"),
 ]
 
 
@@ -192,7 +192,7 @@ async def popular_tags_query(
     tags = []
     for row in rows:
         tag = row[0]
-        # reminder_count = row[1]  # Available if needed
+        # Reminder count (row[1]) available if needed.
         tags.append(TagType.from_pydantic(TagResponse.from_model(tag)))
 
     return tags

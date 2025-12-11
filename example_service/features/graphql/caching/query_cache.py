@@ -20,7 +20,7 @@ from typing import Any
 
 from strawberry.extensions import SchemaExtension
 
-from example_service.core.cache import get_cache_instance
+from example_service.infra.cache import get_cache_instance
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ class QueryCacheExtension(SchemaExtension):
         self,
         ttl: int | None = None,
         config: CacheConfig | None = None,
-    ):
+    ) -> None:
         """Initialize query cache extension.
 
         Args:
@@ -159,7 +159,7 @@ class QueryCacheExtension(SchemaExtension):
 
         except Exception as e:
             # Don't fail the operation if caching has issues
-            logger.error(
+            logger.exception(
                 "Cache read failed",
                 extra={
                     "error": str(e),
@@ -207,7 +207,7 @@ class QueryCacheExtension(SchemaExtension):
                 {
                     "data": result.data,
                     "errors": None,
-                }
+                },
             )
 
             # Cache the result
@@ -230,7 +230,7 @@ class QueryCacheExtension(SchemaExtension):
 
         except Exception as e:
             # Don't fail the operation if caching has issues
-            logger.error(
+            logger.exception(
                 "Cache write failed",
                 extra={
                     "error": str(e),
@@ -281,9 +281,7 @@ class QueryCacheExtension(SchemaExtension):
         key_hash = hashlib.sha256(key_components.encode()).hexdigest()[:16]
 
         # Create cache key
-        cache_key = f"{self.config.KEY_PREFIX}{operation_type}:{operation_name}:{key_hash}"
-
-        return cache_key
+        return f"{self.config.KEY_PREFIX}{operation_type}:{operation_name}:{key_hash}"
 
 
 # ============================================================================
@@ -330,7 +328,7 @@ Example: Cache invalidation
     # After a mutation that modifies data, you may want to invalidate related caches
     # This can be done in the mutation resolver:
 
-    from example_service.core.cache import get_cache_instance
+    from example_service.infra.cache import get_cache_instance
 
     @strawberry.mutation
     async def update_reminder(

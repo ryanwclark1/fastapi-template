@@ -102,7 +102,7 @@ class ComplexityLimiter(SchemaExtension):
         max_complexity: int | None = None,
         max_depth: int | None = None,
         config: ComplexityConfig | None = None,
-    ):
+    ) -> None:
         """Initialize complexity limiter.
 
         Args:
@@ -154,8 +154,9 @@ class ComplexityLimiter(SchemaExtension):
                         "limit": self.max_depth,
                     },
                 )
+                msg = f"Query depth {max_depth} exceeds limit of {self.max_depth}"
                 raise GraphQLError(
-                    f"Query depth {max_depth} exceeds limit of {self.max_depth}",
+                    msg,
                     extensions={
                         "code": "DEPTH_LIMIT_EXCEEDED",
                         "max_depth": max_depth,
@@ -174,8 +175,9 @@ class ComplexityLimiter(SchemaExtension):
                         "limit": self.max_complexity,
                     },
                 )
+                msg = f"Query complexity {complexity_score} exceeds limit of {self.max_complexity}"
                 raise GraphQLError(
-                    f"Query complexity {complexity_score} exceeds limit of {self.max_complexity}",
+                    msg,
                     extensions={
                         "code": "COMPLEXITY_LIMIT_EXCEEDED",
                         "complexity": complexity_score,
@@ -198,7 +200,7 @@ class ComplexityLimiter(SchemaExtension):
             raise
         except Exception as e:
             # Don't fail the operation if complexity calculation has issues
-            logger.error(
+            logger.exception(
                 "Complexity calculation failed",
                 extra={
                     "error": str(e),
@@ -279,7 +281,7 @@ class ComplexityLimiter(SchemaExtension):
         for selection in selections:
             if isinstance(selection, FieldNode):
                 field_complexity, field_depth = self._calculate_field_complexity(
-                    selection, parent_type, depth, multiplier
+                    selection, parent_type, depth, multiplier,
                 )
                 total_complexity += field_complexity
                 max_depth = max(max_depth, field_depth)

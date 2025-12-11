@@ -242,7 +242,7 @@ class ConsulHealthProvider:
 
             # Check if our service is registered
             service_health = "not_registered"
-            for _service_id, service_data in services.items():
+            for service_data in services.values():
                 if service_data.get("Service") == self._service_name:
                     service_health = "registered"
                     break

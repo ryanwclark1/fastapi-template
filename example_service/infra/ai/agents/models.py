@@ -34,7 +34,11 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from example_service.core.database.base import Base
+from example_service.core.database.base import (
+    Base,
+    UserAuditMixin,
+    UUIDv7TimestampedBase,
+)
 from example_service.core.database.enums import (
     AIAgentMessageRole,
     AIAgentRunStatus,
@@ -43,6 +47,9 @@ from example_service.core.database.enums import (
 )
 from example_service.core.models.tenant import Tenant
 from example_service.core.models.user import User
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(Tenant, User)
 
 
 class AgentRunStatus(str, enum.Enum):
@@ -91,7 +98,7 @@ class AgentMessageRole(str, enum.Enum):
     FUNCTION = "function"
 
 
-class AIAgentRun(Base):
+class AIAgentRun(UUIDv7TimestampedBase, UserAuditMixin):
     """Agent run tracking with full state persistence.
 
     Tracks complete agent execution from start to finish including:
@@ -120,9 +127,6 @@ class AIAgentRun(Base):
 
     __tablename__ = "ai_agent_runs"
 
-    # Primary key
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-
     # Tenant association
     tenant_id: Mapped[str] = mapped_column(
         String(255),
@@ -131,6 +135,12 @@ class AIAgentRun(Base):
     )
 
     # Agent identification
+    agent_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("agents.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Reference to agent configuration (if available)",
+    )
     agent_type: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
@@ -293,27 +303,24 @@ class AIAgentRun(Base):
         default=dict,
         comment="Additional metadata",
     )
-    created_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(UTC),
-        nullable=False,
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
-        nullable=False,
-    )
-    created_by_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"),
-    )
 
-    # Relationships
+    # Relationships (id, timestamps, audit FKs provided by base classes)
     tenant: Mapped[Tenant] = relationship("Tenant")
-    created_by: Mapped[User | None] = relationship("User")
+    created_by: Mapped[User | None] = relationship("User", foreign_keys="AIAgentRun.created_by_id")
+    updated_by: Mapped[User | None] = relationship("User", foreign_keys="AIAgentRun.updated_by_id")
     parent_run: Mapped[AIAgentRun | None] = relationship(
         "AIAgentRun",
-        remote_side=[id],
+        remote_side="AIAgentRun.id",
         backref="child_runs",
     )
+
+    # Agent configuration relationship (forward reference to avoid circular imports)
+    agent: Mapped[Any | None] = relationship(
+        "Agent",
+        back_populates="runs",
+        foreign_keys=[agent_id],
+    )
+
     steps: Mapped[list[AIAgentStep]] = relationship(
         "AIAgentStep",
         back_populates="run",
@@ -348,6 +355,7 @@ class AIAgentRun(Base):
     )
 
     def __repr__(self) -> str:
+        """Return agent run summary for debugging."""
         return (
             f"<AIAgentRun(id={self.id}, agent={self.agent_type}, "
             f"status={self.status})>"
@@ -521,7 +529,7 @@ class AIAgentStep(Base):
     )
     parent_step: Mapped[AIAgentStep | None] = relationship(
         "AIAgentStep",
-        remote_side=[id],
+        remote_side="AIAgentStep.id",
         backref="child_steps",
     )
 
@@ -532,6 +540,7 @@ class AIAgentStep(Base):
     )
 
     def __repr__(self) -> str:
+        """Return agent step summary for debugging."""
         return (
             f"<AIAgentStep(run_id={self.run_id}, step={self.step_number}, "
             f"type={self.step_type}, status={self.status})>"
@@ -629,6 +638,7 @@ class AIAgentMessage(Base):
     )
 
     def __repr__(self) -> str:
+        """Return message summary for debugging."""
         return (
             f"<AIAgentMessage(run_id={self.run_id}, seq={self.sequence_number}, "
             f"role={self.role})>"
@@ -724,6 +734,7 @@ class AIAgentToolCall(Base):
     )
 
     def __repr__(self) -> str:
+        """Return tool call summary for debugging."""
         return (
             f"<AIAgentToolCall(run_id={self.run_id}, tool={self.tool_name}, "
             f"success={self.success})>"
@@ -836,6 +847,7 @@ class AIAgentCheckpoint(Base):
     )
 
     def __repr__(self) -> str:
+        """Return checkpoint summary for debugging."""
         return (
             f"<AIAgentCheckpoint(run_id={self.run_id}, "
             f"name={self.checkpoint_name}, step={self.step_number})>"

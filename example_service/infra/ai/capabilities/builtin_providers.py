@@ -63,6 +63,7 @@ def create_openai_adapter(
         transcription_model: Whisper model (default: whisper-1)
         timeout: Request timeout in seconds
         max_retries: Maximum retry attempts
+        **kwargs: Additional adapter-specific configuration.
 
     Returns:
         Configured OpenAIAdapter instance
@@ -100,6 +101,7 @@ def create_anthropic_adapter(
         model_name: Model to use (default: claude-sonnet-4-20250514)
         timeout: Request timeout in seconds
         max_retries: Maximum retry attempts
+        **kwargs: Additional adapter-specific configuration.
 
     Returns:
         Configured AnthropicAdapter instance
@@ -138,6 +140,7 @@ def create_deepgram_adapter(
         model_name: Model to use (default: nova-2)
         timeout: Request timeout in seconds
         max_retries: Maximum retry attempts
+        **kwargs: Additional adapter-specific configuration.
 
     Returns:
         Configured DeepgramAdapter instance
@@ -176,6 +179,7 @@ def create_accent_redaction_adapter(
         entity_types: Default entity types to detect
         confidence_threshold: Minimum confidence (0.0-1.0)
         timeout: Request timeout in seconds
+        **kwargs: Additional adapter-specific configuration.
 
     Returns:
         Configured AccentRedactionAdapter instance
@@ -367,13 +371,13 @@ def register_builtin_providers(
     if settings:
         openai_api_key = openai_api_key or getattr(settings, "openai_api_key", None)
         anthropic_api_key = anthropic_api_key or getattr(
-            settings, "anthropic_api_key", None
+            settings, "anthropic_api_key", None,
         )
         deepgram_api_key = deepgram_api_key or getattr(
-            settings, "deepgram_api_key", None
+            settings, "deepgram_api_key", None,
         )
         accent_redaction_url = accent_redaction_url or getattr(
-            settings, "accent_redaction_url", "http://accent-redaction:8502"
+            settings, "accent_redaction_url", "http://accent-redaction:8502",
         )
 
     results: dict[str, bool] = {}
@@ -395,7 +399,7 @@ def register_builtin_providers(
             )
             results["openai"] = True
         except Exception as e:
-            logger.error(f"Failed to register OpenAI provider: {e}")
+            logger.exception(f"Failed to register OpenAI provider: {e}")
             results["openai"] = False
     elif not skip_unavailable:
         logger.warning("OpenAI API key not provided, skipping registration")
@@ -417,7 +421,7 @@ def register_builtin_providers(
             )
             results["anthropic"] = True
         except Exception as e:
-            logger.error(f"Failed to register Anthropic provider: {e}")
+            logger.exception(f"Failed to register Anthropic provider: {e}")
             results["anthropic"] = False
     elif not skip_unavailable:
         logger.warning("Anthropic API key not provided, skipping registration")
@@ -437,7 +441,7 @@ def register_builtin_providers(
             )
             results["deepgram"] = True
         except Exception as e:
-            logger.error(f"Failed to register Deepgram provider: {e}")
+            logger.exception(f"Failed to register Deepgram provider: {e}")
             results["deepgram"] = False
     elif not skip_unavailable:
         logger.warning("Deepgram API key not provided, skipping registration")
@@ -453,7 +457,7 @@ def register_builtin_providers(
         )
         results["accent_redaction"] = True
     except Exception as e:
-        logger.error(f"Failed to register Accent Redaction provider: {e}")
+        logger.exception(f"Failed to register Accent Redaction provider: {e}")
         results["accent_redaction"] = False
 
     # Summary logging

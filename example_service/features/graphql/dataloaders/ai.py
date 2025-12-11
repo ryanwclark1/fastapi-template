@@ -39,7 +39,7 @@ class AIJobDataLoader:
         """
         self._session = session
         self._loader: DataLoader[UUID, AIJob | None] = DataLoader(
-            load_fn=self._batch_load_ai_jobs
+            load_fn=self._batch_load_ai_jobs,
         )
 
     async def _batch_load_ai_jobs(

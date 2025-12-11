@@ -52,7 +52,7 @@ def _get_manager_safe() -> ConnectionManager | None:
 async def websocket_endpoint(
     websocket: WebSocket,
     channels: Annotated[
-        str, Query(description="Comma-separated list of channels to subscribe")
+        str, Query(description="Comma-separated list of channels to subscribe"),
     ] = "",
     user_id: Annotated[str | None, Query(description="User identifier")] = None,
 ) -> None:

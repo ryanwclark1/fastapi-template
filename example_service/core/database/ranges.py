@@ -97,7 +97,8 @@ class Range[T: (date, datetime, int, Decimal)]:
     def __post_init__(self) -> None:
         """Validate bounds specification and range consistency."""
         if self.bounds not in ("[]", "[)", "(]", "()"):
-            raise ValueError(f"Invalid bounds: {self.bounds}. Use [], [), (], or ()")
+            msg = f"Invalid bounds: {self.bounds}. Use [], [), (], or ()"
+            raise ValueError(msg)
 
         if (
             self.lower is not None
@@ -363,7 +364,7 @@ class BaseRangeType(types.UserDefinedType[Range[T]]):
         return process
 
     def result_processor(
-        self, dialect: Any, coltype: Any
+        self, dialect: Any, coltype: Any,
     ) -> Callable[[Any], Any] | None:
         """Process value received from database."""
         _ = dialect, coltype

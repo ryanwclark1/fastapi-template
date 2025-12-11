@@ -19,9 +19,10 @@ try:
 except ImportError:
     GraphQLRouter = None  # type: ignore[assignment, misc]
 
-from example_service.core.dependencies.accent_auth import get_current_user_optional
+from example_service.core.dependencies.auth import OptionalAuthUser
 from example_service.core.dependencies.database import get_db_session
 from example_service.core.settings import get_app_settings, get_graphql_settings
+from example_service.utils.runtime_dependencies import require_runtime_dependency
 
 # Only import GraphQL-specific modules if GraphQLRouter is available
 if GraphQLRouter is not None:
@@ -34,16 +35,16 @@ else:
     GraphQLContext = None  # type: ignore[misc]
     create_dataloaders = None
     register_playground_routes = None
-    schema = None
+schema = None
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from example_service.core.schemas.auth import AuthUser
 
 logger = logging.getLogger(__name__)
+require_runtime_dependency(OptionalAuthUser)
 
 # Only define these if GraphQLRouter is available to avoid FastAPI processing them
 # when GraphQL is not enabled
@@ -54,7 +55,7 @@ if GraphQLRouter is not None:
         response: Response,
         background_tasks: BackgroundTasks,
         session: Annotated[AsyncSession, Depends(get_db_session)],
-        user: Annotated[AuthUser | None, Depends(get_current_user_optional)],
+        user: OptionalAuthUser,
     ) -> GraphQLContext:
         """Create GraphQL context from FastAPI dependencies.
 
@@ -112,7 +113,7 @@ def create_graphql_router() -> APIRouter:
     selected_ide: Literal["graphiql", "apollo-sandbox", "pathfinder"] | None = None
     if graphql_ide_setting in ("graphiql", "apollo-sandbox", "pathfinder"):
         selected_ide = cast(
-            "Literal['graphiql', 'apollo-sandbox', 'pathfinder']", graphql_ide_setting
+            "Literal['graphiql', 'apollo-sandbox', 'pathfinder']", graphql_ide_setting,
         )
 
     graphql_app = GraphQLRouter(

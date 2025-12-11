@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import time
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 from fastapi import FastAPI, HTTPException, Request
@@ -39,7 +40,9 @@ from example_service.infra.resilience.circuit_breaker import (
     CircuitBreaker,
     CircuitState,
 )
-from tests.integration.conftest import IntegrationTestHelper
+
+if TYPE_CHECKING:
+    from tests.integration.conftest import IntegrationTestHelper
 
 # ============================================================================
 # Circuit Breaker Integration Tests
@@ -383,7 +386,7 @@ class TestNPlusOneDetectionIntegration:
 
     @pytest.mark.asyncio
     async def test_n_plus_one_detection_with_real_queries(
-        self, app_with_n_plus_one_detection: FastAPI, capture_logs
+        self, app_with_n_plus_one_detection: FastAPI, capture_logs,
     ):
         """Test N+1 detection with real SQL query patterns.
 
@@ -498,7 +501,7 @@ class TestNPlusOneDetectionIntegration:
 
                 # Record slow query
                 middleware.record_query(
-                    request, "SELECT * FROM large_table WHERE complex_join = 1", 0.8
+                    request, "SELECT * FROM large_table WHERE complex_join = 1", 0.8,
                 )
 
                 # Record fast query
@@ -509,7 +512,7 @@ class TestNPlusOneDetectionIntegration:
 
     @pytest.mark.asyncio
     async def test_n_plus_one_with_different_query_types(
-        self, app_with_n_plus_one_detection: FastAPI
+        self, app_with_n_plus_one_detection: FastAPI,
     ):
         """Test N+1 detection with various SQL query types.
 
@@ -544,7 +547,7 @@ class TestNPlusOneDetectionIntegration:
         # Simulate N+1 with UPDATEs
         for i in range(5):
             middleware.record_query(
-                request, f"UPDATE posts SET views = views + 1 WHERE id = {i}", 0.003
+                request, f"UPDATE posts SET views = views + 1 WHERE id = {i}", 0.003,
             )
 
         assert request.state.query_count == 10
@@ -702,7 +705,7 @@ class TestDebugMiddlewareIntegration:
 
     @pytest.mark.asyncio
     async def test_logging_context_injection(
-        self, app_with_debug_middleware: FastAPI, capture_logs
+        self, app_with_debug_middleware: FastAPI, capture_logs,
     ):
         """Test that trace context is injected into logs.
 
@@ -728,7 +731,7 @@ class TestDebugMiddlewareIntegration:
 
     @pytest.mark.asyncio
     async def test_exception_handling_with_trace_context(
-        self, app_with_debug_middleware: FastAPI, capture_logs
+        self, app_with_debug_middleware: FastAPI, capture_logs,
     ):
         """Test exception handling includes trace context.
 
@@ -891,7 +894,7 @@ class TestI18nMiddlewareIntegration:
             3. Verify translations are loaded
         """
         async with AsyncClient(
-            transport=ASGITransport(app=app_with_i18n), base_url="http://test"
+            transport=ASGITransport(app=app_with_i18n), base_url="http://test",
         ) as client:
             response = await client.get("/hello", headers={"Accept-Language": "es"})
 
@@ -914,7 +917,7 @@ class TestI18nMiddlewareIntegration:
             3. Verify translations are in French
         """
         async with AsyncClient(
-            transport=ASGITransport(app=app_with_i18n), base_url="http://test"
+            transport=ASGITransport(app=app_with_i18n), base_url="http://test",
         ) as client:
             response = await client.get("/hello?lang=fr")
 
@@ -935,7 +938,7 @@ class TestI18nMiddlewareIntegration:
             4. Verify same locale is used
         """
         async with AsyncClient(
-            transport=ASGITransport(app=app_with_i18n), base_url="http://test"
+            transport=ASGITransport(app=app_with_i18n), base_url="http://test",
         ) as client:
             # First request with query parameter
             response1 = await client.get("/hello?lang=es")
@@ -991,7 +994,7 @@ class TestI18nMiddlewareIntegration:
             3. Verify English translations are used
         """
         async with AsyncClient(
-            transport=ASGITransport(app=app_with_i18n), base_url="http://test"
+            transport=ASGITransport(app=app_with_i18n), base_url="http://test",
         ) as client:
             response = await client.get(
                 "/hello",
@@ -1110,7 +1113,7 @@ class TestSecurityHeadersIntegration:
 
     @pytest.mark.asyncio
     async def test_security_headers_present_in_response(
-        self, app_with_security_headers: FastAPI, test_helper: IntegrationTestHelper
+        self, app_with_security_headers: FastAPI, test_helper: IntegrationTestHelper,
     ):
         """Test all security headers are present in response.
 
@@ -1157,7 +1160,7 @@ class TestSecurityHeadersIntegration:
             return {"env": "production"}
 
         async with AsyncClient(
-            transport=ASGITransport(app=prod_app), base_url="http://test"
+            transport=ASGITransport(app=prod_app), base_url="http://test",
         ) as client:
             prod_response = await client.get("/test")
 
@@ -1180,7 +1183,7 @@ class TestSecurityHeadersIntegration:
             return {"env": "development"}
 
         async with AsyncClient(
-            transport=ASGITransport(app=dev_app), base_url="http://test"
+            transport=ASGITransport(app=dev_app), base_url="http://test",
         ) as client:
             dev_response = await client.get("/test")
 
@@ -1343,7 +1346,7 @@ class TestFullMiddlewareStackIntegration:
 
     @pytest.mark.asyncio
     async def test_all_middleware_working_together(
-        self, full_stack_app: FastAPI, test_helper: IntegrationTestHelper
+        self, full_stack_app: FastAPI, test_helper: IntegrationTestHelper,
     ):
         """Test all middleware work together correctly.
 
@@ -1353,7 +1356,7 @@ class TestFullMiddlewareStackIntegration:
             3. Verify no conflicts between middleware
         """
         async with AsyncClient(
-            transport=ASGITransport(app=full_stack_app), base_url="http://test"
+            transport=ASGITransport(app=full_stack_app), base_url="http://test",
         ) as client:
             response = await client.get("/test?lang=es", headers={"Accept-Language": "fr"})
 
@@ -1390,7 +1393,7 @@ class TestFullMiddlewareStackIntegration:
             3. Ensure no interference
         """
         async with AsyncClient(
-            transport=ASGITransport(app=full_stack_app), base_url="http://test"
+            transport=ASGITransport(app=full_stack_app), base_url="http://test",
         ) as client:
             response = await client.get("/test")
 
@@ -1418,7 +1421,7 @@ class TestFullMiddlewareStackIntegration:
             3. Ensure middleware overhead is reasonable
         """
         async with AsyncClient(
-            transport=ASGITransport(app=full_stack_app), base_url="http://test"
+            transport=ASGITransport(app=full_stack_app), base_url="http://test",
         ) as client:
             # Warmup
             await client.get("/test")
@@ -1467,7 +1470,7 @@ class TestFullMiddlewareStackIntegration:
             3. Ensure no context leakage
         """
         async with AsyncClient(
-            transport=ASGITransport(app=full_stack_app), base_url="http://test"
+            transport=ASGITransport(app=full_stack_app), base_url="http://test",
         ) as client:
             # Make 10 concurrent requests
             tasks = [client.get("/test") for _ in range(10)]
@@ -1494,7 +1497,7 @@ class TestFullMiddlewareStackIntegration:
             3. Ensure no state loss
         """
         async with AsyncClient(
-            transport=ASGITransport(app=full_stack_app), base_url="http://test"
+            transport=ASGITransport(app=full_stack_app), base_url="http://test",
         ) as client:
             response = await client.get("/test")
 
@@ -1516,7 +1519,7 @@ class TestFullMiddlewareStackIntegration:
             3. Ensure no duplicate or conflicting headers
         """
         async with AsyncClient(
-            transport=ASGITransport(app=full_stack_app), base_url="http://test"
+            transport=ASGITransport(app=full_stack_app), base_url="http://test",
         ) as client:
             response = await client.get("/test")
 
@@ -1562,7 +1565,7 @@ class TestPerformanceBenchmarks:
             2. Establish baseline metrics
         """
         async with AsyncClient(
-            transport=ASGITransport(app=test_app_minimal), base_url="http://test"
+            transport=ASGITransport(app=test_app_minimal), base_url="http://test",
         ) as client:
             # Warmup
             for _ in range(10):
@@ -1598,7 +1601,7 @@ class TestPerformanceBenchmarks:
             return {"status": "ok"}
 
         async with AsyncClient(
-            transport=ASGITransport(app=app_debug), base_url="http://test"
+            transport=ASGITransport(app=app_debug), base_url="http://test",
         ) as client:
             start = time.perf_counter()
             for _ in range(100):

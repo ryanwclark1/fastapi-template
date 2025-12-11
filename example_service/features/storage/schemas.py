@@ -63,9 +63,9 @@ class BucketResponse(BaseModel):
                     "creation_date": "2024-01-15T10:30:00Z",
                     "versioning_enabled": False,
                     "tenant_uuid": "tenant-abc-123",
-                }
-            ]
-        }
+                },
+            ],
+        },
     }
 
 
@@ -103,9 +103,9 @@ class ObjectMetadataResponse(BaseModel):
                     "etag": "abc123",
                     "storage_class": "STANDARD",
                     "acl": "private",
-                }
-            ]
-        }
+                },
+            ],
+        },
     }
 
 
@@ -178,11 +178,11 @@ class ACLResponse(BaseModel):
                         {
                             "Grantee": {"Type": "CanonicalUser", "ID": "user-id"},
                             "Permission": "FULL_CONTROL",
-                        }
+                        },
                     ],
-                }
-            ]
-        }
+                },
+            ],
+        },
     }
 
 

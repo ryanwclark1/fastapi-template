@@ -213,7 +213,8 @@ if broker is not None:
                     "Webhook delivery not found",
                     extra={"delivery_id": delivery_id},
                 )
-                raise WebhookDeliveryError(f"Delivery not found: {delivery_id}")
+                msg = f"Delivery not found: {delivery_id}"
+                raise WebhookDeliveryError(msg)
 
             # Step 2: Check if max retries exceeded
             if delivery["attempt_count"] >= delivery["max_attempts"]:
@@ -336,7 +337,7 @@ if broker is not None:
                     error_message=str(e),
                 )
 
-                logger.error(
+                logger.exception(
                     "Webhook delivery failed permanently",
                     extra={
                         "delivery_id": delivery_id,
@@ -357,7 +358,8 @@ if broker is not None:
                 "Webhook delivery task failed",
                 extra={"delivery_id": delivery_id, "error": str(e)},
             )
-            raise WebhookDeliveryError(f"Failed to deliver webhook {delivery_id}: {e}") from e
+            msg = f"Failed to deliver webhook {delivery_id}: {e}"
+            raise WebhookDeliveryError(msg) from e
 
     @broker.task()
     async def process_webhook_retries() -> dict[str, Any]:

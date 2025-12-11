@@ -14,7 +14,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    TypeAdapter,
+    field_validator,
+)
+from pydantic_core import PydanticCustomError, ValidationError
+
+_EMAIL_ADAPTER = TypeAdapter(EmailStr)
 
 if TYPE_CHECKING:
     from example_service.infra.auth.accent_auth import AccentAuthACL
@@ -28,10 +38,10 @@ class TokenPayload(BaseModel):
     """
 
     sub: str = Field(
-        min_length=1, max_length=255, description="Subject (user ID or service ID)"
+        min_length=1, max_length=255, description="Subject (user ID or service ID)",
     )
     user_id: str | None = Field(
-        default=None, max_length=255, description="User ID if authenticated as user"
+        default=None, max_length=255, description="User ID if authenticated as user",
     )
     service_id: str | None = Field(
         default=None,
@@ -49,11 +59,11 @@ class TokenPayload(BaseModel):
         description="Legacy ACL dict - prefer using permissions list with ACL patterns",
     )
     exp: int | None = Field(
-        default=None, ge=0, description="Token expiration timestamp"
+        default=None, ge=0, description="Token expiration timestamp",
     )
     iat: int | None = Field(default=None, ge=0, description="Token issued at timestamp")
     metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Additional user/service metadata"
+        default_factory=dict, description="Additional user/service metadata",
     )
 
     @field_validator("permissions", mode="after")
@@ -82,20 +92,25 @@ class AuthUser(BaseModel):
 
     user_id: str | None = Field(default=None, max_length=255, description="User ID")
     service_id: str | None = Field(
-        default=None, max_length=255, description="Service ID"
+        default=None, max_length=255, description="Service ID",
     )
-    email: EmailStr | None = Field(default=None, description="User email")
+    email: str | None = Field(default=None, description="User email")
+    roles: list[str] = Field(
+        default_factory=list,
+        max_length=50,
+        description="Role identifiers associated with the user or service",
+    )
     permissions: list[str] = Field(
         default_factory=list,
         max_length=200,
         description="ACL patterns granted to user (e.g., 'confd.users.read', 'storage.#')",
     )
-    acl: dict[str, list[str] | dict[str, bool]] = Field(
+    acl: dict[str, list[str] | dict[str, bool]] | list[str] = Field(
         default_factory=dict,
         description="Legacy ACL dict - prefer using permissions list with ACL patterns",
     )
     metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Additional user/service metadata"
+        default_factory=dict, description="Additional user/service metadata",
     )
 
     @field_validator("permissions", mode="after")
@@ -106,6 +121,30 @@ class AuthUser(BaseModel):
             msg = "ACL patterns cannot be empty or whitespace"
             raise ValueError(msg)
         return v
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def _validate_email(cls, value: str | None) -> str | None:
+        """Allow dev-mode .local addresses while validating others."""
+        if value in (None, ""):
+            return value
+
+        try:
+            return _EMAIL_ADAPTER.validate_python(value)
+        except (PydanticCustomError, ValidationError):
+            if isinstance(value, str) and value.endswith(".local"):
+                return value
+            raise
+
+    @field_validator("acl", mode="before")
+    @classmethod
+    def _coerce_acl(cls, value: Any) -> dict[str, Any]:
+        """Normalize legacy ACL lists into dictionary format."""
+        if value is None:
+            return {}
+        if isinstance(value, list):
+            return {"allow": value}
+        return value
 
     model_config = ConfigDict(
         str_strip_whitespace=True,

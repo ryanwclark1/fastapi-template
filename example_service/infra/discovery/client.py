@@ -135,7 +135,7 @@ class ConsulClient:
 
                 duration = time.perf_counter() - start_time
                 service_discovery_operation_duration_seconds.labels(operation="register").observe(
-                    duration
+                    duration,
                 )
 
                 if response.status_code == 200:
@@ -155,7 +155,7 @@ class ConsulClient:
                 span.set_attribute("consul.status_code", response.status_code)
                 service_discovery_registrations_total.labels(status="failure").inc()
                 service_discovery_errors_total.labels(
-                    operation="register", error_type="http_error"
+                    operation="register", error_type="http_error",
                 ).inc()
                 logger.warning(
                     "Consul registration failed",
@@ -170,13 +170,13 @@ class ConsulClient:
             except httpx.TimeoutException as e:
                 duration = time.perf_counter() - start_time
                 service_discovery_operation_duration_seconds.labels(operation="register").observe(
-                    duration
+                    duration,
                 )
                 span.set_attribute("consul.success", False)
                 span.record_exception(e)
                 service_discovery_registrations_total.labels(status="failure").inc()
                 service_discovery_errors_total.labels(
-                    operation="register", error_type="timeout"
+                    operation="register", error_type="timeout",
                 ).inc()
                 logger.warning(
                     "Consul registration timed out",
@@ -187,13 +187,13 @@ class ConsulClient:
             except httpx.HTTPError as e:
                 duration = time.perf_counter() - start_time
                 service_discovery_operation_duration_seconds.labels(operation="register").observe(
-                    duration
+                    duration,
                 )
                 span.set_attribute("consul.success", False)
                 span.record_exception(e)
                 service_discovery_registrations_total.labels(status="failure").inc()
                 service_discovery_errors_total.labels(
-                    operation="register", error_type="connection"
+                    operation="register", error_type="connection",
                 ).inc()
                 logger.warning(
                     "Consul registration connection error",
@@ -222,7 +222,7 @@ class ConsulClient:
 
                 duration = time.perf_counter() - start_time
                 service_discovery_operation_duration_seconds.labels(operation="deregister").observe(
-                    duration
+                    duration,
                 )
 
                 if response.status_code == 200:
@@ -237,7 +237,7 @@ class ConsulClient:
                 span.set_attribute("consul.status_code", response.status_code)
                 service_discovery_deregistrations_total.labels(status="failure").inc()
                 service_discovery_errors_total.labels(
-                    operation="deregister", error_type="http_error"
+                    operation="deregister", error_type="http_error",
                 ).inc()
                 logger.warning(
                     "Consul deregistration failed",
@@ -251,13 +251,13 @@ class ConsulClient:
             except httpx.TimeoutException as e:
                 duration = time.perf_counter() - start_time
                 service_discovery_operation_duration_seconds.labels(operation="deregister").observe(
-                    duration
+                    duration,
                 )
                 span.set_attribute("consul.success", False)
                 span.record_exception(e)
                 service_discovery_deregistrations_total.labels(status="failure").inc()
                 service_discovery_errors_total.labels(
-                    operation="deregister", error_type="timeout"
+                    operation="deregister", error_type="timeout",
                 ).inc()
                 logger.warning(
                     "Consul deregistration timed out",
@@ -268,13 +268,13 @@ class ConsulClient:
             except httpx.HTTPError as e:
                 duration = time.perf_counter() - start_time
                 service_discovery_operation_duration_seconds.labels(operation="deregister").observe(
-                    duration
+                    duration,
                 )
                 span.set_attribute("consul.success", False)
                 span.record_exception(e)
                 service_discovery_deregistrations_total.labels(status="failure").inc()
                 service_discovery_errors_total.labels(
-                    operation="deregister", error_type="connection"
+                    operation="deregister", error_type="connection",
                 ).inc()
                 logger.warning(
                     "Consul deregistration connection error",
@@ -309,23 +309,23 @@ class ConsulClient:
 
                 duration = time.perf_counter() - start_time
                 service_discovery_operation_duration_seconds.labels(operation=operation).observe(
-                    duration
+                    duration,
                 )
 
                 if response.status_code == 200:
                     span.set_attribute("consul.success", True)
                     service_discovery_ttl_passes_total.labels(
-                        status="success", check_status=status
+                        status="success", check_status=status,
                     ).inc()
                     logger.debug("TTL %s sent to Consul", status, extra={"check_id": check_id})
                     return True
                 span.set_attribute("consul.success", False)
                 span.set_attribute("consul.status_code", response.status_code)
                 service_discovery_ttl_passes_total.labels(
-                    status="failure", check_status=status
+                    status="failure", check_status=status,
                 ).inc()
                 service_discovery_errors_total.labels(
-                    operation=operation, error_type="http_error"
+                    operation=operation, error_type="http_error",
                 ).inc()
                 logger.warning(
                     "TTL %s failed",
@@ -340,15 +340,15 @@ class ConsulClient:
             except httpx.TimeoutException as e:
                 duration = time.perf_counter() - start_time
                 service_discovery_operation_duration_seconds.labels(operation=operation).observe(
-                    duration
+                    duration,
                 )
                 span.set_attribute("consul.success", False)
                 span.record_exception(e)
                 service_discovery_ttl_passes_total.labels(
-                    status="failure", check_status=status
+                    status="failure", check_status=status,
                 ).inc()
                 service_discovery_errors_total.labels(
-                    operation=operation, error_type="timeout"
+                    operation=operation, error_type="timeout",
                 ).inc()
                 logger.warning(
                     "TTL %s timed out",
@@ -360,15 +360,15 @@ class ConsulClient:
             except httpx.HTTPError as e:
                 duration = time.perf_counter() - start_time
                 service_discovery_operation_duration_seconds.labels(operation=operation).observe(
-                    duration
+                    duration,
                 )
                 span.set_attribute("consul.success", False)
                 span.record_exception(e)
                 service_discovery_ttl_passes_total.labels(
-                    status="failure", check_status=status
+                    status="failure", check_status=status,
                 ).inc()
                 service_discovery_errors_total.labels(
-                    operation=operation, error_type="connection"
+                    operation=operation, error_type="connection",
                 ).inc()
                 logger.warning(
                     "TTL %s connection error",

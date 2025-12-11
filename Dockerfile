@@ -1,80 +1,108 @@
-###############################################
-# Base Image
-###############################################
-FROM python:3.13-slim AS python-base
-
-ENV PYTHONUNBUFFERED=1 \
-  PYTHONDONTWRITEBYTECODE=1 \
-  PIP_NO_CACHE_DIR=off \
-  PIP_DISABLE_PIP_VERSION_CHECK=on \
-  PIP_DEFAULT_TIMEOUT=100 \
-  UV_SYSTEM_PYTHON=1 \
-  UV_COMPILE_BYTECODE=1 \
-  VENV_PATH="/app/.venv"
-
-ENV PATH="$VENV_PATH/bin:$PATH"
+# Multi-stage Dockerfile for FastAPI Service
+# Optimized for production with security and performance in mind
+# Using UV package manager following best practices from:
+# https://docs.astral.sh/uv/guides/integration/docker/
+# https://github.com/astral-sh/uv-docker-example
 
 ###############################################
-# Builder Image
+# Stage 1: Builder - Use official UV image
 ###############################################
-FROM python-base AS builder-base
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS builder
+
+# Set environment variables for UV
+ENV UV_COMPILE_BYTECODE=1 \
+  UV_LINK_MODE=copy \
+  UV_PYTHON_DOWNLOADS=0
 
 # Install build dependencies
-RUN apt-get update -qq \
-  && apt-get install -y --no-install-recommends \
-  curl \
+RUN apt-get update -qq && apt-get install -y --no-install-recommends \
   gcc \
   libc6-dev \
   libpq-dev \
   && rm -rf /var/lib/apt/lists/*
 
-# Install UV
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.local/bin:$PATH"
-
 WORKDIR /app
-
-# Create virtual environment
-RUN uv venv .venv
 
 # Copy dependency files
 COPY pyproject.toml uv.lock* ./
 # Include README so hatch can build the local package during uv sync
 COPY README.md README.md
 
-# Install dependencies
-RUN uv sync --frozen --no-dev
+# Install dependencies with build cache
+# uv sync will automatically create .venv if it doesn't exist
+RUN --mount=type=cache,target=/root/.cache/uv \
+  uv sync --frozen --no-dev
 
 ###############################################
-# Production Image
+# Stage 2: Production - Use matching Python version
 ###############################################
-FROM python-base AS production
+FROM python:3.13-slim AS production
+
+# Configurable port (change this value or override with --build-arg APP_PORT=XXXX)
+ARG APP_PORT=8000
+
+# Set runtime environment variables
+ENV PYTHONUNBUFFERED=1 \
+  PYTHONDONTWRITEBYTECODE=1 \
+  PATH="/app/.venv/bin:$PATH"
 
 # Install runtime dependencies
-RUN apt-get update -qq \
-  && apt-get install -y --no-install-recommends \
+RUN apt-get update -qq && apt-get install -y --no-install-recommends \
   libpq5 \
+  curl \
+  tini \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-# Copy uv from builder (needed for uv run)
-COPY --from=builder-base /root/.local/bin/uv /usr/local/bin/uv
+# Create app user for security (uid 1000)
+RUN groupadd -g 1000 appuser && \
+  useradd -r -u 1000 -g appuser appuser
 
-# Copy the virtual environment
-COPY --from=builder-base /app/.venv /app/.venv
+WORKDIR /app
+
+# Copy virtual environment from builder
+COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
 
 # Copy application code
-COPY . .
+COPY --chown=appuser:appuser . .
 
-# Create logs directory
-RUN mkdir -p /app/logs
+# Copy and set up entrypoint script
+COPY --chown=appuser:appuser docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
+# Create directories for logs and temp files
+RUN mkdir -p /app/logs /app/tmp && \
+  chown -R appuser:appuser /app
+
+# Switch to app user
+USER appuser
 
 # Expose port
-EXPOSE 8000
+EXPOSE ${APP_PORT}
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/live')" || exit 1
+# Health check endpoint (adjust path based on your actual health endpoint)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:${APP_PORT}/api/v1/health/live || exit 1
 
-# Use uv to run the application
-CMD ["uv", "run", "uvicorn", "example_service.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Use tini for proper signal handling + migration script
+ENTRYPOINT ["/usr/bin/tini", "--", "/app/docker-entrypoint.sh"]
+
+# Default command - start FastAPI application
+# Using venv's python directly (no UV needed at runtime)
+# The entrypoint script will run migrations, then exec this command
+CMD ["sh", "-c", "python -m uvicorn example_service.app.main:app --host 0.0.0.0 --port ${APP_PORT}"]
+
+# Alternative commands (uncomment as needed):
+#
+# Single worker (default):
+# CMD python -m uvicorn example_service.app.main:app --host 0.0.0.0 --port ${APP_PORT}
+#
+# Multiple workers (adjust based on CPU cores):
+# CMD python -m uvicorn example_service.app.main:app --host 0.0.0.0 --port ${APP_PORT} --workers 4
+#
+# With Gunicorn (for production with multiple workers):
+# CMD gunicorn example_service.app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:${APP_PORT}
+#
+# Development mode (if needed):
+# CMD python -m uvicorn example_service.app.main:app --reload --host 0.0.0.0 --port ${APP_PORT}
+

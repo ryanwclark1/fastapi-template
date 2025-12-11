@@ -22,8 +22,8 @@ async def test_ensure_event_outbox_table_creates_table(monkeypatch, postgres_con
     async with temp_engine.connect() as conn:
         result = await conn.execute(
             text(
-                "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'event_outbox'"
-            )
+                "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'event_outbox'",
+            ),
         )
         assert result.scalar_one() == "event_outbox"
 

@@ -19,6 +19,9 @@ import strawberry
 from strawberry.scalars import JSON
 
 from example_service.features.graphql.types.base import PageInfoType
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(datetime, JSON, PageInfoType)
 
 # --- Enums ---
 
@@ -176,7 +179,7 @@ class TriggerTaskInput:
 
     task: TaskNameEnum = strawberry.field(description="Task to trigger")
     params: JSON | None = strawberry.field(
-        default=None, description="Task-specific parameters"
+        default=None, description="Task-specific parameters",
     )
 
 
@@ -186,7 +189,7 @@ class CancelTaskInput:
 
     task_id: str = strawberry.field(description="ID of the task to cancel")
     reason: str | None = strawberry.field(
-        default=None, description="Reason for cancellation"
+        default=None, description="Reason for cancellation",
     )
 
 
@@ -195,34 +198,34 @@ class TaskSearchFilterInput:
     """Filter input for task search query."""
 
     task_name: str | None = strawberry.field(
-        default=None, description="Filter by exact task name"
+        default=None, description="Filter by exact task name",
     )
     task_name_like: str | None = strawberry.field(
-        default=None, description="Filter by task name (contains)"
+        default=None, description="Filter by task name (contains)",
     )
     status: TaskStatusEnum | None = strawberry.field(
-        default=None, description="Filter by status"
+        default=None, description="Filter by status",
     )
     statuses: list[TaskStatusEnum] | None = strawberry.field(
-        default=None, description="Filter by multiple statuses"
+        default=None, description="Filter by multiple statuses",
     )
     worker_id: str | None = strawberry.field(
-        default=None, description="Filter by worker ID"
+        default=None, description="Filter by worker ID",
     )
     error_type: str | None = strawberry.field(
-        default=None, description="Filter by error type"
+        default=None, description="Filter by error type",
     )
     created_after: datetime | None = strawberry.field(
-        default=None, description="Tasks created after this time"
+        default=None, description="Tasks created after this time",
     )
     created_before: datetime | None = strawberry.field(
-        default=None, description="Tasks created before this time"
+        default=None, description="Tasks created before this time",
     )
     min_duration_ms: int | None = strawberry.field(
-        default=None, description="Minimum duration in ms"
+        default=None, description="Minimum duration in ms",
     )
     max_duration_ms: int | None = strawberry.field(
-        default=None, description="Maximum duration in ms"
+        default=None, description="Maximum duration in ms",
     )
 
 
@@ -232,7 +235,7 @@ class BulkCancelInput:
 
     task_ids: list[str] = strawberry.field(description="List of task IDs to cancel")
     reason: str | None = strawberry.field(
-        default=None, description="Reason for cancellation"
+        default=None, description="Reason for cancellation",
     )
 
 

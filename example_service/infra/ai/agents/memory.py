@@ -111,7 +111,7 @@ class MemoryMessage:
     def __hash__(self) -> int:
         """Hash for deduplication."""
         content = json.dumps(self.to_dict(), sort_keys=True)
-        return int(hashlib.md5(content.encode()).hexdigest(), 16)
+        return int(hashlib.sha256(content.encode()).hexdigest(), 16)
 
 
 class BaseMemory(ABC):
@@ -233,6 +233,8 @@ class BufferMemory(BaseMemory):
 
     def _trim_to_token_limit(self) -> None:
         """Remove oldest messages to meet token limit."""
+        if self.max_tokens is None:
+            return
         while self._messages and self._total_tokens > self.max_tokens:
             removed = self._messages.popleft()
             if removed.token_count:
@@ -474,11 +476,7 @@ class SummaryMemory(BaseMemory):
 
     def get_messages(self) -> list[dict[str, Any]]:
         """Get messages with summary."""
-        messages = []
-
-        # Add system messages
-        for msg in self._system_messages:
-            messages.append(msg.to_dict())
+        messages = [msg.to_dict() for msg in self._system_messages]
 
         # Add summary as context
         if self._summary:
@@ -488,8 +486,7 @@ class SummaryMemory(BaseMemory):
             })
 
         # Add recent messages
-        for msg in self._recent_messages:
-            messages.append(msg.to_dict())
+        messages.extend(msg.to_dict() for msg in self._recent_messages)
 
         return messages
 
@@ -743,4 +740,5 @@ def create_memory(
             long_term=kwargs.get("long_term"),
             max_short_term=kwargs.get("max_short_term", 20),
         )
-    raise ValueError(f"Unknown memory type: {memory_type}")
+    msg = f"Unknown memory type: {memory_type}"
+    raise ValueError(msg)

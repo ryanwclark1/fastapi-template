@@ -7,7 +7,11 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
 from .models import FlagStatus
+
+require_runtime_dependency(datetime, FlagStatus)
 
 
 class TargetingRule(BaseModel):
@@ -41,7 +45,7 @@ class FeatureFlagCreate(BaseModel):
     enabled: bool = Field(default=False, description="Global enabled state")
     percentage: int = Field(default=0, ge=0, le=100, description="Rollout percentage")
     targeting_rules: list[TargetingRule] | None = Field(
-        default=None, description="Targeting rules"
+        default=None, description="Targeting rules",
     )
     metadata: dict[str, Any] | None = Field(
         default=None,
@@ -67,8 +71,8 @@ class FeatureFlagCreate(BaseModel):
                 "description": "Enable the redesigned dashboard",
                 "status": "percentage",
                 "percentage": 25,
-            }
-        }
+            },
+        },
     }
 
 
@@ -138,7 +142,8 @@ class FlagOverrideCreate(BaseModel):
         """Validate entity type."""
         allowed = {"user", "tenant"}
         if v.lower() not in allowed:
-            raise ValueError(f"entity_type must be one of: {allowed}")
+            msg = f"entity_type must be one of: {allowed}"
+            raise ValueError(msg)
         return v.lower()
 
 
@@ -163,7 +168,7 @@ class FlagEvaluationRequest(BaseModel):
     user_id: str | None = Field(default=None, description="User ID for evaluation")
     tenant_id: str | None = Field(default=None, description="Tenant ID for evaluation")
     attributes: dict[str, Any] | None = Field(
-        default=None, description="Additional attributes for targeting"
+        default=None, description="Additional attributes for targeting",
     )
 
 
@@ -180,7 +185,7 @@ class FlagEvaluationResponse(BaseModel):
 
     flags: dict[str, bool] = Field(description="Map of flag keys to their evaluated values")
     details: list[FlagEvaluationResult] | None = Field(
-        default=None, description="Detailed evaluation results"
+        default=None, description="Detailed evaluation results",
     )
 
 

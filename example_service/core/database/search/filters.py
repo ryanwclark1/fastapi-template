@@ -511,10 +511,7 @@ class PhraseProximityFilter(StatementFilter):
 
         # Build proximity query: word1 <N> word2 <N> word3
         # Using raw SQL for the tsquery with FOLLOWED BY operator
-        query_parts = []
-        for word in self.words:
-            # Normalize word using to_tsquery to get lexeme
-            query_parts.append(word)
+        query_parts = list(self.words)
 
         # Create the proximity pattern
         # Format: 'word1' <-> 'word2' for adjacent, 'word1' <N> 'word2' for distance N

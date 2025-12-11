@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Annotated
-from uuid import UUID  # noqa: TC003
+from typing import TYPE_CHECKING, Annotated, Any
+import uuid
 
 from fastapi import APIRouter, Depends, File, UploadFile, status
 
@@ -46,9 +46,14 @@ from example_service.infra.storage.client import (
     InvalidFileError,
     StorageClientError,
 )
+from example_service.utils.runtime_dependencies import require_runtime_dependency
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
+else:  # pragma: no cover - typing fallback
+    AsyncSession = Any
+
+require_runtime_dependency(uuid.UUID)
 
 router = APIRouter(prefix="/files", tags=["files"])
 
@@ -132,7 +137,7 @@ async def upload_file(
             type="invalid-file",
         ) from e
     except StorageClientError as e:
-        logger.error("Storage error during file upload", extra={"error": str(e)})
+        logger.exception("Storage error during file upload", extra={"error": str(e)})
         raise ServiceUnavailableException(
             detail="Failed to upload file to storage",
             type="storage-upload-failed",
@@ -188,7 +193,7 @@ async def create_presigned_upload(
             type="invalid-file",
         ) from e
     except StorageClientError as e:
-        logger.error("Storage error during presigned upload creation", extra={"error": str(e)})
+        logger.exception("Storage error during presigned upload creation", extra={"error": str(e)})
         raise ServiceUnavailableException(
             detail="Failed to create presigned upload URL",
             type="presigned-upload-failed",
@@ -202,7 +207,7 @@ async def create_presigned_upload(
     description="Mark a presigned upload as complete after client uploads to S3.",
 )
 async def complete_presigned_upload(
-    file_id: UUID,
+    file_id: uuid.UUID,
     completion: FileUploadComplete,
     service: Annotated[FileService, Depends(get_file_service)],
 ) -> FileRead:
@@ -245,7 +250,7 @@ async def complete_presigned_upload(
             type="invalid-upload-state",
         ) from e
     except StorageClientError as e:
-        logger.error("Storage error during upload completion", extra={"error": str(e)})
+        logger.exception("Storage error during upload completion", extra={"error": str(e)})
         raise BadRequestException(
             detail="Upload verification failed - file not found in storage",
             type="upload-verification-failed",
@@ -305,7 +310,7 @@ async def list_files(
     responses={404: {"description": "File not found"}},
 )
 async def get_file(
-    file_id: UUID,
+    file_id: uuid.UUID,
     service: Annotated[FileService, Depends(get_file_service)],
 ) -> FileRead:
     """Get file metadata by ID.
@@ -340,7 +345,7 @@ async def get_file(
     },
 )
 async def get_download_url(
-    file_id: UUID,
+    file_id: uuid.UUID,
     service: Annotated[FileService, Depends(get_file_service)],
 ) -> FileDownloadResponse:
     """Get presigned download URL for a file.
@@ -380,7 +385,7 @@ async def get_download_url(
     responses={404: {"description": "File not found"}},
 )
 async def delete_file(
-    file_id: UUID,
+    file_id: uuid.UUID,
     service: Annotated[FileService, Depends(get_file_service)],
     hard_delete: bool = False,
 ) -> None:
@@ -421,7 +426,7 @@ async def delete_file(
     responses={404: {"description": "File not found"}},
 )
 async def get_processing_status(
-    file_id: UUID,
+    file_id: uuid.UUID,
     service: Annotated[FileService, Depends(get_file_service)],
 ) -> FileStatusResponse:
     """Get file processing status.
@@ -516,7 +521,7 @@ async def batch_upload_files(
         return BatchUploadResponse(**result)
 
     except StorageClientError as e:
-        logger.error("Storage error during batch upload", extra={"error": str(e)})
+        logger.exception("Storage error during batch upload", extra={"error": str(e)})
         raise ServiceUnavailableException(
             detail="Failed to upload files to storage",
             type="storage-batch-upload-failed",
@@ -553,7 +558,7 @@ async def batch_download_files(
         return BatchDownloadResponse(**result)
 
     except Exception as e:
-        logger.error("Error during batch download", extra={"error": str(e)})
+        logger.exception("Error during batch download", extra={"error": str(e)})
         raise InternalServerException(
             detail="Failed to generate download URLs",
             type="batch-download-failed",
@@ -595,7 +600,7 @@ async def batch_delete_files(
         return BatchDeleteResponse(**result)
 
     except Exception as e:
-        logger.error("Error during batch delete", extra={"error": str(e)})
+        logger.exception("Error during batch delete", extra={"error": str(e)})
         raise InternalServerException(
             detail="Failed to delete files",
             type="batch-delete-failed",
@@ -617,7 +622,7 @@ async def batch_delete_files(
     },
 )
 async def copy_file(
-    file_id: UUID,
+    file_id: uuid.UUID,
     request: CopyFileRequest,
     service: Annotated[FileService, Depends(get_file_service)],
 ) -> FileRead:
@@ -655,7 +660,7 @@ async def copy_file(
             type="file-not-ready-for-copy",
         ) from e
     except StorageClientError as e:
-        logger.error("Storage error during file copy", extra={"error": str(e)})
+        logger.exception("Storage error during file copy", extra={"error": str(e)})
         raise ServiceUnavailableException(
             detail="Failed to copy file in storage",
             type="storage-copy-failed",
@@ -670,7 +675,7 @@ async def copy_file(
     responses={404: {"description": "File not found"}},
 )
 async def move_file(
-    file_id: UUID,
+    file_id: uuid.UUID,
     request: MoveFileRequest,
     service: Annotated[FileService, Depends(get_file_service)],
 ) -> FileRead:

@@ -39,7 +39,7 @@ class ReminderDataLoader:
         """
         self._session = session
         self._loader: DataLoader[UUID, Reminder | None] = DataLoader(
-            load_fn=self._batch_load_reminders
+            load_fn=self._batch_load_reminders,
         )
 
     async def _batch_load_reminders(

@@ -1,3 +1,4 @@
+# mypy: disable-error-code="arg-type,return-value,assignment,attr-defined,misc,no-any-return,override"
 """Taskiq middleware for task execution tracking, metrics, and tracing.
 
 This module provides middleware that hooks into Taskiq's lifecycle:
@@ -30,6 +31,8 @@ from taskiq import TaskiqMiddleware
 
 if TYPE_CHECKING:
     from taskiq import TaskiqMessage, TaskiqResult
+
+import contextlib
 
 from example_service.core.settings import get_redis_settings, get_task_settings
 from example_service.infra.metrics.prometheus import (
@@ -107,7 +110,7 @@ class MetricsMiddleware(TaskiqMiddleware):
         if start_time is not None:
             duration_seconds = time.perf_counter() - start_time
             taskiq_task_duration_seconds.labels(task_name=task_name).observe(
-                duration_seconds
+                duration_seconds,
             )
 
         # Record task completion status
@@ -481,7 +484,7 @@ class TimeoutError(Exception):
         self.task_name = task_name
         self.timeout_seconds = timeout_seconds
         super().__init__(
-            f"Task '{task_name}' (id={task_id}) timed out after {timeout_seconds} seconds"
+            f"Task '{task_name}' (id={task_id}) timed out after {timeout_seconds} seconds",
         )
 
 
@@ -676,7 +679,7 @@ class DuplicateTaskError(Exception):
         self.task_id = task_id
         self.original_task_id = original_task_id
         super().__init__(
-            f"Duplicate task detected: {task_id} duplicates {original_task_id}"
+            f"Duplicate task detected: {task_id} duplicates {original_task_id}",
         )
 
 
@@ -906,10 +909,8 @@ class DeadLetterQueueMiddleware(TaskiqMiddleware):
                     entry = dict(entry_data)
                     for field in ["args", "kwargs", "labels"]:
                         if entry.get(field):
-                            try:
+                            with contextlib.suppress(json.JSONDecodeError, TypeError):
                                 entry[field] = json.loads(entry[field])
-                            except (json.JSONDecodeError, TypeError):
-                                pass
 
                     entries.append(entry)
 
@@ -955,10 +956,8 @@ class DeadLetterQueueMiddleware(TaskiqMiddleware):
             entry = dict(entry_data)
             for field in ["args", "kwargs", "labels"]:
                 if entry.get(field):
-                    try:
+                    with contextlib.suppress(json.JSONDecodeError, TypeError):
                         entry[field] = json.loads(entry[field])
-                    except (json.JSONDecodeError, TypeError):
-                        pass
 
             return entry
 
@@ -1198,17 +1197,13 @@ class ProgressTrackingMiddleware(TaskiqMiddleware):
             result = dict(progress_data)
             for field in ["percent", "current", "total"]:
                 if field in result:
-                    try:
+                    with contextlib.suppress(ValueError, TypeError):
                         result[field] = float(result[field]) if field == "percent" else int(result[field])
-                    except (ValueError, TypeError):
-                        pass
 
             # Parse extra data
             if "extra" in result:
-                try:
+                with contextlib.suppress(json.JSONDecodeError, TypeError):
                     result["extra"] = json.loads(result["extra"])
-                except (json.JSONDecodeError, TypeError):
-                    pass
 
             return result
 

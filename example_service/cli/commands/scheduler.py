@@ -82,7 +82,7 @@ async def list_jobs(output_format: str) -> None:
         for job in jobs:
             next_run = job["next_run_time"]
             if next_run:
-                next_dt = datetime.fromisoformat(next_run.replace("Z", "+00:00"))
+                next_dt = datetime.fromisoformat(next_run)
                 time_until = next_dt - now
                 if time_until.total_seconds() > 0:
                     hours, remainder = divmod(int(time_until.total_seconds()), 3600)
@@ -100,7 +100,7 @@ async def list_jobs(output_format: str) -> None:
                 next_display = click.style("paused", fg="yellow")
 
             click.echo(
-                f"{job['id']:<{id_width}} {job['name']:<{name_width}} {next_display:<25} {job['trigger']:<30}"
+                f"{job['id']:<{id_width}} {job['name']:<{name_width}} {next_display:<25} {job['trigger']:<30}",
             )
 
         click.echo()
@@ -141,7 +141,6 @@ async def run_job(job_id: str, wait: bool) -> None:
     This will execute the job's function immediately, regardless of its schedule.
 
     Examples:
-    \b
       example-service scheduler run cleanup_sessions
       example-service scheduler run database_backup --wait
     """

@@ -282,7 +282,7 @@ async def _execute_pipeline_background(
     orchestrator: InstrumentedOrchestrator,
     pipeline: Any,
     input_data: dict[str, Any],
-    options: dict[str, Any],  # noqa: ARG001
+    options: dict[str, Any],
     execution_id: str,
     tenant_id: str,
     _budget_limit: Decimal | None,
@@ -345,7 +345,8 @@ async def list_available_pipelines(
         # Fallback: convert to dict if possible, otherwise raise
         if hasattr(p, "__dict__"):
             return dict(p.__dict__)
-        raise TypeError(f"Unable to convert {type(p)} to dict")
+        msg = f"Unable to convert {type(p)} to dict"
+        raise TypeError(msg)
 
     pipelines = [to_dict(p) for p in pipelines]
 
@@ -404,7 +405,7 @@ async def list_capabilities() -> CapabilityListResponse:
                         for p in providers
                     ],
                     default_provider=default_provider,
-                )
+                ),
             )
 
     return CapabilityListResponse(capabilities=capability_schemas)

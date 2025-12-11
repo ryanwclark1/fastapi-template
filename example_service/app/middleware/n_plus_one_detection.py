@@ -332,7 +332,7 @@ class NPlusOneDetectionMiddleware(BaseHTTPMiddleware):
         ]
 
     async def dispatch(
-        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         """Process request and monitor for N+1 queries.
 
@@ -424,22 +424,22 @@ class NPlusOneDetectionMiddleware(BaseHTTPMiddleware):
         # Log N+1 patterns found
         if n_plus_one_patterns:
             await self._log_n_plus_one_patterns(
-                request, n_plus_one_patterns, request_time, total_queries
+                request, n_plus_one_patterns, request_time, total_queries,
             )
 
         # Log request summary if detailed logging is enabled
         if self.enable_detailed_logging:
             await self._log_request_summary(
-                request, request_time, total_queries, len(n_plus_one_patterns)
+                request, request_time, total_queries, len(n_plus_one_patterns),
             )
 
         # Add performance headers to response
         if response is not None:
             response.headers["X-Query-Count"] = str(total_queries)
-            response.headers["X-Request-Time"] = f"{request_time:.3f}"
+            response.headers["X-Request-Time"] = f"{request_time:.6f}"
             if n_plus_one_patterns:
                 response.headers["X-N-Plus-One-Detected"] = str(
-                    len(n_plus_one_patterns)
+                    len(n_plus_one_patterns),
                 )
 
     async def _log_n_plus_one_patterns(
@@ -487,7 +487,7 @@ class NPlusOneDetectionMiddleware(BaseHTTPMiddleware):
         # Log recommendation
         logger.warning(
             "Recommendation: Use eager loading (joinedload/selectinload) "
-            "or review repository loading strategies to prevent N+1 queries."
+            "or review repository loading strategies to prevent N+1 queries.",
         )
 
     async def _log_request_summary(
@@ -560,7 +560,7 @@ class NPlusOneDetectionMiddleware(BaseHTTPMiddleware):
                 query_patterns[normalized_query].add_execution(execution_time)
         else:
             query_patterns[normalized_query] = QueryPattern(
-                normalized_query, execution_time
+                normalized_query, execution_time,
             )
 
         # Log slow queries if enabled
@@ -576,7 +576,7 @@ class NPlusOneDetectionMiddleware(BaseHTTPMiddleware):
 
 # SQLAlchemy event integration helper function
 def setup_n_plus_one_monitoring(
-    engine: Any, middleware: NPlusOneDetectionMiddleware
+    engine: Any, middleware: NPlusOneDetectionMiddleware,
 ) -> Callable[[Any], None]:
     """Set up SQLAlchemy event listeners for N+1 detection.
 
@@ -632,7 +632,7 @@ def setup_n_plus_one_monitoring(
 
     # Context variable to track current request
     current_request: ContextVar[Any | None] = ContextVar(
-        "current_request", default=None
+        "current_request", default=None,
     )
 
     # Try to register event listeners, skip if engine is a mock (used in tests)

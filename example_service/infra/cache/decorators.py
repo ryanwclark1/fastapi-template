@@ -78,8 +78,7 @@ def cache_key(*args: Any, **kwargs: Any) -> str:
             # Hash complex objects
             try:
                 json_str = json.dumps(arg, sort_keys=True, default=str)
-                # MD5 used for non-cryptographic cache key hashing
-                hash_val = hashlib.md5(json_str.encode()).hexdigest()[:8]  # noqa: S324
+                hash_val = hashlib.sha256(json_str.encode()).hexdigest()[:8]
                 parts.append(hash_val)
             except (TypeError, ValueError):
                 parts.append(str(hash(str(arg))))
@@ -93,8 +92,7 @@ def cache_key(*args: Any, **kwargs: Any) -> str:
         else:
             try:
                 json_str = json.dumps(value, sort_keys=True, default=str)
-                # MD5 used for non-cryptographic cache key hashing
-                hash_val = hashlib.md5(json_str.encode()).hexdigest()[:8]  # noqa: S324
+                hash_val = hashlib.sha256(json_str.encode()).hexdigest()[:8]
                 parts.append(f"{key}={hash_val}")
             except (TypeError, ValueError):
                 parts.append(f"{key}={hash(str(value))}")

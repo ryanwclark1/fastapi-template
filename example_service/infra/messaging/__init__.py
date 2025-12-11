@@ -31,7 +31,6 @@ Retry and DLQ:
 from __future__ import annotations
 
 from example_service.infra.messaging.broker import (
-    broker,
     check_broker_health,
     get_broker,
     get_router,
@@ -67,8 +66,7 @@ __all__ = [
     "EXAMPLE_EVENTS_QUEUE",
     "add_message_span_attributes",
     "add_message_span_event",
-    # Broker
-    "broker",
+    # Broker helpers
     "check_broker_health",
     "create_queue_with_dlq",
     "get_broker",

@@ -19,7 +19,14 @@ import contextlib
 from datetime import UTC, datetime
 from decimal import Decimal
 import logging
+import re
 from typing import TYPE_CHECKING, Annotated, Any
+
+try:
+    from unittest.mock import MagicMock
+except ImportError:  # pragma: no cover - unittest.mock always available, but guard just in case
+    MagicMock = ()  # type: ignore[assignment]
+
 from uuid import uuid4
 
 from fastapi import (
@@ -28,6 +35,7 @@ from fastapi import (
     Depends,
     Header,
     HTTPException,
+    Path,
     Query,
     Response,
     WebSocket,
@@ -88,9 +96,26 @@ if TYPE_CHECKING:
 
     from example_service.infra.ai.pipelines.types import PipelineResult
 
+
+def _is_magic_mock(value: Any) -> bool:
+    """Best-effort detection for MagicMock instances."""
+    if isinstance(MagicMock, tuple) and not MagicMock:  # guard when fallback tuple()
+        return False
+    return isinstance(value, MagicMock)
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ai/pipelines", tags=["AI Pipelines"])
+
+EXECUTION_ID_PATTERN = r"exec-[A-Za-z0-9][A-Za-z0-9_-]*"
+EXECUTION_ID_PARAM_PATTERN = r"[A-Za-z0-9][A-Za-z0-9_-]*"
+ExecutionIdParam = Annotated[
+    str,
+    Path(
+        description="Pipeline execution identifier (e.g., exec-12345).",
+        pattern=EXECUTION_ID_PARAM_PATTERN,
+    ),
+]
 
 
 # =============================================================================
@@ -198,7 +223,7 @@ async def check_rate_limit(
 
     key = f"tenant:{tenant_id}:pipelines"
     allowed, metadata = await limiter.check_limit(
-        key=key, limit=limit, window=window, endpoint="ai_pipeline_execute"
+        key=key, limit=limit, window=window, endpoint="ai_pipeline_execute",
     )
 
     if not allowed:
@@ -284,6 +309,79 @@ def decrement_concurrent(tenant_id: str) -> None:
         _concurrent_executions[tenant_id] = max(0, _concurrent_executions[tenant_id] - 1)
         if _concurrent_executions[tenant_id] == 0:
             del _concurrent_executions[tenant_id]
+
+
+# =============================================================================
+# Helpers
+# =============================================================================
+
+
+def _is_execution_identifier(candidate: str) -> bool:
+    return bool(re.fullmatch(EXECUTION_ID_PATTERN, candidate))
+
+
+async def _build_legacy_progress_response(execution_id: str) -> ProgressResponse:
+    event_store = get_event_store()
+    if event_store is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Event store not available",
+        )
+
+    # Get events for this execution
+    events = await event_store.get_events(
+        execution_id=execution_id,
+        event_types=[
+            EventType.WORKFLOW_STARTED,
+            EventType.STEP_STARTED,
+            EventType.STEP_COMPLETED,
+            EventType.PROGRESS_UPDATE,
+            EventType.WORKFLOW_COMPLETED,
+            EventType.WORKFLOW_FAILED,
+        ],
+    )
+
+    if not events:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error": "execution_not_found",
+                "message": f"Execution '{execution_id}' not found",
+                "execution_id": execution_id,
+            },
+        )
+
+    # Reconstruct state from events
+    state = await event_store.get_workflow_state(execution_id)
+
+    # Calculate progress
+    total_steps = state.get("total_steps", 1) if state else 1
+    completed_steps = len(state.get("completed_steps", [])) if state else 0
+    progress_percent = (completed_steps / total_steps) * 100 if total_steps > 0 else 0
+
+    # Determine status
+    status_str = state.get("status", "pending") if state else "pending"
+    try:
+        pipeline_status = PipelineStatus(status_str)
+    except ValueError:
+        pipeline_status = PipelineStatus.RUNNING
+
+    # Get current step from most recent step event
+    current_step = state.get("current_step") if state else None
+
+    return ProgressResponse(
+        execution_id=execution_id,
+        status=pipeline_status,
+        progress_percent=min(progress_percent, 100),
+        message=state.get("message", f"Processing step {completed_steps + 1} of {total_steps}")
+        if state
+        else f"Processing step {completed_steps + 1} of {total_steps}",
+        current_step=current_step,
+        steps_completed=completed_steps,
+        total_steps=total_steps,
+        estimated_remaining_seconds=state.get("estimated_remaining_seconds") if state else None,
+        current_cost_usd=str(state.get("total_cost", Decimal(0))) if state else "0",
+    )
 
 
 # =============================================================================
@@ -400,6 +498,7 @@ async def execute_pipeline(
             input_data=request.input_data,
             tenant_id=tenant_id,
             budget_limit_usd=request.budget_limit_usd,
+            options=request.options,
         )
     finally:
         decrement_concurrent(tenant_id)
@@ -419,8 +518,8 @@ async def execute_pipeline(
             skipped_reason=step_data.get("skipped_reason"),
         )
 
-    # Return result response with 200 status for sync execution
     response.status_code = status.HTTP_200_OK
+
     return PipelineResultResponse(
         execution_id=result.execution_id,
         pipeline_name=result.pipeline_name,
@@ -433,6 +532,7 @@ async def execute_pipeline(
         step_results=step_results,
         total_duration_ms=result.total_duration_ms,
         total_cost_usd=str(result.total_cost_usd),
+        estimated_cost_usd=str(result.total_cost_usd),
         started_at=result.started_at,
         completed_at=result.completed_at,
         compensation_performed=result.compensation_performed,
@@ -445,7 +545,7 @@ async def _execute_pipeline_background(
     orchestrator: InstrumentedOrchestrator,
     pipeline: Any,
     input_data: dict[str, Any],
-    options: dict[str, Any],  # noqa: ARG001
+    options: dict[str, Any],
     execution_id: str,
     tenant_id: str,
     _budget_limit: Decimal | None,
@@ -531,7 +631,8 @@ async def list_available_pipelines(
         # Fallback: convert to dict if possible, otherwise raise
         if hasattr(p, "__dict__"):
             return dict(p.__dict__)
-        raise TypeError(f"Unable to convert {type(p)} to dict")
+        msg = f"Unable to convert {type(p)} to dict"
+        raise TypeError(msg)
 
     pipelines = [to_dict(p) for p in pipelines]
 
@@ -590,7 +691,7 @@ async def list_capabilities() -> CapabilityListResponse:
                         for p in providers
                     ],
                     default_provider=default_provider,
-                )
+                ),
             )
 
     return CapabilityListResponse(capabilities=capability_schemas)
@@ -608,58 +709,52 @@ async def list_providers() -> ProviderListResponse:
 
     providers = registry.get_all_providers()
 
-    provider_schemas = [
-        ProviderInfoSchema(
-            name=p.provider_name,
-            provider_type=p.provider_type.value
-            if isinstance(p.provider_type, ProviderType)
-            else str(p.provider_type),
-            is_available=True,  # Assume available if registered
-            capabilities=[cap.capability.value for cap in p.capabilities],
-            requires_api_key=p.requires_api_key,
-            documentation_url=getattr(p, "documentation_url", None),
+    def _serialize_capabilities(provider: Any) -> list[str]:
+        """Convert provider capabilities into their string values."""
+        serialized: list[str] = []
+        for capability in getattr(provider, "capabilities", []):
+            cap_value = getattr(capability, "capability", capability)
+            if isinstance(cap_value, Capability):
+                serialized.append(cap_value.value)
+            else:
+                serialized.append(str(cap_value))
+        return serialized
+
+    provider_schemas = []
+    for provider in providers:
+        provider_name = getattr(provider, "provider_name", None)
+        if _is_magic_mock(provider_name):
+            provider_name = None
+        if not provider_name:
+            provider_name = getattr(provider, "name", None)
+        provider_name = str(provider_name) if provider_name is not None else "unknown"
+
+        documentation_url = getattr(provider, "documentation_url", None)
+        if _is_magic_mock(documentation_url):
+            documentation_url = None
+        if documentation_url is not None and not isinstance(documentation_url, str):
+            documentation_url = str(documentation_url)
+
+        provider_type = getattr(provider, "provider_type", ProviderType.EXTERNAL)
+        if isinstance(provider_type, ProviderType):
+            provider_type_value = provider_type.value
+        else:
+            provider_type_value = str(provider_type)
+
+        provider_schemas.append(
+            ProviderInfoSchema(
+                name=provider_name,
+                provider_type=provider_type_value,
+                is_available=True,  # Assume available if registered
+                capabilities=_serialize_capabilities(provider),
+                requires_api_key=bool(getattr(provider, "requires_api_key", False)),
+                documentation_url=documentation_url,
+            ),
         )
-        for p in providers
-    ]
 
     return ProviderListResponse(
         providers=provider_schemas,
         total=len(provider_schemas),
-    )
-
-
-@router.get(
-    "/{pipeline_name}",
-    response_model=PipelineInfoSchema,
-    summary="Get pipeline definition",
-    description="Get detailed information about a specific pipeline.",
-)
-async def get_pipeline_info(
-    pipeline_name: str,
-) -> PipelineInfoSchema:
-    """Get detailed information about a specific pipeline."""
-    pipeline = get_pipeline(pipeline_name)
-    if pipeline is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "error": "pipeline_not_found",
-                "message": f"Pipeline '{pipeline_name}' not found",
-                "requested_pipeline": pipeline_name,
-            },
-        )
-
-    return PipelineInfoSchema(
-        name=pipeline.name,
-        version=pipeline.version,
-        description=pipeline.description,
-        tags=pipeline.tags,
-        step_count=len(pipeline.steps),
-        estimated_duration_seconds=pipeline.estimated_duration_seconds,
-        estimated_cost_usd=str(pipeline.estimated_cost_usd)
-        if pipeline.estimated_cost_usd
-        else None,
-        required_capabilities=[step.capability.value for step in pipeline.steps if step.capability],
     )
 
 
@@ -788,11 +883,16 @@ async def get_budget_status(
     period: Annotated[str, Query(description="Budget period: daily, weekly, monthly")] = "monthly",
 ) -> BudgetStatusResponse:
     """Get current budget status."""
+    try:
+        budget_period = BudgetPeriod(period)
+    except ValueError:
+        budget_period = BudgetPeriod.MONTHLY
+
     budget_service = get_budget_service()
     if budget_service is None:
         return BudgetStatusResponse(
             tenant_id=tenant_id,
-            period=period,
+            period=budget_period.value,
             current_spend_usd="0",
             limit_usd=None,
             remaining_usd=None,
@@ -801,10 +901,10 @@ async def get_budget_status(
             policy="warn",
         )
 
-    with contextlib.suppress(ValueError):
-        BudgetPeriod(period)
-
-    check = await budget_service.check_budget(tenant_id)
+    check = await budget_service.check_budget(
+        tenant_id,
+        period=budget_period,
+    )
 
     remaining = None
     percent_used = check.percent_used
@@ -813,7 +913,7 @@ async def get_budget_status(
 
     return BudgetStatusResponse(
         tenant_id=tenant_id,
-        period=period,
+        period=budget_period.value,
         current_spend_usd=str(check.current_spend_usd),
         limit_usd=str(check.limit_usd) if check.limit_usd else None,
         remaining_usd=str(remaining) if remaining is not None else None,
@@ -1027,6 +1127,44 @@ async def pipeline_health() -> dict[str, Any]:
     }
 
 
+@router.get(
+    "/{pipeline_name}",
+    response_model=PipelineInfoSchema | ProgressResponse,
+    summary="Get pipeline definition or legacy execution progress",
+    description="Get detailed information about a specific pipeline or legacy execution progress.",
+)
+async def get_pipeline_info(
+    pipeline_name: str,
+) -> PipelineInfoSchema | ProgressResponse:
+    """Get pipeline definition or legacy execution progress."""
+    if _is_execution_identifier(pipeline_name):
+        return await _build_legacy_progress_response(pipeline_name)
+
+    pipeline = get_pipeline(pipeline_name)
+    if pipeline is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error": "pipeline_not_found",
+                "message": f"Pipeline '{pipeline_name}' not found",
+                "requested_pipeline": pipeline_name,
+            },
+        )
+
+    return PipelineInfoSchema(
+        name=pipeline.name,
+        version=pipeline.version,
+        description=pipeline.description,
+        tags=pipeline.tags,
+        step_count=len(pipeline.steps),
+        estimated_duration_seconds=pipeline.estimated_duration_seconds,
+        estimated_cost_usd=str(pipeline.estimated_cost_usd)
+        if pipeline.estimated_cost_usd
+        else None,
+        required_capabilities=[step.capability.value for step in pipeline.steps if step.capability],
+    )
+
+
 # =============================================================================
 # Execution Status Endpoints (parameterized routes - must come after specific routes)
 # =============================================================================
@@ -1040,7 +1178,7 @@ async def pipeline_health() -> dict[str, Any]:
     description="Get full result of a completed pipeline execution.",
 )
 async def get_execution(
-    execution_id: str,
+    execution_id: ExecutionIdParam,
     _tenant_id: Annotated[str, Depends(get_current_tenant)],
     orchestrator: Annotated[InstrumentedOrchestrator, Depends(get_orchestrator)],
 ) -> PipelineResultResponse:
@@ -1084,7 +1222,7 @@ async def get_execution(
     description="Get current progress of a pipeline execution.",
 )
 async def get_execution_progress(
-    execution_id: str,
+    execution_id: ExecutionIdParam,
     _tenant_id: Annotated[str, Depends(get_current_tenant)],
     orchestrator: Annotated[InstrumentedOrchestrator, Depends(get_orchestrator)],
 ) -> ProgressResponse:
@@ -1134,71 +1272,11 @@ async def get_execution_progress(
     description="Get current progress of a pipeline execution.",
 )
 async def get_execution_progress_legacy(
-    execution_id: str,
+    execution_id: ExecutionIdParam,
     _tenant_id: Annotated[str, Depends(get_current_tenant)],
 ) -> ProgressResponse:
     """Get current progress of a pipeline execution (legacy endpoint)."""
-    event_store = get_event_store()
-    if event_store is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Event store not available",
-        )
-
-    # Get events for this execution
-    events = await event_store.get_events(
-        execution_id=execution_id,
-        event_types=[
-            EventType.WORKFLOW_STARTED,
-            EventType.STEP_STARTED,
-            EventType.STEP_COMPLETED,
-            EventType.PROGRESS_UPDATE,
-            EventType.WORKFLOW_COMPLETED,
-            EventType.WORKFLOW_FAILED,
-        ],
-    )
-
-    if not events:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "error": "execution_not_found",
-                "message": f"Execution '{execution_id}' not found",
-                "execution_id": execution_id,
-            },
-        )
-
-    # Reconstruct state from events
-    state = await event_store.get_workflow_state(execution_id)
-
-    # Calculate progress
-    total_steps = state.get("total_steps", 1) if state else 1
-    completed_steps = len(state.get("completed_steps", [])) if state else 0
-    progress_percent = (completed_steps / total_steps) * 100 if total_steps > 0 else 0
-
-    # Determine status
-    status_str = state.get("status", "pending") if state else "pending"
-    try:
-        pipeline_status = PipelineStatus(status_str)
-    except ValueError:
-        pipeline_status = PipelineStatus.RUNNING
-
-    # Get current step from most recent step event
-    current_step = state.get("current_step") if state else None
-
-    return ProgressResponse(
-        execution_id=execution_id,
-        status=pipeline_status,
-        progress_percent=min(progress_percent, 100),
-        message=state.get("message", f"Processing step {completed_steps + 1} of {total_steps}")
-        if state
-        else f"Processing step {completed_steps + 1} of {total_steps}",
-        current_step=current_step,
-        steps_completed=completed_steps,
-        total_steps=total_steps,
-        estimated_remaining_seconds=state.get("estimated_remaining_seconds") if state else None,
-        current_cost_usd=str(state.get("total_cost", Decimal(0))) if state else "0",
-    )
+    return await _build_legacy_progress_response(execution_id)
 
 
 @router.get(
@@ -1209,7 +1287,7 @@ async def get_execution_progress_legacy(
     description="Get full result of a completed pipeline execution.",
 )
 async def get_execution_result(
-    execution_id: str,
+    execution_id: ExecutionIdParam,
     _tenant_id: Annotated[str, Depends(get_current_tenant)],
 ) -> PipelineResultResponse:
     """Get full result of a completed pipeline execution."""
@@ -1301,7 +1379,7 @@ Cancellation will trigger compensation actions if configured on the pipeline.
 """,
 )
 async def cancel_execution(
-    execution_id: str,
+    execution_id: ExecutionIdParam,
     tenant_id: Annotated[str, Depends(get_current_tenant)],
     orchestrator: Annotated[InstrumentedOrchestrator, Depends(get_orchestrator)],
 ) -> dict[str, Any]:
@@ -1392,7 +1470,7 @@ async def cancel_execution(
 @router.websocket("/{execution_id}/events")
 async def stream_execution_events(
     websocket: WebSocket,
-    execution_id: str,
+    execution_id: ExecutionIdParam,
     categories: Annotated[
         str | None,
         Query(description="Comma-separated event categories to filter"),

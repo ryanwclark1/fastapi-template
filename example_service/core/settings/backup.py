@@ -135,7 +135,7 @@ class BackupSettings(BaseSettings):
         )
 
     @field_validator(
-        "retention_days", "s3_retention_days", "schedule_hour", "schedule_minute", mode="before"
+        "retention_days", "s3_retention_days", "schedule_hour", "schedule_minute", mode="before",
     )
     @classmethod
     def _normalize_numeric(cls, value: Any) -> Any:

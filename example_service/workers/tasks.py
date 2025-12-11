@@ -15,10 +15,12 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 from taskiq import TaskiqDepends
-from taskiq.depends.progress_tracker import ProgressTracker  # noqa: TC002
+from taskiq.depends.progress_tracker import (
+    ProgressTracker,  # noqa: TC002 - Required at runtime for dependency injection
+)
 
 from example_service.infra.tasks.broker import broker
 
@@ -148,7 +150,8 @@ if broker is not None:
                 attempt = data.get("_attempt", 1)
                 if attempt < 3:
                     data["_attempt"] = attempt + 1
-                    raise ConnectionError(f"Simulated transient failure (attempt {attempt})")
+                    msg = f"Simulated transient failure (attempt {attempt})"
+                    raise ConnectionError(msg)
 
             # Perform the actual operation
             result = {
@@ -375,7 +378,8 @@ if broker is not None:
     async def batch_process_task(
         items: list[dict[str, Any]],
         delay_per_item: float = 0.1,
-        progress: ProgressTracker[dict[str, Any]] = TaskiqDepends(),  # noqa: B008
+        *,
+        progress: Annotated[ProgressTracker[dict[str, Any]], TaskiqDepends()],
     ) -> dict[str, Any]:
         """Example task demonstrating progress tracking.
 

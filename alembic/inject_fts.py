@@ -570,7 +570,8 @@ def inject_fts_code(migration_file: Path) -> bool:
     is_initial = bool(
         fts_models
         and all(
-            f'"{model["table_name"]}",' in content and "op.create_table" in content
+            (f'"{model["table_name"]}",' in content or f"'{model['table_name']}'," in content)
+            and "op.create_table" in content
             for model in fts_models
         )
     )

@@ -20,7 +20,7 @@ class TestFilterOperator:
         """Test all expected operators are defined."""
         operators = [
             "eq", "ne", "gt", "gte", "lt", "lte",
-            "contains", "in", "not_in", "is_null", "is_not_null"
+            "contains", "in", "not_in", "is_null", "is_not_null",
         ]
         for op in operators:
             assert op in [o.value for o in FilterOperator]
@@ -47,7 +47,7 @@ class TestFilterCondition:
         condition = FilterCondition(
             field="status",
             operator=FilterOperator.IN,
-            value=["active", "pending"]
+            value=["active", "pending"],
         )
         data = condition.model_dump()
         assert data["field"] == "status"
@@ -58,7 +58,7 @@ class TestFilterCondition:
         """Test is_null operator doesn't require value."""
         condition = FilterCondition(
             field="deleted_at",
-            operator=FilterOperator.IS_NULL
+            operator=FilterOperator.IS_NULL,
         )
         assert condition.value is None
 
@@ -82,7 +82,7 @@ class TestExportRequest:
             filter_conditions=[
                 FilterCondition(field="is_completed", operator=FilterOperator.EQ, value=False),
                 FilterCondition(field="created_at", operator=FilterOperator.GTE, value="2024-01-01"),
-            ]
+            ],
         )
         assert len(request.filter_conditions) == 2
         assert request.filter_conditions[0].field == "is_completed"
@@ -92,7 +92,7 @@ class TestExportRequest:
         """Test backward compatibility with simple filters dict."""
         request = ExportRequest(
             entity_type="reminders",
-            filters={"is_completed": True}
+            filters={"is_completed": True},
         )
         assert request.filters == {"is_completed": True}
 
@@ -100,7 +100,7 @@ class TestExportRequest:
         """Test field selection."""
         request = ExportRequest(
             entity_type="reminders",
-            fields=["id", "title", "created_at"]
+            fields=["id", "title", "created_at"],
         )
         assert request.fields == ["id", "title", "created_at"]
 

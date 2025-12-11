@@ -118,37 +118,27 @@ from example_service.infra.logging.sampling import (
 )
 
 __all__ = [
-    # Colors (loguru-inspired)
     "ANSIColors",
     "CatchContext",
-    # Terminal capability detection
     "ColorMode",
     "ColoredConsoleFormatter",
-    # Context-bound loggers
     "ContextBoundLogger",
     "ContextInjectingFilter",
-    # Diagnose mode (loguru-inspired)
     "DiagnoseFormatter",
-    # Formatters and filters
     "JSONFormatter",
-    # Lazy evaluation
     "LazyLoggerAdapter",
     "LazyString",
     "MinimalColoredFormatter",
     "OperationContext",
-    # Opt method (loguru-inspired)
     "OptLoggerAdapter",
     "RateLimitFilter",
-    # Sampling and rate limiting
     "SamplingFilter",
-    # Exception catching (loguru-inspired)
     "catch",
     "catch_context",
     "clear_color_cache",
     "clear_log_context",
     "color_mode_manager",
     "complete",
-    # Configuration
     "configure_logging",
     "create_colored_handler",
     "create_diagnose_handler",
@@ -161,13 +151,11 @@ __all__ = [
     "get_opt_logger",
     "hex_to_ansi",
     "hex_to_ansi_bg",
-    # RGB/Hex color conversion
     "hex_to_rgb",
     "is_color_enabled",
     "lazy",
     "log_db_operation",
     "log_endpoint",
-    # Operation logging decorators and helpers
     "log_operation",
     "log_service_op",
     "operation_context",
@@ -180,7 +168,6 @@ __all__ = [
     "rgb_to_ansi_bg_256",
     "rgb_to_ansi_bg_truecolor",
     "rgb_to_ansi_truecolor",
-    # Context management (recommended)
     "set_log_context",
     "setup_logging",
     "should_colorize",

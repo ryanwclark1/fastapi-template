@@ -14,11 +14,15 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Any
+import typing as t
+from typing import Any, ParamSpec, TypeVar
 
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 from strawberry.extensions import SchemaExtension
+
+P = ParamSpec("P")
+R = TypeVar("R")
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +81,7 @@ class GraphQLTracingExtension(SchemaExtension):
         propagate trace context from incoming HTTP requests.
     """
 
-    def __init__(self, include_document: bool = False, include_variables: bool = True):
+    def __init__(self, include_document: bool = False, include_variables: bool = True) -> None:
         """Initialize tracing extension.
 
         Args:
@@ -183,7 +187,7 @@ class GraphQLTracingExtension(SchemaExtension):
                 span.set_attribute("graphql.response.field_count", len(result.data))
 
         except Exception as e:
-            logger.error(f"Error finalizing tracing span: {e}")
+            logger.exception(f"Error finalizing tracing span: {e}")
             span.set_status(Status(StatusCode.ERROR, str(e)))
         finally:
             # Always end the span
@@ -239,7 +243,7 @@ class GraphQLTracingExtension(SchemaExtension):
 # ============================================================================
 
 
-def trace_resolver(resolver_name: str):
+def trace_resolver(resolver_name: str) -> t.Callable[[t.Callable[..., Any]], t.Callable[..., Any]]:
     """Decorator to add tracing to individual resolvers.
 
     Creates a child span for expensive or important resolvers.
@@ -254,8 +258,8 @@ def trace_resolver(resolver_name: str):
             return await ctx.loaders.reminder_tags.load(self.id)
     """
 
-    def decorator(func):
-        async def async_wrapper(*args, **kwargs):
+    def decorator(func: t.Callable[..., Any]) -> t.Callable[..., Any]:
+        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
             tracer = get_graphql_tracer()
             with tracer.start_as_current_span(
                 f"graphql.resolve.{resolver_name}",
@@ -271,7 +275,7 @@ def trace_resolver(resolver_name: str):
                     span.record_exception(e)
                     raise
 
-        def sync_wrapper(*args, **kwargs):
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
             tracer = get_graphql_tracer()
             with tracer.start_as_current_span(
                 f"graphql.resolve.{resolver_name}",

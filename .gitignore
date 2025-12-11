@@ -50,6 +50,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+coverage/
 
 # Translations
 *.mo
@@ -136,6 +137,8 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .envrc
 .venv
 env/
@@ -213,3 +216,6 @@ logs/
 test.db
 .DS_Store
 .claude/settings.local.json
+
+# UV cache
+.uv/

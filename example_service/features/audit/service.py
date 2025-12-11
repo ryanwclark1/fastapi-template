@@ -415,7 +415,7 @@ class AuditService:
 
         # Total entries
         total_result = await self.session.execute(
-            select(func.count()).select_from(subquery)
+            select(func.count()).select_from(subquery),
         )
         total_entries = total_result.scalar() or 0
 
@@ -423,7 +423,7 @@ class AuditService:
         action_result = await self.session.execute(
             select(subquery.c.action, func.count())
             .select_from(subquery)
-            .group_by(subquery.c.action)
+            .group_by(subquery.c.action),
         )
         actions_count: dict[str, int] = {str(k): v for k, v in action_result.all()}
 
@@ -431,13 +431,13 @@ class AuditService:
         entity_result = await self.session.execute(
             select(subquery.c.entity_type, func.count())
             .select_from(subquery)
-            .group_by(subquery.c.entity_type)
+            .group_by(subquery.c.entity_type),
         )
         entity_types_count: dict[str, int] = dict(entity_result.all())  # type: ignore
 
         # Success rate
         success_result = await self.session.execute(
-            select(func.count()).select_from(subquery).where(subquery.c.success == True)  # noqa: E712
+            select(func.count()).select_from(subquery).where(subquery.c.success),
         )
         success_count = success_result.scalar() or 0
         success_rate = (
@@ -446,15 +446,15 @@ class AuditService:
 
         # Unique users
         users_result = await self.session.execute(
-            select(func.count(func.distinct(subquery.c.user_id))).select_from(subquery)
+            select(func.count(func.distinct(subquery.c.user_id))).select_from(subquery),
         )
         unique_users = users_result.scalar() or 0
 
         # Time range
         time_result = await self.session.execute(
             select(
-                func.min(subquery.c.timestamp), func.max(subquery.c.timestamp)
-            ).select_from(subquery)
+                func.min(subquery.c.timestamp), func.max(subquery.c.timestamp),
+            ).select_from(subquery),
         )
         time_row = time_result.one_or_none()
         time_range_start = time_row[0] if time_row else None
@@ -462,7 +462,7 @@ class AuditService:
 
         # Count dangerous actions
         dangerous_count = await self._count_dangerous_actions(
-            tenant_id, start_time, end_time
+            tenant_id, start_time, end_time,
         )
 
         return AuditSummary(

@@ -19,7 +19,7 @@ class TestBackendFactory:
     """Test backend factory creation logic."""
 
     @pytest.mark.skipif(
-        not AIOBOTO3_AVAILABLE, reason="aioboto3 not installed"
+        not AIOBOTO3_AVAILABLE, reason="aioboto3 not installed",
     )
     def test_create_s3_backend(self):
         """Test creating S3 backend."""
@@ -37,7 +37,7 @@ class TestBackendFactory:
         assert backend.backend_name == "s3"
 
     @pytest.mark.skipif(
-        not AIOBOTO3_AVAILABLE, reason="aioboto3 not installed"
+        not AIOBOTO3_AVAILABLE, reason="aioboto3 not installed",
     )
     def test_create_minio_backend(self):
         """Test creating MinIO backend (same as S3)."""

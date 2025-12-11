@@ -177,7 +177,7 @@ class TestPIIMasker:
                 "name": "John Doe",
                 "email": "john@example.com",
                 "credentials": {"password": "secret123", "api_key": "key_123"},
-            }
+            },
         }
 
         masked = masker.mask_dict(data)
@@ -306,7 +306,7 @@ class TestPIIMasker:
                 "authorization": "Bearer secret_token_123",
                 "x-api-key": "key_abc123",
                 "cookie": "session=xyz789",
-            }
+            },
         }
 
         masked = masker.mask_dict(data)
@@ -358,7 +358,7 @@ class TestPIIMasker:
             "users": [
                 {"email": "user1@example.com", "password": "pass1"},
                 {"email": "user2@example.com", "password": "pass2"},
-            ]
+            ],
         }
 
         masked = masker.mask_dict(data)
@@ -395,7 +395,7 @@ class TestPIIMasker:
                     "password": f"secret{i}",
                 }
                 for i in range(100)
-            ]
+            ],
         }
 
         start = time.perf_counter()

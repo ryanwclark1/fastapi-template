@@ -299,10 +299,10 @@ class ServiceAvailabilityRegistry:
                 )
 
                 override_value = {"none": 0, "force_enable": 1, "force_disable": -1}.get(
-                    mode.value, 0
+                    mode.value, 0,
                 )
                 service_override_mode_gauge.labels(service_name=service.value).set(
-                    override_value
+                    override_value,
                 )
 
             return status

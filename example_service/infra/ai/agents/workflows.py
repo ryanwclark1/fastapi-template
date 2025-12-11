@@ -39,7 +39,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 import logging
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 from uuid import UUID, uuid4
 
 logger = logging.getLogger(__name__)
@@ -114,7 +114,7 @@ class NodeResult:
 
 
 @dataclass
-class WorkflowState(Generic[StateT]):
+class WorkflowState[StateT: dict[str, Any]]:
     """State of a workflow execution."""
 
     workflow_id: UUID = field(default_factory=uuid4)
@@ -350,7 +350,9 @@ class ConditionalNode(WorkflowNode):
             if asyncio.iscoroutine(result):
                 result = await result
 
-            next_node = self.branches.get(result, self.default_branch)
+            # Type narrowing - result is now str
+            branch_key: str = result  # type: ignore[assignment]
+            next_node = self.branches.get(branch_key, self.default_branch)
 
             return NodeResult(
                 node_name=self.name,
@@ -399,7 +401,7 @@ class ParallelNode(WorkflowNode):
 
         # Get nodes for branches
         nodes = [context.get_node(name) for name in self.branches]
-        missing = [name for name, node in zip(self.branches, nodes) if node is None]
+        missing = [name for name, node in zip(self.branches, nodes, strict=False) if node is None]
         if missing:
             return NodeResult(
                 node_name=self.name,
@@ -411,7 +413,7 @@ class ParallelNode(WorkflowNode):
 
         # Execute in parallel
         tasks = [
-            node.execute(state, context)  # type: ignore
+            node.execute(state, context)
             for node in nodes
             if node is not None
         ]
@@ -420,7 +422,7 @@ class ParallelNode(WorkflowNode):
         # Process results
         outputs = []
         errors = []
-        for branch, result in zip(self.branches, results):
+        for branch, result in zip(self.branches, results, strict=False):
             if isinstance(result, Exception):
                 errors.append(f"{branch}: {result}")
             elif isinstance(result, NodeResult):
@@ -536,7 +538,7 @@ class Workflow:
         context.workflow = self
 
         # Determine starting node
-        current_node = state.current_node or self.entry_point
+        current_node: str | None = state.current_node or self.entry_point
 
         while current_node:
             state.current_node = current_node
@@ -610,7 +612,8 @@ class Workflow:
                 break
 
         if not request:
-            raise ValueError(f"Approval request not found: {request_id}")
+            msg = f"Approval request not found: {request_id}"
+            raise ValueError(msg)
 
         # Update request
         request.response = response
@@ -645,7 +648,7 @@ class Workflow:
         if next_nodes:
             state.current_node = next_nodes[0]
             return await self.run(
-                {}, context=WorkflowContext(workflow=self), resume_state=state
+                {}, context=WorkflowContext(workflow=self), resume_state=state,
             )
         state.status = WorkflowStatus.COMPLETED
         state.completed_at = datetime.now(UTC)
@@ -730,7 +733,7 @@ class WorkflowBuilder:
             Self for chaining
         """
         self._nodes[name] = HumanApprovalNode(
-            name, prompt, options, timeout_seconds, context_keys
+            name, prompt, options, timeout_seconds, context_keys,
         )
         return self
 
@@ -825,18 +828,22 @@ class WorkflowBuilder:
             if self._nodes:
                 self._entry_point = next(iter(self._nodes))
             else:
-                raise ValueError("Workflow must have at least one node")
+                msg = "Workflow must have at least one node"
+                raise ValueError(msg)
 
         if self._entry_point not in self._nodes:
-            raise ValueError(f"Entry point not found: {self._entry_point}")
+            msg = f"Entry point not found: {self._entry_point}"
+            raise ValueError(msg)
 
         # Validate edges
         for from_node, to_nodes in self._edges.items():
             if from_node not in self._nodes:
-                raise ValueError(f"Edge source not found: {from_node}")
+                msg = f"Edge source not found: {from_node}"
+                raise ValueError(msg)
             for to_node in to_nodes:
                 if to_node not in self._nodes:
-                    raise ValueError(f"Edge target not found: {to_node}")
+                    msg = f"Edge target not found: {to_node}"
+                    raise ValueError(msg)
 
         return Workflow(
             name=self.name,

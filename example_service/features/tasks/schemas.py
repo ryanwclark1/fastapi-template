@@ -12,6 +12,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from example_service.core.schemas.base import CustomBase
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(datetime)
 
 
 class TaskStatus(str, Enum):
@@ -249,8 +252,8 @@ class TriggerTaskRequest(BaseModel):
                     "task": "cleanup_temp_files",
                     "params": {"max_age_hours": 48},
                 },
-            ]
-        }
+            ],
+        },
     }
 
 

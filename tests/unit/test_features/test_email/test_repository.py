@@ -383,7 +383,7 @@ class TestEmailAuditLogRepository:
         mock_result.scalars.return_value.all.return_value = logs
         mock_session.execute.return_value = mock_result
 
-        items, next_cursor, prev_cursor, has_more = await repo.get_audit_logs_cursor(
+        items, _next_cursor, prev_cursor, has_more = await repo.get_audit_logs_cursor(
             mock_session,
             "tenant-123",
             limit=5,

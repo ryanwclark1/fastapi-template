@@ -5,25 +5,30 @@ Provides endpoints for data export and import operations.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator, Iterator
+from datetime import UTC, datetime
 import logging
 from typing import TYPE_CHECKING, Annotated
+import uuid
 
-from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from example_service.core.dependencies.accent_auth import get_current_user
+from example_service.core.dependencies.auth import AuthUserDep
 from example_service.core.dependencies.database import get_db_session
 from example_service.core.dependencies.ratelimit import per_user_rate_limit
-from example_service.core.dependencies.tenant import TenantContextDep
 from example_service.core.exceptions import BadRequestException
-from example_service.core.schemas.auth import AuthUser
 from example_service.core.settings import get_datatransfer_settings
+from example_service.utils.runtime_dependencies import require_runtime_dependency
 
+from .acl import check_export_permission, check_import_permission, check_job_access
 from .audit import log_export_operation, log_import_operation
 from .schemas import (
     ExportFormat,
     ExportRequest,
     ExportResult,
+    ExportStatus,
     ImportFormat,
     ImportResult,
     SupportedEntitiesResponse,
@@ -34,9 +39,13 @@ from .webhooks import notify_export_complete, notify_import_complete
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from example_service.core.dependencies.tenant import TenantContextDep
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/data-transfer", tags=["data-transfer"])
+
+require_runtime_dependency(AuthUserDep, AsyncIterator)
 
 
 async def validate_file_size(file: UploadFile) -> bytes:
@@ -78,7 +87,7 @@ async def validate_file_size(file: UploadFile) -> bytes:
 )
 async def list_supported_entities(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
 ) -> SupportedEntitiesResponse:
     """Get list of entities supported for data transfer.
 
@@ -104,33 +113,90 @@ StreamingRateLimit = Annotated[None, per_user_rate_limit(limit=5, window=60)]
     "/export",
     response_model=ExportResult,
     summary="Export data to file",
-    description="Export entity data to CSV, JSON, or Excel format.",
+    description="Export entity data to CSV, JSON, or Excel format. Supports sync/async execution.",
 )
 async def export_data(
     request: ExportRequest,
     http_request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
-    user: Annotated[dict, Depends(get_current_user)],
+    user: AuthUserDep,
+    user_dict: Annotated[dict, Depends(get_current_user)],
     _rate_limit: ExportRateLimit,
+    execution_mode: Annotated[
+        str,
+        Query(
+            pattern="^(sync|async|auto)$",
+            description="Execution mode: sync (immediate), async (background job), auto (based on size)",
+        ),
+    ] = "sync",
     tenant: TenantContextDep = None,
 ) -> ExportResult:
     """Export data to a file.
 
     Creates an export file in the specified format with optional filters.
+    Supports both synchronous (immediate) and asynchronous (background job) execution.
 
     Args:
         request: Export configuration including entity type, format, and filters.
+        http_request: Incoming FastAPI request for logging metadata.
+        session: Async database session.
+        user: Authenticated user for ACL checks.
+        user_dict: Authenticated user payload for auditing.
+        execution_mode: Execution mode (sync, async, auto). Default: sync for backward compatibility.
         tenant: Optional tenant context for multi-tenant filtering.
 
     Returns:
-        Export result with file path and statistics.
-    """
-    service = DataTransferService(session)
-    tenant_id = tenant.tenant_uuid if tenant else None
-    result = await service.export(request, tenant_id=tenant_id)
+        Export result with file path and statistics (sync) or job info (async).
 
-    user_id = user.get("id") or user.get("sub")
+    Raises:
+        HTTPException: 403 if user lacks permission for entity type.
+    """
+    # ACL check - verify user can export this entity type
+    if not check_export_permission(user, request.entity_type):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "insufficient_permissions",
+                "message": f"Missing permission: datatransfer.export.{request.entity_type}",
+                "required_permission": f"datatransfer.export.{request.entity_type}",
+            },
+        )
+
+    tenant_id = tenant.tenant_uuid if tenant else None
+    user_id = user_dict.get("id") or user_dict.get("sub") or user.user_id
+
+    # Handle async execution mode
+    if execution_mode == "async":
+        return await _export_async(
+            request=request,
+            session=session,
+            user_id=user_id,
+            tenant_id=tenant_id,
+            http_request=http_request,
+        )
+
+    # Handle auto mode (check size, choose sync/async)
+    if execution_mode == "auto":
+        service = DataTransferService(session)
+        count = await service.get_export_count(request.entity_type, tenant_id=tenant_id)
+
+        # Threshold: use async for >10,000 records
+        if count > 10000:
+            logger.info(
+                "Auto mode: routing to async execution",
+                extra={"entity_type": request.entity_type, "count": count},
+            )
+            return await _export_async(
+                request=request,
+                session=session,
+                user_id=user_id,
+                tenant_id=tenant_id,
+                http_request=http_request,
+            )
+
+    # Synchronous execution (default)
+    service = DataTransferService(session)
+    result = await service.export(request, tenant_id=tenant_id)
 
     # Log audit event
     await log_export_operation(
@@ -154,6 +220,111 @@ async def export_data(
     return result
 
 
+async def _export_async(
+    request: ExportRequest,
+    session: AsyncSession,
+    user_id: str,
+    tenant_id: str | None,
+    http_request: Request,
+) -> ExportResult:
+    """Handle asynchronous export via background job.
+
+    Args:
+        request: Export configuration.
+        session: Database session.
+        user_id: User ID initiating export.
+        tenant_id: Optional tenant ID.
+        http_request: FastAPI request for context.
+
+    Returns:
+        Export result with PENDING status and job ID.
+    """
+    from example_service.infra.tasks.jobs.manager import JobManager
+
+    # Create background job
+    job_manager = JobManager(session)
+
+    job = await job_manager.submit(
+        tenant_id=tenant_id or "default",
+        task_name=f"datatransfer.export.{request.format.value}",
+        args={
+            "entity_type": request.entity_type,
+            "format": request.format.value,
+            "filters": request.filters,
+            "filter_conditions": [
+                fc.model_dump() for fc in request.filter_conditions
+            ] if request.filter_conditions else None,
+            "fields": request.fields,
+            "include_headers": request.include_headers,
+            "upload_to_storage": request.upload_to_storage,
+            "tenant_id": tenant_id,
+        },
+        labels={
+            "feature": "datatransfer",
+            "operation": "export",
+            "entity": request.entity_type,
+            "format": request.format.value,
+        },
+        actor_id=user_id,
+    )
+
+    # Enqueue worker task
+    try:
+        from example_service.workers.export.tasks import (
+            export_data_csv,
+            export_data_json,
+        )
+
+        if request.format == ExportFormat.CSV:
+            await export_data_csv.kiq(
+                model_name=request.entity_type,
+                filters=request.filters,
+                fields=request.fields,
+                upload_to_s3=request.upload_to_storage,
+            )
+        elif request.format == ExportFormat.JSON:
+            await export_data_json.kiq(
+                model_name=request.entity_type,
+                filters=request.filters,
+                fields=request.fields,
+                upload_to_s3=request.upload_to_storage,
+            )
+        else:
+            # Excel format - fallback to sync for now
+            logger.warning(
+                "Excel format not supported in async mode, using sync",
+                extra={"format": request.format},
+            )
+    except Exception as e:
+        logger.error(
+            "Failed to enqueue export task",
+            extra={"error": str(e), "job_id": str(job.id)},
+            exc_info=True,
+        )
+
+    await session.commit()
+
+    logger.info(
+        "Export job created",
+        extra={
+            "job_id": str(job.id),
+            "entity_type": request.entity_type,
+            "format": request.format.value,
+            "user_id": user_id,
+        },
+    )
+
+    # Return pending result with job ID
+    return ExportResult(
+        status=ExportStatus.PENDING,
+        export_id=str(job.id),
+        entity_type=request.entity_type,
+        format=request.format,
+        started_at=datetime.now(UTC),
+        download_url=f"/api/v1/data-transfer/jobs/{job.id}/download",
+    )
+
+
 @router.get(
     "/export/download",
     summary="Download export directly",
@@ -161,11 +332,11 @@ async def export_data(
 )
 async def download_export(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    user: AuthUserDep,
     _rate_limit: ExportRateLimit,
     entity_type: Annotated[str, Query(description="Entity type to export")],
     format: Annotated[
-        ExportFormat, Query(description="Export format")
+        ExportFormat, Query(description="Export format"),
     ] = ExportFormat.CSV,
     compress: Annotated[
         bool | None,
@@ -179,6 +350,8 @@ async def download_export(
     without saving to the server filesystem.
 
     Args:
+        session: Async database session.
+        user: Authenticated user for ACL checks.
         entity_type: Type of entity to export.
         format: Output format (csv, json, xlsx).
         compress: Enable gzip compression (None = use settings default).
@@ -186,7 +359,21 @@ async def download_export(
 
     Returns:
         Streaming file download response.
+
+    Raises:
+        HTTPException: 403 if user lacks permission for entity type.
     """
+    # ACL check - verify user can export this entity type
+    if not check_export_permission(user, entity_type):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "insufficient_permissions",
+                "message": f"Missing permission: datatransfer.export.{entity_type}",
+                "required_permission": f"datatransfer.export.{entity_type}",
+            },
+        )
+
     service = DataTransferService(session)
     tenant_id = tenant.tenant_uuid if tenant else None
 
@@ -197,7 +384,7 @@ async def download_export(
 
     try:
         data, content_type, filename = await service.export_to_bytes(
-            request, tenant_id=tenant_id, compress=compress
+            request, tenant_id=tenant_id, compress=compress,
         )
     except ValueError as e:
         raise BadRequestException(
@@ -222,14 +409,14 @@ async def download_export(
 )
 async def stream_export(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    user: AuthUserDep,
     _rate_limit: StreamingRateLimit,
     entity_type: Annotated[str, Query(description="Entity type to export")],
     format: Annotated[
-        ExportFormat, Query(description="Export format")
+        ExportFormat, Query(description="Export format"),
     ] = ExportFormat.CSV,
     chunk_size: Annotated[
-        int, Query(description="Records per chunk (100-10000)", ge=100, le=10000)
+        int, Query(description="Records per chunk (100-10000)", ge=100, le=10000),
     ] = 1000,
     tenant: TenantContextDep = None,
 ) -> StreamingResponse:
@@ -240,6 +427,8 @@ async def stream_export(
     10,000+ records.
 
     Args:
+        session: Async database session.
+        user: Authenticated user for ACL checks.
         entity_type: Type of entity to export.
         format: Output format (csv or json - xlsx not supported for streaming).
         chunk_size: Number of records per chunk.
@@ -248,10 +437,24 @@ async def stream_export(
     Returns:
         Streaming response with chunked data.
 
+    Raises:
+        HTTPException: 403 if user lacks permission for entity type.
+
     Note:
         For JSON format, data is streamed as JSON Lines (JSONL) format
         where each line is a complete JSON object.
     """
+    # ACL check - verify user can export this entity type
+    if not check_export_permission(user, entity_type):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "insufficient_permissions",
+                "message": f"Missing permission: datatransfer.export.{entity_type}",
+                "required_permission": f"datatransfer.export.{entity_type}",
+            },
+        )
+
     # Excel format doesn't support streaming well
     if format == ExportFormat.XLSX:
         raise BadRequestException(
@@ -280,9 +483,9 @@ async def stream_export(
         content_type = "application/x-ndjson"  # JSON Lines format
         filename = f"{entity_type}_{timestamp}.jsonl"
 
-    async def generate():
+    async def generate() -> AsyncIterator[bytes]:
         async for chunk in service.stream_export(
-            request, tenant_id=tenant_id, chunk_size=chunk_size
+            request, tenant_id=tenant_id, chunk_size=chunk_size,
         ):
             yield chunk
 
@@ -303,7 +506,7 @@ async def stream_export(
 )
 async def get_export_count(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
     entity_type: Annotated[str, Query(description="Entity type to count")],
     tenant: TenantContextDep = None,
 ) -> dict:
@@ -312,6 +515,7 @@ async def get_export_count(
     Useful for determining whether to use streaming export for large datasets.
 
     Args:
+        session: Async database session.
         entity_type: Type of entity to count.
         tenant: Optional tenant context for multi-tenant filtering.
 
@@ -345,20 +549,20 @@ async def get_export_count(
 async def import_data(
     http_request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    user: Annotated[AuthUser, Depends(get_current_user)],
+    user: AuthUserDep,
     _rate_limit: ImportRateLimit,
     file: Annotated[UploadFile, File(description="File to import")],
     entity_type: Annotated[str, Query(description="Entity type to import")],
     format: Annotated[ImportFormat, Query(description="File format")],
     validate_only: Annotated[
-        bool, Query(description="Only validate, don't import")
+        bool, Query(description="Only validate, don't import"),
     ] = False,
     skip_errors: Annotated[bool, Query(description="Continue on errors")] = False,
     update_existing: Annotated[
-        bool, Query(description="Update existing records")
+        bool, Query(description="Update existing records"),
     ] = False,
     batch_size: Annotated[
-        int, Query(description="Records per batch (1-1000)", ge=1, le=1000)
+        int, Query(description="Records per batch (1-1000)", ge=1, le=1000),
     ] = 100,
     tenant: TenantContextDep = None,
 ) -> ImportResult:
@@ -368,16 +572,35 @@ async def import_data(
     into the database.
 
     Args:
+        http_request: Incoming FastAPI request for logging metadata.
+        session: Async database session.
+        user: Authenticated user for ACL checks and auditing.
         file: Uploaded file to import.
         entity_type: Type of entity to import.
         format: File format (csv, json, xlsx).
         validate_only: If true, only validate without importing.
         skip_errors: If true, continue importing even if some records fail.
         update_existing: If true, update existing records instead of skipping.
+        batch_size: Number of records processed per batch.
+        tenant: Optional tenant context for multi-tenant filtering.
 
     Returns:
         Import result with statistics and any validation errors.
+
+    Raises:
+        HTTPException: 403 if user lacks permission for entity type.
     """
+    # ACL check - verify user can import this entity type
+    if not check_import_permission(user, entity_type):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "insufficient_permissions",
+                "message": f"Missing permission: datatransfer.import.{entity_type}",
+                "required_permission": f"datatransfer.import.{entity_type}",
+            },
+        )
+
     service = DataTransferService(session)
     tenant_id = tenant.tenant_uuid if tenant else None
 
@@ -400,7 +623,7 @@ async def import_data(
             type="import-error",
         ) from e
 
-    user_id = user.get("id") or user.get("sub")
+    user_id = user.user_id
 
     # Log audit event and send webhook (only for actual imports, not validation-only)
     if not validate_only:
@@ -432,7 +655,7 @@ async def import_data(
 )
 async def validate_import(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    user: AuthUserDep,
     file: Annotated[UploadFile, File(description="File to validate")],
     entity_type: Annotated[str, Query(description="Entity type")],
     format: Annotated[ImportFormat, Query(description="File format")],
@@ -442,13 +665,29 @@ async def validate_import(
     Useful for checking if a file is valid before committing to import.
 
     Args:
+        session: Async database session.
+        user: Authenticated user for ACL checks.
         file: File to validate.
         entity_type: Type of entity.
         format: File format.
 
     Returns:
         Validation result with any errors found.
+
+    Raises:
+        HTTPException: 403 if user lacks permission for entity type.
     """
+    # ACL check - verify user can import this entity type
+    if not check_import_permission(user, entity_type):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "insufficient_permissions",
+                "message": f"Missing permission: datatransfer.import.{entity_type}",
+                "required_permission": f"datatransfer.import.{entity_type}",
+            },
+        )
+
     service = DataTransferService(session)
 
     # Read and validate file content
@@ -476,7 +715,7 @@ async def validate_import(
     description="Get list of supported export and import formats.",
 )
 async def list_formats(
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
 ) -> dict:
     """Get supported data transfer formats.
 
@@ -496,10 +735,10 @@ async def list_formats(
 )
 async def download_import_template(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    _user: AuthUserDep,
     entity_type: Annotated[str, Query(description="Entity type to get template for")],
     format: Annotated[
-        ImportFormat, Query(description="Template format")
+        ImportFormat, Query(description="Template format"),
     ] = ImportFormat.CSV,
 ) -> StreamingResponse:
     """Download a sample import template.
@@ -508,6 +747,7 @@ async def download_import_template(
     expected format for importing the specified entity type.
 
     Args:
+        session: Async database session.
         entity_type: Type of entity to get template for.
         format: Output format (csv, json, xlsx).
 
@@ -517,7 +757,7 @@ async def download_import_template(
     service = DataTransferService(session)
 
     try:
-        data, content_type, filename = service.generate_import_template(
+        data, content_type, _filename = service.generate_import_template(
             entity_type=entity_type,
             format=format,
         )
@@ -552,19 +792,21 @@ async def download_import_template(
 )
 async def get_job_status(
     job_id: str,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     _user: Annotated[dict, Depends(get_current_user)],
 ) -> dict:
     """Get status of a background job.
 
     Args:
         job_id: ID of the job to check.
+        session: Database session.
 
     Returns:
         Job progress information.
     """
     from .jobs import get_job_tracker
 
-    tracker = get_job_tracker()
+    tracker = get_job_tracker(session)
     job = await tracker.get_job(job_id)
 
     if job is None:
@@ -577,23 +819,154 @@ async def get_job_status(
 
 
 @router.get(
+    "/jobs/{job_id}/download",
+    summary="Download job result",
+    description="Download the result file from a completed export job.",
+)
+async def download_job_result(
+    job_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    user: AuthUserDep,
+) -> StreamingResponse:
+    """Download result file from completed export job.
+
+    Args:
+        job_id: ID of the job to download.
+        session: Database session.
+        user: Authenticated user for access control.
+
+    Returns:
+        Streaming file download response.
+
+    Raises:
+        HTTPException: 404 if job not found, 403 if access denied, 400 if job not completed.
+    """
+    job_id = uuid.UUID(str(job_id))
+
+    from pathlib import Path
+
+    from example_service.infra.tasks.jobs.manager import JobManager
+
+    # Get job from database
+    job_manager = JobManager(session)
+    job = await job_manager.get(job_id, include_relations=True)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "job_not_found",
+                "message": f"Job {job_id} not found",
+                "job_id": str(job_id),
+            },
+        )
+
+    # ACL check - verify user has access to this job
+    if not check_job_access(user, job):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "access_denied",
+                "message": "You do not have permission to access this job",
+                "job_id": str(job_id),
+            },
+        )
+
+    # Check job is completed
+    from example_service.infra.tasks.jobs.enums import JobStatus
+
+    if job.status != JobStatus.COMPLETED:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "job_not_completed",
+                "message": f"Job is not completed (status: {job.status})",
+                "job_id": str(job_id),
+                "status": job.status,
+            },
+        )
+
+    # Get file path from job result
+    result_data = job.result_data or {}
+    file_path_str = result_data.get("filepath") or result_data.get("file_path")
+
+    if not file_path_str:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "no_file",
+                "message": "Job has no associated file",
+                "job_id": str(job_id),
+            },
+        )
+
+    file_path = Path(file_path_str)
+
+    # Check file exists
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "file_not_found",
+                "message": "Export file no longer exists",
+                "job_id": str(job_id),
+                "file_path": str(file_path),
+            },
+        )
+
+    # Determine content type from file extension
+    content_types = {
+        ".csv": "text/csv",
+        ".json": "application/json",
+        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }
+    content_type = content_types.get(file_path.suffix, "application/octet-stream")
+
+    # Stream file
+    def file_iterator() -> Iterator[bytes]:
+        with open(file_path, "rb") as f:
+            yield from f
+
+    logger.info(
+        "Job file downloaded",
+        extra={
+            "job_id": str(job_id),
+            "user_id": user.user_id,
+            "file_path": str(file_path),
+            "file_size": file_path.stat().st_size,
+        },
+    )
+
+    return StreamingResponse(
+        file_iterator(),
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{file_path.name}"',
+            "Content-Length": str(file_path.stat().st_size),
+        },
+    )
+
+
+@router.get(
     "/jobs",
     summary="List jobs",
     description="List background jobs with optional filtering.",
 )
 async def list_jobs(
-    _user: Annotated[AuthUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    _user: AuthUserDep,
     job_type: Annotated[
-        str | None, Query(description="Filter by job type (export/import)")
+        str | None, Query(description="Filter by job type (export/import)"),
     ] = None,
     status: Annotated[str | None, Query(description="Filter by status")] = None,
     limit: Annotated[
-        int, Query(description="Maximum jobs to return", ge=1, le=500)
+        int, Query(description="Maximum jobs to return", ge=1, le=500),
     ] = 100,
 ) -> dict:
     """List background jobs.
 
     Args:
+        session: Database session.
         job_type: Optional filter by job type.
         status: Optional filter by status.
         limit: Maximum number of jobs to return.
@@ -603,7 +976,7 @@ async def list_jobs(
     """
     from .jobs import JobStatus, JobType, get_job_tracker
 
-    tracker = get_job_tracker()
+    tracker = get_job_tracker(session)
 
     jt = JobType(job_type) if job_type else None
     st = JobStatus(status) if status else None
@@ -623,19 +996,21 @@ async def list_jobs(
 )
 async def cancel_job(
     job_id: str,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     _user: Annotated[dict, Depends(get_current_user)],
 ) -> dict:
     """Cancel a background job.
 
     Args:
         job_id: ID of the job to cancel.
+        session: Database session.
 
     Returns:
         Cancellation result.
     """
     from .jobs import get_job_tracker
 
-    tracker = get_job_tracker()
+    tracker = get_job_tracker(session)
     cancelled = await tracker.cancel_job(job_id)
 
     if not cancelled:

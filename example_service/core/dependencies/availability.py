@@ -40,7 +40,7 @@ from example_service.core.exceptions import ServiceUnavailableException
 from example_service.core.services.availability import ServiceName, get_service_registry
 
 
-def require_services(*services: ServiceName):
+def require_services(*services: ServiceName) -> Depends:
     """Create a dependency that validates service availability.
 
     This factory function creates a FastAPI dependency that checks if
@@ -112,13 +112,8 @@ def require_services(*services: ServiceName):
 # Use these as the first parameter in your endpoint functions.
 # The underscore convention indicates the value isn't used directly.
 #
-# Example:
-#     @router.get("/items")
-#     async def list_items(
-#         _: RequireDatabase,
-#         service: ItemService = Depends(get_item_service),
-#     ) -> list[Item]:
-#         ...
+# Example: include `RequireDatabase` as the first parameter in a route handler to
+# ensure the database is healthy before executing additional logic.
 
 RequireDatabase = Annotated[dict, require_services(ServiceName.DATABASE)]
 """Dependency that requires database to be available."""
@@ -140,12 +135,12 @@ RequireConsul = Annotated[dict, require_services(ServiceName.CONSUL)]
 
 # Combined requirements for features needing multiple services
 RequireDatabaseAndCache = Annotated[
-    dict, require_services(ServiceName.DATABASE, ServiceName.CACHE)
+    dict, require_services(ServiceName.DATABASE, ServiceName.CACHE),
 ]
 """Dependency that requires both database and cache to be available."""
 
 RequireDatabaseAndBroker = Annotated[
-    dict, require_services(ServiceName.DATABASE, ServiceName.BROKER)
+    dict, require_services(ServiceName.DATABASE, ServiceName.BROKER),
 ]
 """Dependency that requires both database and message broker to be available."""
 

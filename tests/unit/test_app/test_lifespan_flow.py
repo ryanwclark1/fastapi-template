@@ -101,6 +101,7 @@ def _patch_settings(monkeypatch: pytest.MonkeyPatch, **overrides):
     monkeypatch.setattr(
         "example_service.app.lifespan.get_mock_settings",
         lambda: overrides.get("mock", DummySettings(configured=False)),
+        raising=False,
     )
     monkeypatch.setattr(
         "example_service.app.lifespan.get_task_settings",
@@ -211,9 +212,12 @@ def _patch_infrastructure(monkeypatch: pytest.MonkeyPatch, calls: list[str]):
     )
 
     # Taskiq/Scheduler - skip initialization
+    async def _noop_async():
+        return None
+
     monkeypatch.setattr(
         "example_service.app.lifespan._initialize_taskiq_and_scheduler",
-        lambda: None,
+        _noop_async,
     )
 
 

@@ -24,4 +24,5 @@ def __getattr__(name: str) -> Any:
         from example_service.features.graphql.schema import schema as graphql_schema
 
         return graphql_schema
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    msg = f"module {__name__!r} has no attribute {name!r}"
+    raise AttributeError(msg)

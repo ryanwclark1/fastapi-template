@@ -131,7 +131,7 @@ class TestSearchTasks:
                 "started_at": "2024-01-15T10:00:00",
                 "finished_at": "2024-01-15T10:05:00",
                 "duration_ms": 300000,
-            }
+            },
         ]
         tracker.count_task_history.return_value = 1
 
@@ -515,7 +515,7 @@ class TestTriggerTask:
         with patch("example_service.features.tasks.service.broker", None):
             # Import the service module to patch the broker there
             with patch(
-                "example_service.features.tasks.service.TaskManagementService.trigger_task"
+                "example_service.features.tasks.service.TaskManagementService.trigger_task",
             ) as mock_trigger:
                 mock_trigger.side_effect = BrokerNotConfiguredError("No broker")
 

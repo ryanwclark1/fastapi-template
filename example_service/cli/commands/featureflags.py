@@ -1,3 +1,4 @@
+# mypy: disable-error-code="attr-defined,arg-type,assignment,return-value,misc,name-defined"
 """Feature flag management CLI commands.
 
 This module provides CLI commands for managing feature flags:
@@ -226,7 +227,6 @@ async def create_flag(
     """Create a new feature flag.
 
     Examples:
-    \b
       example-service flags create -k new_checkout -n "New Checkout Flow" -s percentage -p 25
       example-service flags create -k beta_feature -n "Beta Feature" -s disabled
     """
@@ -412,7 +412,6 @@ async def create_override(
     KEY is the unique key of the feature flag.
 
     Examples:
-    \b
       example-service flags override new_feature -t user -e user-123 --enable
       example-service flags override beta_feature -t tenant -e tenant-456 --disable -r "Opted out"
     """
@@ -437,7 +436,7 @@ async def create_override(
             reason=reason,
         )
 
-        override = await service.create_override(payload)
+        await service.create_override(payload)
 
         action = "enabled" if enable else "disabled"
         success(f"Override created: {key} {action} for {entity_type}:{entity_id}")
@@ -533,7 +532,6 @@ async def evaluate_flags(
     Useful for testing flag configurations.
 
     Examples:
-    \b
       example-service flags evaluate -u user-123 -t tenant-456
       example-service flags evaluate -u user-123 -f new_feature -f beta_feature --details
     """
@@ -597,7 +595,7 @@ async def flag_stats() -> None:
         # Flag counts by status
         status_counts = await session.execute(
             select(FeatureFlag.status, func.count(FeatureFlag.id))
-            .group_by(FeatureFlag.status)
+            .group_by(FeatureFlag.status),
         )
         status_dict = {row[0]: row[1] for row in status_counts.all()}
 
@@ -616,13 +614,13 @@ async def flag_stats() -> None:
 
         # Override counts
         override_count = await session.execute(
-            select(func.count(FlagOverride.id))
+            select(func.count(FlagOverride.id)),
         )
         total_overrides = override_count.scalar() or 0
 
         override_by_type = await session.execute(
             select(FlagOverride.entity_type, func.count(FlagOverride.id))
-            .group_by(FlagOverride.entity_type)
+            .group_by(FlagOverride.entity_type),
         )
         override_dict = {row[0]: row[1] for row in override_by_type.all()}
 

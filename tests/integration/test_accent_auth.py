@@ -11,14 +11,16 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 import pytest
 
+from example_service.infra.auth import AuthClient
 from example_service.infra.auth.accent_auth import (
     AccentAuthACL,
     AccentAuthClient,
     AccentAuthToken,
 )
+from example_service.infra.auth.testing import MockAuthClient
 
 
 class TestAccentAuthClient:
@@ -55,7 +57,7 @@ class TestAccentAuthClient:
                     "webhookd.subscriptions.*",
                     "calld.#",
                 ],
-            }
+            },
         }
 
     @pytest.mark.asyncio
@@ -249,7 +251,7 @@ class TestAccentAuthACL:
             [
                 "confd.users.*",
                 "!confd.users.delete",
-            ]
+            ],
         )
 
         # Positive ACLs grant access
@@ -266,7 +268,7 @@ class TestAccentAuthACL:
                 "confd.#",
                 "!confd.users.delete",
                 "!confd.tenants.*",
-            ]
+            ],
         )
 
         # Broad access
@@ -289,7 +291,7 @@ class TestAccentAuthACL:
                 "webhookd.subscriptions.*",
                 "calld.calls.my_session.*",  # Access to own session calls
                 "!admin.*",  # No admin access
-            ]
+            ],
         )
 
         assert acl.has_permission("confd.users.read") is True
@@ -311,13 +313,16 @@ class TestAccentAuthIntegration:
         """Create test client."""
         from example_service.app.main import app
 
-        async with AsyncClient(app=app, base_url="http://test") as ac:
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as ac:
             yield ac
 
     @pytest.mark.asyncio
     async def test_protected_endpoint_without_token(self, client: AsyncClient):
         """Test accessing protected endpoint without X-Auth-Token."""
-        response = await client.get("/api/v1/reminders")
+        response = await client.get("/api/v1/reminders", follow_redirects=True)
 
         assert response.status_code == 401
         assert "X-Auth-Token" in response.json()["detail"]
@@ -328,6 +333,7 @@ class TestAccentAuthIntegration:
         response = await client.get(
             "/api/v1/reminders",
             headers={"X-Auth-Token": "invalid-token"},
+            follow_redirects=True,
         )
 
         assert response.status_code == 401
@@ -395,3 +401,287 @@ class TestAccentAuthDependencies:
             await checker(user)
 
         assert exc_info.value.status_code == 403
+
+
+class TestProtocolBasedAuth:
+    """Test Protocol-based authentication using MockAuthClient.
+
+    These tests demonstrate the advantage of the Protocol pattern:
+    - No unittest.mock required
+    - Clear, readable test code
+    - Protocol compliance verified
+    - Easy to test different scenarios
+    """
+
+    def test_protocol_compliance(self):
+        """Test that MockAuthClient implements AuthClient protocol."""
+        mock_client = MockAuthClient.admin()
+
+        # Protocol check via isinstance
+        assert isinstance(mock_client, AuthClient)
+
+        # Verify protocol methods exist
+        assert hasattr(mock_client, "is_configured")
+        assert hasattr(mock_client, "mode")
+        assert hasattr(mock_client, "validate_token")
+        assert hasattr(mock_client, "check_token")
+        assert hasattr(mock_client, "is_token_valid")
+
+    def test_mock_client_properties(self):
+        """Test MockAuthClient properties."""
+        mock_client = MockAuthClient()
+
+        assert mock_client.is_configured is True
+        assert mock_client.mode == "mock"
+
+    @pytest.mark.asyncio
+    async def test_admin_persona(self, mock_auth_admin):
+        """Test admin persona has full access."""
+        token_info = await mock_auth_admin.validate_token("test-token")
+
+        assert token_info.metadata.uuid == "admin-user-id"
+        assert token_info.metadata.tenant_uuid == "admin-tenant-id"
+        assert "#" in token_info.acl
+
+        # Verify ACL helper works
+        acl = AccentAuthACL(token_info.acl)
+        assert acl.is_superuser()
+        assert acl.has_permission("anything.at.all")
+
+    @pytest.mark.asyncio
+    async def test_readonly_persona(self, mock_auth_readonly):
+        """Test readonly persona has limited access."""
+        token_info = await mock_auth_readonly.validate_token("test-token")
+
+        assert token_info.metadata.uuid == "readonly-user-id"
+        assert "*.*.read" in token_info.acl
+
+        # Can read
+        acl = AccentAuthACL(token_info.acl)
+        assert acl.has_permission("confd.users.read")
+        assert acl.has_permission("webhookd.subscriptions.read")
+
+        # Cannot write
+        assert not acl.has_permission("confd.users.delete")
+        assert not acl.has_permission("webhookd.subscriptions.create")
+
+    @pytest.mark.asyncio
+    async def test_user_persona(self, mock_auth_standard_user):
+        """Test user persona with standard permissions."""
+        token_info = await mock_auth_standard_user.validate_token("test-token")
+
+        assert token_info.metadata.uuid == "user-user-id"
+        assert "users.me.read" in token_info.acl
+        assert "sessions.my_session.delete" in token_info.acl
+
+        # Reserved word substitution
+        acl = AccentAuthACL(
+            token_info.acl,
+            auth_id=token_info.metadata.uuid,
+            session_id=token_info.session_uuid,
+        )
+
+        # Can access own user (me substitution)
+        assert acl.has_permission("users.user-user-id.read")
+
+        # Can manage own session
+        assert acl.has_permission("sessions.mock-session-id.delete")
+
+    @pytest.mark.asyncio
+    async def test_unauthorized_persona(self, mock_auth_unauthorized):
+        """Test unauthorized persona raises permission errors."""
+        from example_service.infra.auth.testing import MissingPermissionsTokenException
+
+        # Basic validation works (no ACL required)
+        token_info = await mock_auth_unauthorized.validate_token("test-token")
+        assert token_info.metadata.uuid == "unauthorized-user-id"
+        assert len(token_info.acl) == 0
+
+        # ACL check fails
+        with pytest.raises(MissingPermissionsTokenException):
+            await mock_auth_unauthorized.validate_token(
+                "test-token",
+                required_acl="users.read",
+            )
+
+    @pytest.mark.asyncio
+    async def test_expired_persona(self, mock_auth_expired):
+        """Test expired persona raises invalid token error."""
+        from example_service.infra.auth.testing import InvalidTokenException
+
+        with pytest.raises(InvalidTokenException, match="expired"):
+            await mock_auth_expired.validate_token("test-token")
+
+        # is_token_valid doesn't raise
+        is_valid = await mock_auth_expired.is_token_valid("test-token")
+        assert is_valid is False
+
+    @pytest.mark.asyncio
+    async def test_custom_permissions(self, mock_auth_custom):
+        """Test custom permissions via factory."""
+        client = mock_auth_custom(
+            user_id="custom-user",
+            permissions=["confd.users.read", "webhookd.#"],
+            tenant_id="custom-tenant",
+        )
+
+        token_info = await client.validate_token("test-token")
+
+        assert token_info.metadata.uuid == "custom-user"
+        assert token_info.metadata.tenant_uuid == "custom-tenant"
+        assert "confd.users.read" in token_info.acl
+        assert "webhookd.#" in token_info.acl
+
+        acl = AccentAuthACL(token_info.acl)
+        assert acl.has_permission("confd.users.read")
+        assert acl.has_permission("webhookd.subscriptions.create")
+        assert not acl.has_permission("confd.users.delete")
+
+    @pytest.mark.asyncio
+    async def test_multitenant_scenario(self, mock_auth_multitenant):
+        """Test multi-tenant isolation with token registry."""
+        # Tenant A - admin
+        token_a = await mock_auth_multitenant.validate_token("tenant-a-token")
+        assert token_a.metadata.tenant_uuid == "tenant-a"
+        assert token_a.metadata.uuid == "admin-user-a"
+        assert "#" in token_a.acl
+
+        # Tenant B - user
+        token_b = await mock_auth_multitenant.validate_token("tenant-b-token")
+        assert token_b.metadata.tenant_uuid == "tenant-b"
+        assert token_b.metadata.uuid == "user-b"
+        assert "#" not in token_b.acl
+
+        # Tenant C - readonly
+        token_c = await mock_auth_multitenant.validate_token("tenant-c-token")
+        assert token_c.metadata.tenant_uuid == "tenant-c"
+        assert token_c.metadata.uuid == "readonly-user-c"
+
+        # Verify tenant isolation
+        from example_service.infra.auth.testing import InvalidTokenException
+
+        with pytest.raises(InvalidTokenException, match="mismatch"):
+            await mock_auth_multitenant.validate_token(
+                "tenant-a-token",
+                tenant_uuid="tenant-b",  # Wrong tenant
+            )
+
+    @pytest.mark.asyncio
+    async def test_acl_validation(self):
+        """Test ACL validation in validate_token."""
+        from example_service.infra.auth.testing import MissingPermissionsTokenException
+
+        client = MockAuthClient(
+            permissions=["users.read", "posts.write"],
+        )
+
+        # Valid ACL
+        token_info = await client.validate_token(
+            "test-token",
+            required_acl="users.read",
+        )
+        assert token_info is not None
+
+        # Invalid ACL
+        with pytest.raises(
+            MissingPermissionsTokenException,
+            match=r"admin\.delete",
+        ):
+            await client.validate_token(
+                "test-token",
+                required_acl="admin.delete",
+            )
+
+    @pytest.mark.asyncio
+    async def test_check_token_vs_is_token_valid(self):
+        """Test difference between check_token and is_token_valid."""
+        from example_service.infra.auth.testing import InvalidTokenException
+
+        expired_client = MockAuthClient.expired()
+
+        # check_token raises exception
+        with pytest.raises(InvalidTokenException):
+            await expired_client.check_token("test-token")
+
+        # is_token_valid returns False (no exception)
+        result = await expired_client.is_token_valid("test-token")
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_tenant_validation(self):
+        """Test tenant UUID validation."""
+        from example_service.infra.auth.testing import InvalidTokenException
+
+        client = MockAuthClient(tenant_id="tenant-123")
+
+        # Matching tenant
+        token_info = await client.validate_token(
+            "test-token",
+            tenant_uuid="tenant-123",
+        )
+        assert token_info.metadata.tenant_uuid == "tenant-123"
+
+        # Mismatched tenant
+        with pytest.raises(InvalidTokenException, match="mismatch"):
+            await client.validate_token(
+                "test-token",
+                tenant_uuid="different-tenant",
+            )
+
+    @pytest.mark.asyncio
+    async def test_token_registry(self):
+        """Test token registry for multi-user scenarios."""
+        client = MockAuthClient()
+
+        # Register multiple tokens
+        client.register_token(
+            "admin-token",
+            "admin-id",
+            ["#"],
+            tenant_id="tenant-1",
+        )
+        client.register_token(
+            "user-token",
+            "user-id",
+            ["users.read"],
+            tenant_id="tenant-2",
+        )
+
+        # Validate different tokens
+        admin_info = await client.validate_token("admin-token")
+        assert admin_info.metadata.uuid == "admin-id"
+        assert admin_info.metadata.tenant_uuid == "tenant-1"
+        assert "#" in admin_info.acl
+
+        user_info = await client.validate_token("user-token")
+        assert user_info.metadata.uuid == "user-id"
+        assert user_info.metadata.tenant_uuid == "tenant-2"
+        assert "users.read" in user_info.acl
+
+    @pytest.mark.asyncio
+    async def test_fastapi_dependency_override(self, mock_auth_admin):
+        """Test using MockAuthClient with FastAPI dependency overrides."""
+        from example_service.core.dependencies.auth_client import get_auth_client
+
+        # In real tests, override get_auth_client to return mock_auth_admin.
+
+        # Verify the mock client works
+        token_info = await mock_auth_admin.validate_token("test-token")
+        assert isinstance(mock_auth_admin, AuthClient)
+        assert token_info.metadata.uuid == "admin-user-id"
+
+    def test_no_mocking_library_needed(self):
+        """Demonstrate that no mocking library is needed.
+
+        This test verifies that MockAuthClient provides everything needed
+        for testing without unittest.mock, pytest-mock, or similar libraries.
+        """
+        # Create mock without any mocking libraries
+        client = MockAuthClient.admin()
+
+        # All assertions work on real methods and properties
+        assert client.is_configured
+        assert client.mode == "mock"
+
+        # No patch(), MagicMock(), or AsyncMock() needed!
+        # This is the power of Protocol-based design.

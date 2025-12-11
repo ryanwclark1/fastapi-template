@@ -40,6 +40,8 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 
+from example_service.infra.realtime import ConnectionManager, EventBridge
+
 
 def get_ws_connection_manager() -> ConnectionManager | None:
     """Get the WebSocket connection manager instance.
@@ -167,10 +169,6 @@ async def optional_event_bridge(
     return bridge
 
 
-# Type aliases for cleaner route signatures
-# Import at runtime after function definitions to avoid circular dependencies
-from example_service.infra.realtime import ConnectionManager, EventBridge  # noqa: E402
-
 ConnectionManagerDep = Annotated[ConnectionManager, Depends(require_connection_manager)]
 """Connection manager dependency that requires it to be available.
 
@@ -181,7 +179,7 @@ Example:
 """
 
 OptionalConnectionManager = Annotated[
-    ConnectionManager | None, Depends(optional_connection_manager)
+    ConnectionManager | None, Depends(optional_connection_manager),
 ]
 """Connection manager dependency that is optional.
 

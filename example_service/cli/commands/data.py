@@ -72,7 +72,6 @@ async def export_data(
     TABLE is the name of the table to export (e.g., users, posts, reminders).
 
     Examples:
-    \b
       example-service data export users --format csv -o users.csv
       example-service data export posts --format json --limit 100
       example-service data export users --where "is_active=true"
@@ -205,7 +204,6 @@ async def import_data(
     FILE_PATH is the path to the data file.
 
     Examples:
-    \b
       example-service data import users users.csv
       example-service data import posts data.json --dry-run
     """
@@ -340,7 +338,7 @@ async def database_stats() -> None:
             db_name = result.scalar_one()
 
             result = await session.execute(
-                text("SELECT pg_size_pretty(pg_database_size(current_database()))")
+                text("SELECT pg_size_pretty(pg_database_size(current_database()))"),
             )
             db_size = result.scalar_one()
 
@@ -360,7 +358,7 @@ async def database_stats() -> None:
                     pg_size_pretty(pg_total_relation_size(relid)) as total_size
                 FROM pg_stat_user_tables
                 ORDER BY n_live_tup DESC
-            """)
+            """),
             )
             tables = result.fetchall()
 
@@ -370,7 +368,7 @@ async def database_stats() -> None:
                 click.echo("  " + "-" * 57)
                 for table in tables:
                     click.echo(
-                        f"  {table.table_name:<30} {table.row_count:<12} {table.total_size:<15}"
+                        f"  {table.table_name:<30} {table.row_count:<12} {table.total_size:<15}",
                     )
             else:
                 info("No tables found")
@@ -386,7 +384,7 @@ async def database_stats() -> None:
                 FROM pg_stat_user_indexes
                 ORDER BY idx_scan DESC
                 LIMIT 10
-            """)
+            """),
             )
             indexes = result.fetchall()
 
@@ -408,7 +406,7 @@ async def database_stats() -> None:
                     count(*) FILTER (WHERE state = 'idle') as idle
                 FROM pg_stat_activity
                 WHERE datname = current_database()
-            """)
+            """),
             )
             conn_stats = result.fetchone()
 
@@ -442,7 +440,7 @@ async def list_tables() -> None:
                 FROM information_schema.tables
                 WHERE table_schema = 'public'
                 ORDER BY table_name
-            """)
+            """),
             )
             tables = result.fetchall()
 
@@ -476,7 +474,7 @@ async def list_tables() -> None:
                     nullable = "Yes" if col.is_nullable == "YES" else "No"
                     default = col.column_default[:30] if col.column_default else "-"
                     click.echo(
-                        f"  {col.column_name:<25} {col.data_type:<20} {nullable:<10} {default}"
+                        f"  {col.column_name:<25} {col.data_type:<20} {nullable:<10} {default}",
                     )
 
                 click.echo()
@@ -504,7 +502,7 @@ async def count_records(table: str | None) -> None:
             if table:
                 # Count specific table
                 result = await session.execute(
-                    text(f"SELECT COUNT(*) FROM {table}")  # noqa: S608
+                    text(f"SELECT COUNT(*) FROM {table}"),
                 )
                 count = result.scalar_one()
                 success(f"Table '{table}': {count:,} records")
@@ -518,7 +516,7 @@ async def count_records(table: str | None) -> None:
                     FROM information_schema.tables
                     WHERE table_schema = 'public'
                     ORDER BY table_name
-                """)
+                """),
                 )
                 tables = result.fetchall()
 
@@ -527,7 +525,7 @@ async def count_records(table: str | None) -> None:
                 for t in tables:
                     table_name = t.table_name
                     result = await session.execute(
-                        text(f"SELECT COUNT(*) FROM {table_name}")  # noqa: S608
+                        text(f"SELECT COUNT(*) FROM {table_name}"),
                     )
                     count = result.scalar_one()
                     total += count

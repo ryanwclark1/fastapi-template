@@ -297,11 +297,11 @@ class FlagOverrideRepository(BaseRepository[FlagOverride]):
         conditions = []
         if user_id:
             conditions.append(
-                (FlagOverride.entity_type == "user") & (FlagOverride.entity_id == user_id)
+                (FlagOverride.entity_type == "user") & (FlagOverride.entity_id == user_id),
             )
         if tenant_id:
             conditions.append(
-                (FlagOverride.entity_type == "tenant") & (FlagOverride.entity_id == tenant_id)
+                (FlagOverride.entity_type == "tenant") & (FlagOverride.entity_id == tenant_id),
             )
 
         stmt = select(FlagOverride).where(or_(*conditions))
@@ -354,7 +354,7 @@ class FlagOverrideRepository(BaseRepository[FlagOverride]):
         deleted = (result.rowcount or 0) > 0  # type: ignore[attr-defined]
         if deleted:
             _lazy.debug(
-                lambda: f"delete_by_entity: removed override for {flag_key}/{entity_type}/{entity_id}"
+                lambda: f"delete_by_entity: removed override for {flag_key}/{entity_type}/{entity_id}",
             )
         return deleted
 

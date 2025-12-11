@@ -202,10 +202,10 @@ def create_connection_type(
     @strawberry.type(name=type_name, description=f"Connection for {node_type.__name__}")
     class Connection:
         edges: list[edge_type] = strawberry.field(
-            description="List of edges containing nodes and cursors"
+            description="List of edges containing nodes and cursors",
         )
         page_info: page_info_type = strawberry.field(
-            description="Information about pagination"
+            description="Information about pagination",
         )
 
     return Connection
@@ -237,9 +237,12 @@ def pydantic_to_strawberry(
         reminder_gql = pydantic_to_strawberry(reminder, ReminderType)
     """
     if not hasattr(strawberry_type, "from_pydantic"):
-        raise ValueError(
+        msg = (
             f"{strawberry_type.__name__} must be decorated with @pydantic.type "
             "to use pydantic_to_strawberry()"
+        )
+        raise ValueError(
+            msg,
         )
 
     return strawberry_type.from_pydantic(pydantic_obj)
@@ -264,9 +267,12 @@ def strawberry_to_pydantic(
         reminder_create = strawberry_to_pydantic(input)  # Returns ReminderCreate
     """
     if not hasattr(strawberry_obj, "to_pydantic"):
-        raise ValueError(
+        msg = (
             f"{type(strawberry_obj).__name__} must be decorated with @pydantic.input or @pydantic.type "
             "to use strawberry_to_pydantic()"
+        )
+        raise ValueError(
+            msg,
         )
 
     return strawberry_obj.to_pydantic()

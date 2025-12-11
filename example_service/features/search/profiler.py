@@ -20,7 +20,6 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -35,6 +34,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from example_service.core.database import TimestampedBase
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
     from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -355,7 +356,7 @@ class QueryProfiler:
                         p99_time_ms=percentiles.get("p99", 0),
                         slow_query_count=slow_count,
                         slow_query_rate=slow_count / total if total > 0 else 0,
-                    )
+                    ),
                 )
 
             return stats

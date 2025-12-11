@@ -42,16 +42,24 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from enum import Enum
 import logging
-from typing import Any
+from typing import Any, ParamSpec, TypeVar
 
 from pydantic import BaseModel, Field
 
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(Awaitable, Callable)
+
 logger = logging.getLogger(__name__)
+
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 # =============================================================================
@@ -108,10 +116,10 @@ class QuotaConfig(BaseModel):
 
     # Concurrency limits
     max_concurrent_executions: int | None = Field(
-        None, ge=1, description="Max concurrent executions"
+        None, ge=1, description="Max concurrent executions",
     )
     max_concurrent_per_workflow: int | None = Field(
-        None, ge=1, description="Max concurrent per workflow type"
+        None, ge=1, description="Max concurrent per workflow type",
     )
 
     # Agent-specific limits
@@ -119,7 +127,7 @@ class QuotaConfig(BaseModel):
 
     # Per-model limits
     model_limits: dict[str, dict[str, int]] | None = Field(
-        None, description="Per-model token limits"
+        None, description="Per-model token limits",
     )
 
     # Alert thresholds
@@ -420,7 +428,7 @@ class RateLimiter:
             window_start = now - window
             ttl = int(window.total_seconds())
             await self.store.increment_usage(
-                tenant_id, quota_type, count, window_start, ttl
+                tenant_id, quota_type, count, window_start, ttl,
             )
 
 
@@ -522,7 +530,7 @@ class QuotaManager:
         if self.config.daily_token_limit is not None:
             window = self._get_window_start("day")
             usage = await self.store.get_usage(
-                self.tenant_id, QuotaType.TOKENS_DAILY, window
+                self.tenant_id, QuotaType.TOKENS_DAILY, window,
             )
             limit = self.config.daily_token_limit
             remaining_tokens = max(0, limit - int(usage) - tokens_needed)
@@ -540,7 +548,7 @@ class QuotaManager:
         if self.config.monthly_token_limit is not None:
             window = self._get_window_start("month")
             usage = await self.store.get_usage(
-                self.tenant_id, QuotaType.TOKENS_MONTHLY, window
+                self.tenant_id, QuotaType.TOKENS_MONTHLY, window,
             )
             limit = self.config.monthly_token_limit
             remaining_tokens = max(0, limit - int(usage) - tokens_needed)
@@ -559,7 +567,7 @@ class QuotaManager:
         if self.config.daily_cost_limit_usd is not None:
             window = self._get_window_start("day")
             usage = Decimal(str(await self.store.get_usage(
-                self.tenant_id, QuotaType.COST_DAILY, window
+                self.tenant_id, QuotaType.COST_DAILY, window,
             )))
             limit = self.config.daily_cost_limit_usd
             remaining_cost = max(Decimal(0), limit - usage - cost_estimate)
@@ -577,7 +585,7 @@ class QuotaManager:
         if self.config.monthly_cost_limit_usd is not None:
             window = self._get_window_start("month")
             usage = Decimal(str(await self.store.get_usage(
-                self.tenant_id, QuotaType.COST_MONTHLY, window
+                self.tenant_id, QuotaType.COST_MONTHLY, window,
             )))
             limit = self.config.monthly_cost_limit_usd
             remaining_cost = max(Decimal(0), limit - usage - cost_estimate)
@@ -652,13 +660,13 @@ class QuotaManager:
             if self.config.daily_token_limit is not None:
                 window = self._get_window_start("day")
                 await self.store.increment_usage(
-                    self.tenant_id, QuotaType.TOKENS_DAILY, tokens, window, 86400
+                    self.tenant_id, QuotaType.TOKENS_DAILY, tokens, window, 86400,
                 )
 
             if self.config.monthly_token_limit is not None:
                 window = self._get_window_start("month")
                 await self.store.increment_usage(
-                    self.tenant_id, QuotaType.TOKENS_MONTHLY, tokens, window, 86400 * 31
+                    self.tenant_id, QuotaType.TOKENS_MONTHLY, tokens, window, 86400 * 31,
                 )
 
         # Record cost
@@ -666,13 +674,13 @@ class QuotaManager:
             if self.config.daily_cost_limit_usd is not None:
                 window = self._get_window_start("day")
                 await self.store.increment_usage(
-                    self.tenant_id, QuotaType.COST_DAILY, cost, window, 86400
+                    self.tenant_id, QuotaType.COST_DAILY, cost, window, 86400,
                 )
 
             if self.config.monthly_cost_limit_usd is not None:
                 window = self._get_window_start("month")
                 await self.store.increment_usage(
-                    self.tenant_id, QuotaType.COST_MONTHLY, cost, window, 86400 * 31
+                    self.tenant_id, QuotaType.COST_MONTHLY, cost, window, 86400 * 31,
                 )
 
     async def acquire_execution_slot(
@@ -697,7 +705,7 @@ class QuotaManager:
             return False
 
         return await self.store.acquire_concurrent_slot(
-            self.tenant_id, execution_id, "global", 3600
+            self.tenant_id, execution_id, "global", 3600,
         )
 
     async def release_execution_slot(
@@ -736,7 +744,7 @@ class QuotaManager:
 def require_quota(
     tokens_estimate: int = 0,
     cost_estimate: Decimal = Decimal(0),
-):
+) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
     """Decorator to check quota before executing an async function.
 
     Args:
@@ -751,13 +759,14 @@ def require_quota(
         async def my_agent_call(manager: QuotaManager, query: str):
             # ... make AI call ...
     """
-    def decorator(func):
-        async def wrapper(manager: QuotaManager, *args, **kwargs):
+    def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
+        async def wrapper(manager: QuotaManager, *args: P.args, **kwargs: P.kwargs) -> R:
             result = await manager.check_quota(tokens_estimate, cost_estimate)
             if not result.allowed:
                 raise QuotaExceededError(result.message or "Quota exceeded")
             return await func(manager, *args, **kwargs)
         return wrapper
+
     return decorator
 
 
@@ -819,27 +828,27 @@ def reset_quota_store() -> None:
 
 
 __all__ = [
-    # Types
-    "QuotaStatus",
-    "QuotaType",
-    # Configuration
-    "QuotaConfig",
-    # Results
-    "QuotaCheckResult",
     # Store
     "InMemoryQuotaStore",
-    "QuotaStore",
-    # Rate limiter
-    "RateLimiter",
-    # Manager
-    "QuotaManager",
-    # Decorator
-    "require_quota",
+    # Results
+    "QuotaCheckResult",
+    # Configuration
+    "QuotaConfig",
     # Exceptions
     "QuotaExceededError",
+    # Manager
+    "QuotaManager",
+    # Types
+    "QuotaStatus",
+    "QuotaStore",
+    "QuotaType",
     "RateLimitedError",
+    # Rate limiter
+    "RateLimiter",
     # Global store
     "configure_quota_store",
     "get_quota_store",
+    # Decorator
+    "require_quota",
     "reset_quota_store",
 ]

@@ -160,7 +160,7 @@ class TestProviderRegistration:
         assert registry.get_provider("deepgram") is deepgram_registration
 
     def test_register_provider_updates_capability_index(
-        self, registry, deepgram_registration
+        self, registry, deepgram_registration,
     ):
         """Registering a provider should update the capability index."""
         registry.register_provider(deepgram_registration)
@@ -202,7 +202,7 @@ class TestProviderRegistration:
         assert cap.cost_per_unit == Decimal("0.005")
 
     def test_unregister_provider_removes_from_registry(
-        self, registry, deepgram_registration
+        self, registry, deepgram_registration,
     ):
         """Unregistering should remove provider from all indexes."""
         registry.register_provider(deepgram_registration)
@@ -212,7 +212,7 @@ class TestProviderRegistration:
         assert result is True
         assert registry.get_provider("deepgram") is None
         assert "deepgram" not in registry._capability_index.get(
-            Capability.TRANSCRIPTION, []
+            Capability.TRANSCRIPTION, [],
         )
 
     def test_unregister_nonexistent_returns_false(self, registry):
@@ -230,7 +230,7 @@ class TestCapabilityDiscovery:
     """Tests for capability discovery functionality."""
 
     def test_get_providers_returns_sorted_by_priority(
-        self, registry, deepgram_registration, openai_registration
+        self, registry, deepgram_registration, openai_registration,
     ):
         """Providers should be returned sorted by priority (lower first)."""
         registry.register_provider(deepgram_registration)
@@ -243,7 +243,7 @@ class TestCapabilityDiscovery:
         assert providers[1].provider_name == "openai"  # Priority 2
 
     def test_get_providers_filters_by_quality_tier(
-        self, registry, deepgram_registration, openai_registration
+        self, registry, deepgram_registration, openai_registration,
     ):
         """Should filter providers by quality tier."""
         registry.register_provider(deepgram_registration)  # PREMIUM
@@ -264,7 +264,7 @@ class TestCapabilityDiscovery:
         assert standard[0].provider_name == "openai"
 
     def test_get_providers_excludes_specified(
-        self, registry, deepgram_registration, openai_registration
+        self, registry, deepgram_registration, openai_registration,
     ):
         """Should exclude providers in the exclude list."""
         registry.register_provider(deepgram_registration)
@@ -279,7 +279,7 @@ class TestCapabilityDiscovery:
         assert providers[0].provider_name == "openai"
 
     def test_get_providers_excludes_unavailable(
-        self, registry, deepgram_registration, openai_registration
+        self, registry, deepgram_registration, openai_registration,
     ):
         """Should exclude unavailable providers by default."""
         registry.register_provider(deepgram_registration)
@@ -292,7 +292,7 @@ class TestCapabilityDiscovery:
         assert providers[0].provider_name == "openai"
 
     def test_get_providers_includes_unavailable_when_requested(
-        self, registry, deepgram_registration, openai_registration
+        self, registry, deepgram_registration, openai_registration,
     ):
         """Should include unavailable providers when only_available=False."""
         registry.register_provider(deepgram_registration)
@@ -321,7 +321,7 @@ class TestCheapestProvider:
     """Tests for cheapest provider discovery."""
 
     def test_get_cheapest_finds_lowest_cost(
-        self, registry, deepgram_registration, openai_registration
+        self, registry, deepgram_registration, openai_registration,
     ):
         """Should find the cheapest provider for a capability."""
         registry.register_provider(deepgram_registration)  # 0.0043/min
@@ -332,7 +332,7 @@ class TestCheapestProvider:
         assert cheapest == "deepgram"
 
     def test_get_cheapest_respects_quality_filter(
-        self, registry, deepgram_registration, openai_registration
+        self, registry, deepgram_registration, openai_registration,
     ):
         """Should respect minimum quality tier when finding cheapest."""
         registry.register_provider(deepgram_registration)  # PREMIUM
@@ -347,7 +347,7 @@ class TestCheapestProvider:
         assert cheapest == "deepgram"
 
     def test_get_cheapest_excludes_providers(
-        self, registry, deepgram_registration, openai_registration
+        self, registry, deepgram_registration, openai_registration,
     ):
         """Should respect exclude list when finding cheapest."""
         registry.register_provider(deepgram_registration)
@@ -375,7 +375,7 @@ class TestFallbackChain:
     """Tests for fallback chain building."""
 
     def test_build_chain_starts_with_primary(
-        self, registry, deepgram_registration, openai_registration
+        self, registry, deepgram_registration, openai_registration,
     ):
         """Chain should start with specified primary provider."""
         registry.register_provider(deepgram_registration)
@@ -390,7 +390,7 @@ class TestFallbackChain:
         assert "deepgram" in chain
 
     def test_build_chain_uses_priority_without_primary(
-        self, registry, deepgram_registration, openai_registration
+        self, registry, deepgram_registration, openai_registration,
     ):
         """Without primary, chain should follow priority order."""
         registry.register_provider(deepgram_registration)  # Priority 1
@@ -421,7 +421,7 @@ class TestFallbackChain:
         assert len(chain) <= 2
 
     def test_build_chain_excludes_providers(
-        self, registry, deepgram_registration, openai_registration
+        self, registry, deepgram_registration, openai_registration,
     ):
         """Chain should respect exclude list."""
         registry.register_provider(deepgram_registration)
@@ -436,7 +436,7 @@ class TestFallbackChain:
         assert chain == ["openai"]
 
     def test_build_chain_skips_unavailable_primary(
-        self, registry, deepgram_registration, openai_registration
+        self, registry, deepgram_registration, openai_registration,
     ):
         """Chain should skip unavailable primary provider."""
         registry.register_provider(deepgram_registration)
@@ -479,7 +479,7 @@ class TestAdapterCreation:
             registry.create_adapter("unknown")
 
     def test_create_adapter_raises_without_factory(
-        self, registry, deepgram_registration
+        self, registry, deepgram_registration,
     ):
         """Should raise ValueError when no factory registered."""
         registry.register_provider(deepgram_registration)  # No factory
@@ -560,7 +560,7 @@ class TestProviderAvailability:
         assert registry.get_provider("deepgram").is_available is True
 
     def test_is_capability_available_true_when_provider_exists(
-        self, registry, deepgram_registration
+        self, registry, deepgram_registration,
     ):
         """Should return True when available provider exists."""
         registry.register_provider(deepgram_registration)
@@ -568,7 +568,7 @@ class TestProviderAvailability:
         assert registry.is_capability_available(Capability.TRANSCRIPTION) is True
 
     def test_is_capability_available_false_when_all_unavailable(
-        self, registry, deepgram_registration
+        self, registry, deepgram_registration,
     ):
         """Should return False when all providers unavailable."""
         registry.register_provider(deepgram_registration)
@@ -610,7 +610,7 @@ class TestIntrospection:
     """Tests for registry introspection methods."""
 
     def test_get_all_providers(
-        self, registry, deepgram_registration, openai_registration
+        self, registry, deepgram_registration, openai_registration,
     ):
         """Should return all registered providers."""
         registry.register_provider(deepgram_registration)
@@ -623,7 +623,7 @@ class TestIntrospection:
         assert names == {"deepgram", "openai"}
 
     def test_get_all_capabilities(
-        self, registry, deepgram_registration, openai_registration
+        self, registry, deepgram_registration, openai_registration,
     ):
         """Should return all capabilities with providers."""
         registry.register_provider(deepgram_registration)

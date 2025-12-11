@@ -14,7 +14,8 @@ def _validate_host(host: str) -> str:
     """Validate host value to prevent command injection."""
     # Allow only alphanumeric, dots, hyphens, colons, and brackets (for IPv6)
     if not re.match(r"^[a-zA-Z0-9.\-:\[\]]+$", host):
-        raise ValueError(f"Invalid host format: {host}")
+        msg = f"Invalid host format: {host}"
+        raise ValueError(msg)
     return host
 
 
@@ -97,7 +98,7 @@ def dev(
 
         success("Starting uvicorn...")
         # S603: Safe - using list (not shell=True), host validated, port/log_level/workers validated by Click
-        subprocess.run(cmd, check=False)  # noqa: S603
+        subprocess.run(cmd, check=False)
 
     except KeyboardInterrupt:
         info("\nShutting down server...")
@@ -170,7 +171,7 @@ def prod(
 
         success("Starting uvicorn in production mode...")
         # S603: Safe - using list (not shell=True), host validated, port/workers validated by Click
-        subprocess.run(cmd, check=False)  # noqa: S603
+        subprocess.run(cmd, check=False)
 
     except KeyboardInterrupt:
         info("\nShutting down server...")
@@ -200,21 +201,6 @@ def worker(queue: str, concurrency: int) -> None:
     info("To implement: Configure your Taskiq broker and worker startup")
     info("Example: taskiq worker example_service.infra.tasks.broker:broker")
 
-    # Example implementation:
-    # try:
-    #     cmd = [
-    #         "taskiq",
-    #         "worker",
-    #         "example_service.workers.broker:broker",
-    #         "--max-async-tasks",
-    #         str(concurrency),
-    #     ]
-    #     subprocess.run(cmd)
-    # except KeyboardInterrupt:
-    #     info("\nShutting down worker...")
-    # except Exception as e:
-    #     error(f"Failed to start worker: {e}")
-    #     sys.exit(1)
 
 
 @server.command()
@@ -230,17 +216,3 @@ def broker(queue: str) -> None:
     warning("⚠ Broker command needs to be configured for your specific FastStream setup")
     info("To implement: Configure your FastStream broker and consumer startup")
     info("Example: faststream run example_service.workers.broker:broker")
-
-    # Example implementation:
-    # try:
-    #     cmd = [
-    #         "faststream",
-    #         "run",
-    #         "example_service.workers.broker:broker",
-    #     ]
-    #     subprocess.run(cmd)
-    # except KeyboardInterrupt:
-    #     info("\nShutting down broker...")
-    # except Exception as e:
-    #     error(f"Failed to start broker: {e}")
-    #     sys.exit(1)

@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
-import pytest
 
 from example_service.app import main as main_module
+
+if TYPE_CHECKING:
+    import pytest
 
 
 def _build_settings() -> SimpleNamespace:

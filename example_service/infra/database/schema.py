@@ -130,7 +130,7 @@ async def drop_all(
                     await conn.execute(DropTable(table, if_exists=True))
                 dropped_tables.append(table.name)
             except Exception as e:
-                logger.error(f"Failed to drop table {table.name}: {e}")
+                logger.exception(f"Failed to drop table {table.name}: {e}")
                 raise
 
     logger.info(f"Dropped {len(dropped_tables)} tables: {dropped_tables}")
@@ -181,30 +181,26 @@ async def dump_schema(
             table_info: dict[str, Any] = {}
 
             if include_columns:
-                columns = []
-                for col in inspector.get_columns(table_name):
-                    columns.append(
-                        {
-                            "name": col["name"],
-                            "type": str(col["type"]),
-                            "nullable": col["nullable"],
-                            "default": str(col.get("default")) if col.get("default") else None,
-                            "autoincrement": col.get("autoincrement", False),
-                        }
-                    )
-                table_info["columns"] = columns
+                table_info["columns"] = [
+                    {
+                        "name": col["name"],
+                        "type": str(col["type"]),
+                        "nullable": col["nullable"],
+                        "default": str(col.get("default")) if col.get("default") else None,
+                        "autoincrement": col.get("autoincrement", False),
+                    }
+                    for col in inspector.get_columns(table_name)
+                ]
 
             if include_indexes:
-                indexes = []
-                for idx in inspector.get_indexes(table_name):
-                    indexes.append(
-                        {
-                            "name": idx["name"],
-                            "columns": idx["column_names"],
-                            "unique": idx["unique"],
-                        }
-                    )
-                table_info["indexes"] = indexes
+                table_info["indexes"] = [
+                    {
+                        "name": idx["name"],
+                        "columns": idx["column_names"],
+                        "unique": idx["unique"],
+                    }
+                    for idx in inspector.get_indexes(table_name)
+                ]
 
             if include_constraints:
                 # Primary key
@@ -216,41 +212,35 @@ async def dump_schema(
                     }
 
                 # Foreign keys
-                fks = []
-                for fk in inspector.get_foreign_keys(table_name):
-                    fks.append(
-                        {
-                            "name": fk.get("name"),
-                            "columns": fk.get("constrained_columns", []),
-                            "referred_table": fk.get("referred_table"),
-                            "referred_columns": fk.get("referred_columns", []),
-                            "ondelete": fk.get("options", {}).get("ondelete"),
-                            "onupdate": fk.get("options", {}).get("onupdate"),
-                        }
-                    )
-                table_info["foreign_keys"] = fks
+                table_info["foreign_keys"] = [
+                    {
+                        "name": fk.get("name"),
+                        "columns": fk.get("constrained_columns", []),
+                        "referred_table": fk.get("referred_table"),
+                        "referred_columns": fk.get("referred_columns", []),
+                        "ondelete": fk.get("options", {}).get("ondelete"),
+                        "onupdate": fk.get("options", {}).get("onupdate"),
+                    }
+                    for fk in inspector.get_foreign_keys(table_name)
+                ]
 
                 # Unique constraints
-                uniques = []
-                for uq in inspector.get_unique_constraints(table_name):
-                    uniques.append(
-                        {
-                            "name": uq.get("name"),
-                            "columns": uq.get("column_names", []),
-                        }
-                    )
-                table_info["unique_constraints"] = uniques
+                table_info["unique_constraints"] = [
+                    {
+                        "name": uq.get("name"),
+                        "columns": uq.get("column_names", []),
+                    }
+                    for uq in inspector.get_unique_constraints(table_name)
+                ]
 
                 # Check constraints
-                checks = []
-                for ck in inspector.get_check_constraints(table_name):
-                    checks.append(
-                        {
-                            "name": ck.get("name"),
-                            "sqltext": str(ck.get("sqltext", "")),
-                        }
-                    )
-                table_info["check_constraints"] = checks
+                table_info["check_constraints"] = [
+                    {
+                        "name": ck.get("name"),
+                        "sqltext": str(ck.get("sqltext", "")),
+                    }
+                    for ck in inspector.get_check_constraints(table_name)
+                ]
 
             result["tables"][table_name] = table_info
 
@@ -343,7 +333,7 @@ async def truncate_all(
                         # SQLite: Reset autoincrement counter
                         # table_name is validated via safe_table_reference above
                         await conn.execute(
-                            text(f"DELETE FROM sqlite_sequence WHERE name='{table_name}'")
+                            text(f"DELETE FROM sqlite_sequence WHERE name='{table_name}'"),
                         )
                 else:
                     await conn.execute(text(f'TRUNCATE TABLE "{table_name}"'))
@@ -383,7 +373,6 @@ async def compare_schema(
         else:
             print("Schema is in sync")
     """
-    differences: list[SchemaDifference] = []
 
     def _compare(conn: Connection) -> list[SchemaDifference]:
         inspector = inspect(conn)
@@ -396,30 +385,30 @@ async def compare_schema(
         model_tables = {t.name for t in metadata.sorted_tables if t.name != "alembic_version"}
 
         # Find missing tables (in model but not in database)
-        for table_name in model_tables - db_tables:
-            diffs.append(
-                SchemaDifference(
-                    type="missing_table",
-                    table=table_name,
-                    column=None,
-                    expected="exists",
-                    actual="missing",
-                    message=f"Table '{table_name}' defined in models but not in database",
-                )
+        diffs.extend(
+            SchemaDifference(
+                type="missing_table",
+                table=table_name,
+                column=None,
+                expected="exists",
+                actual="missing",
+                message=f"Table '{table_name}' defined in models but not in database",
             )
+            for table_name in model_tables - db_tables
+        )
 
         # Find extra tables (in database but not in model)
-        for table_name in db_tables - model_tables - {"alembic_version"}:
-            diffs.append(
-                SchemaDifference(
-                    type="extra_table",
-                    table=table_name,
-                    column=None,
-                    expected="missing",
-                    actual="exists",
-                    message=f"Table '{table_name}' exists in database but not in models",
-                )
+        diffs.extend(
+            SchemaDifference(
+                type="extra_table",
+                table=table_name,
+                column=None,
+                expected="missing",
+                actual="exists",
+                message=f"Table '{table_name}' exists in database but not in models",
             )
+            for table_name in db_tables - model_tables - {"alembic_version"}
+        )
 
         # Compare columns for tables that exist in both
         for table_name in model_tables & db_tables:
@@ -428,30 +417,30 @@ async def compare_schema(
             model_columns = {col.name: col for col in model_table.columns}
 
             # Find missing columns
-            for col_name in model_columns.keys() - db_columns.keys():
-                diffs.append(
-                    SchemaDifference(
-                        type="missing_column",
-                        table=table_name,
-                        column=col_name,
-                        expected="exists",
-                        actual="missing",
-                        message=f"Column '{col_name}' defined in model but not in database",
-                    )
+            diffs.extend(
+                SchemaDifference(
+                    type="missing_column",
+                    table=table_name,
+                    column=col_name,
+                    expected="exists",
+                    actual="missing",
+                    message=f"Column '{col_name}' defined in model but not in database",
                 )
+                for col_name in model_columns.keys() - db_columns.keys()
+            )
 
             # Find extra columns
-            for col_name in db_columns.keys() - model_columns.keys():
-                diffs.append(
-                    SchemaDifference(
-                        type="extra_column",
-                        table=table_name,
-                        column=col_name,
-                        expected="missing",
-                        actual="exists",
-                        message=f"Column '{col_name}' exists in database but not in model",
-                    )
+            diffs.extend(
+                SchemaDifference(
+                    type="extra_column",
+                    table=table_name,
+                    column=col_name,
+                    expected="missing",
+                    actual="exists",
+                    message=f"Column '{col_name}' exists in database but not in model",
                 )
+                for col_name in db_columns.keys() - model_columns.keys()
+            )
 
             # Compare column properties for columns in both
             for col_name in model_columns.keys() & db_columns.keys():
@@ -470,7 +459,7 @@ async def compare_schema(
                             expected=f"nullable={model_nullable}",
                             actual=f"nullable={db_nullable}",
                             message=f"Column '{col_name}' nullable mismatch",
-                        )
+                        ),
                     )
 
                 # Note: Type comparison is complex due to dialect differences
@@ -479,9 +468,8 @@ async def compare_schema(
         return diffs
 
     async with engine.connect() as conn:
-        differences = await conn.run_sync(_compare)
+        return await conn.run_sync(_compare)
 
-    return differences
 
 
 @dataclass

@@ -12,6 +12,7 @@ Provides:
 
 from __future__ import annotations
 
+import contextlib
 from datetime import UTC, datetime, timedelta
 import logging
 from typing import TYPE_CHECKING, Annotated
@@ -53,16 +54,16 @@ logger = logging.getLogger(__name__)
 
 # Type aliases for annotated arguments
 FirstArg = Annotated[
-    int, strawberry.argument(description="Number of items to return (forward pagination)")
+    int, strawberry.argument(description="Number of items to return (forward pagination)"),
 ]
 AfterArg = Annotated[
-    str | None, strawberry.argument(description="Cursor to start after")
+    str | None, strawberry.argument(description="Cursor to start after"),
 ]
 LastArg = Annotated[
-    int | None, strawberry.argument(description="Number of items to return (backward pagination)")
+    int | None, strawberry.argument(description="Number of items to return (backward pagination)"),
 ]
 BeforeArg = Annotated[
-    str | None, strawberry.argument(description="Cursor to start before")
+    str | None, strawberry.argument(description="Cursor to start before"),
 ]
 
 
@@ -136,10 +137,8 @@ async def ai_jobs_query(
     # Simple offset-based pagination using cursor
     offset = 0
     if after:
-        try:
+        with contextlib.suppress(ValueError):
             offset = int(after)
-        except ValueError:
-            pass
 
     stmt = stmt.offset(offset).limit(first + 1)
 
@@ -210,10 +209,8 @@ async def ai_usage_logs_query(
     # Simple offset-based pagination
     offset = 0
     if after:
-        try:
+        with contextlib.suppress(ValueError):
             offset = int(after)
-        except ValueError:
-            pass
 
     stmt = stmt.offset(offset).limit(first + 1)
 
@@ -266,7 +263,7 @@ async def ai_usage_stats_query(
             func.count(AIJob.id).label("count"),
         )
         .where(AIJob.created_at >= since)
-        .group_by(AIJob.status)
+        .group_by(AIJob.status),
     )
     job_counts = {row.status: row.count for row in job_stats}
 
@@ -280,7 +277,7 @@ async def ai_usage_stats_query(
         )
         .select_from(AIUsageLog)
         .outerjoin(AIJob, AIUsageLog.job_id == AIJob.id)
-        .where(AIUsageLog.created_at >= since)
+        .where(AIUsageLog.created_at >= since),
     )
     usage = usage_stats.first()
 
@@ -291,7 +288,7 @@ async def ai_usage_stats_query(
             func.sum(AIUsageLog.cost_usd).label("cost"),
         )
         .where(AIUsageLog.created_at >= since)
-        .group_by(AIUsageLog.provider_name)
+        .group_by(AIUsageLog.provider_name),
     )
     cost_by_provider = {row.provider_name: float(row.cost or 0) for row in provider_costs}
 
@@ -302,7 +299,7 @@ async def ai_usage_stats_query(
             func.sum(AIUsageLog.cost_usd).label("cost"),
         )
         .where(AIUsageLog.created_at >= since)
-        .group_by(AIUsageLog.operation_type)
+        .group_by(AIUsageLog.operation_type),
     )
     cost_by_operation = {row.operation_type: float(row.cost or 0) for row in operation_costs}
 
@@ -340,7 +337,7 @@ async def tenant_ai_config_query(
 
     stmt = select(TenantAIConfig).where(
         TenantAIConfig.tenant_id == tenant_id,
-        TenantAIConfig.is_active == True,  # noqa: E712
+        TenantAIConfig.is_active,
     )
     result = await ctx.session.execute(stmt)
     configs = result.scalars().all()

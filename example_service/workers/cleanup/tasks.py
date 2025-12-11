@@ -12,15 +12,18 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 import logging
 from pathlib import Path
+from tempfile import gettempdir
 from typing import Any
 
 from sqlalchemy import delete
 
 from example_service.core.settings import get_backup_settings
+from example_service.core.settings.datatransfer import DEFAULT_EXPORT_DIR
 from example_service.infra.database.session import get_async_session
 from example_service.infra.tasks.broker import broker
 
 logger = logging.getLogger(__name__)
+DEFAULT_UPLOAD_DIR = Path(gettempdir()) / "example_service_uploads"
 
 
 if broker is not None:
@@ -46,8 +49,8 @@ if broker is not None:
         """
         # Temporary directories for cleanup (development/testing)
         temp_dirs = [
-            Path("/tmp/exports"),  # noqa: S108
-            Path("/tmp/uploads"),  # noqa: S108
+            DEFAULT_EXPORT_DIR,
+            DEFAULT_UPLOAD_DIR,
         ]
 
         cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
@@ -163,7 +166,7 @@ if broker is not None:
         Returns:
             Cleanup result with deletion counts.
         """
-        export_dir = Path("/tmp/exports")  # noqa: S108
+        export_dir = DEFAULT_EXPORT_DIR
 
         if not export_dir.exists():
             return {
@@ -230,7 +233,7 @@ if broker is not None:
             # Clean old completed reminders
             try:
                 stmt = delete(Reminder).where(
-                    Reminder.is_completed == True,  # noqa: E712
+                    Reminder.is_completed,
                     Reminder.updated_at < cutoff,
                 )
                 result = await session.execute(stmt)

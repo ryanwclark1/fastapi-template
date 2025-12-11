@@ -70,7 +70,7 @@ def get_transcription_pipeline(
         .description(
             "Transcribe audio with optional speaker diarization"
             if with_diarization
-            else "Basic audio transcription"
+            else "Basic audio transcription",
         )
         .tags("transcription", "audio")
         .timeout(600)
@@ -206,7 +206,7 @@ def get_call_analysis_pipeline(
         .version("1.0.0")
         .description(
             "Complete call analysis: transcription, PII redaction, "
-            "summarization, sentiment analysis, and coaching insights"
+            "summarization, sentiment analysis, and coaching insights",
         )
         .tags("call-center", "analysis", "transcription", "insights")
         .timeout(900)
@@ -542,7 +542,8 @@ def get_pipeline(name: str, **kwargs: Any) -> PipelineDefinition:
     """
     if name not in PREDEFINED_PIPELINES:
         available = ", ".join(PREDEFINED_PIPELINES.keys())
-        raise KeyError(f"Unknown pipeline: {name}. Available: {available}")
+        msg = f"Unknown pipeline: {name}. Available: {available}"
+        raise KeyError(msg)
 
     factory = PREDEFINED_PIPELINES[name]
     if kwargs:

@@ -223,7 +223,7 @@ async def not_found_error_handler(request: Request, exc: Exception) -> JSONRespo
 
 
 async def validation_exception_handler(
-    request: Request, exc: Exception
+    request: Request, exc: Exception,
 ) -> JSONResponse:
     """Handle FastAPI/Pydantic validation errors.
 
@@ -252,7 +252,7 @@ async def validation_exception_handler(
                 message=error["msg"],
                 type=error["type"],
                 value=error.get("input"),
-            )
+            ),
         )
         # Track each validation error
         tracking.track_validation_error(request.url.path, field_path)
@@ -343,7 +343,7 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
 
 
 async def pydantic_validation_exception_handler(
-    request: Request, exc: Exception
+    request: Request, exc: Exception,
 ) -> JSONResponse:
     """Handle Pydantic validation errors outside of FastAPI request validation.
 
@@ -369,7 +369,7 @@ async def pydantic_validation_exception_handler(
                 message=error["msg"],
                 type=error["type"],
                 value=error.get("input"),
-            )
+            ),
         )
 
     # Log validation error
@@ -428,7 +428,7 @@ def configure_exception_handlers(app: FastAPI) -> None:
 
     # Pydantic validation errors
     app.add_exception_handler(
-        PydanticValidationError, pydantic_validation_exception_handler
+        PydanticValidationError, pydantic_validation_exception_handler,
     )
 
     # Catch-all for unexpected exceptions
@@ -438,7 +438,7 @@ def configure_exception_handlers(app: FastAPI) -> None:
 
     @app.middleware("http")
     async def _exception_handling_middleware(
-        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+        request: Request, call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         try:
             return await call_next(request)
@@ -450,5 +450,5 @@ def configure_exception_handlers(app: FastAPI) -> None:
             return await validation_exception_handler(request, exc)
         except PydanticValidationError as exc:
             return await pydantic_validation_exception_handler(request, exc)
-        except Exception as exc:  # noqa: BLE001 - pragma: no cover - safety fallback
+        except Exception as exc:
             return await generic_exception_handler(request, exc)

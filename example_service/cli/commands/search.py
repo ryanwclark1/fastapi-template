@@ -114,7 +114,7 @@ async def rebuild(entity: tuple[str, ...], batch_size: int, force: bool) -> None
             for field in search_fields:
                 weight = weights.get(field, "D")
                 vector_parts.append(
-                    f"setweight(to_tsvector('{ts_config}', COALESCE({field}, '')), '{weight}')"
+                    f"setweight(to_tsvector('{ts_config}', COALESCE({field}, '')), '{weight}')",
                 )
 
             vector_sql = (
@@ -199,7 +199,7 @@ async def stats() -> None:
                 # Records with search vector
                 if hasattr(model_class, "search_vector"):
                     vector_count_result = await conn.execute(
-                        text(f"SELECT COUNT(*) FROM {safe_table} WHERE search_vector IS NOT NULL")
+                        text(f"SELECT COUNT(*) FROM {safe_table} WHERE search_vector IS NOT NULL"),
                     )
                     indexed = vector_count_result.scalar() or 0
                     click.echo(f"  Indexed records: {indexed:,}")
@@ -240,14 +240,14 @@ async def stats() -> None:
 
         # Check if pg_trgm extension is enabled
         trgm_result = await conn.execute(
-            text("SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm')")
+            text("SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm')"),
         )
         trgm_enabled = trgm_result.scalar()
         click.echo(f"pg_trgm extension: {'enabled' if trgm_enabled else 'not enabled'}")
 
         # Check if unaccent extension is enabled
         unaccent_result = await conn.execute(
-            text("SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'unaccent')")
+            text("SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'unaccent')"),
         )
         unaccent_enabled = unaccent_result.scalar()
         click.echo(f"unaccent extension: {'enabled' if unaccent_enabled else 'not enabled'}")
@@ -258,7 +258,7 @@ async def stats() -> None:
                 SELECT pg_size_pretty(SUM(pg_relation_size(indexrelid)))
                 FROM pg_stat_user_indexes
                 WHERE indexdef LIKE '%gin%'
-            """)
+            """),
         )
         gin_size = gin_size_result.scalar() or "0 bytes"
         click.echo(f"Total GIN index size: {gin_size}")
@@ -463,7 +463,7 @@ async def test(query: str, entity: str | None, limit: int) -> None:
 
             if response.did_you_mean:
                 click.echo(
-                    f'  Did you mean: "{response.did_you_mean.suggested_query}" ({response.did_you_mean.confidence:.0%} confidence)'
+                    f'  Did you mean: "{response.did_you_mean.suggested_query}" ({response.did_you_mean.confidence:.0%} confidence)',
                 )
 
             for result in response.results:
@@ -505,7 +505,7 @@ async def triggers() -> None:
                 JOIN pg_proc p ON t.tgfoid = p.oid
                 WHERE p.proname LIKE '%search%'
                 ORDER BY c.relname, t.tgname
-            """)
+            """),
         )
         triggers = result.fetchall()
 

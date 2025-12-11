@@ -208,7 +208,7 @@ async def delete_webhook_mutation(
         webhook = await repo.get(ctx.session, webhook_uuid)
         if webhook is None:
             return DeletePayload(
-                success=False, message=f"Webhook with ID {id} not found"
+                success=False, message=f"Webhook with ID {id} not found",
             )
 
         # Capture webhook data before deletion
@@ -237,7 +237,7 @@ async def delete_webhook_mutation(
 async def test_webhook_mutation(
     info: Info[GraphQLContext, None],
     id: strawberry.ID,
-    input: TestWebhookInput | None = None,  # noqa: PT028
+    input: TestWebhookInput | None = None,
 ) -> WebhookTestResult:
     """Test a webhook by sending a test delivery."""
     ctx = info.context
@@ -309,7 +309,7 @@ async def retry_delivery_mutation(
         delivery = await repo.get(ctx.session, delivery_uuid)
         if delivery is None:
             return DeletePayload(
-                success=False, message=f"Delivery with ID {delivery_id} not found"
+                success=False, message=f"Delivery with ID {delivery_id} not found",
             )
 
         if delivery.status == "delivered":
@@ -317,7 +317,7 @@ async def retry_delivery_mutation(
 
         if delivery.attempt_count >= delivery.max_attempts:
             return DeletePayload(
-                success=False, message="Delivery has exhausted all retries"
+                success=False, message="Delivery has exhausted all retries",
             )
 
         # Reset for retry

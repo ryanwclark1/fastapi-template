@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 import json
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -22,6 +23,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from example_service.core.database import TenantMixin, TimestampedBase
 from example_service.core.database.enums import DeliveryStatus as DeliveryStatusEnum
 
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Dialect
+    from sqlalchemy.sql.type_api import TypeEngine
+
 
 class StringArray(TypeDecorator):
     """Cross-database type for string arrays.
@@ -32,19 +37,22 @@ class StringArray(TypeDecorator):
     impl = Text
     cache_ok = True
 
-    def load_dialect_impl(self, dialect):
+    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
+        """Return native ARRAY for Postgres, Text for other dialects."""
         if dialect.name == "postgresql":
             return dialect.type_descriptor(ARRAY(String(100)))
         return dialect.type_descriptor(Text())
 
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(self, value: list[str] | None, dialect: Dialect) -> Any:
+        """Serialize the array before binding to the database."""
         if value is None:
             return value
         if dialect.name == "postgresql":
             return value
         return json.dumps(value)
 
-    def process_result_value(self, value, dialect):
+    def process_result_value(self, value: Any, dialect: Dialect) -> list[str]:
+        """Deserialize the stored array back into Python list."""
         if value is None:
             return []
         if dialect.name == "postgresql":
@@ -67,16 +75,16 @@ class Webhook(TimestampedBase, TenantMixin):
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(
-        String(200), nullable=False, comment="Human-readable webhook name"
+        String(200), nullable=False, comment="Human-readable webhook name",
     )
     description: Mapped[str | None] = mapped_column(
-        Text(), nullable=True, comment="Webhook description"
+        Text(), nullable=True, comment="Webhook description",
     )
     url: Mapped[str] = mapped_column(
-        String(2048), nullable=False, comment="Target URL for webhook delivery"
+        String(2048), nullable=False, comment="Target URL for webhook delivery",
     )
     secret: Mapped[str] = mapped_column(
-        String(255), nullable=False, comment="HMAC secret for signing payloads"
+        String(255), nullable=False, comment="HMAC secret for signing payloads",
     )
     event_types: Mapped[list[str]] = mapped_column(
         StringArray(),
@@ -85,13 +93,13 @@ class Webhook(TimestampedBase, TenantMixin):
         comment="List of event types this webhook subscribes to",
     )
     is_active: Mapped[bool] = mapped_column(
-        Boolean(), default=True, nullable=False, comment="Whether webhook is active"
+        Boolean(), default=True, nullable=False, comment="Whether webhook is active",
     )
     max_retries: Mapped[int] = mapped_column(
-        Integer(), default=5, nullable=False, comment="Maximum delivery retry attempts"
+        Integer(), default=5, nullable=False, comment="Maximum delivery retry attempts",
     )
     timeout_seconds: Mapped[int] = mapped_column(
-        Integer(), default=30, nullable=False, comment="HTTP request timeout in seconds"
+        Integer(), default=30, nullable=False, comment="HTTP request timeout in seconds",
     )
     custom_headers: Mapped[dict | None] = mapped_column(
         JSONB().with_variant(JSON(), "sqlite"),
@@ -125,13 +133,13 @@ class WebhookDelivery(TimestampedBase):
         comment="Reference to webhook configuration",
     )
     event_type: Mapped[str] = mapped_column(
-        String(100), nullable=False, index=True, comment="Type of event being delivered"
+        String(100), nullable=False, index=True, comment="Type of event being delivered",
     )
     event_id: Mapped[str] = mapped_column(
-        String(255), nullable=False, index=True, comment="Unique identifier for the event"
+        String(255), nullable=False, index=True, comment="Unique identifier for the event",
     )
     payload: Mapped[dict] = mapped_column(
-        JSONB().with_variant(JSON(), "sqlite"), nullable=False, comment="Event payload data"
+        JSONB().with_variant(JSON(), "sqlite"), nullable=False, comment="Event payload data",
     )
     status: Mapped[str] = mapped_column(
         DeliveryStatusEnum,
@@ -141,10 +149,10 @@ class WebhookDelivery(TimestampedBase):
         comment="Delivery status: pending, delivered, failed, retrying",
     )
     attempt_count: Mapped[int] = mapped_column(
-        Integer(), default=0, nullable=False, comment="Number of delivery attempts made"
+        Integer(), default=0, nullable=False, comment="Number of delivery attempts made",
     )
     max_attempts: Mapped[int] = mapped_column(
-        Integer(), default=5, nullable=False, comment="Maximum attempts allowed"
+        Integer(), default=5, nullable=False, comment="Maximum attempts allowed",
     )
     next_retry_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
@@ -153,16 +161,16 @@ class WebhookDelivery(TimestampedBase):
         comment="Scheduled time for next retry attempt",
     )
     response_status_code: Mapped[int | None] = mapped_column(
-        Integer(), nullable=True, comment="HTTP response status code"
+        Integer(), nullable=True, comment="HTTP response status code",
     )
     response_body: Mapped[str | None] = mapped_column(
-        Text(), nullable=True, comment="HTTP response body (truncated)"
+        Text(), nullable=True, comment="HTTP response body (truncated)",
     )
     response_time_ms: Mapped[int | None] = mapped_column(
-        Integer(), nullable=True, comment="Response time in milliseconds"
+        Integer(), nullable=True, comment="Response time in milliseconds",
     )
     error_message: Mapped[str | None] = mapped_column(
-        Text(), nullable=True, comment="Error message if delivery failed"
+        Text(), nullable=True, comment="Error message if delivery failed",
     )
 
     # Relationship to webhook

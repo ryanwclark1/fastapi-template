@@ -50,22 +50,36 @@ def compose_query() -> type:
 
         # Add all query resolvers from this feature
         for resolver in feature.queries:
-            # Use the function name as the GraphQL field name
-            field_name = resolver.__name__
+            # Handle both raw functions and StrawberryField objects
+            if hasattr(resolver, "python_name"):
+                # Already a StrawberryField object
+                field_name = resolver.python_name
+                field_obj = resolver
+            elif hasattr(resolver, "__name__"):
+                # Raw function - needs to be wrapped
+                field_name = resolver.__name__
+                field_obj = strawberry.field(resolver)
+            else:
+                logger.warning(
+                    f"Skipping resolver from feature '{feature_name}': "
+                    f"Cannot determine name for {resolver}",
+                )
+                continue
+
             # Remove common suffixes for cleaner API
             field_name = field_name.replace("_query", "").replace("_resolver", "")
 
             if field_name in query_methods:
                 logger.warning(
                     f"Duplicate query field '{field_name}' from feature '{feature_name}'. "
-                    "Using first definition."
+                    "Using first definition.",
                 )
                 continue
 
-            query_methods[field_name] = strawberry.field(resolver)
+            query_methods[field_name] = field_obj
 
         logger.debug(
-            f"Added {len(feature.queries)} queries from feature '{feature_name}'"
+            f"Added {len(feature.queries)} queries from feature '{feature_name}'",
         )
 
     # If no queries enabled, provide a minimal health check query
@@ -106,7 +120,7 @@ def compose_query() -> type:
     ]
     logger.info(
         f"Composed Query type with {len(query_methods)} fields "
-        f"from {len(enabled_features)} features: {', '.join(enabled_features)}"
+        f"from {len(enabled_features)} features: {', '.join(enabled_features)}",
     )
 
     return Query
@@ -134,22 +148,36 @@ def compose_mutation() -> type:
 
         # Add all mutation resolvers from this feature
         for resolver in feature.mutations:
-            # Use the function name as the GraphQL field name
-            field_name = resolver.__name__
+            # Handle both raw functions and StrawberryField objects
+            if hasattr(resolver, "python_name"):
+                # Already a StrawberryField/StrawberryMutation object
+                field_name = resolver.python_name
+                field_obj = resolver
+            elif hasattr(resolver, "__name__"):
+                # Raw function - needs to be wrapped
+                field_name = resolver.__name__
+                field_obj = strawberry.mutation(resolver)
+            else:
+                logger.warning(
+                    f"Skipping resolver from feature '{feature_name}': "
+                    f"Cannot determine name for {resolver}",
+                )
+                continue
+
             # Remove common suffixes for cleaner API
             field_name = field_name.replace("_mutation", "").replace("_resolver", "")
 
             if field_name in mutation_methods:
                 logger.warning(
                     f"Duplicate mutation field '{field_name}' from feature '{feature_name}'. "
-                    "Using first definition."
+                    "Using first definition.",
                 )
                 continue
 
-            mutation_methods[field_name] = strawberry.mutation(resolver)
+            mutation_methods[field_name] = field_obj
 
         logger.debug(
-            f"Added {len(feature.mutations)} mutations from feature '{feature_name}'"
+            f"Added {len(feature.mutations)} mutations from feature '{feature_name}'",
         )
 
     # If no mutations enabled, provide a minimal noop mutation
@@ -190,7 +218,7 @@ def compose_mutation() -> type:
     ]
     logger.info(
         f"Composed Mutation type with {len(mutation_methods)} fields "
-        f"from {len(enabled_features)} features: {', '.join(enabled_features)}"
+        f"from {len(enabled_features)} features: {', '.join(enabled_features)}",
     )
 
     return Mutation
@@ -219,24 +247,38 @@ def compose_subscription() -> type | None:
 
         # Add all subscription resolvers from this feature
         for resolver in feature.subscriptions:
-            # Use the function name as the GraphQL field name
-            field_name = resolver.__name__
+            # Handle both raw functions and StrawberryField objects
+            if hasattr(resolver, "python_name"):
+                # Already a StrawberryField/StrawberrySubscription object
+                field_name = resolver.python_name
+                field_obj = resolver
+            elif hasattr(resolver, "__name__"):
+                # Raw function - needs to be wrapped
+                field_name = resolver.__name__
+                field_obj = strawberry.subscription(resolver)
+            else:
+                logger.warning(
+                    f"Skipping resolver from feature '{feature_name}': "
+                    f"Cannot determine name for {resolver}",
+                )
+                continue
+
             # Remove common suffixes for cleaner API
             field_name = field_name.replace("_subscription", "").replace(
-                "_resolver", ""
+                "_resolver", "",
             )
 
             if field_name in subscription_methods:
                 logger.warning(
                     f"Duplicate subscription field '{field_name}' from feature '{feature_name}'. "
-                    "Using first definition."
+                    "Using first definition.",
                 )
                 continue
 
-            subscription_methods[field_name] = strawberry.subscription(resolver)
+            subscription_methods[field_name] = field_obj
 
         logger.debug(
-            f"Added {len(feature.subscriptions)} subscriptions from feature '{feature_name}'"
+            f"Added {len(feature.subscriptions)} subscriptions from feature '{feature_name}'",
         )
 
     # If no subscriptions, return None (subscriptions are optional)
@@ -267,7 +309,7 @@ def compose_subscription() -> type | None:
     ]
     logger.info(
         f"Composed Subscription type with {len(subscription_methods)} fields "
-        f"from {len(enabled_features)} features: {', '.join(enabled_features)}"
+        f"from {len(enabled_features)} features: {', '.join(enabled_features)}",
     )
 
     return Subscription

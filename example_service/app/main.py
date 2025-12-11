@@ -9,7 +9,11 @@ from example_service.app.exception_handlers import configure_exception_handlers
 from example_service.app.lifespan import lifespan
 from example_service.app.middleware import configure_middleware
 from example_service.app.router import setup_routers
-from example_service.core.settings import get_settings
+from example_service.core.settings import (
+    get_graphql_settings,
+    get_settings,
+    get_websocket_settings,
+)
 from example_service.infra.tracing.opentelemetry import instrument_app
 
 
@@ -56,13 +60,15 @@ def create_app() -> FastAPI:
     configure_exception_handlers(app)
 
     # Serve documentation with CSP-friendly assets
-    configure_documentation(app)
+    configure_documentation(app, app_settings)
 
     # Configure middleware (centralized configuration with proper ordering)
-    configure_middleware(app)
+    configure_middleware(app, settings)
 
     # Setup routers
-    setup_routers(app)
+    graphql_settings = get_graphql_settings()
+    websocket_settings = get_websocket_settings()
+    setup_routers(app, app_settings, graphql_settings, websocket_settings)
 
     # Instrument FastAPI for OpenTelemetry tracing
     # This must be called after app creation but before serving requests

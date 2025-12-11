@@ -361,7 +361,7 @@ class RedisTaskTracker(BaseTaskTracker):
                         try:
                             start_time = datetime.fromisoformat(started_at)
                             running_for_ms = int(
-                                (datetime.now(UTC) - start_time).total_seconds() * 1000
+                                (datetime.now(UTC) - start_time).total_seconds() * 1000,
                             )
                         except ValueError:
                             pass
@@ -680,14 +680,14 @@ class RedisTaskTracker(BaseTaskTracker):
             success_count = await self.client.zcard(self._index_status_key("success"))
             failure_count = await self.client.zcard(self._index_status_key("failure"))
             cancelled_count = await self.client.zcard(
-                self._index_status_key("cancelled")
+                self._index_status_key("cancelled"),
             )
             total = await self.client.zcard(self._index_all_key())
 
             # Get counts by task name
             by_task_name: dict[str, int] = {}
             async for key in self.client.scan_iter(
-                match=f"{self.key_prefix}:index:name:*"
+                match=f"{self.key_prefix}:index:name:*",
             ):
                 task_name = key.replace(f"{self.key_prefix}:index:name:", "")
                 count = await self.client.zcard(key)

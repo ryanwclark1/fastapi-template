@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from example_service.core.settings.jobs import get_job_settings
+from example_service.core.settings import get_job_settings
 from example_service.infra.tasks.jobs.audit import AuditLogger
 from example_service.infra.tasks.jobs.enums import JobPriority, JobStatus
 from example_service.infra.tasks.jobs.models import (
@@ -221,9 +221,12 @@ class JobManager:
             ValueError: If too many jobs in single request
         """
         if len(jobs_data) > self._settings.max_bulk_submit_size:
-            raise ValueError(
+            msg = (
                 f"Cannot submit more than {self._settings.max_bulk_submit_size} "
                 f"jobs at once (got {len(jobs_data)})"
+            )
+            raise ValueError(
+                msg,
             )
 
         jobs = []
@@ -594,7 +597,7 @@ class JobManager:
             Updated progress record, or None if job not found
         """
         result = await self._session.execute(
-            select(JobProgress).where(JobProgress.job_id == job_id)
+            select(JobProgress).where(JobProgress.job_id == job_id),
         )
         progress = result.scalar_one_or_none()
 
@@ -675,7 +678,7 @@ class JobManager:
         # Join labels and filter
         for key, value in labels.items():
             label_subquery = select(JobLabel.job_id).where(
-                JobLabel.key == key, JobLabel.value == value
+                JobLabel.key == key, JobLabel.value == value,
             )
             query = query.where(Job.id.in_(label_subquery))
 
@@ -740,8 +743,8 @@ class JobManager:
         result = await self._session.execute(
             select(JobDependency).where(
                 JobDependency.depends_on_job_id == job.id,
-                JobDependency.satisfied == False,  # noqa: E712
-            )
+                not JobDependency.satisfied,
+            ),
         )
         dependencies = list(result.scalars().all())
 
@@ -770,7 +773,7 @@ class JobManager:
             select(Job)
             .where(Job.status == JobStatus.PENDING)
             .options(selectinload(Job.dependencies))
-            .limit(self._settings.dependency_check_batch_size)
+            .limit(self._settings.dependency_check_batch_size),
         )
         pending_jobs = list(result.scalars().all())
 

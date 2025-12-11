@@ -8,7 +8,7 @@ from example_service.infra.cache.decorators import (
     invalidate_pattern,
     invalidate_tags,
 )
-from example_service.infra.cache.redis import RedisCache, get_cache
+from example_service.infra.cache.redis import RedisCache, get_cache, get_cache_instance
 from example_service.infra.cache.strategies import (
     CacheConfig,
     CacheManager,
@@ -24,6 +24,7 @@ __all__ = [
     "cache_key",
     "cached",
     "get_cache",
+    "get_cache_instance",
     "invalidate_cache",
     "invalidate_pattern",
     "invalidate_tags",

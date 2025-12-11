@@ -270,7 +270,7 @@ class TestStructuredOutputExtractor:
         )
 
         result = await extractor.extract(
-            messages=[{"role": "user", "content": "Extract person info"}]
+            messages=[{"role": "user", "content": "Extract person info"}],
         )
 
         assert result.success is True
@@ -284,7 +284,7 @@ class TestStructuredOutputExtractor:
         call_count = 0
 
         async def flaky_llm(
-            messages: list[dict[str, Any]], **kwargs: Any
+            messages: list[dict[str, Any]], **kwargs: Any,
         ) -> dict[str, Any]:
             nonlocal call_count
             call_count += 1
@@ -302,7 +302,7 @@ class TestStructuredOutputExtractor:
         )
 
         result = await extractor.extract(
-            messages=[{"role": "user", "content": "Extract"}]
+            messages=[{"role": "user", "content": "Extract"}],
         )
 
         assert result.success is True
@@ -319,7 +319,7 @@ class TestStructuredOutputExtractor:
         )
 
         result = await extractor.extract(
-            messages=[{"role": "user", "content": "Extract"}]
+            messages=[{"role": "user", "content": "Extract"}],
         )
 
         assert result.success is False
@@ -330,7 +330,7 @@ class TestStructuredOutputExtractor:
         """Test extraction with function calling strategy."""
 
         async def function_llm(
-            messages: list[dict[str, Any]], **kwargs: Any
+            messages: list[dict[str, Any]], **kwargs: Any,
         ) -> dict[str, Any]:
             # Check that tools were passed
             assert "tools" in kwargs
@@ -340,8 +340,8 @@ class TestStructuredOutputExtractor:
                         "function": {
                             "name": "extract_person",
                             "arguments": '{"name": "Function User", "age": 35}',
-                        }
-                    }
+                        },
+                    },
                 ],
                 "usage": {"total_tokens": 150},
             }
@@ -353,7 +353,7 @@ class TestStructuredOutputExtractor:
         )
 
         result = await extractor.extract(
-            messages=[{"role": "user", "content": "Extract"}]
+            messages=[{"role": "user", "content": "Extract"}],
         )
 
         assert result.success is True
@@ -369,7 +369,7 @@ class TestExtractStructured:
         """Test simple extraction."""
 
         async def llm_call(
-            messages: list[dict[str, Any]], **kwargs: Any
+            messages: list[dict[str, Any]], **kwargs: Any,
         ) -> dict[str, Any]:
             return {
                 "content": '{"name": "Quick", "age": 22}',

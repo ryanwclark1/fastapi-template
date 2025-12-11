@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from pathlib import Path  # noqa: TC003
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import AliasChoices, AnyUrl, Field, computed_field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .yaml_sources import create_otel_yaml_source
+
+_SETTINGS_DIR = Path(__file__).resolve().parent
 
 
 class OtelSettings(BaseSettings):
@@ -144,7 +146,7 @@ class OtelSettings(BaseSettings):
     )
 
     sampler_type: Literal[
-        "always_on", "always_off", "trace_id_ratio", "parent_based"
+        "always_on", "always_off", "trace_id_ratio", "parent_based",
     ] = Field(
         default="parent_based",
         description="Sampling strategy type (parent_based recommended for production)",
@@ -241,7 +243,7 @@ class OtelSettings(BaseSettings):
         if self.compression != "none":
             from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
                 Compression,
-            )  # type: ignore[attr-defined]
+            )
 
             kwargs["compression"] = (
                 Compression.Gzip

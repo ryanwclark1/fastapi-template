@@ -28,7 +28,7 @@ class TestConsulHealthProvider:
             "Config": {
                 "AdvertiseAddr": "192.168.1.100",
                 "Datacenter": "dc1",
-            }
+            },
         }
 
         # Mock leader response
@@ -52,7 +52,8 @@ class TestConsulHealthProvider:
                 return mock_leader_response
             if path == "/v1/agent/services":
                 return mock_services_response
-            raise ValueError(f"Unexpected path: {path}")
+            msg = f"Unexpected path: {path}"
+            raise ValueError(msg)
 
         mock_client._client.get = mock_get
 
@@ -87,7 +88,7 @@ class TestConsulHealthProvider:
             "Config": {
                 "AdvertiseAddr": "192.168.1.100",
                 "Datacenter": "dc1",
-            }
+            },
         }
 
         # Mock leader response - no leader
@@ -107,7 +108,8 @@ class TestConsulHealthProvider:
                 return mock_leader_response
             if path == "/v1/agent/services":
                 return mock_services_response
-            raise ValueError(f"Unexpected path: {path}")
+            msg = f"Unexpected path: {path}"
+            raise ValueError(msg)
 
         mock_client._client.get = mock_get
 
@@ -132,7 +134,7 @@ class TestConsulHealthProvider:
         mock_agent_response = MagicMock()
         mock_agent_response.status_code = 200
         mock_agent_response.json.return_value = {
-            "Config": {"AdvertiseAddr": "192.168.1.100", "Datacenter": "dc1"}
+            "Config": {"AdvertiseAddr": "192.168.1.100", "Datacenter": "dc1"},
         }
 
         mock_leader_response = MagicMock()
@@ -150,7 +152,8 @@ class TestConsulHealthProvider:
                 return mock_leader_response
             if path == "/v1/agent/services":
                 return mock_services_response
-            raise ValueError(f"Unexpected path: {path}")
+            msg = f"Unexpected path: {path}"
+            raise ValueError(msg)
 
         mock_client._client.get = mock_get
 
@@ -231,7 +234,7 @@ class TestConsulHealthProvider:
         mock_agent_response = MagicMock()
         mock_agent_response.status_code = 200
         mock_agent_response.json.return_value = {
-            "Config": {"AdvertiseAddr": "192.168.1.100", "Datacenter": "dc1"}
+            "Config": {"AdvertiseAddr": "192.168.1.100", "Datacenter": "dc1"},
         }
 
         mock_leader_response = MagicMock()
@@ -252,7 +255,8 @@ class TestConsulHealthProvider:
                 return mock_leader_response
             if path == "/v1/agent/services":
                 return mock_services_response
-            raise ValueError(f"Unexpected path: {path}")
+            msg = f"Unexpected path: {path}"
+            raise ValueError(msg)
 
         mock_client._client.get = mock_get
 
@@ -275,7 +279,7 @@ class TestConsulHealthProvider:
         mock_agent_response = MagicMock()
         mock_agent_response.status_code = 200
         mock_agent_response.json.return_value = {
-            "Config": {"AdvertiseAddr": "192.168.1.100", "Datacenter": "dc1"}
+            "Config": {"AdvertiseAddr": "192.168.1.100", "Datacenter": "dc1"},
         }
 
         mock_leader_response = MagicMock()
@@ -296,7 +300,8 @@ class TestConsulHealthProvider:
                 return mock_leader_response
             if path == "/v1/agent/services":
                 return mock_services_response
-            raise ValueError(f"Unexpected path: {path}")
+            msg = f"Unexpected path: {path}"
+            raise ValueError(msg)
 
         mock_client._client.get = mock_get
 
@@ -331,7 +336,7 @@ class TestConsulHealthProvider:
         mock_agent_response = MagicMock()
         mock_agent_response.status_code = 200
         mock_agent_response.json.return_value = {
-            "Config": {"AdvertiseAddr": "192.168.1.100", "Datacenter": "dc1"}
+            "Config": {"AdvertiseAddr": "192.168.1.100", "Datacenter": "dc1"},
         }
 
         # Leader check fails
@@ -344,7 +349,8 @@ class TestConsulHealthProvider:
             if path == "/v1/agent/services":
                 msg = "Services endpoint error"
                 raise httpx.HTTPError(msg)
-            raise ValueError(f"Unexpected path: {path}")
+            msg = f"Unexpected path: {path}"
+            raise ValueError(msg)
 
         mock_client._client.get = mock_get
 
@@ -394,7 +400,7 @@ class TestConsulHealthProvider:
             response.status_code = 200
             if path == "/v1/agent/self":
                 response.json.return_value = {
-                    "Config": {"AdvertiseAddr": "192.168.1.100", "Datacenter": "dc1"}
+                    "Config": {"AdvertiseAddr": "192.168.1.100", "Datacenter": "dc1"},
                 }
             elif path == "/v1/status/leader":
                 response.text = '"192.168.1.100:8300"'

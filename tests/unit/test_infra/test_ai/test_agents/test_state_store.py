@@ -424,7 +424,7 @@ class TestScopedStateStore:
 
     @pytest.mark.anyio
     async def test_uses_default_ttl(
-        self, store: InMemoryStateStore, scoped: ScopedStateStore
+        self, store: InMemoryStateStore, scoped: ScopedStateStore,
     ) -> None:
         """Test that default TTL is used."""
         await scoped.set("key", "value")
@@ -440,7 +440,7 @@ class TestScopedStateStore:
 
     @pytest.mark.anyio
     async def test_custom_ttl_overrides_default(
-        self, store: InMemoryStateStore, scoped: ScopedStateStore
+        self, store: InMemoryStateStore, scoped: ScopedStateStore,
     ) -> None:
         """Test custom TTL overrides default."""
         await scoped.set("key", "value", ttl_seconds=60)

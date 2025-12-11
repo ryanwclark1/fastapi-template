@@ -138,7 +138,7 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_extracts_client_ip_from_forwarded_for(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware extracts IP from X-Forwarded-For header."""
         with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
@@ -154,7 +154,7 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_extracts_client_ip_from_real_ip(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware extracts IP from X-Real-IP header."""
         with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
@@ -170,7 +170,7 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_masks_sensitive_headers(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware masks sensitive headers."""
         with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
@@ -196,7 +196,7 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_logs_request_body_when_enabled(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware logs request body when enabled."""
         with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
@@ -215,7 +215,7 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_does_not_log_body_when_disabled(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware doesn't log body when disabled."""
         with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
@@ -231,12 +231,12 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_detects_security_events(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware detects security events when enabled."""
         with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
             app.add_middleware(
-                RequestLoggingMiddleware, log_request_body=True, detect_security_events=True
+                RequestLoggingMiddleware, log_request_body=True, detect_security_events=True,
             )
 
             # SQL injection attempt
@@ -288,7 +288,7 @@ class TestRequestLoggingMiddleware:
             app.add_middleware(RequestLoggingMiddleware)
 
             async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
+                transport=ASGITransport(app=app), base_url="http://test",
             ) as client:
                 with contextlib.suppress(Exception):
                     await client.get("/error")
@@ -315,7 +315,7 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_respects_max_body_size(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware respects max body size limit."""
         with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
@@ -333,7 +333,7 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_handles_malformed_json_body(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware handles malformed JSON gracefully."""
         app.add_middleware(RequestLoggingMiddleware, log_request_body=True)
@@ -349,7 +349,7 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_logs_response_body_when_enabled(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware logs response body when enabled."""
         with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
@@ -363,7 +363,7 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_handles_empty_request_body(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware handles empty request body."""
         app.add_middleware(RequestLoggingMiddleware, log_request_body=True)
@@ -373,13 +373,13 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_handles_non_json_body(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware handles non-JSON body."""
         app.add_middleware(RequestLoggingMiddleware, log_request_body=True)
 
         response = await client.post(
-            "/test", content=b"plain text", headers={"Content-Type": "text/plain"}
+            "/test", content=b"plain text", headers={"Content-Type": "text/plain"},
         )
         # Should handle gracefully
         assert response.status_code in [200, 400, 422]
@@ -389,7 +389,7 @@ class TestRequestLoggingMiddleware:
         """Test that middleware detects XSS attempts."""
         with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
             app.add_middleware(
-                RequestLoggingMiddleware, log_request_body=True, detect_security_events=True
+                RequestLoggingMiddleware, log_request_body=True, detect_security_events=True,
             )
 
             await client.get("/test?q=<script>alert('xss')</script>")
@@ -403,12 +403,12 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_detects_path_traversal(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware detects path traversal attempts."""
         with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
             app.add_middleware(
-                RequestLoggingMiddleware, log_request_body=True, detect_security_events=True
+                RequestLoggingMiddleware, log_request_body=True, detect_security_events=True,
             )
 
             await client.get("/test?file=../../../etc/passwd")
@@ -422,7 +422,7 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_handles_custom_exempt_paths(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware respects custom exempt paths."""
         app.add_middleware(RequestLoggingMiddleware, exempt_paths=["/test"], log_request_body=True)
@@ -432,7 +432,7 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_logs_custom_sensitive_fields(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware masks custom sensitive fields."""
         with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
@@ -454,7 +454,7 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_handles_streaming_response(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware handles streaming responses."""
         from fastapi.responses import StreamingResponse
@@ -525,7 +525,7 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_handles_missing_client_info(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware handles missing client information."""
         app.add_middleware(RequestLoggingMiddleware)
@@ -593,7 +593,7 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_handles_exception_during_request(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware handles exceptions during request processing."""
 
@@ -604,16 +604,14 @@ class TestRequestLoggingMiddleware:
 
         app.add_middleware(RequestLoggingMiddleware)
 
-        try:
+        with contextlib.suppress(Exception):
             await client.get("/error")
-        except Exception:
-            pass
 
         # Middleware should still log the request attempt
 
     @pytest.mark.asyncio
     async def test_middleware_logs_request_with_body(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware logs request body when enabled."""
         with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
@@ -627,7 +625,7 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_logs_response_with_body(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware logs response body when enabled."""
         with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
@@ -641,7 +639,7 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_respects_max_body_size(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware respects max_body_size limit."""
         large_body = {"data": "x" * 20000}  # 20KB body
@@ -658,18 +656,17 @@ class TestRequestLoggingMiddleware:
     @pytest.mark.asyncio
     async def test_middleware_exempts_health_paths(self, app: FastAPI, client: AsyncClient) -> None:
         """Test that middleware exempts health check paths from detailed logging."""
-        with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
+        with patch("example_service.app.middleware.request_logging.logger"):
             app.add_middleware(RequestLoggingMiddleware)
 
             await client.get("/health")
 
             # Health checks may have minimal logging
-            calls = mock_logger.log.call_args_list
             # Should still log but maybe with less detail
 
     @pytest.mark.asyncio
     async def test_middleware_detects_security_events(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware detects security events when enabled."""
         with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
@@ -684,7 +681,7 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_handles_malformed_json_body(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware handles malformed JSON in request body."""
         app.add_middleware(RequestLoggingMiddleware, log_request_body=True)
@@ -766,7 +763,7 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_handles_streaming_response(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware handles streaming responses."""
         from fastapi.responses import StreamingResponse
@@ -857,7 +854,7 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_handles_missing_content_type(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware handles requests without Content-Type header."""
         app.add_middleware(RequestLoggingMiddleware, log_request_body=True)
@@ -869,7 +866,7 @@ class TestRequestLoggingMiddleware:
 
     @pytest.mark.asyncio
     async def test_middleware_logs_different_log_levels(
-        self, app: FastAPI, client: AsyncClient
+        self, app: FastAPI, client: AsyncClient,
     ) -> None:
         """Test that middleware uses configured log level."""
         import logging

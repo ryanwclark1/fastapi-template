@@ -38,11 +38,21 @@ Architecture:
 from __future__ import annotations
 
 from decimal import Decimal
+from importlib import import_module
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from example_service.core.settings.ai import AISettings
+
+from example_service.infra.ai.instrumented_orchestrator import (
+    InstrumentedOrchestrator,
+    get_instrumented_orchestrator,
+)
+from example_service.infra.ai.pipelines import (
+    get_pipeline,
+    list_pipelines,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -261,17 +271,6 @@ def is_ai_initialized() -> bool:
     return _initialized
 
 
-# Re-export key components for convenience
-# These imports are at the bottom to avoid circular import issues
-from example_service.infra.ai.instrumented_orchestrator import (  # noqa: E402
-    InstrumentedOrchestrator,
-    get_instrumented_orchestrator,
-)
-from example_service.infra.ai.pipelines import (  # noqa: E402
-    get_pipeline,
-    list_pipelines,
-)
-
 __all__ = [
     # Orchestrator
     "InstrumentedOrchestrator",
@@ -287,5 +286,10 @@ __all__ = [
     "stop_ai_infrastructure",
 ]
 
-# Lazy import for agents subpackage
-from example_service.infra.ai import agents  # noqa: E402
+
+def __getattr__(name: str) -> Any:
+    if name == "agents":
+        module = import_module("example_service.infra.ai.agents")
+        globals()[name] = module
+        return module
+    raise AttributeError(name)

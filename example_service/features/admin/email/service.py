@@ -78,7 +78,7 @@ class EmailAdminService(BaseService):
 
         # Get all active configs
         active_configs = await self._config_repo.list_active_configs(
-            self._session, limit=10000
+            self._session, limit=10000,
         )
 
         # Get all usage logs for the period
@@ -153,7 +153,7 @@ class EmailAdminService(BaseService):
 
         # Get all active configs
         configs = await self._config_repo.list_active_configs(
-            self._session, limit=1000
+            self._session, limit=1000,
         )
 
         health_checks = []
@@ -242,7 +242,7 @@ class EmailAdminService(BaseService):
         """
         if provider:
             configs = await self._config_repo.list_by_provider_type(
-                self._session, provider
+                self._session, provider,
             )
             if active_only:
                 configs = [c for c in configs if c.is_active]
@@ -303,7 +303,7 @@ class EmailAdminService(BaseService):
         distribution = [
             {"provider": provider, "tenant_count": count}
             for provider, count in sorted(
-                provider_counts.items(), key=lambda x: x[1], reverse=True
+                provider_counts.items(), key=lambda x: x[1], reverse=True,
             )
         ]
 

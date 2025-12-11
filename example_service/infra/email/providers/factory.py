@@ -166,13 +166,19 @@ class EmailProviderFactory:
         # Check if provider is registered
         if provider_type not in self._registry:
             if provider_type in self._unavailable:
-                raise ValueError(
+                msg = (
                     f"Provider '{provider_type}' is not available: "
                     f"{self._unavailable[provider_type]}"
                 )
-            raise ValueError(
+                raise ValueError(
+                    msg,
+                )
+            msg = (
                 f"Unknown provider type: {provider_type}. "
                 f"Available: {list(self._registry.keys())}"
+            )
+            raise ValueError(
+                msg,
             )
 
         # Create cache key from config
@@ -281,7 +287,7 @@ class EmailProviderFactory:
 
         if keys_to_remove:
             logger.info(
-                f"Cleared provider cache for tenant {tenant_id} ({len(keys_to_remove)} entries)"
+                f"Cleared provider cache for tenant {tenant_id} ({len(keys_to_remove)} entries)",
             )
         return len(keys_to_remove)
 

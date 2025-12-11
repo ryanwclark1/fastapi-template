@@ -58,7 +58,7 @@ from example_service.app.middleware.tenant import (
     require_tenant,
     set_tenant_context,
 )
-from example_service.core.settings import get_settings
+from example_service.core.settings import Settings, get_settings
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -93,8 +93,13 @@ __all__ = [
 ]
 
 
-def configure_middleware(app: FastAPI) -> None:
+def configure_middleware(app: FastAPI, settings: Settings | None = None) -> None:
     """Configure all middleware for the FastAPI application.
+
+    Args:
+        app: FastAPI application instance to configure.
+        settings: Optional application settings override. When omitted the
+            function loads settings via :func:`get_settings`.
 
     This function centralizes middleware configuration and ensures
     consistent middleware stack across all environments.
@@ -206,10 +211,10 @@ def configure_middleware(app: FastAPI) -> None:
         - Tracing is handled automatically via FastAPIInstrumentor in lifespan
           (see example_service.app.lifespan)
         - N+1 detection requires separate setup via setup_n_plus_one_monitoring()
-        - Settings are loaded internally via get_settings() (cached for performance)
+        - Settings are loaded internally via get_settings() unless provided (cached for performance)
     """
     # Load unified settings (cached via LRU cache)
-    settings = get_settings()
+    settings = settings or get_settings()
     app_settings = settings.app
     log_settings = settings.logging
     otel_settings = settings.otel
@@ -293,7 +298,7 @@ def configure_middleware(app: FastAPI) -> None:
     if otel_settings.is_configured:
         app.add_middleware(MetricsMiddleware)
         logger.info(
-            "MetricsMiddleware enabled with trace correlation and timing header"
+            "MetricsMiddleware enabled with trace correlation and timing header",
         )
 
     # 5. CORS Middleware (development only)
@@ -309,7 +314,7 @@ def configure_middleware(app: FastAPI) -> None:
             max_age=app_settings.cors_max_age,
         )
         logger.info(
-            "CORSMiddleware enabled for development with origins: %s", cors_origins
+            "CORSMiddleware enabled for development with origins: %s", cors_origins,
         )
 
     # 6. Trusted Host Middleware (production only)
@@ -332,7 +337,7 @@ def configure_middleware(app: FastAPI) -> None:
     if app_settings.enable_rate_limiting:
         logger.warning(
             "Rate limiting middleware is disabled. Use per-route dependencies instead. "
-            "See example_service.core.dependencies.ratelimit"
+            "See example_service.core.dependencies.ratelimit",
         )
 
     # 8. Request Logging Middleware (debug only)

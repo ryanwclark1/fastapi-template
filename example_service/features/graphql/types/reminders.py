@@ -18,9 +18,12 @@ import strawberry
 from example_service.features.graphql.types.base import (
     PageInfoType,
 )
+from example_service.utils.runtime_dependencies import require_runtime_dependency
 
 if TYPE_CHECKING:
     from example_service.features.reminders.models import Reminder
+
+require_runtime_dependency(datetime, PageInfoType)
 
 
 @strawberry.enum(description="Error codes for GraphQL mutation errors")

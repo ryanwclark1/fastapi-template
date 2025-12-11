@@ -99,7 +99,7 @@ class SearchableMixin:
     __search_vector_name__: ClassVar[str] = "search_vector"
 
     @declared_attr
-    def search_vector(cls) -> Mapped[Any]:
+    def search_vector(self) -> Mapped[Any]:
         """Search vector column for full-text search.
 
         This column stores the preprocessed tsvector representation
@@ -113,19 +113,19 @@ class SearchableMixin:
         )
 
     @declared_attr  # type: ignore[arg-type]
-    def __table_args__(cls) -> tuple[Any, ...]:
+    def __table_args__(self) -> tuple[Any, ...]:
         """Add GIN index for search vector.
 
         GIN (Generalized Inverted Index) is optimized for TSVECTOR
         columns and provides fast full-text search.
         """
         # Get existing table args if any
-        existing_args = getattr(cls, "__table_args_extra__", ())
+        existing_args = getattr(self, "__table_args_extra__", ())
         if not isinstance(existing_args, tuple):
             existing_args = (existing_args,)
 
         # Get tablename safely
-        tablename = getattr(cls, "__tablename__", None)
+        tablename = getattr(self, "__tablename__", None)
         if tablename is None:
             return existing_args or ()
 
@@ -134,7 +134,7 @@ class SearchableMixin:
         # Add GIN index for search vector
         gin_index = Index(
             f"ix_{tablename}_search_vector",
-            cls.search_vector,
+            self.search_vector,
             postgresql_using="gin",
         )
         indexes.append(gin_index)
@@ -220,7 +220,7 @@ class SearchableMixin:
             config = cls.get_field_config(field)
             weight = cls.get_field_weight(field)
             vector_parts.append(
-                f"setweight(to_tsvector('{config}', coalesce(NEW.{field}, '')), '{weight}')"
+                f"setweight(to_tsvector('{config}', coalesce(NEW.{field}, '')), '{weight}')",
             )
 
         vector_expr = (
@@ -279,7 +279,7 @@ CREATE TRIGGER {table_name}_search_update
             config = cls.get_field_config(field)
             weight = cls.get_field_weight(field)
             vector_parts.append(
-                f"setweight(to_tsvector('{config}', coalesce({field}, '')), '{weight}')"
+                f"setweight(to_tsvector('{config}', coalesce({field}, '')), '{weight}')",
             )
 
         vector_expr = (
@@ -312,7 +312,7 @@ CREATE TRIGGER {table_name}_search_update
             index_name = f"ix_{table_name}_{field}_trgm"
             statements.append(
                 f"CREATE INDEX IF NOT EXISTS {index_name} "
-                f"ON {table_name} USING gin ({field} gin_trgm_ops);"
+                f"ON {table_name} USING gin ({field} gin_trgm_ops);",
             )
         return statements
 
@@ -467,7 +467,7 @@ class MultiLanguageSearchMixin(SearchableMixin):
             lang_cases.append(f"WHEN '{lang_code}' THEN '{config}'")
 
         default_config = cls.__language_configs__.get(
-            cls.__default_language__, cls.__search_config__
+            cls.__default_language__, cls.__search_config__,
         )
         lang_cases.append(f"ELSE '{default_config}'")
 
@@ -480,7 +480,7 @@ class MultiLanguageSearchMixin(SearchableMixin):
         for field in cls.__search_fields__:
             weight = cls.get_field_weight(field)
             vector_parts.append(
-                f"setweight(to_tsvector({lang_case}, coalesce(NEW.{field}, '')), '{weight}')"
+                f"setweight(to_tsvector({lang_case}, coalesce(NEW.{field}, '')), '{weight}')",
             )
 
         vector_expr = (

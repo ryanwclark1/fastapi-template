@@ -35,6 +35,9 @@ from example_service.features.graphql.types.featureflags import (
     FeatureFlagType,
     UpdateFeatureFlagInput,
 )
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(strawberry)
 
 if TYPE_CHECKING:
     from strawberry.types import Info
@@ -319,7 +322,7 @@ async def toggle_feature_flag_mutation(
         await ctx.session.refresh(flag)
 
         logger.info(
-            "Toggled feature flag: %s (%s) -> %s", flag.id, flag.key, flag.enabled
+            "Toggled feature flag: %s (%s) -> %s", flag.id, flag.key, flag.enabled,
         )
 
         # Publish event for real-time subscriptions

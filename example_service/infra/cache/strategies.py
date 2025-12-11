@@ -179,7 +179,7 @@ class CacheManager:
                 return True
             except Exception as e:
                 logger.error(
-                    "Cache delete failed for key %s: %s", key, e, exc_info=True
+                    "Cache delete failed for key %s: %s", key, e, exc_info=True,
                 )
                 return False
 
@@ -335,7 +335,7 @@ class CacheManager:
             try:
                 # Get next write from queue (with timeout)
                 key, value, write_func = await asyncio.wait_for(
-                    self._write_queue.get(), timeout=1.0
+                    self._write_queue.get(), timeout=1.0,
                 )
 
                 try:
@@ -409,7 +409,7 @@ class CacheManager:
                     if 0 < remaining_ttl < (ttl * self.config.refresh_threshold):
                         # Trigger async refresh (fire-and-forget)
                         refresh_task = asyncio.create_task(
-                            self._refresh_cache(key, fetch_func, ttl)
+                            self._refresh_cache(key, fetch_func, ttl),
                         )
                         # Store reference to prevent garbage collection
                         # Task errors are handled within _refresh_cache
@@ -422,7 +422,7 @@ class CacheManager:
 
             except Exception as e:
                 logger.error(
-                    "Refresh-ahead get failed for key %s: %s", key, e, exc_info=True
+                    "Refresh-ahead get failed for key %s: %s", key, e, exc_info=True,
                 )
                 # Fall back to fetch
                 return (
@@ -432,7 +432,7 @@ class CacheManager:
                 )
 
     async def _refresh_cache(
-        self, key: str, fetch_func: Callable[[], Any], ttl: int
+        self, key: str, fetch_func: Callable[[], Any], ttl: int,
     ) -> None:
         """Refresh cache in background.
 
@@ -547,20 +547,20 @@ class CacheManager:
 
             try:
                 # Find matching keys
-                keys = []
-                async for key in cache.scan_iter(match=full_pattern):
-                    keys.append(key)
+                keys = [
+                    key async for key in cache.scan_iter(match=full_pattern)
+                ]
 
                 if keys:
                     await cache.delete(*keys)
                     logger.info(
-                        "Invalidated %s keys matching pattern: %s", len(keys), pattern
+                        "Invalidated %s keys matching pattern: %s", len(keys), pattern,
                     )
 
                 return len(keys)
             except Exception as e:
                 logger.error(
-                    "Pattern invalidation failed for %s: %s", pattern, e, exc_info=True
+                    "Pattern invalidation failed for %s: %s", pattern, e, exc_info=True,
                 )
                 return 0
 
@@ -602,7 +602,7 @@ def cached(
             # ...
     """
     cache_manager = CacheManager(
-        CacheConfig(key_prefix=key_prefix, ttl=ttl, strategy=strategy)
+        CacheConfig(key_prefix=key_prefix, ttl=ttl, strategy=strategy),
     )
 
     def decorator(func: Callable) -> Callable:
@@ -623,10 +623,10 @@ def cached(
             # Use appropriate strategy
             if strategy == CacheStrategy.REFRESH_AHEAD:
                 return await cache_manager.get_with_refresh(
-                    cache_key, lambda: func(*args, **kwargs), ttl
+                    cache_key, lambda: func(*args, **kwargs), ttl,
                 )
             return await cache_manager.get_or_fetch(
-                cache_key, lambda: func(*args, **kwargs), ttl
+                cache_key, lambda: func(*args, **kwargs), ttl,
             )
 
         return wrapper

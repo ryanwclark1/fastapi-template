@@ -82,14 +82,15 @@ class AIConfigManager:
         """
         # Check if transcription is enabled for tenant
         if not await self._is_feature_enabled(tenant_id, "transcription"):
-            raise ValueError(f"Transcription is disabled for tenant {tenant_id}")
+            msg = f"Transcription is disabled for tenant {tenant_id}"
+            raise ValueError(msg)
 
         # Determine which provider to use
         provider_name = provider_override or self.settings.default_transcription_provider
 
         # Try to get tenant-specific config
         tenant_config = await self._get_tenant_config(
-            tenant_id, AIProviderType.TRANSCRIPTION, provider_name
+            tenant_id, AIProviderType.TRANSCRIPTION, provider_name,
         )
 
         if tenant_config:
@@ -120,7 +121,7 @@ class AIConfigManager:
 
         # Try to get tenant-specific config
         tenant_config = await self._get_tenant_config(
-            tenant_id, AIProviderType.LLM, provider_name
+            tenant_id, AIProviderType.LLM, provider_name,
         )
 
         if tenant_config:
@@ -142,7 +143,8 @@ class AIConfigManager:
             ValueError: If PII redaction is disabled
         """
         if not await self._is_feature_enabled(tenant_id, "pii_redaction"):
-            raise ValueError(f"PII redaction is disabled for tenant {tenant_id}")
+            msg = f"PII redaction is disabled for tenant {tenant_id}"
+            raise ValueError(msg)
 
         # Get tenant-specific settings
         features = await self._get_tenant_features(tenant_id)
@@ -232,7 +234,7 @@ class AIConfigManager:
                 TenantAIConfig.tenant_id == tenant_id,
                 TenantAIConfig.provider_type == provider_type,
                 TenantAIConfig.provider_name == provider_name,
-                TenantAIConfig.is_active == True,  # noqa: E712
+                TenantAIConfig.is_active,
             )
             .order_by(TenantAIConfig.created_at.desc())
             .limit(1)

@@ -74,7 +74,7 @@ class DeepgramAdapter(ProviderAdapter):
         model_name: str = "nova-2",
         timeout: int = 120,
         max_retries: int = 3,
-        **kwargs: Any,  # noqa: ARG002
+        **kwargs: Any,
     ) -> None:
         """Initialize Deepgram adapter.
 
@@ -83,6 +83,7 @@ class DeepgramAdapter(ProviderAdapter):
             model_name: Model to use (nova-2, enhanced, base)
             timeout: Request timeout in seconds
             max_retries: Maximum retry attempts
+            **kwargs: Additional adapter-specific options.
         """
         self.api_key = api_key
         self.model_name = model_name
@@ -207,11 +208,11 @@ class DeepgramAdapter(ProviderAdapter):
         """
         if capability == Capability.TRANSCRIPTION:
             return await self._execute_transcription(
-                input_data, speaker_diarization=False, **options
+                input_data, speaker_diarization=False, **options,
             )
         if capability == Capability.TRANSCRIPTION_DIARIZATION:
             return await self._execute_transcription(
-                input_data, speaker_diarization=True, **options
+                input_data, speaker_diarization=True, **options,
             )
         if capability == Capability.TRANSCRIPTION_DUAL_CHANNEL:
             return await self._execute_dual_channel(input_data, **options)

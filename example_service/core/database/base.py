@@ -61,7 +61,7 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
     @declared_attr.directive
-    def __tablename__(cls) -> str:
+    def __tablename__(self) -> str:
         """Auto-derive table name from class name (lowercase).
 
         Examples:
@@ -71,7 +71,7 @@ class Base(DeclarativeBase):
 
         For complex table names, override __tablename__ explicitly.
         """
-        return cls.__name__.lower()
+        return self.__name__.lower()
 
 
 # ============================================================================
@@ -325,6 +325,60 @@ class SoftDeleteMixin:
         return self.deleted_at is not None
 
 
+class UserAuditMixin:
+    """User foreign key audit tracking for create and update operations.
+
+    Similar to AuditColumnsMixin but uses foreign keys to the users table
+    instead of storing email strings. This provides:
+    - Referential integrity enforcement
+    - Ability to join to User model for user details
+    - Proper cascade behavior on user deletion
+
+    Provides:
+        created_by_id: Foreign key to users.id (who created)
+        updated_by_id: Foreign key to users.id (who last modified)
+
+    IMPORTANT: This mixin assumes users.id is INTEGER (from TimestampedBase).
+    If your User model uses UUIDs, create a custom mixin or use AuditColumnsMixin.
+
+    Usage:
+        from sqlalchemy import ForeignKey, Integer
+        from sqlalchemy.orm import relationship
+
+        class Document(Base, UUIDPKMixin, TimestampMixin, UserAuditMixin):
+            __tablename__ = "documents"
+            title: Mapped[str] = mapped_column(String(255))
+
+            # Optional: Add relationships to User model
+            created_by: Mapped[User | None] = relationship(
+                "User", foreign_keys=[created_by_id]
+            )
+            updated_by: Mapped[User | None] = relationship(
+                "User", foreign_keys=[updated_by_id]
+            )
+
+    Note: Set NULL on user deletion to maintain audit trail even if user
+    account is removed.
+    """
+
+    __allow_unmapped__ = True
+
+    from sqlalchemy import ForeignKey, Integer
+
+    created_by_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="User who created this record",
+    )
+    updated_by_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="User who last modified this record",
+    )
+
+
 class TenantMixin:
     """Multi-tenancy support for tenant-scoped data isolation.
 
@@ -403,6 +457,26 @@ class UUIDTimestampedBase(Base, UUIDPKMixin, TimestampMixin):
     __abstract__ = True
 
 
+class UUIDv7TimestampedBase(Base, UUIDv7PKMixin, TimestampMixin):
+    """Convenience base with UUID v7 PK and timestamps.
+
+    UUID v7 provides time-sortable UUIDs, combining benefits of:
+    - Sequential ordering for better B-tree index performance
+    - Global uniqueness for distributed systems
+    - Extractable timestamp information
+    - No ID enumeration vulnerabilities
+
+    Recommended for NEW models as the default choice.
+
+    Example:
+        class Agent(UUIDv7TimestampedBase):
+            __tablename__ = "agents"
+            name: Mapped[str] = mapped_column(String(255))
+    """
+
+    __abstract__ = True
+
+
 class AuditedBase(Base, IntegerPKMixin, TimestampMixin, AuditColumnsMixin):
     """Convenience base with full audit trail.
 
@@ -418,21 +492,35 @@ class AuditedBase(Base, IntegerPKMixin, TimestampMixin, AuditColumnsMixin):
     __abstract__ = True
 
 
+class UUIDAuditedBase(Base, UUIDPKMixin, TimestampMixin, AuditColumnsMixin):
+    """Convenience base with UUID PK and full audit trail.
+
+    Combines UUID v4 primary keys with timestamps and user tracking.
+    Use when you need UUID PKs AND compliance/audit requirements.
+
+    Example:
+        class FinancialRecord(UUIDAuditedBase):
+            __tablename__ = "financial_records"
+            amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+    """
+
+    __abstract__ = True
+
+
 __all__ = [
     "NAMING_CONVENTION",
     "AuditColumnsMixin",
     "AuditedBase",
-    # Core base
     "Base",
-    # Primary key mixins
     "IntegerPKMixin",
     "SoftDeleteMixin",
-    # Multi-tenancy
     "TenantMixin",
-    # Audit mixins
     "TimestampMixin",
-    # Convenience bases
     "TimestampedBase",
+    "UUIDAuditedBase",
     "UUIDPKMixin",
     "UUIDTimestampedBase",
+    "UUIDv7PKMixin",
+    "UUIDv7TimestampedBase",
+    "UserAuditMixin",
 ]

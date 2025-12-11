@@ -35,7 +35,7 @@ class TestMiddlewareOrdering:
 
         with patch("example_service.app.middleware.request_logging.logger") as mock_logger:
             async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
+                transport=ASGITransport(app=app), base_url="http://test",
             ) as client:
                 response = await client.get("/test")
 
@@ -133,8 +133,7 @@ class TestMiddlewareOrdering:
         @app.middleware("http")
         async def slow_middleware(request: Request, call_next):
             await asyncio.sleep(0.1)  # 100ms delay
-            response = await call_next(request)
-            return response
+            return await call_next(request)
 
         @app.get("/test")
         async def test_endpoint():
@@ -289,8 +288,6 @@ class TestMiddlewareOrdering:
         app.add_middleware(ExecutionTracker, name="5_RequestID")
         app.add_middleware(ExecutionTracker, name="4_Security")
         app.add_middleware(ExecutionTracker, name="3_SizeLimit")
-        # app.add_middleware(ExecutionTracker, name="2_RateLimit")  # Optional
-        # app.add_middleware(ExecutionTracker, name="1_CORS")  # Would be outermost
 
         @app.get("/test")
         async def test_endpoint():

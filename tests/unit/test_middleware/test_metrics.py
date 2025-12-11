@@ -65,7 +65,7 @@ async def test_metrics_middleware_records_metrics(monkeypatch: pytest.MonkeyPatc
             "client": ("127.0.0.1", 1234),
             "server": ("test", 80),
             "scheme": "http",
-        }
+        },
     )
     request.scope["route"] = types.SimpleNamespace(path="/api/items/{id}")
 

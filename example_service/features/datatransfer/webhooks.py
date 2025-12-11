@@ -217,13 +217,12 @@ async def notify_streaming_export_complete(
     event_id = f"export-stream-{export_id}"
 
     try:
-        count = await dispatch_event(
+        return await dispatch_event(
             session=session,
             event_type=event_type,
             event_id=event_id,
             payload=payload,
         )
-        return count
     except Exception as e:
         logger.warning(
             "Failed to dispatch streaming export webhook notification",

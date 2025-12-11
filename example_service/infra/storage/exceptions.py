@@ -431,7 +431,7 @@ def map_boto_error(
 
     # Extract bucket from error response if available
     if "BucketName" in error.response.get("Error", {}):
-        metadata["bucket"] = error.response["Error"]["BucketName"]
+        metadata["bucket"] = error.response["Error"]["BucketName"]  # type: ignore[typeddict-item]
 
     # Map AWS error codes to domain exceptions
     # Not Found Errors (404)

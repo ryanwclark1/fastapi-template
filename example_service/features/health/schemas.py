@@ -12,6 +12,9 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from example_service.core.schemas.common import HealthStatus
+from example_service.utils.runtime_dependencies import require_runtime_dependency
+
+require_runtime_dependency(datetime, HealthStatus)
 
 
 class StatusResponse(BaseModel):
@@ -34,7 +37,7 @@ class StatusResponse(BaseModel):
         json_schema_extra={
             "example": {
                 "status": "ok",
-            }
+            },
         },
     )
 
@@ -66,7 +69,7 @@ class HealthResponse(BaseModel):
     service: str = Field(min_length=1, max_length=100, description="Service name")
     version: str = Field(min_length=1, max_length=50, description="Service version")
     checks: dict[str, bool] = Field(
-        default_factory=dict, description="Individual dependency health checks"
+        default_factory=dict, description="Individual dependency health checks",
     )
 
     model_config = ConfigDict(
@@ -77,7 +80,7 @@ class HealthResponse(BaseModel):
                 "service": "example-service",
                 "version": "0.1.0",
                 "checks": {"database": True, "cache": True, "messaging": True},
-            }
+            },
         },
         str_strip_whitespace=True,
     )
@@ -98,8 +101,8 @@ class ComponentHealthDetail(BaseModel):
                 "status": "healthy",
                 "message": "Database operational",
                 "latency_ms": 5.23,
-            }
-        }
+            },
+        },
     )
 
 
@@ -137,7 +140,7 @@ class DetailedHealthResponse(BaseModel):
     duration_ms: float = Field(description="Total check duration in milliseconds")
     from_cache: bool = Field(default=False, description="Whether result was served from cache")
     checks: dict[str, Any] = Field(
-        default_factory=dict, description="Detailed per-component health info"
+        default_factory=dict, description="Detailed per-component health info",
     )
 
     model_config = ConfigDict(
@@ -163,7 +166,7 @@ class DetailedHealthResponse(BaseModel):
                         "latency_ms": 2.1,
                     },
                 },
-            }
+            },
         },
         str_strip_whitespace=True,
     )
@@ -189,7 +192,7 @@ class ReadinessResponse(BaseModel):
 
     ready: bool = Field(description="Overall readiness status")
     checks: dict[str, bool] = Field(
-        default_factory=dict, description="Individual dependency checks"
+        default_factory=dict, description="Individual dependency checks",
     )
     timestamp: datetime = Field(description="Check timestamp")
 
@@ -199,7 +202,7 @@ class ReadinessResponse(BaseModel):
                 "ready": True,
                 "checks": {"database": True},
                 "timestamp": "2025-01-01T00:00:00Z",
-            }
+            },
         },
     )
 
@@ -230,7 +233,7 @@ class LivenessResponse(BaseModel):
                 "alive": True,
                 "timestamp": "2025-01-01T00:00:00Z",
                 "service": "example-service",
-            }
+            },
         },
         str_strip_whitespace=True,
     )
@@ -259,7 +262,7 @@ class StartupResponse(BaseModel):
             "example": {
                 "started": True,
                 "timestamp": "2025-01-01T00:00:00Z",
-            }
+            },
         },
     )
 
@@ -299,8 +302,8 @@ class HealthHistoryEntry(BaseModel):
                 "status": "healthy",
                 "duration_ms": 15.2,
                 "checks": {"database": "healthy", "cache": "healthy"},
-            }
-        }
+            },
+        },
     )
 
 
@@ -355,8 +358,8 @@ class HealthHistoryResponse(BaseModel):
                 ],
                 "total_entries": 2,
                 "provider_filter": None,
-            }
-        }
+            },
+        },
     )
 
 
@@ -377,8 +380,8 @@ class ProviderStatsDetail(BaseModel):
                 "degraded_count": 3,
                 "unhealthy_count": 2,
                 "uptime_percentage": 98.0,
-            }
-        }
+            },
+        },
     )
 
 
@@ -418,10 +421,10 @@ class HealthStatsResponse(BaseModel):
     avg_duration_ms: float = Field(description="Average check duration in milliseconds")
     current_status: str | None = Field(default=None, description="Current health status")
     last_status_change: datetime | None = Field(
-        default=None, description="When status last changed"
+        default=None, description="When status last changed",
     )
     provider_stats: dict[str, ProviderStatsDetail] = Field(
-        default_factory=dict, description="Per-provider statistics"
+        default_factory=dict, description="Per-provider statistics",
     )
 
     model_config = ConfigDict(
@@ -451,7 +454,7 @@ class HealthStatsResponse(BaseModel):
                         "uptime_percentage": 98.0,
                     },
                 },
-            }
+            },
         },
     )
 
@@ -484,8 +487,8 @@ class CacheInfoResponse(BaseModel):
                 "is_valid": True,
                 "age_seconds": 5.2,
                 "has_cached_result": True,
-            }
-        }
+            },
+        },
     )
 
 
@@ -509,8 +512,8 @@ class ProvidersResponse(BaseModel):
             "example": {
                 "providers": ["database", "cache", "messaging"],
                 "count": 3,
-            }
-        }
+            },
+        },
     )
 
 
@@ -530,8 +533,8 @@ class ProtectionDetail(BaseModel):
                     "protection_status": "active",
                     "consecutive_failures": 0,
                 },
-            }
-        }
+            },
+        },
     )
 
 
@@ -563,7 +566,7 @@ class ProtectionHealthResponse(BaseModel):
     status: HealthStatus = Field(description="Overall protection status")
     timestamp: datetime = Field(description="Check timestamp")
     protections: dict[str, ProtectionDetail] = Field(
-        default_factory=dict, description="Individual protection mechanism statuses"
+        default_factory=dict, description="Individual protection mechanism statuses",
     )
 
     model_config = ConfigDict(
@@ -579,9 +582,9 @@ class ProtectionHealthResponse(BaseModel):
                             "protection_status": "active",
                             "consecutive_failures": 0,
                         },
-                    }
+                    },
                 },
-            }
+            },
         },
     )
 

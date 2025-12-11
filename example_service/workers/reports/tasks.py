@@ -13,11 +13,14 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime
 import logging
+from pathlib import Path
+from tempfile import gettempdir
 from typing import Any
 
 from example_service.infra.tasks.broker import broker
 
 logger = logging.getLogger(__name__)
+REPORT_OUTPUT_DIR = Path(gettempdir()) / "example_service_reports"
 
 
 # =============================================================================
@@ -130,11 +133,12 @@ if broker is not None:
         report_filename = (
             f"report_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}.{output_format}"
         )
-        report_path = f"/tmp/reports/{report_filename}"  # noqa: S108
+        REPORT_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        report_path = REPORT_OUTPUT_DIR / report_filename
 
         # Simulate file generation
         formatted_report = {
-            "file_path": report_path,
+            "file_path": str(report_path),
             "filename": report_filename,
             "format": output_format,
             "size_bytes": 1024 * 150,  # 150 KB
@@ -190,14 +194,14 @@ if broker is not None:
         # Simulate report delivery
         await asyncio.sleep(0.5)  # Simulate email/upload time
 
-        delivery_results = []
-        for recipient in recipients:
-            # In production: send email with attachment, upload to S3, etc.
-            delivery_results.append({
+        delivery_results = [
+            {
                 "recipient": recipient,
                 "status": "delivered",
                 "delivered_at": datetime.now(UTC).isoformat(),
-            })
+            }
+            for recipient in recipients
+        ]
 
         result = {
             "status": "success",
@@ -318,7 +322,8 @@ if broker is not None:
                 }
                 data = step1_result.return_value
             else:
-                raise Exception(f"Data collection failed: {step1_result.error}")
+                msg = f"Data collection failed: {step1_result.error}"
+                raise Exception(msg)
 
             # Step 2: Format report
             logger.info("Step 2: Formatting report")
@@ -337,7 +342,8 @@ if broker is not None:
                 }
                 report = step2_result.return_value
             else:
-                raise Exception(f"Report formatting failed: {step2_result.error}")
+                msg = f"Report formatting failed: {step2_result.error}"
+                raise Exception(msg)
 
             # Step 3: Deliver report
             logger.info("Step 3: Delivering report")
@@ -357,7 +363,8 @@ if broker is not None:
                 }
                 delivery = step3_result.return_value
             else:
-                raise Exception(f"Report delivery failed: {step3_result.error}")
+                msg = f"Report delivery failed: {step3_result.error}"
+                raise Exception(msg)
 
             # Workflow completed successfully
             workflow_result["status"] = "completed"

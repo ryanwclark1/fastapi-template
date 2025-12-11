@@ -2,19 +2,24 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from pathlib import Path
 import shutil
 import subprocess
 import time
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import pytest
 
 pytest.importorskip(
-    "testcontainers.core.container", reason="testcontainers is required for container smoke tests"
+    "testcontainers.core.container", reason="testcontainers is required for container smoke tests",
 )
 from testcontainers.core.container import DockerContainer
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+else:  # pragma: no cover - runtime placeholder for typing-only imports
+    Iterator = Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 IMAGE_TAG = "example-service-integration-test"

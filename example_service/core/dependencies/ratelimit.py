@@ -105,7 +105,7 @@ def rate_limit(
 
         # Check rate limit
         metadata = await check_rate_limit(
-            limiter, key, limit, window, endpoint=request.url.path
+            limiter, key, limit, window, endpoint=request.url.path,
         )
 
         # Store metadata in request state for access in route handler

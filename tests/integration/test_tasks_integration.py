@@ -70,7 +70,7 @@ async def test_search_tasks_integration(tasks_client: AsyncClient):
                 "started_at": "2024-01-01T00:00:00Z",
                 "finished_at": "2024-01-01T00:02:00Z",
                 "duration_ms": 120000,
-            }
+            },
         ],
         1,
     )
@@ -154,7 +154,7 @@ async def test_scheduled_jobs_serialization(tasks_client: AsyncClient):
             "is_paused": False,
             "misfire_grace_time": 5,
             "max_instances": 1,
-        }
+        },
     ]
 
     resp = await tasks_client.get("/api/v1/tasks/scheduled")

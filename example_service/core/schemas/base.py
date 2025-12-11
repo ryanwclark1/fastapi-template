@@ -127,7 +127,7 @@ class PaginatedResponse[T](BaseModel):
 
     @classmethod
     def create(
-        cls, items: list[T], total: int, page: int, page_size: int
+        cls, items: list[T], total: int, page: int, page_size: int,
     ) -> PaginatedResponse[T]:
         """Create paginated response with calculated total pages.
 

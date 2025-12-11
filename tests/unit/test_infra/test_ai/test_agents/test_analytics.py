@@ -292,7 +292,7 @@ class TestAgentAnalytics:
 
     @pytest.mark.anyio
     async def test_get_usage_metrics_with_agent_filter(
-        self, mock_session: AsyncMock
+        self, mock_session: AsyncMock,
     ) -> None:
         """Test getting metrics filtered by agent type."""
         mock_result = MagicMock()
@@ -406,7 +406,7 @@ class TestAgentAnalytics:
         assert analysis.wasted_cost == Decimal("50.0")
 
     def test_generate_recommendations_high_error_rate(
-        self, mock_session: AsyncMock
+        self, mock_session: AsyncMock,
     ) -> None:
         """Test recommendations for high error rate."""
         now = datetime.now(UTC)
@@ -436,7 +436,7 @@ class TestAgentAnalytics:
         assert any("error rate" in r.lower() for r in recommendations)
 
     def test_generate_recommendations_high_wasted_cost(
-        self, mock_session: AsyncMock
+        self, mock_session: AsyncMock,
     ) -> None:
         """Test recommendations for high wasted cost."""
         now = datetime.now(UTC)
